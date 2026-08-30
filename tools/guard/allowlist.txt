@@ -1,0 +1,77 @@
+# sin-e-phile — permitted content and metadata source domains
+# SPEC.md §12.5 · ADR-0010
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# READ THIS BEFORE ADDING A LINE.
+#
+# This file is the exhaustive half of the posture guard. The denylist is
+# best-effort by construction (ADR-0009); this list is complete. Any
+# source-shaped domain in the repository that is not here, not an RFC 2606
+# reserved domain, and not recognised development infrastructure is a finding.
+#
+# Which means: a one-line change to this file can silently reverse SPEC.md §2.1,
+# and it will look innocuous in a diff. That is why:
+#
+#   ADDING A LINE REQUIRES AN ADR.
+#
+# The ADR must state what the source is, why it is unambiguously legal, and
+# whether it ships enabled or requires the user to opt in. The cost of adding
+# to this file IS the mechanism that protects it. Phase 27's §2.1 re-verification
+# reads this file line by line.
+#
+# Scope: content and metadata SOURCES only. Development infrastructure
+# (crates.io, npmjs.com, github.com, docs.rs …) is out of scope and is handled
+# by INFRASTRUCTURE_DOMAINS in guard.py.
+#
+# Matching is by suffix, so an entry covers its subdomains:
+# `archive.org` also permits `ia801234.us.archive.org`.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Internet Archive — public-domain collection. SPEC.md §2.1 names this as a
+# shipped reference backend; it is the legal source Phase 6 and Phase 8 demo against.
+archive.org
+
+# TMDB — artwork, rich detail, cast headshots. SPEC.md §14. Free non-commercial
+# API key, OPTIONAL (ADR-0013): the app is fully functional without it.
+themoviedb.org
+tmdb.org
+
+# AniList — anime metadata, relations, absolute/seasonal episode numbering.
+# SPEC.md §14. Public GraphQL, no key required.
+anilist.co
+
+# Jikan — MyAnimeList mirror, supplementary anime data. SPEC.md §14.
+# Public REST, no key, rate-limited. Optional fallback.
+jikan.moe
+
+# OpenSubtitles — hash-matched subtitles, step 3 of the Phase 10 priority chain.
+# SPEC.md §14. Free account, heavily rate-limited; quota is budgeted and cached.
+opensubtitles.com
+
+# Fanart.tv — logos, clearart, backgrounds. SPEC.md §14. Free personal key, optional.
+fanart.tv
+
+# Trakt — watch history sync and scrobbling. SPEC.md §14, Phase 19. Free API key.
+trakt.tv
+
+# MovieLens / GroupLens — item-item collaborative filtering signal for Phase 16.
+# SPEC.md §14. Free dataset download, no account.
+grouplens.org
+movielens.org
+
+# IMDb datasets — offline title, rating and crew index; the base catalogue that
+# makes the app work with no API key at all (ADR-0013). SPEC.md §14.
+# Free download, no account, non-commercial use.
+imdbws.com
+imdb.com
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NOT ON THIS LIST, DELIBERATELY:
+#
+#   iptv-org — Phase 24 treats this as a URL the user pastes like any other.
+#              Bundling it would make it a shipped default, which §2.1 forbids.
+#
+#   Pluto TV, Samsung TV Plus, Plex FAST — permitted additions WHEN Phase 24 is
+#              built (ADR-0010), each with its own justification line and ADR.
+#              Not added in advance; this file describes what ships today.
+# ─────────────────────────────────────────────────────────────────────────────

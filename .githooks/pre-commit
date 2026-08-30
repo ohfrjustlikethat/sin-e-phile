@@ -1,0 +1,26 @@
+#!/bin/sh
+# sin-e-phile pre-commit hook — SPEC.md §12.5, §12.6, ADR-0012.
+#
+# Scans STAGED content only. History scanning is CI's job: a hook whose cost
+# grows with repository age is a hook that eventually gets bypassed.
+#
+# Activated by `git config core.hooksPath .githooks`, which tools/doctor does.
+
+set -e
+
+PY="${PYTHON:-python}"
+command -v "$PY" >/dev/null 2>&1 || PY=python3
+
+if ! command -v "$PY" >/dev/null 2>&1; then
+    echo "pre-commit: Python not found — cannot run the posture guard." >&2
+    echo "            Run tools/doctor/doctor.py, or install Python 3.12+." >&2
+    exit 1
+fi
+
+"$PY" tools/guard/guard.py --staged || exit 1
+
+if command -v gitleaks >/dev/null 2>&1; then
+    gitleaks protect --staged --redact --no-banner || exit 1
+else
+    "$PY" tools/guard/secretscan.py --staged || exit 1
+fi

@@ -1,0 +1,26 @@
+# sin-e-phile - hashed posture denylist
+# SPEC.md 12.5 - ADR-0009
+#
+# Each line: SHA-256(salt || normalised_token) in hex, then a justification.
+# PLAINTEXT TOKENS ARE NEVER WRITTEN HERE - doing so would itself violate 2.1.
+#
+# Add an entry with:
+#     python tools/guard/add_token.py "why this token is denylisted"
+# It reads the token from stdin without echoing it and appends only the hash.
+#
+# HYGIENE, NOT SECURITY. The salt beside this file is committed, so these
+# hashes are brute-forceable by anyone determined. The threat model is
+# accidental plaintext and casual discovery, not a motivated adversary.
+# Do not describe this mechanism as anything stronger than that.
+#
+# Cost of the design: exact-token matching only. No substring, fuzzy or
+# homoglyph matching, because those need the plaintext this file does not hold.
+# The structural patterns in guard.py cover the shapes that carry real risk.
+#
+# CURRENTLY EMPTY, AND THAT IS CORRECT. The project ships no content sources
+# (2.1), so there is no real token to deny yet. The self-test does NOT seed
+# this file - it builds its own denylist in memory from RFC 2606 reserved
+# vectors at test time, so that documentation mentioning those vectors does
+# not trip the guard. An empty denylist is not an unverified one:
+#     python tools/guard/guard.py --selftest
+
