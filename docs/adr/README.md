@@ -8,6 +8,10 @@ exist, any performance trade-off, and any deviation from `SPEC.md`.
 Format: Context / Decision / Consequences / Alternatives Considered. See
 [0001](0001-record-architecture-decisions.md).
 
+**Terse from ADR-0016 onward** — bullets, roughly 15 lines. ADRs are mandatory and
+are not what gets cut; length is. The Alternatives section is the one that must
+never be empty: if nothing was genuinely rejected, there was no decision.
+
 ## Index
 
 | # | Title | Status | Date |
@@ -27,6 +31,10 @@ Format: Context / Decision / Consequences / Alternatives Considered. See
 | [0013](0013-tmdb-optional-offline-first-catalogue.md) | TMDB is optional; the catalogue is offline-first | Accepted | 2026-08-30 |
 | [0014](0014-embedding-artefact-distribution.md) | Embedding artefacts ship via GitHub Releases | Accepted | 2026-08-30 |
 | [0015](0015-tier-0-query-embedding.md) | Tier 0 embeds queries but never documents | Accepted | 2026-08-30 |
+| [0016](0016-lean-documentation-and-session-profile.md) | Lean documentation and session profile | Accepted | 2026-08-31 |
+| [0017](0017-dual-license-extracted-crates.md) | Dual-license the extracted crates; no FFmpeg in subtitle-align | Accepted | 2026-08-31 |
+| [0018](0018-tmdb-embedding-text-and-swappable-source.md) | TMDB text in embeddings is inference; text source is swappable | Accepted | 2026-08-31 |
+| [0019](0019-movielens-matrix-computed-on-device.md) | Compute the MovieLens item-item matrix on the user's machine | Accepted | 2026-08-31 |
 
 **0002–0008 record decisions that were already locked in `SPEC.md` §5 before this
 repository existed.** They were written in session 0b, after 0009–0015, which is why

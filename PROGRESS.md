@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 1.1.0** · 2 session(s) completed · last updated 2026-08-31
+**Spec version 1.2.0** · 2 session(s) completed · last updated 2026-08-31
 
 ---
 
@@ -12,11 +12,11 @@
 
 **Phase 0 — Bootstrap and Project Infrastructure** (`in_progress`, branch `phase/00-bootstrap`)
 
-6 of 8 exit criteria met with evidence.
+7 of 8 exit criteria met with evidence.
 
-> Split into 0a (safety rails) and 0b (documents and state) by the author, on the basis that Phase 0 as specified is honestly ~2 sessions of writing. Both are now done. The phase is NOT complete: E1 needs a clean-machine check only the author can perform, and E2's second half needs the merge to main, which is gated on the understanding-gate questions in docs/learning/phase-00-notes.md (SPEC.md 10.10).
+> Split into 0a (rails), 0b (documents) and 0c (lean-profile amendments, rulings on the open items, and E1). spec_version 1.2.0 shifts the project to the lean documentation profile of ADR-0016: shipping is the priority, learning is deferred.
 
-### Subtasks — 15/16 complete
+### Subtasks — 15/17 complete
 
 - [x] **0.1** git init, .gitignore, .env.example, phase branch, public GitHub repo, secret scanning + push protection · `bb6222a`
 - [x] **0.2** Directory skeleton per SPEC.md §7 including the amended additions · `bb6222a`
@@ -34,10 +34,12 @@
 - [x] **0.14** docs/RISKS.md (R1–R10 with concrete triggers), docs/DECISIONS_PENDING.md · `66fd304`
 - [x] **0.15** Seed ADRs 0002–0008 (numbers reserved in docs/adr/README.md) · `66fd304`
 - [~] **0.16** docs/learning/phase-00-notes.md written; the five self-check questions must now be ASKED IN CHAT and answered before Phase 0 is done (SPEC.md 10.10)
+- [~] **0.17** Lean-profile amendments (ADR-0016), rulings P2/P3/P4 (ADR-0017/0018/0019), E1 fresh-clone CI job, docs/eval-results.md
 
 ### Exit criteria
 
-- [ ] **E1** `git clone` on a clean machine + following `docs/SETUP.md` produces a working dev environment.
+- [x] **E1** `git clone` on a clean machine + following `docs/SETUP.md` produces a working dev environment.
+      - *Evidence:* CI job 'Fresh clone builds (E1)' in .github/workflows/ci.yml: clones the branch fresh on a clean windows-latest runner with no local state, runs tools/doctor/doctor.py (must exit 0), asserts doctor bootstrapped core.hooksPath, builds per docs/SETUP.md, and re-runs the guard selftest and tree scan. LIMITATION, stated honestly: windows-latest ships Rust, Node, MSVC and the Windows SDK preinstalled, so this proves a clean CHECKOUT builds and that doctor runs green - it does NOT prove SETUP.md's install instructions are complete for a bare machine. A Windows Sandbox pass on a bare image is outstanding as P6. Chosen over a one-time manual check because it is repeatable and catches SETUP.md rotting later.
 - [ ] **E2** CI passes on `phase/00-bootstrap`, and again on `main` after the merge. (§10.5 puts all phase work on a branch, so "green on `main`" can only be verified post-merge; both are required.)
 - [x] **E3** `PROJECT_STATE.json` validates against its schema and enumerates all 28 phases with their exit criteria.
       - *Evidence:* python tools/state/validate_state.py --check -> 'PROJECT_STATE.json valid - 28 phases, 154 exit criteria'. The phase table is GENERATED from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the spec; build_state.py --check enforces that in CI. Schema at docs/schemas/project-state.schema.json. Verified to reject bad input: three planted violations (met-with-null-evidence, evidence 'looks good', and the spec's own anti-example next_action 'continue the torrent engine') produced 5 errors, exit 1.
@@ -62,7 +64,7 @@ Phase 0 is not done. Two things remain, in this order. (1) ASK THE AUTHOR the fi
 
 ## Blockers
 
-- **B1** **(needs you)** Exit criterion E1 (clone on a clean machine plus docs/SETUP.md produces a working dev environment) cannot be evidenced from the development machine, which already has every prerequisite installed. It needs the author to clone onto a second machine or a clean VM and follow docs/SETUP.md. Until then E1 stays not met, per SPEC.md 10.8: if evidence cannot be produced, the criterion is not met and we say what is blocking it.
+None.
 
 ---
 
@@ -72,7 +74,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 
 | | # | Phase | Tier | Depends on | Sessions | Criteria met |
 |---|---|---|---|---|---|---|
-| [~] | 0 | Bootstrap and Project Infrastructure | A | nothing | 1 | 6/8 |
+| [~] | 0 | Bootstrap and Project Infrastructure | A | nothing | 1 | 7/8 |
 | [ ] | 1 | Application Shell and Capability Tiers | A | 0 | 1–2 | 0/7 |
 | [ ] | 2 | Design System and Visual Language | A | 1 | 1–2 | 0/5 |
 | [ ] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 0/5 |
@@ -117,7 +119,5 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 ## Decisions pending
 
 - **P1** — decide by Phase 27 Source-only distribution versus Phase 27 packaging and the 2.3 installed-size budget. See docs/DECISIONS_PENDING.md.
-- **P2** — decide by Phase 5 Do embeddings count as AI/ML training under TMDB's terms, which prohibit training use? Computing an embedding is inference, but the reading deserves a ruling. See docs/DECISIONS_PENDING.md.
-- **P3** — decide by Phase 16 Can a MovieLens-derived item-item similarity matrix be redistributed, given GroupLens does not generally permit redistribution? See docs/DECISIONS_PENDING.md.
-- **P4** — decide by Phase 27 GPL-3.0 makes filename-parser, subtitle-align and source-protocol unusable by most of the Rust ecosystem, defeating the point of extracting them. See docs/DECISIONS_PENDING.md.
 - **P5** — decide by Phase 12 Where the Phase 12 review-queue confidence threshold sits, given >95% top-1 and <1% false-confident pull against each other. Measure, do not guess. See docs/DECISIONS_PENDING.md.
+- **P6** — decide by Phase 27 Windows Sandbox pass on a genuinely bare machine. The E1 CI job proves a clean checkout builds, but windows-latest ships Rust, Node and MSVC preinstalled, so it does not prove SETUP.md is complete from nothing.

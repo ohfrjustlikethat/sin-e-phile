@@ -154,6 +154,68 @@ jobs:
         if: steps.detect.outputs.present == 'true'
 
   # ───────────────────────────────────────────────────────────────────────────
+  # E1 — a fresh clone on a clean runner produces a working dev environment.
+  #
+  # HONEST LIMITATION: windows-latest ships Rust, Node, MSVC and the Windows SDK
+  # preinstalled, so this does NOT prove the install instructions in docs/SETUP.md
+  # are complete for a genuinely bare machine. What it does prove, repeatably and
+  # on every push, is that a clean checkout with no local state builds and that
+  # doctor runs green - which catches SETUP.md rotting later, and a one-time
+  # manual check would not. A Windows Sandbox pass on a truly bare image remains
+  # outstanding; see docs/DECISIONS_PENDING.md.
+  # ───────────────────────────────────────────────────────────────────────────
+  fresh-clone:
+    name: Fresh clone builds (E1)
+    runs-on: windows-latest
+    steps:
+      - name: Clone into a directory with no local state
+        shell: pwsh
+        run: |
+          git clone --depth 1 --branch $env:GITHUB_REF_NAME `
+            "https://github.com/${env:GITHUB_REPOSITORY}.git" fresh
+          Write-Host "cloned $env:GITHUB_REF_NAME"
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: doctor reports a working environment
+        working-directory: fresh
+        run: python tools/doctor/doctor.py
+
+      - name: git hooks were bootstrapped by doctor
+        working-directory: fresh
+        shell: bash
+        run: |
+          configured=$(git config --get core.hooksPath || echo "UNSET")
+          if [ "$configured" != ".githooks" ]; then
+            echo "::error::doctor did not set core.hooksPath (got: $configured)"
+            exit 1
+          fi
+          echo "core.hooksPath = $configured"
+
+      - name: Build per docs/SETUP.md
+        working-directory: fresh
+        shell: bash
+        run: |
+          if [ -f Cargo.toml ] || [ -f src-tauri/Cargo.toml ]; then
+            cargo build --locked
+          else
+            echo "::notice::No Rust workspace yet - nothing to build until Phase 1."
+          fi
+          if [ -f package.json ]; then
+            npm ci && npm run build
+          else
+            echo "::notice::No Node project yet - nothing to build until Phase 1."
+          fi
+
+      - name: Safety rails work on a fresh clone
+        working-directory: fresh
+        run: |
+          python tools/guard/guard.py --selftest
+          python tools/guard/guard.py --tree
+
+  # ───────────────────────────────────────────────────────────────────────────
   # Repository hygiene that does not need a toolchain.
   # ───────────────────────────────────────────────────────────────────────────
   hygiene:

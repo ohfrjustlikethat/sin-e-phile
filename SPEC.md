@@ -44,7 +44,7 @@ The author is new to Rust and to React. Therefore:
 - Prefer the clear implementation over the clever one. If an abstraction saves 30 lines but requires understanding four Rust traits to follow, don't build it yet.
 - Every phase produces a **learning note** (Section 13). This is a deliverable, not a nicety.
 - When introducing an unfamiliar concept — lifetimes, `Arc<Mutex<>>`, async cancellation, React's rendering model, Tauri's IPC boundary — explain it *in the learning note* with reference to the actual code just written, not in the abstract.
-- Never write more than roughly 400 lines of new logic without stopping to explain what it does and why.
+- Never write more than roughly 400 lines of new logic without recording what it does and why — **as bullets in the phase learning note, not as a mid-session pause** (ADR-0016). The explanation is still mandatory; interrupting the session for it is not.
 - If a phase requires a genuinely advanced technique, say so explicitly and explain the simpler alternative that was rejected and why.
 
 ### 2.3 Performance and the low-end machine
@@ -466,9 +466,9 @@ This section governs how Claude Code operates. It matters more than any individu
 
 ### 10.2 Session start ritual — mandatory, every session
 
-1. Read `PROJECT_STATE.json`, then `PROGRESS.md`, then the last two entries of `SESSION_LOG.md`, then `docs/phases/phase-NN-<slug>.md` for the current phase.
+1. **Read only these** (ADR-0016): `PROJECT_STATE.json`, the **last** `SESSION_LOG.md` entry, and §15's entry for the current phase. `CLAUDE.md` loads automatically and carries the standing rules, so **do not re-read `SPEC.md` end to end.** Read another section only when the work actually touches it — or on a cold resume (§10.11), which keeps its fuller reading list.
 2. **Verify state against reality**: run `git status`, `git log --oneline -10`, `cargo test`, `npm test`. If the repository disagrees with `PROJECT_STATE.json`, **the repository is right**. Correct the state file, and record the discrepancy in `SESSION_LOG.md`.
-3. Report to the author, in five lines or fewer: current phase, what's done, what's next, any blockers, anything that needs a decision.
+3. Report to the author in **five lines or fewer**: current phase, what's done, what's next, blockers, anything needing a decision. Do not restate the spec back. Findings are bullets, not tables. Prose is for when something genuinely needs arguing (ADR-0016).
 4. If there are blockers with `needs_user: true`, raise them *before* planning.
 5. Produce a plan for this session. Wait for approval before implementing.
 
@@ -546,7 +546,9 @@ Equally: if something turns out to be much easier than expected, say so. Do not 
 
 ### 10.10 The understanding gate is active, not passive
 
-At the end of every phase, Claude Code **asks the author the five self-check questions** from the learning note, in the chat, and waits for answers.
+**The gate fires at tier boundaries, not every phase** (ADR-0016): the end of Phase 8, the end of Phase 18, the end of whatever tier the author stops at, and whenever the author asks for it. At those points Claude Code **asks the five self-check questions** from the relevant learning notes, in the chat, and waits for answers.
+
+Every phase still *writes* its five questions (§13.2). They accumulate unasked until a gate, which is what makes a gate meaningful rather than a formality.
 
 - If the author answers them well → the phase is done.
 - If they struggle on one → re-explain that concept, in a different way, and update the learning note. That note failed; fix it.
@@ -584,14 +586,24 @@ Documentation is written *as the code is written*, never retrofitted.
 
 ### 11.1 Per-phase, always
 
-- `docs/phases/phase-NN-<slug>.md`: the phase spec (copied from Section 15) plus, on completion, a retrospective — what was actually built, what deviated from the plan and why, what was harder than expected, what debt was incurred.
-- `docs/learning/phase-NN-notes.md`: the author's explainer (Section 13).
-- Updates to `docs/HOW_IT_WORKS.md` and `docs/ARCHITECTURE.md` if the system's shape changed.
-- New terms added to `docs/GLOSSARY.md`.
+Lean by default (ADR-0016). Per phase, only:
+
+- **The phase retrospective folds into the `SESSION_LOG.md` entry** — what was built, what deviated and why, what was harder than expected, what debt was incurred. **No separate `docs/phases/` file.**
+- `docs/learning/phase-NN-notes.md` — the lean four-section note (§13.2).
+- **`docs/eval-results.md` — every eval-harness metric and performance measurement, appended the moment it is produced.** Not deferrable; see below.
+- A 2–3 sentence stub appended to `docs/HOW_IT_WORKS.md`, and raw one-line entries appended to `docs/GLOSSARY.md`. Prose write-up is deferred.
+- `docs/specs/*.md` algorithm specifications where the phase produces one. These are **build inputs**, not learning material, and are written in full.
+- ADRs for every non-obvious decision (§11.2), terse.
+
+**Deferred to Phase 27 or a tier boundary:** all five case studies, `INTERVIEW_PREP.md`, and the prose expansion of `HOW_IT_WORKS.md` and `GLOSSARY.md`.
+
+**The exception that is never deferred — numbers.** Every eval-harness run and every performance measurement is recorded in `docs/eval-results.md` **at the moment it is produced**: metric, value, date, commit, and the command that produced it. Numbers cannot be reconstructed after the fact, and the regression policy (§10.12) is worthless without them. A measurement not written down is a measurement that did not happen.
 
 ### 11.2 ADRs
 
-Every non-obvious decision gets an ADR in `docs/adr/NNNN-title.md`, using the standard format: Context / Decision / Consequences / Alternatives Considered. Write the ADR *at the moment of deciding*, not later.
+Every non-obvious decision gets an ADR in `docs/adr/NNNN-title.md`: Context / Decision / Consequences / Alternatives Considered. Write it *at the moment of deciding*, not later — a reconstructed ADR records the justification rather than the reasoning, which is the half worth having.
+
+**Terse: bullets, roughly 15 lines** (ADR-0016). ADRs are mandatory and are not what gets cut; length is. The Alternatives section is the one that must never be empty — if nothing was genuinely rejected, there was no decision.
 
 An ADR is required for: choosing between libraries, designing a public interface, choosing an algorithm where alternatives exist, any performance trade-off, and any deviation from this spec.
 
@@ -707,13 +719,16 @@ A plain-English explanation of the entire system, assuming no prior knowledge. U
 
 ### 13.2 `docs/learning/phase-NN-notes.md`
 
-Written at the end of every phase. Five sections:
+Written at the end of every phase, **lean** (ADR-0016). Four sections:
 
-1. **What we built** — plain language, no code.
-2. **Why this approach** — what alternatives existed, why this one won.
-3. **New concepts** — every unfamiliar Rust or React or domain concept used, explained against the actual code just written. *"`Arc<Mutex<TorrentSession>>` appears in `scheduler.rs:42`. `Arc` means..."*. Include the mistakes that concept invites.
-4. **Code tour** — trace one real user action end to end through the code written this phase, file by file, with line references.
-5. **Questions to check yourself** — five questions the author should be able to answer. If they can't, the note failed.
+1. **What we built** — 3–5 bullets.
+2. **Why this approach** — 2–3 bullets, naming the alternatives rejected.
+3. **New concepts** — a **list** of concept plus `file:line` pointer. No prose explanation. `Arc<Mutex<T>> — torrent/scheduler.rs:42` is the whole entry.
+4. **Five self-check questions** — written now, **asked at the next tier boundary** (§10.10).
+
+**The code tour section is dropped.** A tour traced from the real code on demand is better than one written from memory and immediately stale.
+
+The principle: **record what cannot be reconstructed** — the decision, the gotcha, the pointer to where a concept lives. Explanatory prose can be regenerated from the code later, so it is not written now.
 
 ### 13.3 `docs/GLOSSARY.md`
 
@@ -1431,6 +1446,37 @@ Face recognition, live TV, manga and comics, casting and watch-together. Fully i
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 1.2.0 — 2026-08-31 (Phase 0, session 0c)
+
+Six amendments shifting the project to a **lean documentation profile**. The author
+reweighted the goals: shipping the app is now the priority and the learning happens
+later. Single ADR by request — [0016](docs/adr/0016-lean-documentation-and-session-profile.md).
+
+**Governing principle: record what cannot be reconstructed, defer what can.**
+Measured numbers, decisions and gotchas are recorded live because they are otherwise
+gone forever. Explanatory prose can be regenerated from the code, so it is not
+written now.
+
+| # | Section(s) | What changed |
+|---|---|---|
+| A1 | §10.2 | Session reading reduced to `PROJECT_STATE.json`, the last `SESSION_LOG.md` entry, and §15's current-phase entry. **`SPEC.md` is no longer re-read end to end**; `CLAUDE.md` carries the standing rules. Cold resume (§10.11) keeps its fuller list. |
+| A2 | §10.10 | Understanding gate fires at **tier boundaries only** — end of Phase 8, end of Phase 18, end of whatever tier the author stops at, and on request. Questions are still written every phase; they accumulate unasked. |
+| A3 | §2.2 | The ~400-line rule records its explanation as **bullets in the learning note** rather than a mid-session pause. The explanation stays mandatory; the interruption does not. |
+| A4 | §13.2 | Learning notes cut to four sections: what we built (3–5 bullets), why (2–3 bullets), new concepts (**a list of concept + `file:line`, no prose**), five questions. **Code tour dropped** — one traced from real code on demand beats one written from memory. |
+| A5 | §11.1, §11.4, §13 | Case studies, `INTERVIEW_PREP.md` and prose expansion of `HOW_IT_WORKS.md`/`GLOSSARY.md` deferred to Phase 27 or a tier boundary; per phase only a 2–3 sentence stub and one-line terms. **Phase retrospectives fold into the `SESSION_LOG.md` entry — no separate `docs/phases/` file.** `docs/specs/*.md` stay in full, being build inputs. |
+| A6 | §10.2 | Terse reporting: five-line session start, bullets not tables, no restating the spec. |
+
+**Never deferred, and stated explicitly in §11.1:** every eval-harness metric and
+performance measurement goes into **`docs/eval-results.md` the moment it is
+produced** — metric, value, date, commit, command. The §10.12 regression policy
+depends on those numbers and they cannot be reconstructed later.
+
+**Explicitly not cut**, being the resume and safety mechanisms: the posture guard,
+§10.8 evidence strings, §10.9 three-attempts-then-stop, per-subtask
+`PROJECT_STATE.json` updates, `SESSION_LOG.md` entries, ADRs, and the eval numbers.
+
+---
 
 ### spec_version 1.1.0 — 2026-08-30 (Phase 0, session 0a)
 

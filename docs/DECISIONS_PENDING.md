@@ -12,10 +12,10 @@ removed only when resolved — with a line saying which ADR resolved them.
 | | Decide by | Raised |
 |---|---|---|
 | [P1 — Source-only distribution versus Phase 27 packaging](#p1) | Phase 27 | 2026-08-30 |
-| [P2 — Do embeddings count as "AI/ML training" under TMDB's terms?](#p2) | **Phase 5** | 2026-08-31 |
-| [P3 — Can a MovieLens-derived similarity matrix be redistributed?](#p3) | **Phase 16** | 2026-08-31 |
-| [P4 — Licensing the three extracted crates for actual reuse](#p4) | Phase 27 | 2026-08-31 |
 | [P5 — Where the review queue's confidence threshold is set](#p5) | Phase 12 | 2026-08-31 |
+| [P6 — Windows Sandbox pass on a genuinely bare machine](#p6) | Phase 27 | 2026-08-31 |
+
+**Resolved:** P2 (ADR-0018), P3 (ADR-0019), P4 (ADR-0017) — see [Resolved](#resolved).
 
 ---
 
@@ -45,93 +45,8 @@ without building. Not urgent, but must not be decided implicitly.
 
 ---
 
-## P2 — Do embeddings count as "AI/ML training" under TMDB's terms? {#p2}
 
-**Decide by:** Phase 5 · **Raised:** 2026-08-31, live verification of §14 terms
-· **Risk:** R11
 
-TMDB's current API terms **prohibit use of the data for AI/ML training**. Phase 5's
-document text builder composes each item's embedding input partly from TMDB
-synopses, then runs a sentence-transformer over it.
-
-Computing an embedding is **inference, not training** — no model weights are
-updated, and the output is a representation of the text rather than a derived model.
-That reading is almost certainly correct. But "almost certainly" is not the standard
-for a term that could invalidate the project's use of its primary enrichment source,
-and the distinction deserves a deliberate ruling rather than an assumption nobody
-wrote down.
-
-**What makes this low-stakes in practice:** ADR-0013 already made TMDB optional, and
-the offline IMDb + MovieLens catalogue is the base. If the conservative reading is
-taken, Phase 5 builds embedding documents from IMDb/MovieLens fields plus AniList,
-and TMDB contributes artwork only — a real but survivable loss of synopsis text.
-
-**Options.** (a) Proceed on the inference-not-training reading, and record it
-explicitly in the case study. (b) Exclude TMDB text from embedding input; use it for
-display only. (c) Ask TMDB directly — they are responsive, and a written answer
-settles it permanently.
-
-**Leaning:** (c), then (a). Asking costs an email and removes the ambiguity
-completely.
-
----
-
-## P3 — Can a MovieLens-derived similarity matrix be redistributed? {#p3}
-
-**Decide by:** Phase 16 · **Raised:** 2026-08-31, live verification of §14 terms
-· **Risk:** R11
-
-GroupLens states it **does not generally permit public redistribution** of the
-MovieLens datasets, and requires a usage form to be completed.
-
-Phase 16 precomputes an **item-item similarity matrix** from MovieLens and ships it
-— either bundled or, per ADR-0014, as a versioned release asset. A similarity matrix
-is a *derived statistical artefact*, not the ratings data: it contains no user
-identifiers and no individual ratings, only aggregate item-to-item relationships.
-Whether that counts as redistribution is a real question and not one to answer by
-assumption.
-
-**Options.** (a) Ship the derived matrix, on the reading that an aggregate statistic
-is not the dataset. (b) Do not ship it; have the user's machine build it during
-first-run ingestion from a dataset they download themselves — slower first run, no
-redistribution question at all, and it fits the existing ingestion pipeline. (c) Ask
-GroupLens.
-
-**Leaning:** (b) is the clean answer and needs no permission from anyone. It costs
-first-run time on Tier 0 hardware, which is exactly where that hurts most — so
-measure it in Phase 4 before committing.
-
----
-
-## P4 — Licensing the three extracted crates for actual reuse {#p4}
-
-**Decide by:** Phase 27, and before any of them is published separately
-· **Raised:** 2026-08-31, ADR-0007
-
-`SPEC.md` §7 extracts `filename-parser`, `subtitle-align` and `source-protocol` into
-standalone crates deliberately, because they are self-contained, genuinely reusable,
-and make the repository read as engineering rather than one application blob.
-
-But as part of a GPL-3.0 repository they are GPL-3.0 — and the Rust ecosystem is
-overwhelmingly MIT/Apache-2.0, which is compatible in one direction only. So the
-three crates specifically chosen for reuse are, as licensed, unusable by most of the
-ecosystem that would want them.
-
-Note that none of the three links libmpv or FFmpeg. `filename-parser` is pure string
-handling; `source-protocol` is types and a schema. `subtitle-align` uses FFmpeg for
-VAD extraction, but by invoking the binary rather than linking it, which is a
-materially different licensing situation and needs checking rather than assuming.
-
-**Options.** (a) Leave them GPL-3.0 — simplest, and the reuse claim becomes
-rhetorical. (b) Dual-license them MIT/Apache-2.0 within this repository, which is
-possible for code we wholly own. (c) Publish them from separate repositories under
-MIT/Apache-2.0 and depend on them here, which is also the strongest portfolio
-story — three published crates.
-
-**Leaning:** (c) for `filename-parser` and `source-protocol`, which are clean;
-check `subtitle-align`'s FFmpeg relationship before deciding it.
-
----
 
 ## P5 — Where the review queue's confidence threshold is set {#p5}
 
@@ -156,6 +71,30 @@ and picking the knee — and record the plot in the Phase 12 case study. This is
 
 ---
 
+## P6 — Windows Sandbox pass on a genuinely bare machine {#p6}
+
+**Decide by:** Phase 27 · **Raised:** 2026-08-31
+
+Exit criterion **E1** is now evidenced by a CI job that clones fresh on a clean
+`windows-latest` runner and runs `doctor` plus the build. That is repeatable and
+catches `docs/SETUP.md` rotting later, which a one-time manual check would not.
+
+**Its limitation is real and is stated in the evidence string:** the runner ships
+Rust, Node, MSVC and the Windows SDK preinstalled. So the job proves a clean
+*checkout* builds; it does not prove the install instructions are complete for a
+genuinely bare machine.
+
+**Outstanding:** one pass in Windows Sandbox or a bare VM, following `SETUP.md`
+literally from nothing, confirming every prerequisite link and step is correct.
+Worth doing once before Phase 27, and again at Phase 27 when it becomes part of the
+portfolio claim that a stranger can build this.
+
+---
+
 ## Resolved
 
-*(none yet — resolved entries move here with the ADR that settled them)*
+| | Resolved by | Decision |
+|---|---|---|
+| **P2** — do embeddings count as AI/ML training under TMDB's terms? | [ADR-0018](adr/0018-tmdb-embedding-text-and-swappable-source.md) | Inference, not training — recorded as a decision rather than an assumption. Enquiry drafted at `docs/correspondence/tmdb-ai-clause.md` for the author to send. Hedged structurally: the Phase 5 document builder takes a swappable text source via config, so an unfavourable answer is a config change and a re-embed, not a rewrite. |
+| **P3** — can a MovieLens-derived matrix be redistributed? | [ADR-0019](adr/0019-movielens-matrix-computed-on-device.md) | Never ship one. Ingestion downloads MovieLens and computes the item-item matrix on the user's machine, so the question never arises. Deliberately a different answer from §8's shipped embeddings: embeddings computed from metadata we assemble are ours to publish; a matrix derived from GroupLens' ratings is not clearly ours. |
+| **P4** — licensing the extracted crates for actual reuse | [ADR-0017](adr/0017-dual-license-extracted-crates.md) | `filename-parser`, `subtitle-align` and `source-protocol` are **MIT OR Apache-2.0**; the app stays GPL-3.0 from libmpv and FFmpeg linkage. Binding design constraint: **`subtitle-align` must not depend on FFmpeg** — it takes PCM samples or a precomputed VAD signal, and extraction lives in the app. Licence-clean, and testable without spawning a process. |

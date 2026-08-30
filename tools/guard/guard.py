@@ -148,7 +148,10 @@ INFRASTRUCTURE_DOMAINS = frozenset(
         "react.dev", "typescriptlang.org", "developer.mozilla.org", "mozilla.org",
         "w3.org", "ietf.org", "rfc-editor.org", "unicode.org", "sqlite.org",
         "ffmpeg.org", "videolan.org", "mpv.io", "onnxruntime.ai", "huggingface.co",
-        "gnu.org", "fsf.org", "opensource.org", "microsoft.com", "wikipedia.org", "schema.org",
+        # Licence and standards bodies. Cited by canonical licence texts we do not
+        # own and must not edit, so they can never be removed from the tree.
+        "gnu.org", "fsf.org", "apache.org", "opensource.org", "mit-license.org",
+        "microsoft.com", "wikipedia.org", "schema.org",
         "json-schema.org", "semver.org", "conventionalcommits.org", "keepachangelog.com",
         "rustup.rs", "git-scm.com", "visualstudio.microsoft.com", "gitleaks.io",
         "adr.github.io", "pola.rs", "serde.rs",

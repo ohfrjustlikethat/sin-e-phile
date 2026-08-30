@@ -131,4 +131,5 @@ SHOULD_PASS: list[tuple[str, str]] = [
     # INFRASTRUCTURE_DOMAINS, not in the allowlist (ADR-0010 scopes the
     # allowlist to content and metadata sources only).
     ("LICENSE header", "Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>"),
+    ("Apache-2.0 licence body", "    http://www.apache.org/licenses/LICENSE-2.0"),
 ]
