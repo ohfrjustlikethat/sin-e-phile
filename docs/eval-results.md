@@ -62,6 +62,27 @@ Tier 2 and are labelled as such.
 
 ---
 
+## Phase 1 — Spike A (libmpv in Tauri, risk R1)
+
+Dev machine (Tier 2). libmpv `20260830-git-e8673660ab` x86_64, loaded dynamically.
+Test clip generated locally with FFmpeg (`testsrc2` 1280x720 h264 + aac, 15 s) — no
+download, no posture question.
+
+| Measurement | Value | Date | Commit | Command |
+|---|---|---|---|---|
+| libmpv load + `mpv_create` | 14.1 ms | 2026-08-31 | spike | `step1-own-window` |
+| `mpv_initialize` | 1.5 ms | 2026-08-31 | spike | `step1-own-window` |
+| file-loaded, own window | 216 ms | 2026-08-31 | spike | `step1-own-window` |
+| **First frame, own window** | **1353 ms** | 2026-08-31 | spike | `step1-own-window` |
+| **First frame, into a child HWND (`wid`)** | **970 / 1014 / 1023 ms** (3 runs) | 2026-08-31 | spike | `step2-child-hwnd` |
+| Hardware decode selected | **d3d11va** | 2026-08-31 | spike | `hwdec-current` property |
+| Video output driver | gpu-next, `d3d11[nv12]` | 2026-08-31 | spike | mpv log |
+| Playback survives parent resize | yes — `time-pos` advanced 2.2 s through a mid-playback resize | 2026-08-31 | spike | `step2-child-hwnd` |
+
+Note: first-frame figures include window creation and process start, and are **not**
+the §2.3 "play → first frame < 500 ms" budget, which is measured from a warm player
+in the real app. Recorded as a Spike A baseline only.
+
 ## Phase 0
 
 No harnesses exist yet. Recorded for completeness, since the guard's self-test is the
