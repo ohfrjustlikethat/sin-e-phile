@@ -16,7 +16,7 @@
 
 > Split into 0a (safety rails) and 0b (documents and state) by the author, on the basis that Phase 0 as specified is honestly ~2 sessions of writing. Both are now done. The phase is NOT complete: E1 needs a clean-machine check only the author can perform, and E2's second half needs the merge to main, which is gated on the understanding-gate questions in docs/learning/phase-00-notes.md (SPEC.md 10.10).
 
-### Subtasks — 9/16 complete
+### Subtasks — 15/16 complete
 
 - [x] **0.1** git init, .gitignore, .env.example, phase branch, public GitHub repo, secret scanning + push protection · `bb6222a`
 - [x] **0.2** Directory skeleton per SPEC.md §7 including the amended additions · `bb6222a`
@@ -27,12 +27,12 @@
 - [x] **0.7** .githooks/ pre-commit and commit-msg via core.hooksPath · `deecf52`
 - [x] **0.8** CI workflow, four jobs on windows-latest · `0aa6e23`
 - [x] **0.9** Verify the rails fire on deliberate plants · `0aa6e23`
-- [~] **0.10** LICENSE (GPL-3.0), README.md with pitch drafted, CONTRIBUTING.md, CHANGELOG.md
-- [~] **0.11** PROJECT_STATE.json with all 28 phases and exit criteria + JSON schema; PROGRESS.md
-- [~] **0.12** docs/SETUP.md with live-verified §14 service terms
-- [~] **0.13** docs/GLOSSARY.md (30 terms), docs/HOW_IT_WORKS.md skeleton
-- [~] **0.14** docs/RISKS.md (R1–R10 with concrete triggers), docs/DECISIONS_PENDING.md
-- [~] **0.15** Seed ADRs 0002–0008 (numbers reserved in docs/adr/README.md)
+- [x] **0.10** LICENSE (GPL-3.0), README.md with pitch drafted, CONTRIBUTING.md, CHANGELOG.md · `66fd304`
+- [x] **0.11** PROJECT_STATE.json with all 28 phases and exit criteria + JSON schema; PROGRESS.md · `66fd304`
+- [x] **0.12** docs/SETUP.md with live-verified §14 service terms · `66fd304`
+- [x] **0.13** docs/GLOSSARY.md (30 terms), docs/HOW_IT_WORKS.md skeleton · `66fd304`
+- [x] **0.14** docs/RISKS.md (R1–R10 with concrete triggers), docs/DECISIONS_PENDING.md · `66fd304`
+- [x] **0.15** Seed ADRs 0002–0008 (numbers reserved in docs/adr/README.md) · `66fd304`
 - [~] **0.16** docs/learning/phase-00-notes.md written; the five self-check questions must now be ASKED IN CHAT and answered before Phase 0 is done (SPEC.md 10.10)
 
 ### Exit criteria

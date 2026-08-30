@@ -1,7 +1,7 @@
 {
   "spec_version": "1.1.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-08-31T12:30:00Z",
+  "last_updated": "2026-08-31T13:05:00Z",
   "sessions_completed": 2,
   "current_phase": {
     "number": 0,
@@ -68,38 +68,38 @@
       {
         "id": "0.10",
         "text": "LICENSE (GPL-3.0), README.md with pitch drafted, CONTRIBUTING.md, CHANGELOG.md",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "66fd304"
       },
       {
         "id": "0.11",
         "text": "PROJECT_STATE.json with all 28 phases and exit criteria + JSON schema; PROGRESS.md",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "66fd304"
       },
       {
         "id": "0.12",
         "text": "docs/SETUP.md with live-verified §14 service terms",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "66fd304"
       },
       {
         "id": "0.13",
         "text": "docs/GLOSSARY.md (30 terms), docs/HOW_IT_WORKS.md skeleton",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "66fd304"
       },
       {
         "id": "0.14",
         "text": "docs/RISKS.md (R1–R10 with concrete triggers), docs/DECISIONS_PENDING.md",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "66fd304"
       },
       {
         "id": "0.15",
         "text": "Seed ADRs 0002–0008 (numbers reserved in docs/adr/README.md)",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "66fd304"
       },
       {
         "id": "0.16",
@@ -278,38 +278,38 @@
         {
           "id": "0.10",
           "text": "LICENSE (GPL-3.0), README.md with pitch drafted, CONTRIBUTING.md, CHANGELOG.md",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "66fd304"
         },
         {
           "id": "0.11",
           "text": "PROJECT_STATE.json with all 28 phases and exit criteria + JSON schema; PROGRESS.md",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "66fd304"
         },
         {
           "id": "0.12",
           "text": "docs/SETUP.md with live-verified §14 service terms",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "66fd304"
         },
         {
           "id": "0.13",
           "text": "docs/GLOSSARY.md (30 terms), docs/HOW_IT_WORKS.md skeleton",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "66fd304"
         },
         {
           "id": "0.14",
           "text": "docs/RISKS.md (R1–R10 with concrete triggers), docs/DECISIONS_PENDING.md",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "66fd304"
         },
         {
           "id": "0.15",
           "text": "Seed ADRs 0002–0008 (numbers reserved in docs/adr/README.md)",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "66fd304"
         },
         {
           "id": "0.16",
