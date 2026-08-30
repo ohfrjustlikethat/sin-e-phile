@@ -1,0 +1,56 @@
+# ── Secrets ───────────────────────────────────────────────────────────
+# See SPEC.md §12.6. .env.example is the ONLY env file that is tracked.
+.env
+.env.*
+!.env.example
+
+# ── Portable application data (SPEC.md §2.5) ──────────────────────────
+# All runtime state lives next to the executable and is never committed.
+data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# ── Models and large binary artefacts ─────────────────────────────────
+# Embedding + vision models are optional downloads, never repo content.
+*.onnx
+models/
+*.hnsw
+
+# ── Test media ────────────────────────────────────────────────────────
+# Hand-labelled fixture METADATA is committed; media files never are.
+fixtures/media/
+
+# ── Rust build output ─────────────────────────────────────────────────
+target/
+**/*.rs.bk
+*.pdb
+
+# ── Node / frontend build output ──────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+coverage/
+
+# ── Tooling caches ────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# ── Spikes (SPEC.md Phase 1) ──────────────────────────────────────────
+# Spike SOURCE is committed as evidence; spike build output is not.
+spikes/**/target/
+spikes/**/node_modules/
+
+# ── Editor / OS ───────────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+Thumbs.db
+desktop.ini
