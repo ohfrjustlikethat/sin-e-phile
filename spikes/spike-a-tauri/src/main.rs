@@ -18,10 +18,12 @@
 use std::time::{Duration, Instant};
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 use windows::Win32::Foundation::{HWND, LPARAM, RECT};
+use windows::Win32::Graphics::Gdi::{ClientToScreen, InvalidateRect};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{w, BOOL, Interface, PCWSTR};
 
+mod cutout;
 mod mpv;
 mod snapshot;
 use mpv::*;
@@ -93,6 +95,91 @@ fn pause_and_capture(app: tauri::AppHandle) -> Result<String, String> {
     Ok("ok".into())
 }
 
+/// Chrome geometry in client pixels. Kept in one place so the HTML and the
+/// region cannot disagree about where the hole is.
+fn chrome_rect(w: i32, h: i32) -> RECT {
+    let bar_h = 190;
+    RECT { left: 40, top: h - bar_h - 30, right: w - 40, bottom: h - 30 }
+}
+
+/// TEST 1 + 3. Toggle the cutout, exactly as auto-hide would.
+#[tauri::command]
+fn set_chrome(app: tauri::AppHandle, visible: bool, redraw: bool) -> Result<u128, String> {
+    use tauri::Emitter;
+    let guard = CTX.lock().unwrap();
+    let ctx = guard.as_ref().ok_or("no context")?;
+    let child = HWND(ctx.video_child as *mut _);
+
+    let mut rc = RECT::default();
+    unsafe { GetClientRect(child, &mut rc).map_err(|e| e.to_string())?; }
+    let (w, h) = (rc.right, rc.bottom);
+
+    let micros = unsafe {
+        if visible {
+            cutout::apply_cutout(child, w, h, &[chrome_rect(w, h)], redraw)
+        } else {
+            cutout::clear_cutout(child, redraw)
+        }
+    };
+    app.emit("chrome", visible).map_err(|e| e.to_string())?;
+    println!("  SetWindowRgn visible={visible} redraw={redraw}  {:.3} ms", micros as f64 / 1000.0);
+    Ok(micros)
+}
+
+/// TEST 1 setup. The page reports the button's CSS-pixel rect; convert to screen
+/// coordinates so the harness can click exactly there. CSS px -> physical px via
+/// the window scale factor, then client -> screen.
+#[tauri::command]
+fn report_button(app: tauri::AppHandle, x: f64, y: f64, w: f64, h: f64) -> Result<String, String> {
+    use tauri::Manager;
+    let win = app.get_webview_window("main").ok_or("no window")?;
+    let scale = win.scale_factor().map_err(|e| e.to_string())?;
+    let guard = CTX.lock().unwrap();
+    let ctx = guard.as_ref().ok_or("no context")?;
+    let top = unsafe { GetParent(HWND(ctx.video_child as *mut _)).map_err(|e| e.to_string())? };
+    let mut pt = windows::Win32::Foundation::POINT {
+        x: ((x + w / 2.0) * scale) as i32,
+        y: ((y + h / 2.0) * scale) as i32,
+    };
+    unsafe { let _ = ClientToScreen(top, &mut pt); }
+    let out = format!("BUTTON_SCREEN_XY {} {}", pt.x, pt.y);
+    println!("{out}");
+    Ok(out)
+}
+
+/// TEST 1. The page reports that a click landed on the button inside the hole.
+#[tauri::command]
+fn cutout_click(x: f64, y: f64) {
+    println!("TEST 1  HIT-TEST: click REACHED the webview through the hole at ({x:.0}, {y:.0})");
+}
+
+/// TEST 2. Resize the parent mid-playback, then re-apply the region and confirm
+/// the hole tracks the new size.
+#[tauri::command]
+fn resize_and_reshape(app: tauri::AppHandle, w: i32, h: i32) -> Result<String, String> {
+    let guard = CTX.lock().unwrap();
+    let ctx = guard.as_ref().ok_or("no context")?;
+    let child = HWND(ctx.video_child as *mut _);
+    let top = unsafe { GetParent(child).map_err(|e| e.to_string())? };
+
+    unsafe {
+        SetWindowPos(top, None, 0, 0, w, h, SWP_NOMOVE | SWP_NOZORDER)
+            .map_err(|e| e.to_string())?;
+        let mut rc = RECT::default();
+        let _ = GetClientRect(top, &mut rc);
+        // Track the parent: resize the video child, then re-cut at the new size.
+        let _ = SetWindowPos(child, None, 0, 0, rc.right, rc.bottom, SWP_NOZORDER);
+        let hole = chrome_rect(rc.right, rc.bottom);
+        cutout::apply_cutout(child, rc.right, rc.bottom, &[hole], false);
+        let _ = InvalidateRect(Some(child), None, false);
+        drop(guard);
+        let _ = app;
+        Ok(format!("parent {}x{} -> child {}x{}, hole {},{} {}x{}",
+            w, h, rc.right, rc.bottom,
+            hole.left, hole.top, hole.right - hole.left, hole.bottom - hole.top))
+    }
+}
+
 /// The webview has painted the still frame. Stop the clock, then hide the video
 /// child — hiding only now means there is never a frame of blank window.
 #[tauri::command]
@@ -138,6 +225,14 @@ fn b64(data: &[u8]) -> String {
 unsafe extern "system" fn video_host_proc(
     hwnd: HWND, msg: u32, wp: windows::Win32::Foundation::WPARAM, lp: LPARAM,
 ) -> windows::Win32::Foundation::LRESULT {
+    // Test 3 defence. When the region shrinks, Windows would otherwise erase the
+    // newly-exposed area with the class brush before mpv repaints — which is
+    // exactly the flash that would make auto-hiding chrome strobe. Claiming the
+    // erase (return 1) and shipping a NULL class brush means nothing paints
+    // there but mpv.
+    if msg == WM_ERASEBKGND {
+        return windows::Win32::Foundation::LRESULT(1);
+    }
     DefWindowProcW(hwnd, msg, wp, lp)
 }
 
@@ -163,7 +258,7 @@ fn main() {
     let (dll, video) = (args[1].clone(), args[2].clone());
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![pause_and_capture, overlay_painted, resume])
+        .invoke_handler(tauri::generate_handler![pause_and_capture, overlay_painted, resume, set_chrome, cutout_click, resize_and_reshape, report_button])
         .setup(move |app| {
             let win = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                 .title("Spike A - transparent WebView2 over libmpv")
@@ -224,6 +319,9 @@ fn main() {
                     lpfnWndProc: Some(video_host_proc),
                     hInstance: instance.into(),
                     lpszClassName: w!("SpikeVideoHost"),
+                    // NULL background brush: see video_host_proc. Default would be
+                    // COLOR_WINDOW and would flash white on every region change.
+                    hbrBackground: windows::Win32::Graphics::Gdi::HBRUSH(std::ptr::null_mut()),
                     ..Default::default()
                 };
                 RegisterClassW(&class);
@@ -297,18 +395,45 @@ fn main() {
 
                 let handle = app.handle().clone();
                 std::thread::spawn(move || {
-                    // Wait for playback to be genuinely running before pausing.
                     std::thread::sleep(Duration::from_millis(2500));
-                    for round in 1..=3 {
-                        println!("--- pause cycle {round} ---");
-                        if let Err(e) = pause_and_capture(handle.clone()) {
-                            println!("  pause failed: {e}");
-                        }
-                        std::thread::sleep(Duration::from_millis(1400));
-                        let _ = resume(handle.clone());
-                        std::thread::sleep(Duration::from_millis(1600));
+
+                    println!("=== TEST 4: seam — cutout applied, hold for capture ===");
+                    let _ = set_chrome(handle.clone(), true, false);
+                    std::thread::sleep(Duration::from_millis(2500));
+
+                    println!("=== TEST 2: resize with region applied ===");
+                    match resize_and_reshape(handle.clone(), 1100, 720) {
+                        Ok(s) => println!("  {s}"),
+                        Err(e) => println!("  resize failed: {e}"),
                     }
-                    println!("--- cycles complete ---");
+                    std::thread::sleep(Duration::from_millis(1800));
+                    match resize_and_reshape(handle.clone(), 1400, 880) {
+                        Ok(s) => println!("  {s}"),
+                        Err(e) => println!("  resize failed: {e}"),
+                    }
+                    std::thread::sleep(Duration::from_millis(1800));
+
+                    println!("=== TEST 3: flicker — 12 toggles at the auto-hide cadence ===");
+                    let mut costs = Vec::new();
+                    for i in 0..12 {
+                        let visible = i % 2 == 0;
+                        if let Ok(us) = set_chrome(handle.clone(), visible, false) {
+                            costs.push(us);
+                        }
+                        std::thread::sleep(Duration::from_millis(420));
+                    }
+                    if !costs.is_empty() {
+                        costs.sort_unstable();
+                        println!("  SetWindowRgn cost: min {:.3} / median {:.3} / max {:.3} ms",
+                            costs[0] as f64 / 1000.0,
+                            costs[costs.len() / 2] as f64 / 1000.0,
+                            costs[costs.len() - 1] as f64 / 1000.0);
+                    }
+
+                    println!("=== TEST 1: waiting for a click in the cutout ===");
+                    let _ = set_chrome(handle.clone(), true, false);
+                    std::thread::sleep(Duration::from_millis(6000));
+                    println!("--- tests complete ---");
                 });
 
                 // Pump mpv events on a worker so the Tauri event loop stays free.

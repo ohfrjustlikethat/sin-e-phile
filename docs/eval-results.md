@@ -83,6 +83,24 @@ download, no posture question.
 | Compositing: HTML over video, child-window z-order | **FAILS** — 3 distinct attempts, see `docs/RISKS.md` R1 | 2026-08-31 | `a286489` | `spike-a-tauri` |
 | Compositing: HTML beside video, video on top | works | 2026-08-31 | `a286489` | `SPIKE_ZORDER=top` |
 
+### B2 option 5 — region cutouts for playback chrome
+
+`SetWindowRgn` on the video child: full rect minus the chrome silhouette. The page
+shows through the hole. Four tests, chosen as the places this class of thing breaks.
+
+| Test | Result | Date | Commit | Command |
+|---|---|---|---|---|
+| **1. Hit-testing through the hole** | **PASS** — `RealChildWindowFromPoint` reports `WRY_WEBVIEW` inside the hole, `SpikeVideoHost` outside, boundary **pixel-exact** (1 px above → video, 1 px below → webview). Synthetic click reached the button. | 2026-08-31 | `28eb3d6` | `test1_probe.ps1` |
+| **2. Region + mid-playback resize** | **PASS** — hole tracks: 1078×664 → hole 40,444 998×190; 1378×824 → hole 40,604 1298×190 | 2026-08-31 | `28eb3d6` | `spike-a-tauri` |
+| **3. Flicker on region change** | **PASS — zero flicker.** 758 samples at ~7 ms across 12 toggles at the auto-hide cadence; colourfulness median 232.7, min 170.5; **0 frames** below 45% of median | 2026-08-31 | `28eb3d6` | `run_cutout_tests.ps1` |
+| └ `SetWindowRgn` cost | min 0.326 / **median 0.467** / max 1.062 ms | 2026-08-31 | `28eb3d6` | as above |
+| **4. Seam quality** | **PASS with one defect** — edge is razor sharp, no bleed, tearing or fringe. **Defect:** rounded panel corners over a rectangular hole leave a gap showing the *desktop* (transparent window). Fix: match the region to the silhouette (ADR-0020). | 2026-08-31 | `28eb3d6` | `seam_capture.ps1` |
+
+**Test 3's result is created, not free.** Both defences are required: a NULL class
+background brush plus swallowing `WM_ERASEBKGND`, and `SetWindowRgn(redraw=false)`.
+Without them Windows erases the newly-exposed area before mpv repaints — the strobe
+that would make auto-hiding chrome unusable.
+
 ### B2 option 1 — still-frame substitution for the pause overlay
 
 On pause: capture via `screenshot-raw window`, downscale, JPEG, render as an

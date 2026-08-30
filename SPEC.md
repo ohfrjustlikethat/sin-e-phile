@@ -399,6 +399,17 @@ Phase 2 builds this properly. These are the starting tokens; refine them in the 
 - Poster hover: scale 1.045, 220 ms, with a 400 ms dwell before any preview begins.
 - Rail scroll: native momentum, snap to card edges, never a jump-by-page carousel.
 - Player chrome: fades in 120 ms, out 400 ms after 2.5 s idle.
+- **Player chrome during playback is a solid, opaque panel with a hard edge**
+  (ADR-0020). No gradient scrim beneath it, and no blur-behind. This is a platform
+  constraint made into a deliberate design: on Windows a native video surface always
+  paints above the webview, so the chrome is *cut out* of the video window
+  (`SetWindowRgn`) rather than composited over it — and a window region is binary, so
+  there is no per-pixel alpha through the hole. Rounded corners are permitted **only
+  with a matching rounded region**: the hole and the opaque chrome must be the same
+  shape, because any part of a hole the chrome does not paint shows the desktop
+  through the transparent window. The **pause overlay is exempt** and keeps its dim
+  and blur — it composites over a captured still frame, where everything is HTML
+  (ADR-0021).
 - `prefers-reduced-motion` disables all scale and parallax, keeps opacity fades at 100 ms.
 
 ### 9.4 Layout
@@ -1446,6 +1457,28 @@ Face recognition, live TV, manga and comics, casting and watch-together. Fully i
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 1.3.0 — 2026-08-31 (Phase 1, Spike A)
+
+One amendment, from a measured platform constraint rather than a preference.
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A7 | §9.3 | **The gradient scrim and blur-behind under player chrome are removed**, replaced by a solid opaque panel with a hard edge. Rounded corners permitted only with a matching rounded region. The **pause overlay is exempt** and keeps dim and blur. | [0020](docs/adr/0020-solid-player-chrome-region-cutouts.md) |
+
+**Why.** Spike A established that on Windows a native child HWND always paints above
+a sibling WebView2, so HTML cannot be composited over video — confirmed
+independently by `ventic/ventic`, which ships the same architecture. The working
+approach inverts it: cut the chrome silhouette *out* of the video window with
+`SetWindowRgn` and let the page show through, which carries painting and hit-testing
+both. A window region is binary, so a gradient through the hole is not expressible.
+
+Amended deliberately rather than carrying a requirement the platform cannot meet.
+[ADR-0021](docs/adr/0021-player-composition-architecture.md) records the full player
+composition architecture; if wry PR #1762 (DirectComposition hosting) ever merges,
+§9.3 can be restored by a superseding ADR.
+
+---
 
 ### spec_version 1.2.0 — 2026-08-31 (Phase 0, session 0c)
 

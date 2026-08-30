@@ -21,7 +21,7 @@ fallback taken — the ADR records what happened).
 | **Likelihood** | Medium |
 | **Impact** | **Severe** — Phase 8 and everything downstream |
 | **Owner** | Phase 1 (Spike A), Phase 8 |
-| **Status** | `spiked` — escalated, see below |
+| **Status** | **`retired`** — resolved by ADR-0021, see below |
 
 Rendering a native video surface with a webview UI drawn over it is the fiddliest
 integration in this project. Everything from Phase 8 onward assumes it works.
@@ -83,6 +83,21 @@ materially more work than the three attempts above.
 
 Escalated per §10.9 rather than continuing: see blocker **B2** in
 `PROJECT_STATE.json` for the costed options.
+
+### RESOLVED — 2026-08-31, ADR-0021
+
+**R1 is closed.** libmpv embeds in a Tauri v2 window, hardware-decodes (d3d11va), and
+the compositing problem is solved by two mechanisms, one per surface:
+
+- **Paused:** still-frame substitution — 161/95/140 ms, within §11's 200 ms budget.
+- **Playing:** region cutouts via `SetWindowRgn` — no flicker across 12 toggles,
+  median 0.467 ms, hit-testing pixel-exact.
+
+**No patched or forked dependency is required.** Stock Tauri, stock wry.
+
+Cost: `SPEC.md` §9.3's gradient scrim and blur-behind under playback chrome are
+removed (ADR-0020), amended deliberately. wry PR #1762 (DirectComposition) is
+retained as an upgrade path, not a dependency.
 
 ### Prior-art survey — 2026-08-31 (B2 step ②)
 

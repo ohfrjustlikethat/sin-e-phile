@@ -1,22 +1,22 @@
 {
-  "spec_version": "1.2.0",
+  "spec_version": "1.3.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-08-31T20:15:00Z",
+  "last_updated": "2026-08-31T23:10:00Z",
   "sessions_completed": 3,
   "current_phase": {
     "number": 1,
     "slug": "application-shell",
     "title": "Application Shell and Capability Tiers",
-    "status": "blocked",
+    "status": "in_progress",
     "branch": "phase/01-application-shell",
     "started_at": "2026-08-31T16:20:00Z",
-    "note": "Spikes A, B then C run FIRST, before any other Phase 1 work, in that order. Each is throwaway code in spikes/, timeboxed to ~2 hours, with findings written to docs/RISKS.md and numbers to docs/eval-results.md. A failed spike escalates under SPEC.md 10.9 and stops.",
+    "note": "Spike A COMPLETE and R1 retired: libmpv embeds in Tauri v2, hardware-decodes, and the compositing problem is solved by still-frame substitution on pause plus region cutouts during playback (ADR-0021), with no patched dependency. SPEC.md 9.3 amended by ADR-0020. Spikes B and C are next, before any other Phase 1 work.",
     "subtasks": [
       {
         "id": "1.1",
-        "text": "Spike A - libmpv in a Tauri v2 window (R1). Child-window approach DONE and mostly successful; HTML-over-video compositing FAILS after 3 distinct attempts. Render-API-into-texture approach UNTESTED. Escalated as B2.",
-        "status": "blocked",
-        "commit": null
+        "text": "Spike A - libmpv in a Tauri v2 window (R1). DONE: embeds, d3d11va hardware decode, survives resize. Compositing solved by still-frame on pause + SetWindowRgn cutouts during playback. Both approaches the spec mandates were evaluated; DirectComposition (wry #1762) rejected as unmerged and retained as an upgrade path.",
+        "status": "complete",
+        "commit": "28eb3d6"
       },
       {
         "id": "1.2",
@@ -1457,24 +1457,8 @@
       ]
     }
   ],
-  "next_action": "Start Phase 1 on branch phase/01-application-shell. Run the three de-risking spikes FIRST, in order A then B then C, before any other Phase 1 work - SPEC.md 15 is explicit that discovering a failure in Phase 8 is catastrophic while discovering it now costs a day. Spike A: prove libmpv can render video inside a Tauri v2 window under Rust control with HTML UI drawn over it; try BOTH the render-API-into-a-texture and child-window-overlay approaches and record what each costs. Throwaway code in spikes/spike-a-libmpv/. Timebox ~2 hours. Write findings to docs/RISKS.md under R1 and any numbers to docs/eval-results.md. If the trigger in R1 fires (no frame rendered in the timebox, or UI cannot be composited without flicker or z-order failure), escalate under 10.9 and STOP - do not proceed to the rest of Phase 1 hoping it works out.",
-  "blockers": [
-    {
-      "id": "B2",
-      "raised": "2026-08-31T18:10:00Z",
-      "needs_user": true,
-      "description": "Spike A, risk R1. libmpv embeds in a Tauri v2 window and hardware-decodes correctly (d3d11va), first frame ~1.0-1.2 s, survives resize. But HTML UI CANNOT be composited OVER the video using child-window z-order, which SPEC.md 4 requires for the player chrome and Phase 11 requires for the pause overlay. Root cause: a transparent WebView2 composites against what is behind the WINDOW, not against sibling child HWNDs - a Windows compositing property, not a Tauri bug. The render-API-into-a-texture approach, which Spike A also mandates, is untested and is materially more work. Needs a decision on which path to spend time on before Phase 1 continues. Options and a recommendation are in the session report and docs/RISKS.md under R1. UPDATE 2026-08-31: option 1 (still-frame substitution) WORKS - pause to overlay visible measured at 161/95/140 ms across three cycles, all within the 200 ms budget, on a DEBUG build. So Phase 11's pause overlay is NOT blocked, and the problem shrinks to chrome-over-PLAYING-video only. DECISION DEADLINE: before Phase 8. Phases 2-7 are independent of compositing and proceed regardless; only 8 and 11 depend on it, and 11 is now substantially unblocked.",
-      "attempts": [
-        "Attempt 1: Tauri transparent(true) with the mpv child at HWND_BOTTOM. Video never appeared; the webview painted opaque over it.",
-        "Attempt 2: additionally set ICoreWebView2Controller2::put_DefaultBackgroundColor to A=0. The call succeeded (verified, not assumed) and the video still never appeared, which identified the root cause: transparency composites against the window's background, not against sibling child HWNDs.",
-        "Attempt 3: inverted the z-order, mpv child at HWND_TOP inset 120px. Video renders correctly and COVERS the HTML wherever they overlap. So the mechanism yields UI beside video, never UI over video.",
-        "Option 1 (still-frame substitution), 2026-08-31: WORKS. screenshot-raw window -> downscale 945x540 -> JPEG 37-39 KB -> data URI -> <img> under the HTML overlay, then hide the video HWND. 161/95/140 ms end to end, within the 200 ms budget, debug build. Captures at WINDOW resolution so the cost does not scale with a 4K source.",
-        "Prior art survey, 2026-08-31: ventic/ventic (126*, Tauri+mpv+torrents, ships no sources) states in player.rs that the native surface ALWAYS paints above the webview and DOM controls can never composite over video - independently confirming our result. Their fix is REGION CUTOUTS (X11 Shape; Windows equivalent SetWindowRgn), which is a fifth option not previously on the list. Cost: regions are binary, so no gradient scrim or blur-behind. wry PR #1762 adds DirectComposition hosting and needs NO tauri-runtime-wry changes (register_composition_visual_target exists for exactly that), so option A is a [patch.crates-io] wry override rather than a fork - but the PR is unreviewed after 6 weeks and the adjacent issue #391 has been open since 2021."
-      ],
-      "decision_deadline": "before Phase 8",
-      "decide_by_phase": 8
-    }
-  ],
+  "next_action": "Spike B, then Spike C, before any other Phase 1 work. Spike B (librqbit, risk R2): measure time-to-first-usable-bytes with sequential priority against a legal well-seeded torrent - an Internet Archive item or a Linux ISO - and AUDIT whether the API exposes runtime per-piece or per-range priority control at all, since without that the Phase 7 deadline scheduler cannot be written. Pass the torrent URL as a CLI argument; NEVER commit one, the guard blocks .torrent URLs and bare infohashes by design. R2 triggers: no runtime piece-priority control, or TTFB above 20 s. Then Spike C (ort, risk R3): measure QUERY-embedding p95 specifically - model loaded, one ~30-token query, wall clock to a returned vector - and escalate above ~30 ms rather than widening the 80 ms search budget. Numbers to docs/eval-results.md as produced. Then Phase 1 subtasks 1.4-1.10.",
+  "blockers": [],
   "decisions_pending": [
     {
       "id": "P1",
@@ -1493,12 +1477,6 @@
       "text": "Windows Sandbox pass on a genuinely bare machine. The E1 CI job proves a clean checkout builds, but windows-latest ships Rust, Node and MSVC preinstalled, so it does not prove SETUP.md is complete from nothing.",
       "raised": "2026-08-31",
       "decide_by_phase": 27
-    },
-    {
-      "id": "P7",
-      "text": "B2 / R1: how to composite player chrome over PLAYING video. Phase 11's pause overlay is solved by still-frame substitution (measured, within budget). Ranked fallbacks per the author: 1) DirectComposition visual hosting if tractable without forking wry; 2) still-frame plus a reserved chrome strip during playback; 3) layered TOP-LEVEL window, DWM-composited, which is a different mechanism from child-HWND z-order and is untried; 4) HTML5 plus remux, last. Chrome-beside-video is explicitly NOT on the list - amend SPEC.md 4 deliberately rather than back into it. DEADLINE: before Phase 8. ADDED after the prior-art survey: option 5, REGION CUTOUTS via SetWindowRgn - proven technique in ventic on X11, cheap to test on Windows, builds on the config that already works. Cost: binary regions, so hard-edged chrome and no gradient scrim, which would need a SPEC.md 9.3 amendment.",
-      "raised": "2026-08-31",
-      "decide_by_phase": 8
     }
   ],
   "adrs": [
@@ -1596,6 +1574,16 @@
       "id": "0019",
       "title": "Compute the MovieLens item-item matrix on the user's machine",
       "date": "2026-08-31"
+    },
+    {
+      "id": "0020",
+      "title": "Solid player chrome, cut out of the video window",
+      "date": "2026-08-31"
+    },
+    {
+      "id": "0021",
+      "title": "Player composition: still-frame on pause, region cutouts during playback",
+      "date": "2026-08-31"
     }
   ],
   "environment": {
@@ -1632,6 +1620,11 @@
       "id": "D4",
       "text": "tools/state/validate_state.py implements a subset of JSON Schema draft 2020-12 by hand, because ADR-0012 fixed these tools as stdlib-only. It rejects any schema construct it does not implement rather than passing silently, but it is not a conformant validator. Revisit only if the schema needs constructs it lacks.",
       "phase_raised": 0
+    },
+    {
+      "id": "D5",
+      "text": "Player has TWO compositing paths - still-frame when paused, region cutouts when playing - and the chrome silhouette must stay in sync with the region or the uncovered part of the hole shows the desktop. Phase 11 owns this invariant. Retire if wry PR #1762 merges and DirectComposition replaces both.",
+      "phase_raised": 1
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

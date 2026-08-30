@@ -4,21 +4,21 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 1.2.0** · 3 session(s) completed · last updated 2026-08-31
+**Spec version 1.3.0** · 3 session(s) completed · last updated 2026-08-31
 
 ---
 
 ## Where we are right now
 
-**Phase 1 — Application Shell and Capability Tiers** (`blocked`, branch `phase/01-application-shell`)
+**Phase 1 — Application Shell and Capability Tiers** (`in_progress`, branch `phase/01-application-shell`)
 
 0 of 7 exit criteria met with evidence.
 
-> Spikes A, B then C run FIRST, before any other Phase 1 work, in that order. Each is throwaway code in spikes/, timeboxed to ~2 hours, with findings written to docs/RISKS.md and numbers to docs/eval-results.md. A failed spike escalates under SPEC.md 10.9 and stops.
+> Spike A COMPLETE and R1 retired: libmpv embeds in Tauri v2, hardware-decodes, and the compositing problem is solved by still-frame substitution on pause plus region cutouts during playback (ADR-0021), with no patched dependency. SPEC.md 9.3 amended by ADR-0020. Spikes B and C are next, before any other Phase 1 work.
 
-### Subtasks — 0/10 complete
+### Subtasks — 1/10 complete
 
-- [!] **1.1** Spike A - libmpv in a Tauri v2 window (R1). Child-window approach DONE and mostly successful; HTML-over-video compositing FAILS after 3 distinct attempts. Render-API-into-texture approach UNTESTED. Escalated as B2.
+- [x] **1.1** Spike A - libmpv in a Tauri v2 window (R1). DONE: embeds, d3d11va hardware decode, survives resize. Compositing solved by still-frame on pause + SetWindowRgn cutouts during playback. Both approaches the spec mandates were evaluated; DirectComposition (wry #1762) rejected as unmerged and retained as an upgrade path. · `28eb3d6`
 - [ ] **1.2** Spike B - librqbit sequential streaming (R2). Measure time-to-first-usable-bytes against a legal well-seeded torrent; audit runtime per-piece priority control
 - [ ] **1.3** Spike C - ort/ONNX on Windows (R3). Measure QUERY-embedding p95 specifically; escalate above ~30ms
 - [ ] **1.4** Tauri v2 + React + TS strict + Vite + Tailwind building
@@ -43,13 +43,13 @@
 
 ## What's next
 
-Start Phase 1 on branch phase/01-application-shell. Run the three de-risking spikes FIRST, in order A then B then C, before any other Phase 1 work - SPEC.md 15 is explicit that discovering a failure in Phase 8 is catastrophic while discovering it now costs a day. Spike A: prove libmpv can render video inside a Tauri v2 window under Rust control with HTML UI drawn over it; try BOTH the render-API-into-a-texture and child-window-overlay approaches and record what each costs. Throwaway code in spikes/spike-a-libmpv/. Timebox ~2 hours. Write findings to docs/RISKS.md under R1 and any numbers to docs/eval-results.md. If the trigger in R1 fires (no frame rendered in the timebox, or UI cannot be composited without flicker or z-order failure), escalate under 10.9 and STOP - do not proceed to the rest of Phase 1 hoping it works out.
+Spike B, then Spike C, before any other Phase 1 work. Spike B (librqbit, risk R2): measure time-to-first-usable-bytes with sequential priority against a legal well-seeded torrent - an Internet Archive item or a Linux ISO - and AUDIT whether the API exposes runtime per-piece or per-range priority control at all, since without that the Phase 7 deadline scheduler cannot be written. Pass the torrent URL as a CLI argument; NEVER commit one, the guard blocks .torrent URLs and bare infohashes by design. R2 triggers: no runtime piece-priority control, or TTFB above 20 s. Then Spike C (ort, risk R3): measure QUERY-embedding p95 specifically - model loaded, one ~30-token query, wall clock to a returned vector - and escalate above ~30 ms rather than widening the 80 ms search budget. Numbers to docs/eval-results.md as produced. Then Phase 1 subtasks 1.4-1.10.
 
 ---
 
 ## Blockers
 
-- **B2** **(needs you)** Spike A, risk R1. libmpv embeds in a Tauri v2 window and hardware-decodes correctly (d3d11va), first frame ~1.0-1.2 s, survives resize. But HTML UI CANNOT be composited OVER the video using child-window z-order, which SPEC.md 4 requires for the player chrome and Phase 11 requires for the pause overlay. Root cause: a transparent WebView2 composites against what is behind the WINDOW, not against sibling child HWNDs - a Windows compositing property, not a Tauri bug. The render-API-into-a-texture approach, which Spike A also mandates, is untested and is materially more work. Needs a decision on which path to spend time on before Phase 1 continues. Options and a recommendation are in the session report and docs/RISKS.md under R1. UPDATE 2026-08-31: option 1 (still-frame substitution) WORKS - pause to overlay visible measured at 161/95/140 ms across three cycles, all within the 200 ms budget, on a DEBUG build. So Phase 11's pause overlay is NOT blocked, and the problem shrinks to chrome-over-PLAYING-video only. DECISION DEADLINE: before Phase 8. Phases 2-7 are independent of compositing and proceed regardless; only 8 and 11 depend on it, and 11 is now substantially unblocked.
+None.
 
 ---
 
@@ -98,6 +98,7 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D2** (raised in Phase 0) A fresh clone is unprotected by the git hooks until tools/doctor runs once, because core.hooksPath is per-clone config. CI is the backstop. Accepted in ADR-0012.
 - **D3** (raised in Phase 0) Bare-domain detection is disabled inside source files (attribute access is shaped identically). URLs are still checked everywhere, as is the denylist. Documented in tools/guard/README.md.
 - **D4** (raised in Phase 0) tools/state/validate_state.py implements a subset of JSON Schema draft 2020-12 by hand, because ADR-0012 fixed these tools as stdlib-only. It rejects any schema construct it does not implement rather than passing silently, but it is not a conformant validator. Revisit only if the schema needs constructs it lacks.
+- **D5** (raised in Phase 1) Player has TWO compositing paths - still-frame when paused, region cutouts when playing - and the chrome silhouette must stay in sync with the region or the uncovered part of the hole shows the desktop. Phase 11 owns this invariant. Retire if wry PR #1762 merges and DirectComposition replaces both.
 
 ---
 
@@ -106,4 +107,3 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **P1** — decide by Phase 27 Source-only distribution versus Phase 27 packaging and the 2.3 installed-size budget. See docs/DECISIONS_PENDING.md.
 - **P5** — decide by Phase 12 Where the Phase 12 review-queue confidence threshold sits, given >95% top-1 and <1% false-confident pull against each other. Measure, do not guess. See docs/DECISIONS_PENDING.md.
 - **P6** — decide by Phase 27 Windows Sandbox pass on a genuinely bare machine. The E1 CI job proves a clean checkout builds, but windows-latest ships Rust, Node and MSVC preinstalled, so it does not prove SETUP.md is complete from nothing.
-- **P7** — decide by Phase 8 B2 / R1: how to composite player chrome over PLAYING video. Phase 11's pause overlay is solved by still-frame substitution (measured, within budget). Ranked fallbacks per the author: 1) DirectComposition visual hosting if tractable without forking wry; 2) still-frame plus a reserved chrome strip during playback; 3) layered TOP-LEVEL window, DWM-composited, which is a different mechanism from child-HWND z-order and is untried; 4) HTML5 plus remux, last. Chrome-beside-video is explicitly NOT on the list - amend SPEC.md 4 deliberately rather than back into it. DEADLINE: before Phase 8. ADDED after the prior-art survey: option 5, REGION CUTOUTS via SetWindowRgn - proven technique in ventic on X11, cheap to test on Windows, builds on the config that already works. Cost: binary regions, so hard-edged chrome and no gradient scrim, which would need a SPEC.md 9.3 amendment.
