@@ -33,7 +33,9 @@ This is precisely Stremio's architecture, and it is why Stremio still exists whi
 
 **When any phase is tempted to add a "convenient default", the answer is no.** If a feature genuinely cannot be demonstrated without a source, demonstrate it against the local-filesystem backend or the Internet Archive backend.
 
-Documentation must never include a specific indexer name, URL, or scraping example. Write `https://example.com/addon/manifest.json`.
+Documentation must never include a specific indexer name, URL, or scraping example. Write `https://example.com/addon/manifest.json`. Examples and test vectors use RFC 2606 reserved domains — `.invalid`, `.test`, `.example`, `example.com` — which no registry can ever issue (ADR-0009).
+
+**Test fixtures containing real-world filenames** (§12.2, Phase 12) follow a redaction policy (ADR-0011). **Release-group tokens are kept verbatim** — a release group is not an indexer, and group identity is a genuine quality signal the Phase 9 scorer uses. **Site tags inside filenames are replaced at authoring time** with synthetic `[SITE01]`, `[SITE02]` tokens, allocated per distinct *shape* so the corpus keeps its variety of tag position, bracket style and casing. The mapping from synthetic token to real site is never recorded anywhere, so there is nothing to leak. The parser still learns the lesson that matters, which is positional and structural — strip a bracketed distribution tag in leading or trailing position — and is indifferent to the string inside the brackets. `fixtures/filenames/README.md` documents that redaction occurred, so nobody mistakes a redacted corpus for a synthetic one.
 
 ### 2.2 Understanding over velocity
 
@@ -54,12 +56,14 @@ Hard budgets, enforced by the performance phase and checked in CI where feasible
 | Metric | Budget |
 |---|---|
 | Cold start to interactive home screen | < 2.0 s (Tier 2), < 4.0 s (Tier 0) |
-| Search keystroke → results rendered | < 80 ms at p95 |
+| Search keystroke → results rendered | < 80 ms at p95, **including query embedding** (§8, ADR-0015) |
 | Press play → first frame (cached/local) | < 500 ms |
 | Press play → first frame (healthy swarm) | < 8 s |
 | Idle RAM, app open, nothing playing | < 250 MB (Tier 0) |
 | Home screen scroll | 60 fps sustained, no dropped frames |
-| Installed size | < 120 MB excluding optional models |
+| Installed size | < 120 MB excluding optional models and downloaded artefacts (§2.7, ADR-0014) |
+
+**Every budget in this table is a Tier 0 number unless the row says otherwise, and Tier 0 is what governs.** Individual phases may state tighter targets for the dev machine — Phase 1's "< 2 s to interactive" and "idle RAM < 200 MB" are **Tier 2 dev-machine** numbers, not replacements for the Tier 0 budgets here. Where a phase states a performance target, it must name the tier it applies to. Both sets are tracked in `docs/PERFORMANCE.md`.
 
 ### 2.4 Windows only
 
@@ -76,6 +80,8 @@ The application must be fully functional with no paid services. Every external d
 ### 2.7 No telemetry
 
 Nothing leaves the machine except explicit user-initiated requests to APIs they configured. No analytics, no crash reporting to a server, no "anonymous usage statistics". Crash logs are written locally. State this in the README as a feature.
+
+**Static asset downloads are permitted and are not a violation** (ADR-0014). Fetching the ONNX model, the IMDb and MovieLens datasets, or a precomputed embedding artefact published as a versioned GitHub Release asset is not "a server component" in the sense §5 forbids: there is nothing operated, nothing paid for, and nothing whose downtime degrades a running installation. Every such download must be **consented to, with its size shown, before it happens** — never fetched in the background, never assumed.
 
 ### 2.8 This specification is amendable — deliberately, never casually
 
@@ -260,6 +266,10 @@ sin-e-phile/
 │  ├─ GLOSSARY.md
 │  ├─ INTERVIEW_PREP.md
 │  ├─ SETUP.md                   # prerequisites, API keys, build
+│  ├─ RISKS.md                   # the Appendix D risk register, with triggers
+│  ├─ DECISIONS_PENDING.md       # deliberately deferred decisions
+│  ├─ PERFORMANCE.md             # every budget, current measurement, how achieved
+│  ├─ MANUAL_TESTS.md            # the manual test plan (§12.3)
 │  ├─ adr/                       # 0001-record-architecture-decisions.md, ...
 │  ├─ phases/                    # phase-NN-<slug>.md — spec + retrospective per phase
 │  ├─ learning/                  # phase-NN-notes.md — the author's explainers
@@ -294,7 +304,11 @@ sin-e-phile/
 │  └─ source-protocol/           # published spec + types for addon authors
 ├─ tools/
 │  ├─ ingest/                    # offline dataset ingestion pipeline
-│  └─ eval/                      # evaluation harness runners
+│  ├─ eval/                      # evaluation harness runners
+│  ├─ guard/                     # posture guard (§12.5) — Python, stdlib only
+│  └─ doctor/                    # prerequisite checker (Phase 0) — Python, stdlib only
+├─ .githooks/                    # tracked hooks, activated via core.hooksPath
+├─ spikes/                       # throwaway de-risking spikes (Phase 1)
 └─ fixtures/                     # test corpora (see Section 12)
 ```
 
@@ -308,9 +322,11 @@ Detect on first run, store in config, allow manual override in settings. Re-dete
 
 | Tier | Detection | Enabled |
 |---|---|---|
-| **Tier 0 — Modest** | < 8 GB RAM, or no hardware video decode, or ≤ 2 physical cores | Full core experience. Software decode fallback, capped to 1080p by default (user-overridable). Embeddings precomputed and shipped/downloaded, never computed on device. No face recognition. No local VAD subtitle alignment (hash-match and duration heuristics only). Reduced hover previews, no background blur effects, virtualised rails with smaller windows. |
+| **Tier 0 — Modest** | < 8 GB RAM, or no hardware video decode, or ≤ 2 physical cores | Full core experience. Software decode fallback, capped to 1080p by default (user-overridable). **Catalogue document embeddings** precomputed and downloaded, never computed on device — but queries *are* embedded on device, see below. No face recognition. No local VAD subtitle alignment (hash-match and duration heuristics only). Reduced hover previews, no background blur effects, virtualised rails with smaller windows. |
 | **Tier 1 — Standard** | 8–16 GB RAM, hardware decode present, ≥ 4 cores | Everything in Tier 0, plus on-device embedding of new items, VAD-based subtitle alignment, up to 4K playback, full motion design, intro/credit detection. |
 | **Tier 2 — Capable** | ≥ 16 GB RAM, discrete GPU or strong iGPU, ≥ 6 cores | Everything, plus face recognition in the pause overlay, optional Whisper-based subtitle generation and alignment, background pre-embedding of the catalogue, higher-quality ANN parameters. |
+
+**Documents versus queries — the Tier 0 embedding rule stated precisely** (ADR-0015). *Tier 0 never embeds catalogue documents on device. Tier 0 does embed one short query per search.* The asymmetry is scale, not kind: embedding the catalogue is hundreds of thousands of forward passes over long composed documents, which is what this rule protects a weak machine from; embedding a query is a single forward pass over roughly 30 tokens. They differ by five or six orders of magnitude. ONNX Runtime is therefore required at runtime on **all** tiers, and `tiers.rs` gates only whether *document* embedding is permitted. Phase 1 Spike C must measure query-embedding latency specifically, the §2.3 80 ms p95 search budget is measured *including* it, and a Spike C p95 above ~30 ms escalates under §10.9 rather than widening the budget.
 
 **Rules:**
 - Tier gating is a single module (`tiers.rs`) exposing `Capability::FaceRecognition`, `Capability::LocalEmbedding`, etc. No feature checks hardware directly.
@@ -626,7 +642,7 @@ Four harnesses live in `tools/eval/`, run in CI, and report metrics that get tra
 | **Filename identification** | `fixtures/filenames/` — 500+ real-world messy filenames with hand-labelled correct answers, including deliberate ambiguities (`The.Batman` 1989 vs 2022, anime absolute numbering, scene-release garbage, multi-episode files, foreign titles) | Top-1 accuracy; false-confident rate (wrong answer above threshold) | > 95% top-1; < 1% false-confident |
 | **Subtitle alignment** | `fixtures/subtitles/` — subtitle files deliberately offset by known amounts, framerate-scaled (23.976↔25), and with inserted/removed intro segments, paired with audio VAD traces | % of files aligned to within 150 ms | > 90% |
 | **Search relevance** | `fixtures/search/` — 100+ queries with hand-graded relevant results, including semantic queries ("slow films about grief that aren't depressing"), lookalike queries ("like Wong Kar-wai but Korean"), and exact-title queries | nDCG@10; exact-title top-1 rate | nDCG@10 > 0.75; exact-title top-1 = 100% |
-| **Recommender quality** | Held-out split of a public ratings dataset, plus a synthetic cinephile profile | Recall@20, catalogue coverage, intra-list diversity, novelty (mean inverse popularity) | Recall@20 beats a popularity baseline by > 40%; coverage > 15% of catalogue |
+| **Recommender quality** | Held-out split of a public ratings dataset, plus a synthetic cinephile profile | Recall@20, catalogue coverage, intra-list diversity, novelty (mean inverse popularity) | Recall@20 beats a popularity baseline by > 40% **relative** (ratio, not percentage points); coverage > 15% of catalogue |
 
 Building these corpora is real work and it is worth it. Phase 12, 10, 5, and 16 each include their corpus as a deliverable.
 
@@ -643,14 +659,27 @@ GitHub Actions on `windows-latest`, on every push and PR:
 
 A human rule that must hold across 28 phases and dozens of sessions will eventually be broken by accident. So automate it.
 
-`tools/guard/` contains a script, run in CI on every push and as a pre-commit hook, that fails the build if the repository contains:
+`tools/guard/` contains a Python 3.12 script (ADR-0012), run in CI on every push and as a pre-commit hook, that fails the build on the findings below. It uses **two matchers with deliberately different visibility properties** (ADR-0009), plus an **allowlist** (ADR-0010).
 
-- any URL matching known indexer, tracker-index, or streaming-aggregator patterns
-- a denylist of site names and their common abbreviations, maintained in `tools/guard/denylist.txt` (the denylist file itself contains patterns, not working addresses)
-- hardcoded magnet links or info-hashes outside clearly-marked, legal test fixtures
-- any default value for a source or catalogue URL in config, code, or documentation
+**Matcher 1 — structural patterns, in plaintext.** These describe the *shape* of forbidden content without naming any instance of it, so they are safe to commit in the clear, and they generalise to sites nobody has thought of:
 
-The guard also scans **commit history**, not just the working tree, so a mistake that was committed and then removed is still caught. Wire this in Phase 0, before there is anything to catch.
+- `magnet:?xt=urn:btih:` URIs
+- bare 40-character hex and 32-character base32 infohashes, outside clearly-marked legal test fixtures
+- `/announce` and `/scrape` URL path shapes
+- HTTP(S) URLs ending in `.torrent`
+- configuration keys shaped like `default_source_url`, `default_indexer`, or `default_catalogue_url` carrying any non-empty value
+
+This matcher does the majority of the real work.
+
+**Matcher 2 — a hashed exact-token denylist.** `tools/guard/denylist.txt` stores `SHA-256(salt || normalised_token)` in hex, one per line, with the salt committed alongside in `tools/guard/denylist.salt`. Plaintext site names are **never** written to this repository, because doing so would itself violate §2.1. Entries are added via `tools/guard/add_token.py`, which reads from stdin without echoing.
+
+This is **hygiene, not security.** A committed salt is brute-forceable by anyone determined. The threat model is accidental plaintext and casual discovery — a grep of the tree, a code search, a reader scrolling the file list — and against that it is fully effective. It is not protection against a motivated adversary and must never be described as such. Its accepted cost is that it matches **exact tokens only**: no substring, fuzzy, or homoglyph matching, because those require the plaintext it deliberately does not hold.
+
+**The allowlist.** `tools/guard/allowlist.txt` enumerates every content or metadata source domain permitted to appear in shipped code, config, or documentation — the Internet Archive, TMDB, AniList, Jikan, OpenSubtitles, Fanart.tv, Trakt, MovieLens/GroupLens, and the IMDb datasets — each with an inline justification. It covers *content and metadata sources only*; general development infrastructure (`crates.io`, `npmjs.com`, `github.com` and similar) is out of scope. **Adding a line requires an ADR**, stating what the source is, why it is unambiguously legal, and whether it ships enabled or opt-in. The allowlist is the easiest place for the §2.1 posture to erode quietly, so its diffs get reviewed specifically.
+
+**Test vectors and examples use RFC 2606 reserved domains.** Every guard self-test, denylist test case, and documentation example uses `.invalid`, `.test`, `.example`, or `example.com`. A string like `notarealindexer.invalid` is *provably* not a real site, so the guard can be proven to fire without a real forbidden string ever entering the repository or its history. Any example URL that is neither on a reserved TLD nor on the allowlist is itself a finding.
+
+The guard also scans **commit history**, not just the working tree, so a mistake that was committed and then removed is still caught. History scanning runs in CI (which checks out with `fetch-depth: 0`); the pre-commit hook scans staged content only, because a hook whose cost grows with repository age is a hook that eventually gets bypassed. Wire this in Phase 0, before there is anything to catch.
 
 When the guard fires, the fix is to remove the content and — if it was committed — rewrite history before pushing. Never suppress the guard to make CI pass.
 
@@ -659,7 +688,8 @@ When the guard fires, the fix is to remove the content and — if it was committ
 This is a public repository and it will hold API keys during development. Phase 0 establishes:
 
 - `.gitignore` covering `.env`, `.env.*` (except `.env.example`), `data/`, `*.db`, `*.onnx`, `models/`, `fixtures/media/`, and all build output.
-- A secret-scan step in CI and in the pre-commit hook (`gitleaks` or equivalent) that fails on anything resembling an API key, token, or credential.
+- A secret-scan step that fails on anything resembling an API key, token, or credential (ADR-0012). CI runs a **version-pinned, checksum-verified gitleaks** binary. The pre-commit hook runs `tools/guard/secretscan.py`, a standard-library regex fallback covering the key shapes relevant here, so the hook works whether or not gitleaks is installed locally. `doctor` reports which is active. Defence in depth: the local check is fast and approximate, CI is thorough and authoritative, and GitHub push protection is the backstop if both are bypassed.
+- **Hooks are activated via `core.hooksPath`.** They live in a tracked `.githooks/` directory and are wired up by `tools/doctor/` as a bootstrap step, because `.git/hooks/` is not tracked and a hook that does not activate on clone protects nothing. A fresh clone is unprotected until `doctor` runs once — which is why the guard runs in CI as well, and why `docs/SETUP.md` makes `doctor` step one.
 - GitHub's own push-protection and secret-scanning enabled on the repository.
 - `.env.example` documents every variable with a placeholder value and never a real one.
 
@@ -710,9 +740,13 @@ Answers must be honest, including about weaknesses. A candidate who can name the
 
 All free. Phase 0 verifies current terms for each and records them in `docs/SETUP.md` — terms change, so check rather than trusting this table.
 
+**Development prerequisites** (checked by `tools/doctor/`): Rust stable with the MSVC toolchain, Node, MSVC C++ build tools, the Windows SDK, the WebView2 runtime, git, FFmpeg, and **Python 3.12+** (ADR-0012 — required by `tools/guard/` and `tools/doctor/`, which use the standard library only and need no `pip install`). Python is a *development* prerequisite; a user running a built application never needs it.
+
+**No API key is required to run the application** (ADR-0013). The offline catalogue — IMDb datasets plus MovieLens, both free downloads with no account — supplies titles, years, runtimes, genres, cast, crew and ratings, and semantic search, the taste model, the recommender and the discovery engine all run on it unchanged. **Every service below is optional enrichment**, and none of their keys ever ship in the build.
+
 | Service | Needed for | Cost | Notes |
 |---|---|---|---|
-| **TMDB** | Primary metadata: films, TV, artwork, cast | Free API key, instant, non-commercial | Register at themoviedb.org → Settings → API. Required. |
+| **TMDB** | Artwork, rich detail, cast headshots | Free API key, instant, non-commercial | Register at themoviedb.org → Settings → API. **Optional** — offered in onboarding as ~30 seconds of work, with a "later" option that is not a dead end (ADR-0013). |
 | **AniList** | Anime metadata, relations, absolute/seasonal numbering | Free, public GraphQL, no key | Required for anime. |
 | **Jikan** | MyAnimeList mirror, supplementary anime data | Free, no key, rate-limited | Optional fallback. |
 | **IMDb datasets** | Offline title/rating/crew index | Free download, no account | `datasets.imdbws.com`. Non-commercial use. |
@@ -736,7 +770,11 @@ Treat the quota as a scarce resource with a budget and a cache. This constraint 
 
 ## 15. The Phases
 
-28 phases, `0`–`27`. Each is scoped to one Claude Code session where possible; larger ones state their expected session count. **Phase 8 is the first demoable milestone** — a working vertical slice — and it exists that early on purpose.
+28 phases, `0`–`27`. Each is scoped to one Claude Code session where possible; larger ones state their expected session count.
+
+**Session counts are estimates, not commitments.** They are the honest expectation at the time of writing and they will be wrong in both directions. In particular, §2.2's rule that no more than ~400 lines of new logic ships without stopping to explain it, combined with the active understanding gate in §10.10, means **Phases 4, 7 and 16 should be expected to run 4+ sessions each** rather than the 2–3 stated. That is the specification working as intended, not falling behind. Written down here so it does not feel like failure when it happens.
+
+**Phase 8 is the first demoable milestone** — a working vertical slice — and it exists that early on purpose.
 
 Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the start of the phase and gains a retrospective at the end.
 
@@ -758,7 +796,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 **Exit criteria.**
 - [ ] `git clone` on a clean machine + following `docs/SETUP.md` produces a working dev environment.
-- [ ] CI passes on `main`.
+- [ ] CI passes on `phase/00-bootstrap`, and again on `main` after the merge. (§10.5 puts all phase work on a branch, so "green on `main`" can only be verified post-merge; both are required.)
 - [ ] `PROJECT_STATE.json` validates against its schema and enumerates all 28 phases with their exit criteria.
 - [ ] Eight seed ADRs exist and are non-trivial.
 - [ ] **The posture guard fails CI when fed a deliberately-planted test string, and passes on the clean tree.** Verify it actually works — an unverified guard is worse than none, because it produces false confidence.
@@ -781,17 +819,17 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 - **Spike A — libmpv in a Tauri v2 window** (risk R1). Prove a video can render, controlled from Rust, with UI drawn over it. Try the render-API-into-a-texture approach and the child-window-overlay approach. Note which works and what it costs.
 - **Spike B — librqbit sequential streaming** (risk R2). Against a legal, well-seeded torrent (a Linux ISO or an Internet Archive item), measure time-to-first-usable-bytes with sequential priority, and confirm the API exposes enough control to build the Phase 7 scheduler.
-- **Spike C — ONNX Runtime in Rust on Windows** (risk R3). Get `ort` building and running a quantised sentence-transformer, and measure single-embedding latency and memory. Confirm the build does not require an unreasonable toolchain.
+- **Spike C — ONNX Runtime in Rust on Windows** (risk R3). Get `ort` building and running a quantised sentence-transformer, and measure latency and memory. **Measure query-embedding latency specifically** — model already loaded, a single ~30-token query, wall clock to a returned vector, p50 and p95, on the dev machine and on a constrained VM approximating Tier 0 — not just document-embedding throughput. Confirm the build does not require an unreasonable toolchain. **A p95 above ~30 ms escalates under §10.9**; do not widen the §2.3 80 ms search budget to accommodate it (ADR-0015). Because ONNX Runtime is now required on all tiers, this spike gates Phase 5 — run it early in the phase, not last.
 
 **If a spike fails, stop and escalate under §10.9.** The fallback for each is recorded in Appendix D. Do not proceed to the rest of Phase 1 hoping it will work out later.
 
 **Exit criteria.**
 - [ ] All three spikes completed, with findings and measurements recorded in `docs/RISKS.md`.
 - [ ] Any spike that failed has an ADR recording the fallback decision and the author's approval.
-- [ ] App launches to interactive in < 2 s on the dev machine.
+- [ ] App launches to interactive in < 2 s on the dev machine (**Tier 2 target**; the governing budget is §2.3's < 4 s on Tier 0).
 - [ ] IPC types are generated, not hand-written; changing a Rust command signature breaks the TypeScript build.
 - [ ] Tier detection is correct on the dev machine and on a deliberately-constrained run (simulate Tier 0 via override).
-- [ ] Idle RAM < 200 MB.
+- [ ] Idle RAM < 200 MB on the dev machine (**Tier 2 target**; the governing budget is §2.3's < 250 MB on Tier 0).
 - [ ] A deliberately-triggered panic writes a crash log and shows a graceful error screen.
 
 **Learning note.** What Tauri actually is (webview + Rust process, not a browser); how IPC works and why the type generation matters; Rust's `Result` and error handling; what React strict mode does.
@@ -826,7 +864,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 **Exit criteria.**
 - [ ] All migrations run forward and backward cleanly against a populated database.
 - [ ] Schema documented with an entity-relationship diagram in `docs/ARCHITECTURE.md`.
-- [ ] Inserting and querying 500,000 synthetic media items stays under 100 ms for indexed lookups.
+- [ ] A database populated with 500,000 synthetic media items answers **indexed lookups in under 100 ms**. (The 100 ms budget is the lookup alone; bulk insertion of the 500,000 rows has no time budget and is measured and recorded separately in `docs/PERFORMANCE.md`.)
 - [ ] Copying the app folder to another location and launching it preserves all data.
 - [ ] An ADR records why the schema is generic over media kind.
 
@@ -847,6 +885,8 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 - [ ] Catalogue lookups work with the network disconnected.
 - [ ] Rate limits are never exceeded under a stress test of 1,000 rapid lookups.
 - [ ] Anime titles resolve across AniList and TMDB with correct ID mapping for a hand-checked set of 50 titles including tricky cases (long-running shonen, split-cour seasons, films tied to series).
+- [ ] **The catalogue is fully usable with no TMDB key** (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.
+- [ ] **The embedding artefact is produced and published** (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.
 
 **Learning note.** ETL pipelines; why offline-first beats API-first here; rate limiting and backoff; caching strategy and TTL choice; the anime metadata problem specifically.
 
@@ -857,7 +897,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 **Goal.** Search that understands meaning, is instant, works offline, and never gets an exact title wrong.
 
-**Deliverables.** FTS5 index over titles, alternative titles, people, and keywords, with BM25 ranking and trigram fuzzy matching for typos. `ort` (ONNX Runtime) running a quantised sentence-transformer; a document text builder that composes each item's embedding input from synopsis, genres, keywords, director, mood descriptors, and era. HNSW index over the embeddings, persisted to disk, memory-mapped. **Reciprocal rank fusion** combining BM25 and vector results, with an exact-title short-circuit that guarantees a literal title match always ranks first. Query understanding: detect and extract structured filters from natural language (year ranges, "in Japanese", "under 100 minutes", "directed by") and apply them as constraints rather than as embedding input. Tier 0 path: embeddings precomputed and downloaded, never generated on device. Search UI: instant results as you type, grouped by kind, with keyboard navigation and a "why this matched" hint on semantic results. `fixtures/search/` corpus and the relevance eval harness.
+**Deliverables.** FTS5 index over titles, alternative titles, people, and keywords, with BM25 ranking and trigram fuzzy matching for typos. `ort` (ONNX Runtime) running a quantised sentence-transformer; a document text builder that composes each item's embedding input from synopsis, genres, keywords, director, mood descriptors, and era. HNSW index over the embeddings, persisted to disk, memory-mapped. **Reciprocal rank fusion** combining BM25 and vector results, with an exact-title short-circuit that guarantees a literal title match always ranks first. Query understanding: detect and extract structured filters from natural language (year ranges, "in Japanese", "under 100 minutes", "directed by") and apply them as constraints rather than as embedding input. Tier 0 path: **catalogue document** embeddings precomputed and downloaded, never generated on device — but the user's query *is* embedded on device on every tier, since that is one forward pass over ~30 tokens (§8, ADR-0015). The 80 ms p95 budget below includes it. Search UI: instant results as you type, grouped by kind, with keyboard navigation and a "why this matched" hint on semantic results. `fixtures/search/` corpus and the relevance eval harness.
 
 **Exit criteria.**
 - [ ] p95 keystroke-to-results < 80 ms over the full catalogue.
@@ -970,7 +1010,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 **Goal.** The player becomes better than the commercial ones.
 
-**Deliverables.** **The pause overlay** — the signature feature. On pause, a Prime-X-Ray-inspired panel slides in over a dimmed, blurred frame: full cast with headshots, director and key crew, ratings (IMDb, TMDB, Rotten Tomatoes if available), runtime remaining, the current chapter, trivia and goofs, soundtrack, and "more like this". Clicking a cast member opens their filmography. It must be beautiful — this is the screenshot people will remember. (Face recognition arrives in Phase 22; until then it shows the full cast list, well-designed.) Next-episode handling with a countdown and a preview card. Episode navigation within the player. Chapter markers on the scrub bar. Thumbnail previews on scrub-bar hover, generated in the background via FFmpeg and cached. Picture-in-picture. Audio delay control. Video filter controls (brightness, contrast, saturation) for badly-encoded sources. Statistics-for-nerds overlay showing decode path, dropped frames, bitrate, and swarm state.
+**Deliverables.** **The pause overlay** — the signature feature. On pause, a Prime-X-Ray-inspired panel slides in over a dimmed, blurred frame: full cast with headshots, director and key crew, ratings (IMDb, TMDB, and AniList for anime — **not** Rotten Tomatoes, which has no free API and whose scraping would violate its terms), runtime remaining, the current chapter, trivia and goofs, soundtrack, and "more like this". Clicking a cast member opens their filmography. It must be beautiful — this is the screenshot people will remember. (Face recognition arrives in Phase 22; until then it shows the full cast list, well-designed.) Next-episode handling with a countdown and a preview card. Episode navigation within the player. Chapter markers on the scrub bar. Thumbnail previews on scrub-bar hover, generated in the background via FFmpeg and cached. Picture-in-picture. Audio delay control. Video filter controls (brightness, contrast, saturation) for badly-encoded sources. Statistics-for-nerds overlay showing decode path, dropped frames, bitrate, and swarm state.
 
 **Exit criteria.**
 - [ ] The pause overlay is visually excellent and appears in < 200 ms.
@@ -1025,12 +1065,13 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 **Goal.** A three-screen setup that a non-technical person completes in under two minutes, and that gives the recommender everything it needs.
 
-**Deliverables.** Profile system: creation, avatar, optional PIN, Netflix-style picker on launch, fast switching. Full isolation of taste model, history, watchlist, continue-watching, and playback preferences; shared downloaded files and metadata cache. A kids profile with content-rating limits. **The onboarding wizard**, three steps: (1) create profile; (2) taste — all four methods the author chose, offered together: import from Letterboxd CSV, Trakt, IMDb ratings export, or MAL/AniList XML; an adaptive poster grid (3–4 rounds, each adapted to previous picks, choices spread to maximise information gain); taste statements about pace, ambiguity, era, subtitles, runtime, and formal experimentation — *not* genre checkboxes; and a free-text "describe what you love" box embedded directly into the taste vector; (3) sources — optional, one paste-a-URL field with plain-language help and a "later" option that is not a dead end. **The app must be fully usable if step 3 is skipped**, via local files and the Internet Archive backend. Add-a-local-folder is offered inline in step 3 as the zero-configuration path.
+**Deliverables.** Profile system: creation, avatar, optional PIN, Netflix-style picker on launch, fast switching. Full isolation of taste model, history, watchlist, continue-watching, and playback preferences; shared downloaded files and metadata cache. A kids profile with content-rating limits. **The onboarding wizard**, three steps: (1) create profile; (2) taste — **defaulting to the three methods that need no artwork** (ADR-0013), since the app is fully functional with no TMDB key and a poster grid needs posters: import from Letterboxd CSV, Trakt, IMDb ratings export, or MAL/AniList XML; taste statements about pace, ambiguity, era, subtitles, runtime, and formal experimentation — *not* genre checkboxes; and a free-text "describe what you love" box embedded directly into the taste vector. The **adaptive poster grid** (3–4 rounds, each adapted to previous picks, choices spread to maximise information gain) appears as an additional round **only once artwork is available**. Where artwork is absent the equivalent surface is a **typographic title-card grid** — title, year, director, set in the §9.2 display serif — which for a cinephile app is arguably the better design anyway: it selects on knowledge and taste rather than poster recognition. Offering the optional ~30-second TMDB step sits here, framed as *unlock artwork and rich detail*, with a "later" that is not a dead end; (3) sources — optional, one paste-a-URL field with plain-language help and a "later" option that is not a dead end. **The app must be fully usable if step 3 is skipped**, via local files and the Internet Archive backend. Add-a-local-folder is offered inline in step 3 as the zero-configuration path.
 
 **Exit criteria.**
 - [ ] A first-time user with no technical knowledge reaches a populated Home screen in under two minutes. Test this on an actual person.
 - [ ] A Letterboxd export of 500+ films imports correctly and is reflected in the taste model.
 - [ ] Skipping the sources step leaves a functional, non-empty app.
+- [ ] **Completing onboarding with no TMDB key produces a working, populated, good-looking app** (ADR-0013). Every artwork-bearing surface has a designed artwork-free state — a typographic fallback, never a grey rectangle.
 - [ ] Profile switching is instant and leaks no state between profiles.
 - [ ] Every onboarding screen is beautiful — this is the first impression.
 
@@ -1064,7 +1105,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 **Deliverables.** **Layer 1 — content-based**: similarity in embedding space against each taste mode, filtered and boosted by the explicit axes from Phase 15. **Layer 2 — item-item collaborative filtering**: precompute an item-item similarity matrix offline from MovieLens (and AniList/IMDb rating signals), shipped or built during ingestion, giving genuine "people who loved this also loved" signal with no server and no other users. Handle the popularity bias that raw co-occurrence produces — normalise so that a beloved obscure film can surface above a mediocre blockbuster. **Layer 3 — the hybrid ranker**: blend both signals with candidate generation (retrieve ~1,000 candidates cheaply, rank precisely), apply diversity constraints (maximal marginal relevance so a rail isn't eight films by one director), availability weighting (something you can actually watch right now ranks higher), and freshness. **Explanations**: every recommendation carries a human-readable reason grounded in the model ("Because you finished three Béla Tarr films", "Loved by people who share your taste in 1970s political thrillers"). Cold-start handling for items with no ratings. `fixtures/recommender/` and the recommender eval harness.
 
 **Exit criteria.**
-- [ ] Recall@20 beats a popularity baseline by > 40% on a held-out split.
+- [ ] Recall@20 beats a popularity baseline by > 40% **relative** on a held-out split — i.e. `(recall_model / recall_baseline) - 1 > 0.40`, not 40 percentage points.
 - [ ] Catalogue coverage > 15% — the recommender does not only ever surface the same 2,000 films.
 - [ ] Intra-list diversity meets the documented target; no rail is dominated by one director, franchise, or year.
 - [ ] Every recommendation has a truthful explanation.
@@ -1149,7 +1190,9 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 ---
 
 ### Phase 21 — Performance Engineering and the Low-End Path
-**Depends on:** 18, 20. **Sessions:** 2.
+**Depends on:** 18 (20 optional). **Sessions:** 2.
+
+> Phase 20 is a *soft* dependency: with no shell integration built, there is simply no shell-integration cost to profile. This keeps Tier B (Appendix E) reachable without Tier C.
 
 **Goal.** Meet every budget in Section 2.3 on a genuinely weak machine.
 
@@ -1205,7 +1248,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 **Goal.** The fifth tab becomes real.
 
-**Deliverables.** M3U and M3U8 playlist import from a user-supplied URL or file; Xtream Codes credential support. XMLTV EPG parsing with a full programme guide UI — a proper timeline grid, not a list. Channel logos, categories, country grouping, and search. Free legal FAST sources as built-in options the user can enable: Pluto TV, Samsung TV Plus, Plex FAST, and the public `iptv-org` index — offered as *choices*, not defaults. HLS playback through libmpv with adaptive bitrate. Channel favourites and recents. Recording to disk with scheduling from the EPG. Time-shift and pause-live where the stream supports it. Integration with the taste model so live content participates in recommendations where metadata allows.
+**Deliverables.** M3U and M3U8 playlist import from a user-supplied URL or file; Xtream Codes credential support. XMLTV EPG parsing with a full programme guide UI — a proper timeline grid, not a list. Channel logos, categories, country grouping, and search. Free legal FAST services as built-in options the user can enable: Pluto TV, Samsung TV Plus and Plex FAST — offered as *choices*, never defaults, and each added to `tools/guard/allowlist.txt` with its own justification and ADR (ADR-0010). **The `iptv-org` index is not bundled**: it is a URL the user pastes like any other, which is cleaner and consistent with §2.1's rule that no default URL ships. HLS playback through libmpv with adaptive bitrate. Channel favourites and recents. Recording to disk with scheduling from the EPG. Time-shift and pause-live where the stream supports it. Integration with the taste model so live content participates in recommendations where metadata allows.
 
 **Exit criteria.**
 - [ ] A user-supplied M3U with 5,000 channels imports and browses smoothly.
@@ -1286,31 +1329,41 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 ### A. Phase Dependency Graph
 
+Regenerated from the `Depends on:` line of each phase, which is authoritative. Where this diagram and a phase header disagree, **the header wins and the diagram is wrong** — fix the diagram.
+
 ```
-0 → 1 → 2 ─────────────────────┐
-    │                          │
-    └→ 3 → 4 → 5 ──────────────┤
-         │    │                │
-         └→ 6 → 7 → 8 ◄────────┘   ← MILESTONE (demoable)
-                   │
-         ┌─────────┼─────────┬──────────┐
-         ↓         ↓         ↓          ↓
-         9        10        11         12
-         │         │         │          │
-         └────┬────┴────┬────┘          │
-              ↓         ↓               ↓
-             13 ◄───────────────────────┘
-              
-    14 → 15 → 16 → 17 → 18 → 19
-                            │
-                            ├→ 20 → 21
-                            ├→ 22, 23
-                            ├→ 24
-                            ├→ 25
-                            └→ 26
-                                 ↓
-                                27
+0 ──→ 1 ──┬──────────────────→ 2 ─────────────────────────┐
+          │                                               │
+          └→ 3 ──┬──→ 4 ──→ 5 ────────────┬───────────────┤
+                 │                        │               │
+                 └→ 6 ──→ 7 ──────────────┴→ 8 ◄──────────┘
+                                             │   MILESTONE
+                     ┌───────────┬───────────┼───────────┐
+                     ↓           ↓           ↓           ↓
+                     9          10          11          12
+                     │           │           ↑           │
+                     │           └───────────┤           │
+                     └───────────────────────┘           │
+                     │        (11 needs 8, 9, 10)        │
+                     └────────────┬──────────────────────┘
+                                  ↓
+                                 13   (needs 7, 9, 12)
+
+
+  3 ─┬─→ 14 ──→ 15 ──→ 16 ──→ 17 ──→ 18 ─┬──→ 19
+  5 ─┘                                   ├──→ 20 ──┐
+                                         ├──→ 21 ◄─┘  (20 optional)
+                                         ├──→ 23      (also needs 11, 12)
+                                         ├──→ 24
+                                         └──→ 25      (also needs 3, 5, 16)
+
+  11 ─┬──→ 22
+      └──→ 26
+
+  27 ← everything (run it whenever you stop — see Appendix E)
 ```
+
+**Corrections made in this regeneration.** Phase 8 depends on **5 and 7**; the previous diagram implied a hard `2 → 8` edge that no phase header states (Phase 2 is a practical prerequisite for a good-looking Phase 8, not a declared one). Phase 14 depends on **3 and 5**; the previous diagram drew `14 → 15 → …` as a disconnected root. Phase 21 depends on **18, with 20 optional** (see its header). Phases 22 and 26 depend on **11**; 23 on **11 and 12**; 25 on **3, 5 and 16**.
 
 Phases 9–13 can be reordered if a session's energy suits one better. Phases 22–26 are genuinely independent of one another and can be tackled in any order, or deferred indefinitely without harming the project — 27 is reachable from 21.
 
@@ -1344,7 +1397,7 @@ Maintained in `docs/RISKS.md` from Phase 0. Reviewed at the start of any phase w
 |---|---|---|---|---|---|
 | **R1** | **libmpv cannot be cleanly embedded in a Tauri v2 window.** Rendering a native video surface with a webview UI over it is the single fiddliest integration in this project. | Medium | Severe — Phase 8 and everything downstream | Spike A in Phase 1, before anything depends on it. Two approaches tried. | In order: (a) child window positioned and clipped under the webview; (b) libVLC, which has friendlier bindings; (c) HTML5 `<video>` with FFmpeg remuxing, accepting the codec limitations. Each is an ADR. |
 | **R2** | **librqbit's streaming control is insufficient** to build the Phase 7 deadline scheduler. | Medium | Severe — the "8 seconds to first frame" promise | Spike B in Phase 1 measures real numbers and audits the API surface. | libtorrent-rasterbar via FFI. Costs a C++ toolchain and binding work, roughly a week, but it is the proven path and every serious client uses it. |
-| **R3** | **ONNX Runtime is painful to build on Windows, or too slow on Tier 0.** | Low–Medium | Moderate — semantic search and the taste model | Spike C in Phase 1 measures latency and memory on the dev machine, then on a constrained VM. | Ship precomputed embeddings for the whole catalogue and never embed on device (already the Tier 0 design). New items get embeddings on next catalogue refresh. Semantic search survives; on-the-fly embedding of free-text queries would need a smaller model or a hash-based fallback. |
+| **R3** | **ONNX Runtime is painful to build on Windows, or too slow on Tier 0.** | Low–Medium | **Moderate/Severe** — semantic search and the taste model. Raised from Moderate by ADR-0015: query embedding now runs on *all* tiers, so an unusable `ort` breaks semantic search everywhere, not only on Tier 0. Spike C gates Phase 5. | Spike C in Phase 1 measures latency and memory on the dev machine, then on a constrained VM. | Ship precomputed embeddings for the whole catalogue and never embed on device (already the Tier 0 design). New items get embeddings on next catalogue refresh. Semantic search survives; on-the-fly embedding of free-text queries would need a smaller model or a hash-based fallback. |
 | **R4** | **Catalogue ingestion is far larger or slower than expected** — IMDb plus TMDB plus MovieLens is a lot of data. | Medium | Moderate — first-run experience | Measure in Phase 4 before committing to a shape. Scope by a vote/popularity threshold rather than ingesting everything. | Tiered catalogue: ship a core index of ~200k well-known titles, fetch the long tail live on demand and cache. The "vastest library" promise is met by the source layer, not by the local index. |
 | **R5** | **Windows shell integration hits platform limits.** Windows 11 context-menu entries require a packaged (sparse MSIX) app; icon overlay handlers are limited to roughly 15 slots system-wide and cloud-storage apps have already taken them. | **High** | Low — these are enhancements | Research the constraints in Phase 20 *before* implementing, not after. | Ship the legacy context menu (still reachable via "Show more options"), or produce a sparse package purely for shell registration. Drop icon overlays and document why — knowing *why* a platform limit exists is itself a good interview answer. |
 | **R6** | **Subtitle alignment doesn't reach 90%** on the fixture corpus. | Medium | Low–Moderate | Build the corpus first, in Phase 10, so the target is measured rather than assumed. | Lower the target *with evidence*, and lean harder on the embedded-track path (which is already the primary route and needs no alignment at all). Report the honest number in the case study — a measured 76% with an explanation beats an unverified claim of 95%. |
@@ -1379,4 +1432,33 @@ Face recognition, live TV, manga and comics, casting and watch-together. Fully i
 
 Every change to this document is recorded here: date, section, what changed, ADR.
 
-*(none yet — Phase 0 initialises this section)*
+### spec_version 1.1.0 — 2026-08-30 (Phase 0, session 0a)
+
+Seventeen amendments arising from the Phase 0 specification audit. Author approved
+each ruling explicitly before any edit was made (§2.8: amend first, then build).
+The seven that introduce new design carry ADRs; the ten that fix internal
+contradictions or imprecision do not.
+
+| # | Section(s) | What changed | ADR |
+|---|---|---|---|
+| 1 | §12.5 | Posture guard redesigned around two matchers: plaintext **structural patterns** and a **salted-SHA-256 hashed denylist**, resolving the contradiction whereby §12.5's plaintext site-name denylist violated §2.1. Documented explicitly as hygiene, not security. | [0009](docs/adr/0009-posture-guard-denylist-design.md) |
+| 2 | §2.1, §12.5 | All test vectors, fixtures and documentation examples must use **RFC 2606 reserved domains**, so the guard can be proven to fire without a real forbidden string entering history. | [0009](docs/adr/0009-posture-guard-denylist-design.md) |
+| 3 | §12.5 | Added the **allowlist** (`tools/guard/allowlist.txt`), which §12.5 lacked entirely despite §2.1 requiring shipped legal sources. Scoped to content/metadata source domains only; adding a line requires an ADR. | [0010](docs/adr/0010-source-allowlist-and-governance.md) |
+| 4 | §2.1, §12.2 | **Fixture site-tag redaction policy**: release-group tokens kept verbatim, site tags replaced with synthetic `[SITE01]` tokens at authoring time, mapping never recorded. Resolves the collision between §12.2's "real-world filenames" and §2.1. | [0011](docs/adr/0011-fixture-site-tag-redaction.md) |
+| 5 | §12.5, §12.6, §14 | Dev tooling (`guard`, `doctor`) fixed as **Python 3.12, stdlib only, permanently**; hooks activated via **`core.hooksPath`**; gitleaks **pinned in CI** with a regex fallback locally. All three were unspecified. Python added to §14. | [0012](docs/adr/0012-dev-tooling-language-and-hooks.md) |
+| 6 | §14, Phase 4, Phase 14 | **TMDB is now optional, not required.** The app is fully functional on the offline IMDb + MovieLens catalogue with no key. Resolves the contradiction between §14 and the §3.3 two-minute onboarding promise. Cold-start taste defaults to the three artwork-free methods; the poster grid appears only once artwork exists. | [0013](docs/adr/0013-tmdb-optional-offline-first-catalogue.md) |
+| 7 | §2.7, Phase 4 | Embedding artefacts ship as **versioned GitHub Release assets**, explicitly permitted by an amended §2.7 and requiring consent with size shown. Added the Phase 4 subtask that **produces** the artefact — previously unowned work. | [0014](docs/adr/0014-embedding-artefact-distribution.md) |
+| 8 | §8, Phase 1, Phase 5 | **Tier 0 embeds queries but never documents.** Resolves the three-way disagreement between §8, Phase 5 and R3. Spike C must measure query latency specifically; >~30 ms p95 escalates under §10.9 rather than widening the budget. | [0015](docs/adr/0015-tier-0-query-embedding.md) |
+| 9 | Appendix D (R3) | R3 impact raised **Moderate → Moderate/Severe**, since ONNX Runtime is now required on all tiers. Spike C gates Phase 5. | — |
+| 10 | Phase 0 | Exit criterion "CI passes on `main`" was circular against §10.5's branch-per-phase rule. Now: green on `phase/00-bootstrap`, **and** on `main` after merge. | — |
+| 11 | Phase 21 | Dependency changed from "18, 20" to **"18 (20 optional)"**. Tier B contained Phase 21 but not Phase 20, making Tier B — the designated definition of done — unreachable as specified. | — |
+| 12 | Appendix A | Dependency graph **regenerated from the phase headers**, which are now stated to be authoritative. Corrected phantom `2 → 8` edge, disconnected Phase 14 root, and missing edges for 21, 22, 23, 25, 26. | — |
+| 13 | §7 | Repository layout was missing `tools/guard/`, `tools/doctor/`, `.githooks/`, `spikes/`, `docs/RISKS.md`, `docs/DECISIONS_PENDING.md`, `docs/PERFORMANCE.md` and `docs/MANUAL_TESTS.md`, all of which Phase 0 or Phase 1 requires. Added. | — |
+| 14 | §2.3, Phase 1 | Budgets **labelled by tier**. §2.3 is Tier 0 and governs; Phase 1's <2 s and <200 MB are Tier 2 dev-machine targets. Neither number changed. Search budget now explicitly includes query embedding. | — |
+| 15 | Phase 3 | Exit criterion split so the **100 ms applies unambiguously to indexed lookup**, not to bulk insertion of 500,000 rows. | — |
+| 16 | Phase 16, §12.2 | "Beats a popularity baseline by > 40%" clarified as **relative** (a ratio), not percentage points. | — |
+| 17 | Phase 11, Phase 24 | **Rotten Tomatoes cut** (no free API; scraping violates its terms) — use IMDb, TMDB, AniList. Phase 24's FAST services go on the allowlist with justification; **`iptv-org` is not bundled** and becomes a user-pasted URL. | — |
+
+Deferred rather than resolved, and tracked in `docs/DECISIONS_PENDING.md`: the
+GPL-3.0 "source only, no compiled installers" posture versus Phase 27's packaging
+deliverables and the §2.3 installed-size budget.
