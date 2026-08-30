@@ -1,0 +1,13 @@
+[package]
+name = "spike-c-ort"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# SPIKE. Throwaway (SPEC.md Phase 1, risk R3). Not the Phase 5 design.
+
+[dependencies]
+ort = { version = "2.0.0-rc.13", features = ["download-binaries"] }
+tokenizers = { version = "0.20", default-features = false, features = ["onig"] }
+ndarray = "0.16"
+anyhow = "1"

@@ -14,13 +14,13 @@
 
 0 of 7 exit criteria met with evidence.
 
-> Spike A COMPLETE and R1 retired: libmpv embeds in Tauri v2, hardware-decodes, and the compositing problem is solved by still-frame substitution on pause plus region cutouts during playback (ADR-0021), with no patched dependency. SPEC.md 9.3 amended by ADR-0020. Spikes B and C are next, before any other Phase 1 work.
+> ALL THREE SPIKES COMPLETE. R1 retired (ADR-0021: still-frame on pause + region cutouts during playback). R2 retired (librqbit already provides most of the Phase 7 scheduler). R3 retired (query embedding p95 1.63 ms against a 30 ms trigger). No spike failed and no fallback was taken. Phase 1 proceeds to subtasks 1.4-1.10.
 
 ### Subtasks — 1/10 complete
 
 - [x] **1.1** Spike A - libmpv in a Tauri v2 window (R1). DONE: embeds, d3d11va hardware decode, survives resize. Compositing solved by still-frame on pause + SetWindowRgn cutouts during playback. Both approaches the spec mandates were evaluated; DirectComposition (wry #1762) rejected as unmerged and retained as an upgrade path. · `28eb3d6`
-- [ ] **1.2** Spike B - librqbit sequential streaming (R2). Measure time-to-first-usable-bytes against a legal well-seeded torrent; audit runtime per-piece priority control
-- [ ] **1.3** Spike C - ort/ONNX on Windows (R3). Measure QUERY-embedding p95 specifically; escalate above ~30ms
+- [~] **1.2** Spike B - librqbit sequential streaming (R2). DONE: TTFB 1.0/2.9/3.1 s, seek re-prioritisation 0.6/0.8/2.4 s, both well inside targets. API audit found ManagedTorrent::stream gives a position-tracking 32 MiB priority window the picker already honours, so Phase 7 largely tunes rather than builds. librqbit has NO webseed support - Phase 6's InternetArchiveBackend must use direct HTTP.
+- [~] **1.3** Spike C - ort/ONNX on Windows (R3). DONE: query-embedding p95 1.63 ms true length / 8.13 ms padded, against a 30 ms trigger. Load 82 ms, resident +51.6 MB, 384 dims. Tier 0 VM measurement outstanding as P8.
 - [ ] **1.4** Tauri v2 + React + TS strict + Vite + Tailwind building
 - [ ] **1.5** Window: custom title bar, remembered size/position, min 1024x640
 - [ ] **1.6** Left nav rail, five destinations, collapse/expand
@@ -43,7 +43,7 @@
 
 ## What's next
 
-Spike B, then Spike C, before any other Phase 1 work. Spike B (librqbit, risk R2): measure time-to-first-usable-bytes with sequential priority against a legal well-seeded torrent - an Internet Archive item or a Linux ISO - and AUDIT whether the API exposes runtime per-piece or per-range priority control at all, since without that the Phase 7 deadline scheduler cannot be written. Pass the torrent URL as a CLI argument; NEVER commit one, the guard blocks .torrent URLs and bare infohashes by design. R2 triggers: no runtime piece-priority control, or TTFB above 20 s. Then Spike C (ort, risk R3): measure QUERY-embedding p95 specifically - model loaded, one ~30-token query, wall clock to a returned vector - and escalate above ~30 ms rather than widening the 80 ms search budget. Numbers to docs/eval-results.md as produced. Then Phase 1 subtasks 1.4-1.10.
+All three spikes are done and no fallback was taken, so Phase 1 continues with subtask 1.4: scaffold the real Tauri v2 + React + TypeScript(strict) + Vite + Tailwind application in src-tauri/ and src/, replacing nothing in spikes/ (that code stays as evidence). Then 1.5 window chrome, 1.6 the five-destination nav rail, 1.7 the typed IPC layer with GENERATED TypeScript types (the exit criterion is that changing a Rust command signature breaks the TS build, so verify that by actually breaking one), 1.8 tiers.rs, 1.9 the Settings screen, 1.10 tracing plus panic handler. Carry forward from the spikes: libmpv loads dynamically with no MSVC import library; ADR-0021 fixes the player composition architecture; Phase 6's Internet Archive backend must use direct HTTP, not torrents (D6).
 
 ---
 
@@ -99,6 +99,7 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D3** (raised in Phase 0) Bare-domain detection is disabled inside source files (attribute access is shaped identically). URLs are still checked everywhere, as is the denylist. Documented in tools/guard/README.md.
 - **D4** (raised in Phase 0) tools/state/validate_state.py implements a subset of JSON Schema draft 2020-12 by hand, because ADR-0012 fixed these tools as stdlib-only. It rejects any schema construct it does not implement rather than passing silently, but it is not a conformant validator. Revisit only if the schema needs constructs it lacks.
 - **D5** (raised in Phase 1) Player has TWO compositing paths - still-frame when paused, region cutouts when playing - and the chrome silhouette must stay in sync with the region or the uncovered part of the hole shows the desktop. Phase 11 owns this invariant. Retire if wry PR #1762 merges and DirectComposition replaces both.
+- **D6** (raised in Phase 1) librqbit has no webseed (BEP-19) support, so Internet Archive torrents will not work through the torrent path. Phase 6's InternetArchiveBackend must resolve to direct HTTP instead. Not a defect, but it constrains how that backend is built.
 
 ---
 
@@ -107,3 +108,4 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **P1** — decide by Phase 27 Source-only distribution versus Phase 27 packaging and the 2.3 installed-size budget. See docs/DECISIONS_PENDING.md.
 - **P5** — decide by Phase 12 Where the Phase 12 review-queue confidence threshold sits, given >95% top-1 and <1% false-confident pull against each other. Measure, do not guess. See docs/DECISIONS_PENDING.md.
 - **P6** — decide by Phase 27 Windows Sandbox pass on a genuinely bare machine. The E1 CI job proves a clean checkout builds, but windows-latest ships Rust, Node and MSVC preinstalled, so it does not prove SETUP.md is complete from nothing.
+- **P8** — decide by Phase 21 Spike C measured query-embedding latency on the Tier 2 dev machine only. ADR-0015 also asked for a constrained VM approximating Tier 0. Unpadded headroom is ~18x so this does not block Phase 5, but the padded worst case with a 3-4x Tier 0 penalty lands at 24-33 ms, close to the 30 ms trigger. Measure before Phase 21 signs off the 80 ms search budget.

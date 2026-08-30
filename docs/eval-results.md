@@ -62,6 +62,109 @@ Tier 2 and are labelled as such.
 
 ---
 
+## Phase 1 — Spike C (ONNX Runtime, risk R3)
+
+**R3 does not fire. PASS, with large headroom.** `ort` 2.0.0-rc.13, ONNX Runtime,
+`all-MiniLM-L6-v2` INT8 (21.9 MiB), dev machine (**Tier 2**), release build,
+`intra_threads = 2`.
+
+ADR-0015 made this the measurement that gates Phase 5: query embedding runs on
+**every** tier, so this is query latency specifically — model already loaded, one
+query, wall clock to a returned vector — not document throughput.
+
+| Measurement | True query length | Padded to 128 | Trigger / budget |
+|---|---|---|---|
+| tokens per query | 10.0 avg | 128.0 | ADR-0015 assumed ~30 |
+| min | 0.71 ms | 6.61 ms | — |
+| p50 | **0.98 ms** | 7.11 ms | — |
+| mean | 1.06 ms | 7.43 ms | — |
+| **p95** | **1.63 ms** | **8.13 ms** | **R3 trigger: > ~30 ms** |
+| max | 2.23 ms | 9.30 ms | — |
+| share of the §2.3 80 ms search budget | **2.0%** | 10.2% | — |
+
+| | Value | Budget |
+|---|---|---|
+| Model load | 81.9–84.9 ms | — (lazy-load on first search if it threatens cold start) |
+| Resident memory added | **+51.6 MB** | §2.3 Tier 0 idle RAM 250 MB |
+| Embedding dimension | 384 | matches ADR-0014's 77 MB/200k estimate |
+
+**Both columns are reported because the tokenizer surprised the measurement.**
+`tokenizer.json` for this model configures padding to a fixed 128 tokens, so the
+first run measured every query as 128 tokens — roughly 4× the real work, and the
+wrong thing. Padding is now disabled by default and the padded figure kept as a
+worst case. Note the queries here average **10 tokens**, shorter than the ~30 ADR-0015
+assumed, so the honest bracket for a real query is **1.6–8.1 ms p95**.
+
+**Headroom against Tier 0.** These are Tier 2 numbers. Even taking the padded worst
+case and assuming a 3–4× penalty on Tier 0 hardware, p95 lands around 24–33 ms —
+which is why the padded column matters. The unpadded case has roughly **18× headroom**
+against the 30 ms trigger.
+
+**Outstanding (honest gap):** ADR-0015 asked for this to be measured on the dev
+machine **and on a constrained VM approximating Tier 0**. Only the dev machine has
+been measured. Logged as **P8**; it does not block Phase 5, but the Tier 0 number
+should exist before Phase 21 signs off the search budget.
+
+## Phase 1 — Spike B (librqbit streaming, risk R2)
+
+**R2 does not fire. PASS.** librqbit 9.0.1, dev machine, 3 runs against a legal
+well-seeded Linux ISO torrent (6.05 GiB). Torrent URL passed as an argument and
+never committed — the guard blocks `.torrent` URLs by design (§2.1).
+
+| Measurement | Run 1 | Run 2 | Run 3 | Target |
+|---|---|---|---|---|
+| Session created | 7 ms | — | — | — |
+| Metadata resolved | 1400 ms | 1485 ms | 795 ms | — |
+| Torrent live | 927 ms | 920 ms | 929 ms | — |
+| First byte | 686 ms | — | — | — |
+| **Time to first usable bytes (1 MiB)** | **1003 ms** | **2902 ms** | **3127 ms** | **R2 trigger > 20 000 ms** |
+| **Seek re-prioritisation (to 50%, unbuffered)** | **588 ms** | **753 ms** | **2392 ms** | **Phase 7 exit: < 5000 ms** |
+| Live peers / queued | 1 / 0 | 18 / 473 | 11 / 694 | — |
+
+**End-to-end time to playable bytes** (metadata + live + TTFB): **3.3 / 5.3 / 4.9 s**
+— inside §2.3's 8 s budget, before any tuning, on a debug-grade spike.
+
+Note run 1 hit 1003 ms with a **single live peer**, so these numbers are not
+dependent on a large swarm.
+
+### API audit — the part that actually gated R2
+
+R2's trigger was "the API does not permit per-piece or per-range priority to be set
+and changed at runtime". It does, and more directly than expected.
+
+- **`ManagedTorrent::stream(file_id) -> FileStream`** is public and implements
+  `AsyncRead + AsyncSeek` (`torrent_state/streaming.rs:337`).
+- Each open stream maintains a **32 MiB lookahead window** from its current read
+  position, converted to piece indices (`StreamState::queue`).
+- The picker consumes those as `priority_pieces`
+  (`torrent_state/live/mod.rs:1440`), ahead of the normal queue.
+- Selection order is: steal from a 10× slower peer → **priority pieces** → queued
+  pieces → steal from a 3× slower peer (`piece_tracker.rs:117`).
+- **Seeking moves the window immediately** — `start_seek` sets the position, and the
+  next `queue()` is computed from it. This is why seek re-prioritisation measures in
+  hundreds of milliseconds rather than seconds.
+- Multiple concurrent streams are interleaved fairly, with shuffling to avoid
+  determinism.
+
+**Consequence for Phase 7: much of the deadline scheduler already exists.** The
+phase shifts from "build a piece scheduler" toward "drive, tune and instrument
+librqbit's". That should be reflected when Phase 7 is planned.
+
+**Two limitations found, neither trigger-worthy:**
+
+- `PER_STREAM_BUF_DEFAULT` (32 MiB lookahead) is a **compile-time constant**, not
+  configurable. Phase 7's "documented bandwidth floor" tuning would want it
+  adjustable; options are a PR upstream or accepting the fixed window.
+- `iter_next_pieces` is `pub(crate)` — there is **no public API to set arbitrary
+  per-piece priority**. Control is indirect, via stream position. Sufficient for
+  playback; insufficient if Phase 7 ever wants a priority scheme unrelated to a
+  read head.
+
+**Separate finding, and it changes a Phase 6 assumption: librqbit has NO webseed
+(BEP-19) support.** Internet Archive torrents lean heavily on webseeds, so the
+`InternetArchiveBackend` (§2.1's named legal reference backend) should resolve to
+**direct HTTP**, not to torrents. This is why the spike measured against a Linux ISO.
+
 ## Phase 1 — Spike A (libmpv in Tauri, risk R1)
 
 Dev machine (Tier 2). libmpv `20260830-git-e8673660ab` x86_64, loaded dynamically.

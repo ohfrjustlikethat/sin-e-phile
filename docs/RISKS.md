@@ -187,7 +187,31 @@ outcome is the same, since the native surface still ends up above the webview.
 | **Likelihood** | Medium |
 | **Impact** | **Severe** — the "8 seconds to first frame" promise |
 | **Owner** | Phase 1 (Spike B), Phase 7 |
-| **Status** | `open` |
+| **Status** | **`retired`** — Spike B, 2026-08-31 |
+
+### RESOLVED — Spike B
+
+**Neither trigger fired.** Time to first usable bytes **1.0 / 2.9 / 3.1 s** across
+three runs against a legal well-seeded Linux ISO (trigger: > 20 s). Seek
+re-prioritisation **0.6 / 0.8 / 2.4 s** (Phase 7 exit criterion: < 5 s). End-to-end
+time to playable bytes 3.3–5.3 s, inside §2.3's 8 s budget, untuned.
+
+**The API question — which was the real gate — is answered better than expected.**
+`ManagedTorrent::stream(file_id)` is public and yields an `AsyncRead + AsyncSeek`
+stream; each open stream maintains a 32 MiB lookahead window from its read position,
+and the piece picker consumes those as `priority_pieces` ahead of its normal queue.
+Seeking moves the window immediately. **Much of the Phase 7 deadline scheduler
+already exists**, so that phase shifts toward driving, tuning and instrumenting
+librqbit's rather than building one.
+
+Two limitations, neither trigger-worthy: the 32 MiB lookahead is a compile-time
+constant, and there is no public API for arbitrary per-piece priority (control is
+indirect, via stream position).
+
+**Separate finding that changes a Phase 6 assumption: librqbit has no webseed
+(BEP-19) support.** Internet Archive torrents depend on webseeds, so the
+`InternetArchiveBackend` should resolve to **direct HTTP**, not torrents. Numbers in
+`docs/eval-results.md`.
 
 **Mitigation.** Spike B measures real numbers against a legal, well-seeded torrent
 and audits whether the API exposes enough control to build a deadline scheduler.
@@ -211,7 +235,21 @@ roughly a week, but it is the proven path that every serious client uses.
 | **Likelihood** | Low–Medium |
 | **Impact** | **Moderate/Severe** — raised from Moderate by ADR-0015 |
 | **Owner** | Phase 1 (Spike C), Phase 5 |
-| **Status** | `open` |
+| **Status** | **`retired`** — Spike C, 2026-08-31 |
+
+### RESOLVED — Spike C
+
+**No trigger fired.** `ort` builds and runs on Windows with no toolchain beyond what
+`docs/SETUP.md` already requires. Query-embedding **p95 = 1.63 ms** at true query
+length, **8.13 ms** padded to 128 tokens — against a 30 ms trigger, so roughly 18×
+headroom in the realistic case. Model load 82 ms; resident **+51.6 MB**, comfortably
+inside the 250 MB Tier 0 idle budget. 384-dimensional output as ADR-0014 assumed.
+
+**Caveat, recorded rather than glossed:** these are **Tier 2** numbers. ADR-0015 also
+asked for a constrained VM approximating Tier 0, which has not been run — logged as
+**P8**. Taking the padded worst case with a 3–4× Tier 0 penalty lands at 24–33 ms,
+which is close enough to the trigger that the Tier 0 measurement should exist before
+Phase 21 signs off the search budget.
 
 **Impact was raised during the Phase 0 audit.** ADR-0015 established that query
 embedding runs on *all* tiers, so an unusable `ort` breaks semantic search
