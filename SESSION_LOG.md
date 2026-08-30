@@ -1,0 +1,222 @@
+# Session Log
+
+Append-only (`SPEC.md` §10.1). One entry per session. **Never edit past entries** —
+a corrected fact goes in a later entry saying what changed and why.
+
+---
+
+## Session 1 — 2026-08-30 — Phase 0 (session 0a of 0a/0b): specification audit and safety rails
+
+**Phase:** 0 — Bootstrap and Project Infrastructure · **Branch:** `phase/00-bootstrap`
+**Spec version at end of session:** 1.1.0
+
+### What was attempted
+
+Session Zero (`SPEC.md` §10.7). Read `SPEC.md` in full, confirmed the five topics
+the author asked about, audited the specification for contradictions, then — after
+the author's rulings — executed the first half of Phase 0.
+
+The author split Phase 0 into two sessions on the basis that it is honestly ~2
+sessions of writing, not the 1 the spec estimates. **0a is the rails; 0b is the
+documents.**
+
+### What was completed
+
+**The audit.** Twelve issues raised, all twelve ruled on by the author. Seven
+required new design and became ADRs; ten were contradictions or imprecision fixed
+directly. Highlights:
+
+- §12.5 required a plaintext denylist of site names, which §2.1 forbids outright.
+  The two sections directly contradicted each other.
+- §12.5 had no allowlist at all, despite §2.1 requiring shipped legal sources.
+- §12.2's "real-world messy filenames" corpus could not have been committed under
+  §2.1 — a collision that would have surfaced in Phase 12 with 500 fixtures already
+  hand-labelled.
+- §14 marked TMDB required while §3.3 promised two-minute keyless onboarding.
+- Tier B contained Phase 21 but not Phase 20, and Phase 21 depended on Phase 20 —
+  so the tier designated as the definition of done was unreachable as specified.
+
+**`SPEC.md` amended to 1.1.0** with 17 amendments logged under `## Amendments`,
+each ADR-first per §2.8. Seven ADRs written (0009–0015) plus ADR-0001.
+
+**The safety rails, all verified working:**
+
+- `tools/guard/` — posture guard implementing ADR-0009/0010: plaintext structural
+  patterns, salted-SHA-256 denylist, allowlist. Modes: `--staged`, `--tree`,
+  `--history`, `--selftest`.
+- `tools/guard/secretscan.py` — stdlib regex secret scan for the pre-commit path.
+- `tools/doctor/doctor.py` — prerequisite checker and hook bootstrapper.
+- `.githooks/pre-commit` and `commit-msg`, activated via `core.hooksPath`.
+- `.github/workflows/ci.yml` — four jobs on `windows-latest`.
+- Public repo created at `ohfrjustlikethat/sin-e-phile`, secret scanning and push
+  protection enabled.
+
+### Evidence (§10.8)
+
+| Claim | Artefact |
+|---|---|
+| Guard fires on planted violations | `python tools/guard/guard.py --staged` on a planted `default_source_url` + announce URL → exit 1, 2 findings (`default-source-key`, `tracker-announce`) |
+| Guard is quiet on a clean tree | `--tree`, `--history` → exit 0, "clean" |
+| Guard self-test passes both directions | `python tools/guard/guard.py --selftest` → 30/30 (12 must-fire, 16 must-not-fire, 2 structural) |
+| Secret scan fires on a planted fake key | `python tools/guard/secretscan.py --staged` → exit 1, 2 findings (`generic-api-key-assignment`, `github-token`) |
+| Doctor reports missing prerequisites | PATH stripped of FFmpeg and Node → 3 MISS, exit 1, each with an actionable fix line |
+| Doctor passes on a good machine | Full PATH → all required ok, exit 0 |
+| commit-msg hook enforces §10.5 | Rejected a 77-character subject: "keep it under 72" |
+| CI green on the phase branch | Run `33314370192`, all four jobs ✓ |
+| Toolchain verified by real compile | `cargo new` + `cargo build` + run → "Hello, world!", host `x86_64-pc-windows-msvc` |
+
+### What was learned / what broke
+
+**The guard needed three rounds of tuning against the real tree: 118 false
+positives, then 12, then 0.** Each round exposed a genuine design flaw, not a
+typo — bare domains versus file extensions, URL hosts versus path segments,
+attribute access in source files, and filesystem-walking versus git-tracked files.
+This is the concrete argument for §12.5's insistence on *verifying* the guard: a
+guard written and never tested would have shipped, produced constant noise, and
+been bypassed within a week.
+
+**The first CI run failed, correctly**, on the fourth of those: the tree scan read
+the downloaded gitleaks archive's own README, which contains an example API key.
+
+**A real bug was found by the deliberate plant**, exactly as the exit criterion
+intends. The secret scanner's placeholder-exclusion list included the bare word
+`a`, so any secret whose value began with `a` — including the planted
+`a1b2c3…` TMDB key — was skipped entirely. Short, common placeholder words match
+the start of real secrets and silently disable the rule.
+
+**Environment gotcha, twice.** The tooling shell inherits a stale `PATH`, so
+freshly-installed toolchains look missing. `doctor` now reads the registry `PATH`
+and distinguishes "not installed" from "installed, restart your terminal". Related:
+`vswhere` silently ignores Insiders/Preview Visual Studio installs unless passed
+`-prerelease`, which made a present MSVC toolchain look absent.
+
+### Blockers
+
+None. The author installed Rust 1.98.0, Node 24.20.0 and MSVC 14.50.35717 during
+the session; all verified.
+
+### What the next session should do first
+
+**Session 0b — the documents.** In order: `LICENSE` (GPL-3.0), `README.md` with
+the pitch section drafted, `CONTRIBUTING.md`, `CHANGELOG.md`; then
+`PROJECT_STATE.json` enumerating **all 28 phases with their exit criteria** plus
+`docs/schemas/project-state.schema.json`; then `PROGRESS.md`; then `docs/SETUP.md`
+with **live-verified** current terms for the §14 services; `docs/GLOSSARY.md`
+(30 terms); `docs/HOW_IT_WORKS.md` skeleton; `docs/RISKS.md` (R1–R10, each with a
+concrete trigger, including ADR-0015's ~30 ms Spike C escalation trigger);
+`docs/DECISIONS_PENDING.md`; ADRs 0002–0008; and
+`docs/learning/phase-00-notes.md`, whose five self-check questions must then be
+**asked in chat and answered** before Phase 0 can be called done (§10.10).
+
+
+---
+
+## Session 2 — 2026-08-31 — Phase 0 (session 0b of 0a/0b): the documentation set
+
+**Phase:** 0 — Bootstrap and Project Infrastructure · **Branch:** `phase/00-bootstrap`
+**Spec version:** 1.1.0 (unchanged this session)
+
+### What was attempted
+
+The second half of Phase 0: the documents and the state system. Session 0a built the
+safety rails; this session wrote everything that has to exist for a future session —
+or an employer — to understand the project.
+
+### What was completed
+
+**Seed ADRs 0002–0008**, recording the decisions `SPEC.md` §5 locked before the
+repository existed: Tauri over Electron, librqbit over libtorrent, libmpv over
+libVLC, SQLite + FTS5 + HNSW over a vector database, the ships-empty source posture,
+GPL-3.0, and portable-by-default storage. Each states what was actually rejected and
+why. Two produced new pending decisions: ADR-0005 flags `sqlite-vec` as the
+alternative most likely worth revisiting, and ADR-0007 flags that GPL-3.0 makes the
+three extracted crates unusable by most of the Rust ecosystem — which defeats the
+point of extracting them (**P4**).
+
+**The state system**, which turned out to be the interesting engineering:
+
+- `tools/state/build_state.py` **generates** the 28-phase table with all 154 exit
+  criteria by parsing `SPEC.md` §15, rather than transcribing them. Transcription
+  would create a second copy of the specification that drifts the moment the spec is
+  amended. It also derives branch slugs by the spec's own convention, reproducing
+  §10.1's `torrent-engine` example exactly.
+- `docs/schemas/project-state.schema.json` plus a **hand-rolled stdlib validator**
+  (ADR-0012 forbids `pip install` in these tools). It makes §10.8 structural: a
+  criterion with `met: true` and no evidence fails validation, and the banned
+  phrases are rejected by pattern.
+- `PROGRESS.md` is now **generated** from the state file, so §10.1's "the two can
+  never disagree" is mechanical rather than a promise. CI fails if it is stale.
+
+**Documentation:** `README.md` with the pitch section written properly,
+`docs/RISKS.md`, `docs/SETUP.md`, `docs/GLOSSARY.md`, `docs/HOW_IT_WORKS.md`,
+`docs/DECISIONS_PENDING.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `LICENSE` (GPL-3.0
+fetched canonically, not typed), GitHub issue and PR templates, and stubs for
+`ARCHITECTURE`, `PERFORMANCE`, `MANUAL_TESTS` and `INTERVIEW_PREP` that say honestly
+what they are waiting on.
+
+**`docs/learning/phase-00-notes.md`** and `docs/phases/phase-00-bootstrap.md` with
+its retrospective.
+
+### Evidence (§10.8)
+
+| Claim | Artefact |
+|---|---|
+| E3 — state validates and enumerates 28 phases | `python tools/state/validate_state.py --check` → "valid — 28 phases, 154 exit criteria". Table generated from `SPEC.md` §15; `build_state.py --check` enforces sync in CI. |
+| The schema actually rejects bad input | Planted three violations — `met:true` with null evidence, evidence `"looks good"`, and `next_action: "continue the torrent engine"` (the spec's own anti-example) → 5 errors, exit 1. Restored, revalidated clean. |
+| E4 — eight seed ADRs, non-trivial | `docs/adr/0001`–`0008`, each with a real Alternatives Considered section. Plus 0009–0015 from the audit. |
+| E8 — risk register with concrete triggers | `docs/RISKS.md`: 11 risks, each with an observable trigger. R3 → Spike C p95 > ~30 ms. R7 → 30 days without a commit. R10 → allowlist gains a line without an ADR. |
+| Guard still clean after ~40 new files | `--selftest` 31/31, `--tree` and `--history` clean. |
+| §14 terms verified live | TMDB, AniList, Jikan, IMDb, MovieLens, OpenSubtitles, Trakt fetched 2026-08-30/31; dates recorded per service in `docs/SETUP.md`. |
+
+### What was learned / what broke
+
+**The schema caught me.** I marked the 0b subtasks complete with `commit: "PENDING"`,
+because the commit that completes them does not exist while they are being written.
+Validation rejected it. The correct ordering is: commit the work, then record the
+real SHA — which is now what happened, in two commits. A small thing, but it is the
+schema doing exactly its job on its author.
+
+**The guard blocked the GPL-3.0 licence.** The canonical text cites `fsf.org`, which
+is not on the allowlist. The fix was to add it to the guard's *infrastructure* set
+rather than the allowlist — ADR-0010 scopes the allowlist to content and metadata
+sources, and the FSF is neither — plus a regression vector, per `CONTRIBUTING`: fix
+the guard, add a vector, never add an exemption. Self-test now 31 checks.
+
+**Live verification of §14 was worth doing and produced four findings the spec did
+not record**, three of which constrain later phases: TMDB forbids caching beyond
+6 months (Phase 4 TTL design) and prohibits AI/ML training use (**P2** — embeddings
+are inference, but that reading needs a ruling, not an assumption); MovieLens does
+not generally permit redistribution (**P3** — bears on shipping a derived item-item
+matrix in Phase 16); Trakt has tightened its free tier and is revising limits for
+2026. These became risk **R11**.
+
+Worth noting: the OpenSubtitles free tier is **20 downloads/day with an account, 5
+without** — even tighter than §14's "single-digit" note implies for the no-account
+case. The Phase 10 design already assumes this and puts embedded tracks first.
+
+### Blockers
+
+**B1, `needs_user: true`.** Exit criterion **E1** — clone on a clean machine plus
+`docs/SETUP.md` produces a working dev environment — **cannot be evidenced from this
+machine**, which already has every prerequisite. `doctor` was verified both with a
+full PATH (all pass, exit 0) and a stripped one (3 MISS, exit 1, each with a fix
+line), so the diagnostic path works — but neither proves the clean-machine path.
+Per §10.8, evidence that cannot be produced means the criterion is **not met**, and
+we say what is blocking it rather than marking it done.
+
+### What the next session should do first
+
+**Phase 0 is not finished.** In order:
+
+1. **Ask the author the five self-check questions** at the end of
+   `docs/learning/phase-00-notes.md`, in chat, and wait for real answers (§10.10).
+   Struggling on one means re-explaining and fixing the note; struggling on most
+   means saying plainly that we went too fast.
+2. **The author clears B1** by cloning onto a clean machine or VM and following
+   `docs/SETUP.md`, recorded as `manual:` evidence.
+3. Then merge `phase/00-bootstrap` to `main`, confirm CI green there to close **E2**,
+   and tag `phase-00`.
+
+Phase 1 then begins with the three de-risking spikes — and **Spike C runs first**,
+not last, because ADR-0015 raised R3's impact to Moderate/Severe by establishing
+that query embedding runs on every tier.

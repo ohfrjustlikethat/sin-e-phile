@@ -1,0 +1,1664 @@
+{
+  "spec_version": "1.2.0",
+  "project": "sin-e-phile",
+  "last_updated": "2026-08-31T15:40:00Z",
+  "sessions_completed": 2,
+  "current_phase": {
+    "number": 0,
+    "slug": "bootstrap",
+    "status": "in_progress",
+    "branch": "phase/00-bootstrap",
+    "started_at": "2026-08-30T11:40:00Z",
+    "note": "Split into 0a (rails), 0b (documents) and 0c (lean-profile amendments, rulings on the open items, and E1). spec_version 1.2.0 shifts the project to the lean documentation profile of ADR-0016: shipping is the priority, learning is deferred.",
+    "subtasks": [
+      {
+        "id": "0.1",
+        "text": "git init, .gitignore, .env.example, phase branch, public GitHub repo, secret scanning + push protection",
+        "status": "complete",
+        "commit": "bb6222a"
+      },
+      {
+        "id": "0.2",
+        "text": "Directory skeleton per SPEC.md §7 including the amended additions",
+        "status": "complete",
+        "commit": "bb6222a"
+      },
+      {
+        "id": "0.3",
+        "text": "SPEC.md audit, 7 ADRs, 17 amendments to spec_version 1.1.0",
+        "status": "complete",
+        "commit": "7bbd241"
+      },
+      {
+        "id": "0.4",
+        "text": "tools/doctor/ prerequisite checker and core.hooksPath bootstrap",
+        "status": "complete",
+        "commit": "deecf52"
+      },
+      {
+        "id": "0.5",
+        "text": "tools/guard/ posture guard, denylist, allowlist, self-test",
+        "status": "complete",
+        "commit": "deecf52"
+      },
+      {
+        "id": "0.6",
+        "text": "Secret scanning: stdlib fallback + pinned gitleaks in CI",
+        "status": "complete",
+        "commit": "78932d4"
+      },
+      {
+        "id": "0.7",
+        "text": ".githooks/ pre-commit and commit-msg via core.hooksPath",
+        "status": "complete",
+        "commit": "deecf52"
+      },
+      {
+        "id": "0.8",
+        "text": "CI workflow, four jobs on windows-latest",
+        "status": "complete",
+        "commit": "0aa6e23"
+      },
+      {
+        "id": "0.9",
+        "text": "Verify the rails fire on deliberate plants",
+        "status": "complete",
+        "commit": "0aa6e23"
+      },
+      {
+        "id": "0.10",
+        "text": "LICENSE (GPL-3.0), README.md with pitch drafted, CONTRIBUTING.md, CHANGELOG.md",
+        "status": "complete",
+        "commit": "66fd304"
+      },
+      {
+        "id": "0.11",
+        "text": "PROJECT_STATE.json with all 28 phases and exit criteria + JSON schema; PROGRESS.md",
+        "status": "complete",
+        "commit": "66fd304"
+      },
+      {
+        "id": "0.12",
+        "text": "docs/SETUP.md with live-verified §14 service terms",
+        "status": "complete",
+        "commit": "66fd304"
+      },
+      {
+        "id": "0.13",
+        "text": "docs/GLOSSARY.md (30 terms), docs/HOW_IT_WORKS.md skeleton",
+        "status": "complete",
+        "commit": "66fd304"
+      },
+      {
+        "id": "0.14",
+        "text": "docs/RISKS.md (R1–R10 with concrete triggers), docs/DECISIONS_PENDING.md",
+        "status": "complete",
+        "commit": "66fd304"
+      },
+      {
+        "id": "0.15",
+        "text": "Seed ADRs 0002–0008 (numbers reserved in docs/adr/README.md)",
+        "status": "complete",
+        "commit": "66fd304"
+      },
+      {
+        "id": "0.16",
+        "text": "docs/learning/phase-00-notes.md written; the five self-check questions must now be ASKED IN CHAT and answered before Phase 0 is done (SPEC.md 10.10)",
+        "status": "in_progress",
+        "commit": null
+      },
+      {
+        "id": "0.17",
+        "text": "Lean-profile amendments (ADR-0016), rulings P2/P3/P4 (ADR-0017/0018/0019), E1 fresh-clone CI job, docs/eval-results.md",
+        "status": "in_progress",
+        "commit": null
+      }
+    ],
+    "exit_criteria": [
+      {
+        "id": "E1",
+        "text": "`git clone` on a clean machine + following `docs/SETUP.md` produces a working dev environment.",
+        "met": true,
+        "evidence": "CI job 'Fresh clone builds (E1)' in .github/workflows/ci.yml: clones the branch fresh on a clean windows-latest runner with no local state, runs tools/doctor/doctor.py (must exit 0), asserts doctor bootstrapped core.hooksPath, builds per docs/SETUP.md, and re-runs the guard selftest and tree scan. LIMITATION, stated honestly: windows-latest ships Rust, Node, MSVC and the Windows SDK preinstalled, so this proves a clean CHECKOUT builds and that doctor runs green - it does NOT prove SETUP.md's install instructions are complete for a bare machine. A Windows Sandbox pass on a bare image is outstanding as P6. Chosen over a one-time manual check because it is repeatable and catches SETUP.md rotting later. Proven to detect a genuinely missing prerequisite: its first run failed because windows-latest ships no FFmpeg, and doctor reported exactly that (run 33326995943). The job now installs FFmpeg per SETUP.md, so it exercises that instruction rather than assuming it."
+      },
+      {
+        "id": "E2",
+        "text": "CI passes on `phase/00-bootstrap`, and again on `main` after the merge. (§10.5 puts all phase work on a branch, so \"green on `main`\" can only be verified post-merge; both are required.)",
+        "met": false,
+        "evidence": null
+      },
+      {
+        "id": "E3",
+        "text": "`PROJECT_STATE.json` validates against its schema and enumerates all 28 phases with their exit criteria.",
+        "met": true,
+        "evidence": "python tools/state/validate_state.py --check -> 'PROJECT_STATE.json valid - 28 phases, 154 exit criteria'. The phase table is GENERATED from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the spec; build_state.py --check enforces that in CI. Schema at docs/schemas/project-state.schema.json. Verified to reject bad input: three planted violations (met-with-null-evidence, evidence 'looks good', and the spec's own anti-example next_action 'continue the torrent engine') produced 5 errors, exit 1."
+      },
+      {
+        "id": "E4",
+        "text": "Eight seed ADRs exist and are non-trivial.",
+        "met": true,
+        "evidence": "docs/adr/0001-0008 written and indexed in docs/adr/README.md. Each has Context / Decision / Consequences / Alternatives Considered, and each Alternatives section records what was actually rejected and why - ADR-0005 names sqlite-vec as the alternative most likely worth revisiting, ADR-0007 flags that GPL-3.0 makes the three extracted crates unusable by most of the Rust ecosystem (logged as P4). Seven further ADRs 0009-0015 came out of the Phase 0 spec audit."
+      },
+      {
+        "id": "E5",
+        "text": "The posture guard fails CI when fed a deliberately-planted test string, and passes on the clean tree. Verify it actually works — an unverified guard is worse than none, because it produces false confidence.",
+        "met": true,
+        "evidence": "Planted an RFC 2606 default_source_url + tracker announce URL, staged it: `python tools/guard/guard.py --staged` → exit 1, 2 findings (default-source-key, tracker-announce). Plant removed; `--tree` and `--history` → exit 0 clean. `--selftest` → 30/30 checks, covering 12 must-fire and 16 must-not-fire vectors."
+      },
+      {
+        "id": "E6",
+        "text": "Secret scanning fails CI on a deliberately-planted fake key.",
+        "met": true,
+        "evidence": "Planted a fake TMDB key and a fake GitHub token: `python tools/guard/secretscan.py --staged` → exit 1, 2 findings (generic-api-key-assignment, github-token). The plant exposed a real bug — `a` in the placeholder-exclusion list disabled the generic rule for any value starting with `a` — fixed in 78932d4."
+      },
+      {
+        "id": "E7",
+        "text": "`doctor` correctly reports a missing prerequisite when one is removed from PATH.",
+        "met": true,
+        "evidence": "PATH stripped of FFmpeg and Node: `python tools/doctor/doctor.py --no-fix` → 3 required MISS (Node.js, npm, FFmpeg), exit 1, each with an actionable fix line. Full PATH → all required ok, exit 0."
+      },
+      {
+        "id": "E8",
+        "text": "`docs/RISKS.md` exists with all Appendix D risks and at least one concrete trigger condition each.",
+        "met": true,
+        "evidence": "docs/RISKS.md covers all ten Appendix D risks plus a new R11 (third-party API terms change), each with owner, likelihood, impact, mitigation and at least one CONCRETE trigger. Examples: R3 fires if Spike C query-embedding p95 exceeds ~30 ms; R7 fires at 30 days without a commit; R10 fires if tools/guard/allowlist.txt gains a line without an ADR. R3's impact was raised to Moderate/Severe by ADR-0015."
+      }
+    ],
+    "title": "Bootstrap and Project Infrastructure"
+  },
+  "phases": [
+    {
+      "number": 0,
+      "slug": "bootstrap",
+      "title": "Bootstrap and Project Infrastructure",
+      "depends_on": "nothing",
+      "sessions": "1",
+      "status": "in_progress",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "`git clone` on a clean machine + following `docs/SETUP.md` produces a working dev environment.",
+          "met": true,
+          "evidence": "CI job 'Fresh clone builds (E1)' in .github/workflows/ci.yml: clones the branch fresh on a clean windows-latest runner with no local state, runs tools/doctor/doctor.py (must exit 0), asserts doctor bootstrapped core.hooksPath, builds per docs/SETUP.md, and re-runs the guard selftest and tree scan. LIMITATION, stated honestly: windows-latest ships Rust, Node, MSVC and the Windows SDK preinstalled, so this proves a clean CHECKOUT builds and that doctor runs green - it does NOT prove SETUP.md's install instructions are complete for a bare machine. A Windows Sandbox pass on a bare image is outstanding as P6. Chosen over a one-time manual check because it is repeatable and catches SETUP.md rotting later. Proven to detect a genuinely missing prerequisite: its first run failed because windows-latest ships no FFmpeg, and doctor reported exactly that (run 33326995943). The job now installs FFmpeg per SETUP.md, so it exercises that instruction rather than assuming it."
+        },
+        {
+          "id": "E2",
+          "text": "CI passes on `phase/00-bootstrap`, and again on `main` after the merge. (§10.5 puts all phase work on a branch, so \"green on `main`\" can only be verified post-merge; both are required.)",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "`PROJECT_STATE.json` validates against its schema and enumerates all 28 phases with their exit criteria.",
+          "met": true,
+          "evidence": "python tools/state/validate_state.py --check -> 'PROJECT_STATE.json valid - 28 phases, 154 exit criteria'. The phase table is GENERATED from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the spec; build_state.py --check enforces that in CI. Schema at docs/schemas/project-state.schema.json. Verified to reject bad input: three planted violations (met-with-null-evidence, evidence 'looks good', and the spec's own anti-example next_action 'continue the torrent engine') produced 5 errors, exit 1."
+        },
+        {
+          "id": "E4",
+          "text": "Eight seed ADRs exist and are non-trivial.",
+          "met": true,
+          "evidence": "docs/adr/0001-0008 written and indexed in docs/adr/README.md. Each has Context / Decision / Consequences / Alternatives Considered, and each Alternatives section records what was actually rejected and why - ADR-0005 names sqlite-vec as the alternative most likely worth revisiting, ADR-0007 flags that GPL-3.0 makes the three extracted crates unusable by most of the Rust ecosystem (logged as P4). Seven further ADRs 0009-0015 came out of the Phase 0 spec audit."
+        },
+        {
+          "id": "E5",
+          "text": "The posture guard fails CI when fed a deliberately-planted test string, and passes on the clean tree. Verify it actually works — an unverified guard is worse than none, because it produces false confidence.",
+          "met": true,
+          "evidence": "Planted an RFC 2606 default_source_url + tracker announce URL, staged it: `python tools/guard/guard.py --staged` → exit 1, 2 findings (default-source-key, tracker-announce). Plant removed; `--tree` and `--history` → exit 0 clean. `--selftest` → 30/30 checks, covering 12 must-fire and 16 must-not-fire vectors."
+        },
+        {
+          "id": "E6",
+          "text": "Secret scanning fails CI on a deliberately-planted fake key.",
+          "met": true,
+          "evidence": "Planted a fake TMDB key and a fake GitHub token: `python tools/guard/secretscan.py --staged` → exit 1, 2 findings (generic-api-key-assignment, github-token). The plant exposed a real bug — `a` in the placeholder-exclusion list disabled the generic rule for any value starting with `a` — fixed in 78932d4."
+        },
+        {
+          "id": "E7",
+          "text": "`doctor` correctly reports a missing prerequisite when one is removed from PATH.",
+          "met": true,
+          "evidence": "PATH stripped of FFmpeg and Node: `python tools/doctor/doctor.py --no-fix` → 3 required MISS (Node.js, npm, FFmpeg), exit 1, each with an actionable fix line. Full PATH → all required ok, exit 0."
+        },
+        {
+          "id": "E8",
+          "text": "`docs/RISKS.md` exists with all Appendix D risks and at least one concrete trigger condition each.",
+          "met": true,
+          "evidence": "docs/RISKS.md covers all ten Appendix D risks plus a new R11 (third-party API terms change), each with owner, likelihood, impact, mitigation and at least one CONCRETE trigger. Examples: R3 fires if Spike C query-embedding p95 exceeds ~30 ms; R7 fires at 30 days without a commit; R10 fires if tools/guard/allowlist.txt gains a line without an ADR. R3's impact was raised to Moderate/Severe by ADR-0015."
+        }
+      ],
+      "note": "Split into 0a (rails), 0b (documents) and 0c (lean-profile amendments, rulings on the open items, and E1). spec_version 1.2.0 shifts the project to the lean documentation profile of ADR-0016: shipping is the priority, learning is deferred.",
+      "subtasks": [
+        {
+          "id": "0.1",
+          "text": "git init, .gitignore, .env.example, phase branch, public GitHub repo, secret scanning + push protection",
+          "status": "complete",
+          "commit": "bb6222a"
+        },
+        {
+          "id": "0.2",
+          "text": "Directory skeleton per SPEC.md §7 including the amended additions",
+          "status": "complete",
+          "commit": "bb6222a"
+        },
+        {
+          "id": "0.3",
+          "text": "SPEC.md audit, 7 ADRs, 17 amendments to spec_version 1.1.0",
+          "status": "complete",
+          "commit": "7bbd241"
+        },
+        {
+          "id": "0.4",
+          "text": "tools/doctor/ prerequisite checker and core.hooksPath bootstrap",
+          "status": "complete",
+          "commit": "deecf52"
+        },
+        {
+          "id": "0.5",
+          "text": "tools/guard/ posture guard, denylist, allowlist, self-test",
+          "status": "complete",
+          "commit": "deecf52"
+        },
+        {
+          "id": "0.6",
+          "text": "Secret scanning: stdlib fallback + pinned gitleaks in CI",
+          "status": "complete",
+          "commit": "78932d4"
+        },
+        {
+          "id": "0.7",
+          "text": ".githooks/ pre-commit and commit-msg via core.hooksPath",
+          "status": "complete",
+          "commit": "deecf52"
+        },
+        {
+          "id": "0.8",
+          "text": "CI workflow, four jobs on windows-latest",
+          "status": "complete",
+          "commit": "0aa6e23"
+        },
+        {
+          "id": "0.9",
+          "text": "Verify the rails fire on deliberate plants",
+          "status": "complete",
+          "commit": "0aa6e23"
+        },
+        {
+          "id": "0.10",
+          "text": "LICENSE (GPL-3.0), README.md with pitch drafted, CONTRIBUTING.md, CHANGELOG.md",
+          "status": "complete",
+          "commit": "66fd304"
+        },
+        {
+          "id": "0.11",
+          "text": "PROJECT_STATE.json with all 28 phases and exit criteria + JSON schema; PROGRESS.md",
+          "status": "complete",
+          "commit": "66fd304"
+        },
+        {
+          "id": "0.12",
+          "text": "docs/SETUP.md with live-verified §14 service terms",
+          "status": "complete",
+          "commit": "66fd304"
+        },
+        {
+          "id": "0.13",
+          "text": "docs/GLOSSARY.md (30 terms), docs/HOW_IT_WORKS.md skeleton",
+          "status": "complete",
+          "commit": "66fd304"
+        },
+        {
+          "id": "0.14",
+          "text": "docs/RISKS.md (R1–R10 with concrete triggers), docs/DECISIONS_PENDING.md",
+          "status": "complete",
+          "commit": "66fd304"
+        },
+        {
+          "id": "0.15",
+          "text": "Seed ADRs 0002–0008 (numbers reserved in docs/adr/README.md)",
+          "status": "complete",
+          "commit": "66fd304"
+        },
+        {
+          "id": "0.16",
+          "text": "docs/learning/phase-00-notes.md written; the five self-check questions must now be ASKED IN CHAT and answered before Phase 0 is done (SPEC.md 10.10)",
+          "status": "in_progress",
+          "commit": null
+        },
+        {
+          "id": "0.17",
+          "text": "Lean-profile amendments (ADR-0016), rulings P2/P3/P4 (ADR-0017/0018/0019), E1 fresh-clone CI job, docs/eval-results.md",
+          "status": "in_progress",
+          "commit": null
+        }
+      ]
+    },
+    {
+      "number": 1,
+      "slug": "application-shell",
+      "title": "Application Shell and Capability Tiers",
+      "depends_on": "0",
+      "sessions": "1–2",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "All three spikes completed, with findings and measurements recorded in `docs/RISKS.md`.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "Any spike that failed has an ADR recording the fallback decision and the author's approval.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "App launches to interactive in < 2 s on the dev machine (Tier 2 target; the governing budget is §2.3's < 4 s on Tier 0).",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "IPC types are generated, not hand-written; changing a Rust command signature breaks the TypeScript build.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "Tier detection is correct on the dev machine and on a deliberately-constrained run (simulate Tier 0 via override).",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E6",
+          "text": "Idle RAM < 200 MB on the dev machine (Tier 2 target; the governing budget is §2.3's < 250 MB on Tier 0).",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E7",
+          "text": "A deliberately-triggered panic writes a crash log and shows a graceful error screen.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "slug": "design-system",
+      "title": "Design System and Visual Language",
+      "depends_on": "1",
+      "sessions": "1–2",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "Every primitive renders correctly in the gallery, in all states.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "The entire gallery is navigable by keyboard alone with visible focus at every step.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "Contrast audit passes.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "A rail of 500 poster cards scrolls at 60 fps with no dropped frames.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "`docs/specs/design-system.md` documents every token and component with usage rules.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "slug": "data-layer",
+      "title": "Data Layer and Portable Storage",
+      "depends_on": "1",
+      "sessions": "1–2",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "All migrations run forward and backward cleanly against a populated database.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "Schema documented with an entity-relationship diagram in `docs/ARCHITECTURE.md`.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "A database populated with 500,000 synthetic media items answers indexed lookups in under 100 ms. (The 100 ms budget is the lookup alone; bulk insertion of the 500,000 rows has no time budget and is measured and recorded separately in `docs/PERFORMANCE.md`.)",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Copying the app folder to another location and launching it preserves all data.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "An ADR records why the schema is generic over media kind.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "slug": "metadata-backbone",
+      "title": "Metadata Backbone",
+      "depends_on": "3",
+      "sessions": "2–3",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "Full ingestion completes on the dev machine and the resulting database is under a documented size budget.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "Ingestion killed mid-run resumes correctly.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "Catalogue lookups work with the network disconnected.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Rate limits are never exceeded under a stress test of 1,000 rapid lookups.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "Anime titles resolve across AniList and TMDB with correct ID mapping for a hand-checked set of 50 titles including tricky cases (long-running shonen, split-cour seasons, films tied to series).",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E6",
+          "text": "The catalogue is fully usable with no TMDB key (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E7",
+          "text": "The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "slug": "semantic-search-engine",
+      "title": "Semantic Search Engine",
+      "depends_on": "4",
+      "sessions": "2",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "p95 keystroke-to-results < 80 ms over the full catalogue.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "Exact-title top-1 rate is 100% on the fixture corpus.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "nDCG@10 > 0.75 on the semantic query set.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "\"films about grief that aren't depressing\" and \"like Wong Kar-wai but Korean\" both return defensible results — documented with screenshots in the case study.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "Works fully offline.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "slug": "source-resolver",
+      "title": "Source Resolver and Addon Protocol",
+      "depends_on": "3",
+      "sessions": "1–2",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "Adding a new backend requires implementing one trait and registering it — no changes elsewhere.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "The Internet Archive backend returns real, playable results.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "A malformed or hostile addon manifest is rejected with a clear error and cannot crash or hang the app.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Backend timeout: one slow backend never delays results from the others.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "`docs/specs/addon-protocol.md` is complete enough that a third party could implement a backend from it alone.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E6",
+          "text": "Repository-wide grep confirms zero indexer names or URLs anywhere, including tests and docs.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 7,
+      "slug": "torrent-engine",
+      "title": "Torrent Engine and Streaming Server",
+      "depends_on": "6",
+      "sessions": "2–3",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "Playback begins in < 8 s on a healthy swarm (measured against a legal, well-seeded Internet Archive or Linux ISO torrent).",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "Seeking to an unbuffered region resumes playback in < 5 s.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "Sequential mode never starves — the buffer ahead of the playhead is maintained under a documented bandwidth floor.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Correct behaviour on a dead swarm: clear, fast failure, not an indefinite hang.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "Range requests are byte-correct — verified by streaming a file and comparing its hash to a full download.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E6",
+          "text": "`docs/specs/streaming-scheduler.md` explains the algorithm with a diagram.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 8,
+      "slug": "player-core",
+      "title": "Player Core — MILESTONE: FIRST DEMOABLE BUILD",
+      "depends_on": "5, 7",
+      "sessions": "2–3",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "A user can search, click, and watch — from a local file, from the Internet Archive backend, and from a configured P2P source.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "Playback of 4K HEVC HDR uses hardware decode (verified in logs and by CPU usage).",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "Seeking is frame-accurate and responsive.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Position resume works across app restarts.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "A demo GIF of this flow exists and is in the README.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E6",
+          "text": "Tag `phase-08`, and celebrate — this is the first thing worth showing anyone.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 9,
+      "slug": "intelligent-source-selection",
+      "title": "Intelligent Source Selection",
+      "depends_on": "8",
+      "sessions": "1–2",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "Scoring is a pure function with unit and property tests over a fixture set of candidate lists.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "Selecting \"Hindi\" plays a source with a Hindi audio track, or clearly reports that none is available.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "Selecting 4K plays genuine 4K, or explains why it can't.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "A deliberately-failing top candidate falls back within 10 s with no user action.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "The expert panel's score breakdown is legible and matches the code.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E6",
+          "text": "`docs/specs/source-scoring.md` documents every term in the scoring function and its weight, with justification.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 10,
+      "slug": "subtitle-pipeline",
+      "title": "Subtitle Pipeline",
+      "depends_on": "8",
+      "sessions": "2",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "> 90% of the fixture corpus aligns to within 150 ms.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "A 23.976 vs 25 fps mismatch is detected and corrected, not just offset.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "Embedded tracks are found and used without any network request.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "The OpenSubtitles daily quota is respected and never exceeded; quota state is visible in Settings.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "The manual nudge persists across sessions for the same file.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E6",
+          "text": "`crates/subtitle-align` is independently testable and documented as a standalone crate.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 11,
+      "slug": "player-experience-layer",
+      "title": "Player Experience Layer",
+      "depends_on": "8, 9, 10",
+      "sessions": "2",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "The pause overlay is visually excellent and appears in < 200 ms.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "Scrub thumbnails generate without stuttering playback.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "Next-episode autoplay works and is disableable.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "All player features are keyboard-accessible and documented in a shortcuts overlay (`?`).",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "Manual test plan for playback passes on all three tiers.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 12,
+      "slug": "local-library-engine",
+      "title": "Local Library Engine",
+      "depends_on": "4",
+      "sessions": "2–3",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "> 95% top-1 accuracy on the fixture corpus.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "< 1% false-confident rate — being wrong while confident is the worst failure mode here.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "Scanning 10,000 files completes in under 3 minutes and does not block the UI.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Renaming a file outside the app is detected and does not create a duplicate.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "The review queue is genuinely pleasant to use — resolving 20 ambiguous items takes under a minute.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E6",
+          "text": "`crates/filename-parser` is documented and independently useful.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 13,
+      "slug": "download-manager",
+      "title": "Download Manager and the Stream-vs-Download Advisor",
+      "depends_on": "7, 9, 12",
+      "sessions": "1–2",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "The advisor's recommendation is correct (matches what actually happens) in at least 8 of 10 manual trials across varied swarm conditions.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "Downloads survive an app restart and resume.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "A completed download is automatically matched and appears in the local library with no user action.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Bandwidth limits are actually respected, verified by measurement.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "The recommendation reason is a single readable sentence.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 14,
+      "slug": "profiles",
+      "title": "Profiles and First-Run Onboarding",
+      "depends_on": "3, 5",
+      "sessions": "2",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "A first-time user with no technical knowledge reaches a populated Home screen in under two minutes. Test this on an actual person.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "A Letterboxd export of 500+ films imports correctly and is reflected in the taste model.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "Skipping the sources step leaves a functional, non-empty app.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Completing onboarding with no TMDB key produces a working, populated, good-looking app (ADR-0013). Every artwork-bearing surface has a designed artwork-free state — a typographic fallback, never a grey rectangle.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "Profile switching is instant and leaks no state between profiles.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E6",
+          "text": "Every onboarding screen is beautiful — this is the first impression.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 15,
+      "slug": "taste-model",
+      "title": "Taste Model",
+      "depends_on": "5, 14",
+      "sessions": "2",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "The model produces distinct, recognisable clusters for a synthetic profile with two deliberately unrelated tastes.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "Abandonment is weighted correctly — abandoning at 5 minutes and at 80 minutes mean different things.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "The taste profile screen describes a test profile in a way the author agrees is accurate.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Temporal decay is tested with a synthetic profile whose taste shifts over simulated time.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "The model updates within 2 s of a watch event, without blocking the UI.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 16,
+      "slug": "recommendation-engine",
+      "title": "Recommendation Engine",
+      "depends_on": "15",
+      "sessions": "2–3",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "Recall@20 beats a popularity baseline by > 40% relative on a held-out split — i.e. `(recall_model / recall_baseline) - 1 > 0.40`, not 40 percentage points.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "Catalogue coverage > 15% — the recommender does not only ever surface the same 2,000 films.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "Intra-list diversity meets the documented target; no rail is dominated by one director, franchise, or year.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Every recommendation has a truthful explanation.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "Ranking 1,000 candidates completes in < 150 ms on Tier 0.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E6",
+          "text": "Case study written with real numbers.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 17,
+      "slug": "discovery-engine",
+      "title": "Discovery Engine",
+      "depends_on": "16",
+      "sessions": "2",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "The bandit demonstrably shifts its strategy distribution in simulation when reward patterns change.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "The exploration floor holds: even a maximally-conservative simulated user still receives genuine discovery.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "Rail labels accurately describe why each item is there.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "The author tests it on their own taste and finds at least three films they hadn't heard of and want to watch. This is the real acceptance test.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E6",
+          "text": "Case study written — this is the flagship one.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 18,
+      "slug": "browsing-surfaces",
+      "title": "Browsing Surfaces",
+      "depends_on": "17",
+      "sessions": "2–3",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "Home renders in < 800 ms on Tier 0 with 20 rails.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "Anything in the catalogue is reachable in ≤ 3 interactions from Home.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "Every rail's \"see all\" goes somewhere genuinely useful.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Full keyboard navigation across all browsing surfaces.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "Screenshots of Home, Films, and a detail page are good enough for the README.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 19,
+      "slug": "watchlist",
+      "title": "Watchlist and External Sync",
+      "depends_on": "18",
+      "sessions": "1–2",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "Trakt scrobbling correctly marks items watched at the right threshold.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "A round-trip Letterboxd export → import → export preserves all data.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "Sync conflicts are detected and resolved per the documented rules, never silently losing data.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Smart views return sensible results on a real watchlist.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "Sync failures degrade gracefully and never block the app.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 20,
+      "slug": "windows-platform-integration",
+      "title": "Windows Platform Integration",
+      "depends_on": "12, 18",
+      "sessions": "2–3",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "Every registration is cleanly reversible; uninstalling leaves no orphaned registry entries. Verify this.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "Media keys control playback with correct metadata in the Windows volume flyout.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "Clicking a magnet link in a browser opens sin-e-phile and starts resolving.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Icon overlays appear in Explorer for library files. (If the overlay-handler slot limit blocks this, document the limitation honestly and ship the rest.)",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "Correct rendering at 100%, 150%, and 200% DPI, and across two monitors with different scaling.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 21,
+      "slug": "performance-engineering",
+      "title": "Performance Engineering and the Low-End Path",
+      "depends_on": "18 (20 optional)",
+      "sessions": "2",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "Every budget in Section 2.3 met on the constrained test configuration.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "No memory growth over a 4-hour session with continuous playback.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "CI fails on a > 10% regression in any tracked benchmark.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "The Tier 0 experience is genuinely good, not merely functional — verified by the manual test plan.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 22,
+      "slug": "vision-layer-tier-2",
+      "title": "Vision Layer (Tier 2)",
+      "depends_on": "11",
+      "sessions": "1–2",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "Correct identification on a hand-checked set of 50 paused frames across varied films, lighting, and eras.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "The pass never blocks the UI and never exceeds 400 ms.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "Wrong identifications are rarer than 2% — below-threshold matches show nothing rather than guessing.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Tier 0 and Tier 1 users see a well-designed cast panel with no hint anything is missing.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "Models are optional and the app is fully functional without them.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 23,
+      "slug": "binge-intelligence",
+      "title": "Binge Intelligence",
+      "depends_on": "11, 12",
+      "sessions": "1–2",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "Intro detection is accurate to within 2 s on a test set of 10 series across different runtimes and structures.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "Next episode starts in < 1 s when prefetched.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "Detection runs in the background without affecting playback.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Failures are silent — no intro detected means no button, never a wrong button.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 24,
+      "slug": "live-channels",
+      "title": "Live Channels",
+      "depends_on": "18",
+      "sessions": "2",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "A user-supplied M3U with 5,000 channels imports and browses smoothly.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "EPG parses and displays correctly with a usable timeline.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "Channel switching takes < 3 s.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Recording works and produces a file the local library correctly identifies.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "Dead channels are detected and marked rather than hanging.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 25,
+      "slug": "manga",
+      "title": "Manga and Comics",
+      "depends_on": "3, 5, 16",
+      "sessions": "2–3",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "All listed formats open correctly, including malformed archives, without crashing.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "Webtoon continuous scroll is smooth at 60 fps on Tier 0.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "No database migration was required — proving the Phase 3 design was right.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Cross-media recommendations work and are demonstrably sensible.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "Reading progress syncs to AniList.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 26,
+      "slug": "connected-playback",
+      "title": "Connected Playback",
+      "depends_on": "11",
+      "sessions": "2",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "Casting works to at least one real DLNA renderer and one Chromecast.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "Transcoding engages only when required, and is documented.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "Watch Together keeps two clients within 500 ms of each other over a 90-minute film.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Watch Together degrades gracefully when a peer disconnects.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "No mandatory server component was introduced.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "number": 27,
+      "slug": "hardening-packaging",
+      "title": "Hardening, Packaging, and Portfolio Finalisation",
+      "depends_on": "everything",
+      "sessions": "2–3",
+      "status": "not_started",
+      "completion_commit": null,
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "A stranger can read the README and understand what this is and why it's hard, in under three minutes.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E2",
+          "text": "Every eval harness has published, current numbers.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E3",
+          "text": "The author can answer every question in `INTERVIEW_PREP.md` without notes. This is the real exit criterion for the entire project.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E4",
+          "text": "Fresh-clone build succeeds on a clean Windows machine following only `docs/SETUP.md`.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "Section 2.1 verified once more: no source URLs, indexer names, or catalogues anywhere in the repository or its history.",
+          "met": false,
+          "evidence": null
+        }
+      ]
+    }
+  ],
+  "next_action": "Phase 0 is not done. Two things remain, in this order. (1) ASK THE AUTHOR the five self-check questions at the end of docs/learning/phase-00-notes.md, in chat, and wait for real answers (SPEC.md 10.10). If they struggle on one, re-explain that concept differently and fix the note; if they struggle on most, say plainly that we went too fast and propose simplifying. (2) The author runs a clean-machine check for E1: clone the repo on a machine that has not built it, follow docs/SETUP.md, and confirm tools/doctor/doctor.py reports what is missing and that the build works - then record it as manual: evidence. Only then merge phase/00-bootstrap to main, confirm CI green on main to close E2, and tag phase-00. Phase 1 begins with the three de-risking spikes, and SPIKE C RUNS FIRST because ADR-0015 raised R3 to Moderate/Severe.",
+  "blockers": [],
+  "decisions_pending": [
+    {
+      "id": "P1",
+      "text": "Source-only distribution versus Phase 27 packaging and the 2.3 installed-size budget. See docs/DECISIONS_PENDING.md.",
+      "raised": "2026-08-30",
+      "decide_by_phase": 27
+    },
+    {
+      "id": "P5",
+      "text": "Where the Phase 12 review-queue confidence threshold sits, given >95% top-1 and <1% false-confident pull against each other. Measure, do not guess. See docs/DECISIONS_PENDING.md.",
+      "raised": "2026-08-31",
+      "decide_by_phase": 12
+    },
+    {
+      "id": "P6",
+      "text": "Windows Sandbox pass on a genuinely bare machine. The E1 CI job proves a clean checkout builds, but windows-latest ships Rust, Node and MSVC preinstalled, so it does not prove SETUP.md is complete from nothing.",
+      "raised": "2026-08-31",
+      "decide_by_phase": 27
+    }
+  ],
+  "adrs": [
+    {
+      "id": "0001",
+      "title": "Record architecture decisions",
+      "date": "2026-08-30"
+    },
+    {
+      "id": "0002",
+      "title": "Tauri v2 over Electron",
+      "date": "2026-08-30"
+    },
+    {
+      "id": "0003",
+      "title": "librqbit over libtorrent-rasterbar",
+      "date": "2026-08-30"
+    },
+    {
+      "id": "0004",
+      "title": "libmpv over libVLC",
+      "date": "2026-08-30"
+    },
+    {
+      "id": "0005",
+      "title": "SQLite + FTS5 + HNSW over a vector database",
+      "date": "2026-08-31"
+    },
+    {
+      "id": "0006",
+      "title": "The ships-empty source posture",
+      "date": "2026-08-31"
+    },
+    {
+      "id": "0007",
+      "title": "GPL-3.0, and the dependency licence audit",
+      "date": "2026-08-31"
+    },
+    {
+      "id": "0008",
+      "title": "Portable-by-default storage",
+      "date": "2026-08-31"
+    },
+    {
+      "id": "0009",
+      "title": "Posture guard denylist design",
+      "date": "2026-08-30"
+    },
+    {
+      "id": "0010",
+      "title": "Source allowlist and its governance",
+      "date": "2026-08-30"
+    },
+    {
+      "id": "0011",
+      "title": "Fixture site-tag redaction policy",
+      "date": "2026-08-30"
+    },
+    {
+      "id": "0012",
+      "title": "Dev tooling in Python; git hooks via core.hooksPath",
+      "date": "2026-08-30"
+    },
+    {
+      "id": "0013",
+      "title": "TMDB is optional; the catalogue is offline-first",
+      "date": "2026-08-30"
+    },
+    {
+      "id": "0014",
+      "title": "Embedding artefacts ship via GitHub Releases",
+      "date": "2026-08-30"
+    },
+    {
+      "id": "0015",
+      "title": "Tier 0 embeds queries but never documents",
+      "date": "2026-08-30"
+    },
+    {
+      "id": "0016",
+      "title": "Lean documentation and session profile",
+      "date": "2026-08-31"
+    },
+    {
+      "id": "0017",
+      "title": "Dual-license the extracted crates; no FFmpeg in subtitle-align",
+      "date": "2026-08-31"
+    },
+    {
+      "id": "0018",
+      "title": "TMDB text in embeddings is inference; text source is swappable",
+      "date": "2026-08-31"
+    },
+    {
+      "id": "0019",
+      "title": "Compute the MovieLens item-item matrix on the user's machine",
+      "date": "2026-08-31"
+    }
+  ],
+  "environment": {
+    "rust_version": "1.98.0",
+    "cargo_version": "1.98.0",
+    "node_version": "24.20.0",
+    "npm_version": "11.19.0",
+    "python_version": "3.12.10",
+    "msvc_version": "14.50.35717 (VS Enterprise 2026 Insiders — vswhere needs -prerelease to find it)",
+    "windows_sdk": "10.0.26100",
+    "webview2": "151.0.4129.107",
+    "ffmpeg_version": "9.0",
+    "verified_at": "2026-08-30T13:10:00Z",
+    "verified_how": "tools/doctor/doctor.py exit 0, plus a real cargo new/build/run round trip",
+    "configured_services": []
+  },
+  "known_debt": [
+    {
+      "id": "D1",
+      "text": "The hashed denylist matches exact tokens only — no substring, fuzzy, or homoglyph matching. Accepted in ADR-0009; the structural matcher covers the shapes that carry real risk. Revisit only if a near-miss is ever observed.",
+      "phase_raised": 0
+    },
+    {
+      "id": "D2",
+      "text": "A fresh clone is unprotected by the git hooks until tools/doctor runs once, because core.hooksPath is per-clone config. CI is the backstop. Accepted in ADR-0012.",
+      "phase_raised": 0
+    },
+    {
+      "id": "D3",
+      "text": "Bare-domain detection is disabled inside source files (attribute access is shaped identically). URLs are still checked everywhere, as is the denylist. Documented in tools/guard/README.md.",
+      "phase_raised": 0
+    },
+    {
+      "id": "D4",
+      "text": "tools/state/validate_state.py implements a subset of JSON Schema draft 2020-12 by hand, because ADR-0012 fixed these tools as stdlib-only. It rejects any schema construct it does not implement rather than passing silently, but it is not a conformant validator. Revisit only if the schema needs constructs it lacks.",
+      "phase_raised": 0
+    }
+  ],
+  "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."
+}
