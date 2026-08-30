@@ -179,6 +179,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Follows docs/SETUP.md's own instruction. The runner ships Rust, Node and
+      # MSVC but NOT FFmpeg - which the first run of this job caught, correctly.
+      - name: Install FFmpeg per docs/SETUP.md
+        run: choco install ffmpeg --no-progress -y
+
       - name: doctor reports a working environment
         working-directory: fresh
         run: python tools/doctor/doctor.py
