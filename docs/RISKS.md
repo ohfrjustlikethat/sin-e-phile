@@ -21,7 +21,7 @@ fallback taken — the ADR records what happened).
 | **Likelihood** | Medium |
 | **Impact** | **Severe** — Phase 8 and everything downstream |
 | **Owner** | Phase 1 (Spike A), Phase 8 |
-| **Status** | `open` |
+| **Status** | `spiked` — escalated, see below |
 
 Rendering a native video surface with a webview UI drawn over it is the fiddliest
 integration in this project. Everything from Phase 8 onward assumes it works.
@@ -38,6 +38,51 @@ cannot draw HTML UI over the video without flicker or z-order failure.
 1. Child window positioned and clipped under the webview.
 2. libVLC, which has friendlier bindings.
 3. HTML5 `<video>` with FFmpeg remuxing, accepting the codec limitations.
+
+### Spike A findings — 2026-08-31, dev machine (Tier 2)
+
+**Status: `spiked`, partially answered, escalated under §10.9 as blocker B2.**
+
+libmpv `20260830-git-e8673660ab`, Tauri 2.11.5, WebView2 151.0.4129.107.
+
+**What works — and it is most of the risk:**
+
+| Question | Answer |
+|---|---|
+| Does libmpv drive from Rust on Windows? | **Yes.** Loaded dynamically with `libloading`; ~10 FFI declarations, no bindgen, no pkg-config, **and no MSVC import library** — the MinGW `libmpv.dll.a` never has to be converted. |
+| Hardware decode? | **Yes — d3d11va**, selected automatically, VO `gpu-next` `d3d11[nv12]`. |
+| Render into a child HWND via `wid`? | **Yes.** First frame 970–1023 ms in a bare Win32 host, 1019–1192 ms inside a Tauri window. |
+| Survive a mid-playback parent resize? | **Yes.** `time-pos` advanced through it; surface not torn down. |
+| Does it work inside a *Tauri* window? | **Yes.** The Tauri top-level HWND accepts a sibling child alongside the `Chrome_WidgetWin_*` webview host. |
+
+**What does not work — and it is the part R1 is actually about:**
+
+**HTML UI cannot be composited *over* the video using child-window z-order.**
+Three genuinely distinct attempts:
+
+1. **Tauri `transparent(true)`, video child at `HWND_BOTTOM`.** Video never
+   appeared. The webview painted opaque over it.
+2. **Plus `ICoreWebView2Controller2::put_DefaultBackgroundColor` = `A=0`.** The call
+   succeeded (verified, not assumed). Video still never appeared. **A transparent
+   webview composites against what is behind the *window*, not against sibling
+   child HWNDs** — which is the root cause, and it is a Windows compositing
+   property, not a Tauri bug.
+3. **Inverted: video child at `HWND_TOP`, inset 120 px.** Video renders correctly
+   and **covers** the HTML wherever they overlap. HTML renders fine outside the
+   video rect.
+
+**Conclusion.** The child-window approach gives **UI *beside* video, never UI *over*
+video.** That is insufficient for `SPEC.md` §4, which requires custom player chrome
+drawn over the video with auto-hide, and for Phase 11's pause overlay, which is the
+project's signature screen.
+
+**The render-API-into-a-texture approach — the other approach Spike A mandates —
+remains untested.** `render_gl.h` is present in the dev build. Testing it means
+creating a GL or D3D11 context, an `mpv_render_context`, and a present path, which is
+materially more work than the three attempts above.
+
+Escalated per §10.9 rather than continuing: see blocker **B2** in
+`PROJECT_STATE.json` for the costed options.
 
 ---
 

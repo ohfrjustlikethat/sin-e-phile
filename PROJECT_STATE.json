@@ -1,21 +1,21 @@
 {
   "spec_version": "1.2.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-08-31T16:20:00Z",
+  "last_updated": "2026-08-31T18:10:00Z",
   "sessions_completed": 3,
   "current_phase": {
     "number": 1,
     "slug": "application-shell",
     "title": "Application Shell and Capability Tiers",
-    "status": "not_started",
+    "status": "blocked",
     "branch": "phase/01-application-shell",
     "started_at": "2026-08-31T16:20:00Z",
     "note": "Spikes A, B then C run FIRST, before any other Phase 1 work, in that order. Each is throwaway code in spikes/, timeboxed to ~2 hours, with findings written to docs/RISKS.md and numbers to docs/eval-results.md. A failed spike escalates under SPEC.md 10.9 and stops.",
     "subtasks": [
       {
         "id": "1.1",
-        "text": "Spike A - libmpv in a Tauri v2 window (R1). Try BOTH render-API-into-texture and child-window-overlay; record what each costs",
-        "status": "not_started",
+        "text": "Spike A - libmpv in a Tauri v2 window (R1). Child-window approach DONE and mostly successful; HTML-over-video compositing FAILS after 3 distinct attempts. Render-API-into-texture approach UNTESTED. Escalated as B2.",
+        "status": "blocked",
         "commit": null
       },
       {
@@ -1458,7 +1458,19 @@
     }
   ],
   "next_action": "Start Phase 1 on branch phase/01-application-shell. Run the three de-risking spikes FIRST, in order A then B then C, before any other Phase 1 work - SPEC.md 15 is explicit that discovering a failure in Phase 8 is catastrophic while discovering it now costs a day. Spike A: prove libmpv can render video inside a Tauri v2 window under Rust control with HTML UI drawn over it; try BOTH the render-API-into-a-texture and child-window-overlay approaches and record what each costs. Throwaway code in spikes/spike-a-libmpv/. Timebox ~2 hours. Write findings to docs/RISKS.md under R1 and any numbers to docs/eval-results.md. If the trigger in R1 fires (no frame rendered in the timebox, or UI cannot be composited without flicker or z-order failure), escalate under 10.9 and STOP - do not proceed to the rest of Phase 1 hoping it works out.",
-  "blockers": [],
+  "blockers": [
+    {
+      "id": "B2",
+      "raised": "2026-08-31T18:10:00Z",
+      "needs_user": true,
+      "description": "Spike A, risk R1. libmpv embeds in a Tauri v2 window and hardware-decodes correctly (d3d11va), first frame ~1.0-1.2 s, survives resize. But HTML UI CANNOT be composited OVER the video using child-window z-order, which SPEC.md 4 requires for the player chrome and Phase 11 requires for the pause overlay. Root cause: a transparent WebView2 composites against what is behind the WINDOW, not against sibling child HWNDs - a Windows compositing property, not a Tauri bug. The render-API-into-a-texture approach, which Spike A also mandates, is untested and is materially more work. Needs a decision on which path to spend time on before Phase 1 continues. Options and a recommendation are in the session report and docs/RISKS.md under R1.",
+      "attempts": [
+        "Attempt 1: Tauri transparent(true) with the mpv child at HWND_BOTTOM. Video never appeared; the webview painted opaque over it.",
+        "Attempt 2: additionally set ICoreWebView2Controller2::put_DefaultBackgroundColor to A=0. The call succeeded (verified, not assumed) and the video still never appeared, which identified the root cause: transparency composites against the window's background, not against sibling child HWNDs.",
+        "Attempt 3: inverted the z-order, mpv child at HWND_TOP inset 120px. Video renders correctly and COVERS the HTML wherever they overlap. So the mechanism yields UI beside video, never UI over video."
+      ]
+    }
+  ],
   "decisions_pending": [
     {
       "id": "P1",

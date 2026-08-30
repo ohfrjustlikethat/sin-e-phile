@@ -46,6 +46,9 @@ __pycache__/
 # Spike SOURCE is committed as evidence; spike build output is not.
 spikes/**/target/
 spikes/**/node_modules/
+# tauri-build generates capability schemas into gen/ at build time.
+# NOTE: .gitignore has no trailing-comment syntax - the whole line is the pattern.
+spikes/**/gen/
 
 # ── Editor / OS ───────────────────────────────────────────────────────
 .vscode/*

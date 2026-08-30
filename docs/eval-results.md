@@ -79,6 +79,10 @@ download, no posture question.
 | Video output driver | gpu-next, `d3d11[nv12]` | 2026-08-31 | spike | mpv log |
 | Playback survives parent resize | yes — `time-pos` advanced 2.2 s through a mid-playback resize | 2026-08-31 | spike | `step2-child-hwnd` |
 
+| **First frame, inside a Tauri v2 window** | **1019 / 1036 / 1192 ms** (3 runs) | 2026-08-31 | `a286489` | `spike-a-tauri` |
+| Compositing: HTML over video, child-window z-order | **FAILS** — 3 distinct attempts, see `docs/RISKS.md` R1 | 2026-08-31 | `a286489` | `spike-a-tauri` |
+| Compositing: HTML beside video, video on top | works | 2026-08-31 | `a286489` | `SPIKE_ZORDER=top` |
+
 Note: first-frame figures include window creation and process start, and are **not**
 the §2.3 "play → first frame < 500 ms" budget, which is measured from a warm player
 in the real app. Recorded as a Spike A baseline only.

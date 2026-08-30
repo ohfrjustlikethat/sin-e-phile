@@ -10,7 +10,7 @@
 
 ## Where we are right now
 
-**Phase 1 — Application Shell and Capability Tiers** (`not_started`, branch `phase/01-application-shell`)
+**Phase 1 — Application Shell and Capability Tiers** (`blocked`, branch `phase/01-application-shell`)
 
 0 of 7 exit criteria met with evidence.
 
@@ -18,7 +18,7 @@
 
 ### Subtasks — 0/10 complete
 
-- [ ] **1.1** Spike A - libmpv in a Tauri v2 window (R1). Try BOTH render-API-into-texture and child-window-overlay; record what each costs
+- [!] **1.1** Spike A - libmpv in a Tauri v2 window (R1). Child-window approach DONE and mostly successful; HTML-over-video compositing FAILS after 3 distinct attempts. Render-API-into-texture approach UNTESTED. Escalated as B2.
 - [ ] **1.2** Spike B - librqbit sequential streaming (R2). Measure time-to-first-usable-bytes against a legal well-seeded torrent; audit runtime per-piece priority control
 - [ ] **1.3** Spike C - ort/ONNX on Windows (R3). Measure QUERY-embedding p95 specifically; escalate above ~30ms
 - [ ] **1.4** Tauri v2 + React + TS strict + Vite + Tailwind building
@@ -49,7 +49,7 @@ Start Phase 1 on branch phase/01-application-shell. Run the three de-risking spi
 
 ## Blockers
 
-None.
+- **B2** **(needs you)** Spike A, risk R1. libmpv embeds in a Tauri v2 window and hardware-decodes correctly (d3d11va), first frame ~1.0-1.2 s, survives resize. But HTML UI CANNOT be composited OVER the video using child-window z-order, which SPEC.md 4 requires for the player chrome and Phase 11 requires for the pause overlay. Root cause: a transparent WebView2 composites against what is behind the WINDOW, not against sibling child HWNDs - a Windows compositing property, not a Tauri bug. The render-API-into-a-texture approach, which Spike A also mandates, is untested and is materially more work. Needs a decision on which path to spend time on before Phase 1 continues. Options and a recommendation are in the session report and docs/RISKS.md under R1.
 
 ---
 
