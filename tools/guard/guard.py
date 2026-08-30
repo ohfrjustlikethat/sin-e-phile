@@ -395,17 +395,34 @@ def git(*args: str) -> str:
     return result.stdout
 
 
+def tracked_files() -> list[str]:
+    """Files git knows about. Tree scans consider ONLY these.
+
+    Walking the filesystem instead sweeps in whatever happens to be sitting in
+    the working directory — a downloaded archive, a scratch file, an extracted
+    tool. In CI that produced a false failure when an unpacked binary's own
+    README (containing an example key) was scanned as though it were project
+    source. Untracked content is caught at `git add` time by the pre-commit
+    hook, which is the right moment for it.
+    """
+    result = subprocess.run(
+        ["git", "ls-files"], cwd=REPO_ROOT, capture_output=True,
+        text=True, encoding="utf-8", errors="replace",
+    )
+    if result.returncode != 0:
+        return []
+    return [p for p in result.stdout.splitlines() if p]
+
+
 def scan_tree(salt, deny, allow) -> list[Finding]:
     findings = []
-    for path in REPO_ROOT.rglob("*"):
-        if not path.is_file() or SKIP_DIR_PARTS & set(path.relative_to(REPO_ROOT).parts):
-            continue
-        rel = str(path.relative_to(REPO_ROOT))
+    for rel in tracked_files():
         if not looks_like_text(rel):
             continue
+        path = REPO_ROOT / rel
         try:
             text = path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
+        except (UnicodeDecodeError, OSError, FileNotFoundError):
             continue
         findings += scan_text(rel, text, salt, deny, allow)
     return findings

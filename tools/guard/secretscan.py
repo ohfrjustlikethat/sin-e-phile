@@ -148,15 +148,18 @@ def main() -> int:
                 findings += scan_text(rel, git("show", f":{rel}"))
     else:
         what = "working tree"
-        for path in REPO_ROOT.rglob("*"):
-            if not path.is_file() or SKIP_DIR_PARTS & set(path.relative_to(REPO_ROOT).parts):
-                continue
-            rel = str(path.relative_to(REPO_ROOT))
+        # Tracked files only. Walking the filesystem sweeps in whatever happens
+        # to be in the directory — a downloaded archive, an extracted tool — and
+        # in CI that failed the build on an unpacked binary's own README.
+        result = subprocess.run(["git", "ls-files"], cwd=REPO_ROOT,
+                                capture_output=True, text=True,
+                                encoding="utf-8", errors="replace")
+        for rel in (p for p in result.stdout.splitlines() if p):
             if not looks_like_text(rel):
                 continue
             try:
-                findings += scan_text(rel, path.read_text(encoding="utf-8"))
-            except (UnicodeDecodeError, OSError):
+                findings += scan_text(rel, (REPO_ROOT / rel).read_text(encoding="utf-8"))
+            except (UnicodeDecodeError, OSError, FileNotFoundError):
                 continue
 
     if not findings:

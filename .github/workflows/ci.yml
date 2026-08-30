@@ -64,8 +64,12 @@ jobs:
             Write-Error "gitleaks checksum mismatch. Expected $($env:GITLEAKS_SHA256), got $actual. Update GITLEAKS_SHA256 in ci.yml after verifying the release."
             exit 1
           }
-          Expand-Archive gitleaks.zip -DestinationPath gitleaks-bin
-          echo "$PWD\gitleaks-bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          # Extract OUTSIDE the workspace: anything unpacked into the repo tree
+          # becomes input to our own scanners on the next step.
+          $dest = Join-Path $env:RUNNER_TEMP "gitleaks-bin"
+          Expand-Archive gitleaks.zip -DestinationPath $dest
+          Remove-Item gitleaks.zip
+          echo $dest | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Secret scan — full history (authoritative)
         run: gitleaks detect --source . --redact --no-banner --exit-code 1
