@@ -84,6 +84,85 @@ materially more work than the three attempts above.
 Escalated per §10.9 rather than continuing: see blocker **B2** in
 `PROJECT_STATE.json` for the costed options.
 
+### Prior-art survey — 2026-08-31 (B2 step ②)
+
+**The core finding is independently confirmed by a shipped project.** `ventic/ventic`
+(126★, Nuxt + Tauri + embedded mpv, streams torrents, and — notably — ships with no
+sources, the same posture as this project) states it plainly in
+`src-tauri/src/player.rs`:
+
+> "The native surface always paints above the webview, so DOM controls can never be
+> composited on top of the video."
+
+So this is not a mistake in our spike. It is the known behaviour, reached
+independently by someone shipping the same architecture.
+
+**A fifth option exists that was not on the original list: region cutouts.**
+ventic's solution is to invert the problem — rather than compositing the UI over the
+video, **cut holes in the video window** where the chrome goes, and let the page
+underneath show through:
+
+> "Shaping gets the same result the other way round: cut the control-bar rectangles
+> *out* of mpv's window and the page underneath shows through the holes — rendering
+> and input both, since a window's input region follows its bounding shape. The video
+> window itself never changes size for the UI, so nothing rescales when a bar
+> appears."
+
+They use the X11 Shape extension. **The Windows equivalent is `SetWindowRgn`**, and
+child windows are clipped to their parent's region — so setting a region on the video
+child we own clips mpv's own render window inside it. Untested here, but cheap to
+test and it builds directly on the configuration that already works (attempt 3).
+
+*Caveat to verify:* the comment references a `player_windows.rs` that **is not
+present in the repository** — only the X11 and macOS backends ship. So the Windows
+half of this is our inference from a working Linux implementation, not an observed
+Windows precedent.
+
+**Its cost is real and specific:** a window region is **binary, not per-pixel alpha**.
+Hard-edged holes only. `SPEC.md` §9.3's gradient scrim under the player chrome, and
+any blur-behind, cannot survive a region cutout — the chrome becomes an opaque panel
+with a hard edge (rounded corners are possible via `CreateRoundRectRgn`; soft edges
+are not).
+
+### DirectComposition: the path exists, but is unmerged
+
+**wry PR [#1762]** — "feat(windows): add DirectComposition (visual) hosting for
+WebView2" — adds exactly the capability option A needs.
+
+| | |
+|---|---|
+| State | **Open, mergeable, `blocked`, and has NO REVIEWS** |
+| Opened / last updated | 2026-07-07 / 2026-07-22 |
+| Author | external contributor, not a Tauri maintainer |
+| Size | 1 commit, 5 files, +740/−26 |
+| Runtime verification | production use in a Windows PDF app, as a **wry 0.55.1 fork**; not run on Windows by the PR's CI |
+
+**Crucially, it would not require forking Tauri.** The PR ships
+`register_composition_visual_target(hwnd, visual)` specifically for this case — in
+its own words, "the piece that lets a Tauri app opt a window into composition hosting
+today **with no `tauri-runtime-wry` changes**". So the integration is a
+`[patch.crates-io]` override of **wry alone**, pinned to a commit — a dependency
+override, not a fork we author or maintain.
+
+**But the ongoing burden is real:** the branch lives in a contributor's fork, is
+unreviewed after ~6 weeks, and the adjacent request #391 (offscreen rendering) has
+been open **since 2021** — so wry has historically not prioritised this area. Pinning
+to an unmerged branch means owning the rebase whenever Tauri's wry requirement moves.
+Under R8's pin-and-do-not-upgrade policy that is bounded, but it is not zero, and it
+lands on a beginner.
+
+Known gaps the PR itself flags: OLE drag-drop untested in composition mode, touch/pen
+best-effort, and JS `window.close()` destroys the host window.
+
+### Existing mpv-in-Tauri plugins
+
+`nini22P/tauri-plugin-libmpv` (21★) and `tauri-plugin-mpv` (29★) exist and work by
+passing the **Tauri top-level HWND** as `wid`, so mpv creates its own child inside it,
+with `"transparent": true` and a transparent CSS background. That is a different
+configuration from the one tested in attempts 1–3 (where we created the child
+ourselves), and it is worth one cheap test — though ventic's finding suggests the
+outcome is the same, since the native surface still ends up above the webview.
+
 ---
 
 ## R2 — librqbit's streaming control is insufficient for the Phase 7 scheduler

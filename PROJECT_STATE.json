@@ -1,7 +1,7 @@
 {
   "spec_version": "1.2.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-08-31T19:30:00Z",
+  "last_updated": "2026-08-31T20:15:00Z",
   "sessions_completed": 3,
   "current_phase": {
     "number": 1,
@@ -1468,7 +1468,8 @@
         "Attempt 1: Tauri transparent(true) with the mpv child at HWND_BOTTOM. Video never appeared; the webview painted opaque over it.",
         "Attempt 2: additionally set ICoreWebView2Controller2::put_DefaultBackgroundColor to A=0. The call succeeded (verified, not assumed) and the video still never appeared, which identified the root cause: transparency composites against the window's background, not against sibling child HWNDs.",
         "Attempt 3: inverted the z-order, mpv child at HWND_TOP inset 120px. Video renders correctly and COVERS the HTML wherever they overlap. So the mechanism yields UI beside video, never UI over video.",
-        "Option 1 (still-frame substitution), 2026-08-31: WORKS. screenshot-raw window -> downscale 945x540 -> JPEG 37-39 KB -> data URI -> <img> under the HTML overlay, then hide the video HWND. 161/95/140 ms end to end, within the 200 ms budget, debug build. Captures at WINDOW resolution so the cost does not scale with a 4K source."
+        "Option 1 (still-frame substitution), 2026-08-31: WORKS. screenshot-raw window -> downscale 945x540 -> JPEG 37-39 KB -> data URI -> <img> under the HTML overlay, then hide the video HWND. 161/95/140 ms end to end, within the 200 ms budget, debug build. Captures at WINDOW resolution so the cost does not scale with a 4K source.",
+        "Prior art survey, 2026-08-31: ventic/ventic (126*, Tauri+mpv+torrents, ships no sources) states in player.rs that the native surface ALWAYS paints above the webview and DOM controls can never composite over video - independently confirming our result. Their fix is REGION CUTOUTS (X11 Shape; Windows equivalent SetWindowRgn), which is a fifth option not previously on the list. Cost: regions are binary, so no gradient scrim or blur-behind. wry PR #1762 adds DirectComposition hosting and needs NO tauri-runtime-wry changes (register_composition_visual_target exists for exactly that), so option A is a [patch.crates-io] wry override rather than a fork - but the PR is unreviewed after 6 weeks and the adjacent issue #391 has been open since 2021."
       ],
       "decision_deadline": "before Phase 8",
       "decide_by_phase": 8
@@ -1495,7 +1496,7 @@
     },
     {
       "id": "P7",
-      "text": "B2 / R1: how to composite player chrome over PLAYING video. Phase 11's pause overlay is solved by still-frame substitution (measured, within budget). Ranked fallbacks per the author: 1) DirectComposition visual hosting if tractable without forking wry; 2) still-frame plus a reserved chrome strip during playback; 3) layered TOP-LEVEL window, DWM-composited, which is a different mechanism from child-HWND z-order and is untried; 4) HTML5 plus remux, last. Chrome-beside-video is explicitly NOT on the list - amend SPEC.md 4 deliberately rather than back into it. DEADLINE: before Phase 8.",
+      "text": "B2 / R1: how to composite player chrome over PLAYING video. Phase 11's pause overlay is solved by still-frame substitution (measured, within budget). Ranked fallbacks per the author: 1) DirectComposition visual hosting if tractable without forking wry; 2) still-frame plus a reserved chrome strip during playback; 3) layered TOP-LEVEL window, DWM-composited, which is a different mechanism from child-HWND z-order and is untried; 4) HTML5 plus remux, last. Chrome-beside-video is explicitly NOT on the list - amend SPEC.md 4 deliberately rather than back into it. DEADLINE: before Phase 8. ADDED after the prior-art survey: option 5, REGION CUTOUTS via SetWindowRgn - proven technique in ventic on X11, cheap to test on Windows, builds on the config that already works. Cost: binary regions, so hard-edged chrome and no gradient scrim, which would need a SPEC.md 9.3 amendment.",
       "raised": "2026-08-31",
       "decide_by_phase": 8
     }
