@@ -148,7 +148,7 @@ INFRASTRUCTURE_DOMAINS = frozenset(
         "react.dev", "typescriptlang.org", "developer.mozilla.org", "mozilla.org",
         "w3.org", "ietf.org", "rfc-editor.org", "unicode.org", "sqlite.org",
         "ffmpeg.org", "videolan.org", "mpv.io", "onnxruntime.ai", "huggingface.co",
-        "gnu.org", "opensource.org", "microsoft.com", "wikipedia.org", "schema.org",
+        "gnu.org", "fsf.org", "opensource.org", "microsoft.com", "wikipedia.org", "schema.org",
         "json-schema.org", "semver.org", "conventionalcommits.org", "keepachangelog.com",
         "rustup.rs", "git-scm.com", "visualstudio.microsoft.com", "gitleaks.io",
         "adr.github.io", "pola.rs", "serde.rs",

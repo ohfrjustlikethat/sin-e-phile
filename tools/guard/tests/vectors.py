@@ -126,4 +126,9 @@ SHOULD_PASS: list[tuple[str, str]] = [
     ("release group token is permitted", "Movie.Title.2019.1080p.BluRay.x264-GROUP.mkv"),
     ("redacted site tag is permitted", "[SITE01] Series Title - 07 [1080p][HEVC].mkv"),
     ("prose mentioning torrents", "The torrent engine streams rather than downloads."),
+    # The GPL-3.0 text is not ours to edit, and the FSF is legal/development
+    # infrastructure rather than a content source - so it belongs in
+    # INFRASTRUCTURE_DOMAINS, not in the allowlist (ADR-0010 scopes the
+    # allowlist to content and metadata sources only).
+    ("LICENSE header", "Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>"),
 ]

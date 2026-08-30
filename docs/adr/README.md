@@ -13,13 +13,13 @@ Format: Context / Decision / Consequences / Alternatives Considered. See
 | # | Title | Status | Date |
 |---|---|---|---|
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted | 2026-08-30 |
-| 0002 | *(reserved)* Tauri v2 over Electron | Pending — Phase 0b | |
-| 0003 | *(reserved)* librqbit over libtorrent-rasterbar | Pending — Phase 0b | |
-| 0004 | *(reserved)* libmpv over libVLC | Pending — Phase 0b | |
-| 0005 | *(reserved)* SQLite + FTS5 + HNSW over a vector database | Pending — Phase 0b | |
-| 0006 | *(reserved)* The ships-empty source posture | Pending — Phase 0b | |
-| 0007 | *(reserved)* GPL-3.0 and the dependency licence audit | Pending — Phase 0b | |
-| 0008 | *(reserved)* Portable-by-default storage | Pending — Phase 0b | |
+| [0002](0002-tauri-v2-over-electron.md) | Tauri v2 over Electron | Accepted | 2026-08-30 |
+| [0003](0003-librqbit-over-libtorrent.md) | librqbit over libtorrent-rasterbar | Accepted | 2026-08-30 |
+| [0004](0004-libmpv-over-libvlc.md) | libmpv over libVLC | Accepted | 2026-08-30 |
+| [0005](0005-sqlite-fts5-hnsw-over-vector-database.md) | SQLite + FTS5 + HNSW over a vector database | Accepted | 2026-08-31 |
+| [0006](0006-ships-empty-source-posture.md) | The ships-empty source posture | Accepted | 2026-08-31 |
+| [0007](0007-gpl-3-and-dependency-licence-audit.md) | GPL-3.0, and the dependency licence audit | Accepted | 2026-08-31 |
+| [0008](0008-portable-by-default-storage.md) | Portable-by-default storage | Accepted | 2026-08-31 |
 | [0009](0009-posture-guard-denylist-design.md) | Posture guard denylist design | Accepted | 2026-08-30 |
 | [0010](0010-source-allowlist-and-governance.md) | Source allowlist and its governance | Accepted | 2026-08-30 |
 | [0011](0011-fixture-site-tag-redaction.md) | Fixture site-tag redaction policy | Accepted | 2026-08-30 |
@@ -28,7 +28,14 @@ Format: Context / Decision / Consequences / Alternatives Considered. See
 | [0014](0014-embedding-artefact-distribution.md) | Embedding artefacts ship via GitHub Releases | Accepted | 2026-08-30 |
 | [0015](0015-tier-0-query-embedding.md) | Tier 0 embeds queries but never documents | Accepted | 2026-08-30 |
 
-**Numbers 0002–0008 are reserved, not skipped.** They record decisions already
-locked in `SPEC.md` §5 and are written in session 0b. Reserving them keeps the
-seed decisions in a contiguous block at the front of the index, where someone
-reading the repository for the first time will look for them.
+**0002–0008 record decisions that were already locked in `SPEC.md` §5 before this
+repository existed.** They were written in session 0b, after 0009–0015, which is why
+their numbers are lower than their dates. The numbers were reserved rather than
+allocated on a first-come basis, so that the seed decisions sit in a contiguous
+block at the front of the index — which is where someone reading the repository for
+the first time will look for them.
+
+**0009–0015 came out of the Phase 0 specification audit** (see `SESSION_LOG.md`
+entry 1). Seven contradictions or gaps in `SPEC.md` needed new design before any
+code could be written; each was ruled on by the author, recorded here, and only then
+amended into the spec, per §2.8's amend-first rule.

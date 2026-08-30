@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ohfrjustlikethat/sin-e-phile/docs/schemas/project-state.schema.json",
+  "title": "sin-e-phile PROJECT_STATE.json",
+  "description": "Machine-readable resume state (SPEC.md §10.1). The single most important invariant this schema enforces: an exit criterion marked met MUST carry evidence (§10.8). Marking a criterion met without an artefact destroys every future session's ability to trust this file, and the spec treats it as a correctness bug.",
+  "type": "object",
+  "required": [
+    "spec_version", "project", "last_updated", "sessions_completed",
+    "current_phase", "phases", "next_action", "blockers", "environment"
+  ],
+  "additionalProperties": true,
+
+  "$defs": {
+    "status": {
+      "enum": ["not_started", "in_progress", "blocked", "awaiting_review", "complete"]
+    },
+    "commitSha": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{7,40}$",
+      "description": "Short or full git SHA."
+    },
+    "exitCriterion": {
+      "type": "object",
+      "required": ["id", "text", "met", "evidence"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^E[0-9]+$" },
+        "text": { "type": "string", "minLength": 1 },
+        "met": { "type": "boolean" },
+        "evidence": {
+          "type": ["string", "null"],
+          "description": "SPEC.md §10.8 — an ARTEFACT, never an opinion. One of: a passing test name; a measured number WITH the command that produced it; a path to a produced file; a commit SHA implementing something specific; or an explicit 'manual: <what was done and observed>'. Prose such as 'implemented and working', 'tested manually' or 'looks good' is not evidence and means the criterion is not met."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "met": { "const": true } } },
+          "then": {
+            "properties": {
+              "evidence": { "type": "string", "minLength": 12 }
+            },
+            "required": ["evidence"],
+            "description": "A met criterion must carry evidence. This is the schema's reason for existing."
+          }
+        },
+        {
+          "if": { "properties": { "met": { "const": true } } },
+          "then": {
+            "not": {
+              "properties": {
+                "evidence": {
+                  "pattern": "(?i)^\\s*(implemented and working|tested manually|looks good|should be fine|done|works|it works|ok|fine)\\s*\\.?\\s*$"
+                }
+              }
+            },
+            "description": "Rejects the exact phrases SPEC.md §10.8 names as non-evidence."
+          }
+        }
+      ]
+    },
+    "subtask": {
+      "type": "object",
+      "required": ["id", "text", "status", "commit"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+        "text": { "type": "string", "minLength": 1 },
+        "status": { "$ref": "#/$defs/status" },
+        "commit": { "$ref": "#/$defs/commitSha" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "complete" } } },
+          "then": {
+            "properties": { "commit": { "type": "string" } },
+            "description": "A completed subtask names the commit that completed it."
+          }
+        }
+      ]
+    }
+  },
+
+  "properties": {
+    "_comment": { "type": "string" },
+
+    "spec_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Bumped by SPEC.md §2.8: minor for a clarification, major for a reversed decision."
+    },
+    "project": { "const": "sin-e-phile" },
+    "last_updated": { "type": "string", "format": "date-time" },
+    "sessions_completed": { "type": "integer", "minimum": 0 },
+
+    "current_phase": {
+      "type": "object",
+      "required": ["number", "slug", "status", "branch", "exit_criteria"],
+      "additionalProperties": true,
+      "properties": {
+        "number": { "type": "integer", "minimum": 0, "maximum": 27 },
+        "slug": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "title": { "type": "string" },
+        "status": { "$ref": "#/$defs/status" },
+        "branch": {
+          "type": "string",
+          "pattern": "^phase/[0-9]{2}-[a-z0-9-]+$",
+          "description": "SPEC.md §10.5: one branch per phase, phase/NN-slug."
+        },
+        "started_at": { "type": "string", "format": "date-time" },
+        "note": { "type": "string" },
+        "subtasks": { "type": "array", "items": { "$ref": "#/$defs/subtask" } },
+        "exit_criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/exitCriterion" }
+        }
+      }
+    },
+
+    "phases": {
+      "type": "array",
+      "minItems": 28,
+      "maxItems": 28,
+      "description": "All 28 phases, 0..27. Generated from SPEC.md §15 by tools/state/build_state.py so it cannot drift from the specification.",
+      "items": {
+        "type": "object",
+        "required": ["number", "slug", "status", "completion_commit", "exit_criteria"],
+        "additionalProperties": true,
+        "properties": {
+          "number": { "type": "integer", "minimum": 0, "maximum": 27 },
+          "slug": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+          "title": { "type": "string" },
+          "depends_on": { "type": ["string", "null"] },
+          "sessions": { "type": ["string", "null"] },
+          "status": { "$ref": "#/$defs/status" },
+          "completion_commit": { "$ref": "#/$defs/commitSha" },
+          "note": { "type": "string" },
+          "subtasks": { "type": "array", "items": { "$ref": "#/$defs/subtask" } },
+          "exit_criteria": { "type": "array", "items": { "$ref": "#/$defs/exitCriterion" } }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "status": { "const": "complete" } } },
+            "then": {
+              "properties": {
+                "completion_commit": { "type": "string" },
+                "exit_criteria": { "items": { "properties": { "met": { "const": true } } } }
+              },
+              "description": "SPEC.md Appendix B: a phase is complete only when EVERY exit criterion is met with evidence. This makes that unrepresentable rather than merely discouraged."
+            }
+          }
+        ]
+      }
+    },
+
+    "next_action": {
+      "type": "string",
+      "minLength": 40,
+      "description": "SPEC.md §10.3: an unambiguous instruction to the next session, naming the file and the approach. Not 'continue the torrent engine'. The length floor exists to make the lazy version fail validation."
+    },
+
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "raised", "needs_user", "description"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^B[0-9]+$" },
+          "raised": { "type": "string", "format": "date-time" },
+          "needs_user": { "type": "boolean" },
+          "description": { "type": "string", "minLength": 20 },
+          "attempts": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "SPEC.md §10.9: after three genuinely distinct attempts, record what was tried and what happened each time."
+          }
+        }
+      }
+    },
+
+    "decisions_pending": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "raised"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^P[0-9]+$" },
+          "text": { "type": "string", "minLength": 20 },
+          "raised": { "type": "string" },
+          "decide_by_phase": { "type": ["integer", "null"], "minimum": 0, "maximum": 27 }
+        }
+      }
+    },
+
+    "adrs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "date"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[0-9]{4}$" },
+          "title": { "type": "string", "minLength": 1 },
+          "date": { "type": "string" }
+        }
+      }
+    },
+
+    "environment": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["verified_at"],
+      "properties": {
+        "verified_at": { "type": "string", "format": "date-time" },
+        "verified_how": { "type": "string" },
+        "configured_services": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "known_debt": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "phase_raised"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^D[0-9]+$" },
+          "text": { "type": "string", "minLength": 20 },
+          "phase_raised": { "type": "integer", "minimum": 0, "maximum": 27 }
+        }
+      }
+    }
+  }
+}

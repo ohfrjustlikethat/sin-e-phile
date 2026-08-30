@@ -166,14 +166,22 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: PROJECT_STATE.json is valid JSON and matches its schema
+      - name: PROJECT_STATE.json phase table matches SPEC.md 15
+        run: python tools/state/build_state.py --check
+
+      - name: PROJECT_STATE.json validates against its schema
+        run: python tools/state/validate_state.py --check
+
+      - name: PROGRESS.md is up to date with PROJECT_STATE.json
         shell: bash
         run: |
-          if [ -f PROJECT_STATE.json ]; then
-            python -c "import json; json.load(open('PROJECT_STATE.json')); print('PROJECT_STATE.json parses')"
-          else
-            echo "::notice::PROJECT_STATE.json not present yet — written in session 0b."
+          python tools/state/validate_state.py --progress
+          if ! git diff --quiet -- PROGRESS.md; then
+            echo "::error::PROGRESS.md is stale. Run: python tools/state/validate_state.py --progress"
+            git diff --stat -- PROGRESS.md
+            exit 1
           fi
+          echo "PROGRESS.md is in sync"
 
       - name: Doctor runs and reports (does not gate CI)
         continue-on-error: true
