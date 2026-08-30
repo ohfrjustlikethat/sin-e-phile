@@ -220,3 +220,76 @@ we say what is blocking it rather than marking it done.
 Phase 1 then begins with the three de-risking spikes — and **Spike C runs first**,
 not last, because ADR-0015 raised R3's impact to Moderate/Severe by establishing
 that query embedding runs on every tier.
+
+
+---
+
+## Session 3 — 2026-08-31 — Phase 0 session 0c: lean profile, rulings, Phase 0 closed
+
+**Phase:** 0 → complete. **Branch:** `phase/00-bootstrap` → squash-merged to `main`,
+tagged `phase-00`. **spec_version:** 1.1.0 → **1.2.0**.
+
+### What was done
+
+- **Lean documentation profile adopted** (ADR-0016, six amendments A1–A6). Author
+  reweighted the goals: shipping is the priority, learning happens later. Principle:
+  record what cannot be reconstructed, defer what can.
+- **Rulings on the open items**, one ADR each: 0017 (dual-license the crates),
+  0018 (TMDB inference-not-training + swappable text source), 0019 (MovieLens matrix
+  computed on device).
+- **E1 evidenced by a fresh-clone CI job** rather than a one-time manual check.
+- **`docs/eval-results.md` created** — the one never-deferred documentation output.
+- Phase 0 closed: 8/8 exit criteria met with evidence.
+
+### Retrospective (folded in per ADR-0016)
+
+**Deviated:** Phase 0 ran three sessions, not the spec's one. 0a rails, 0b documents,
+0c amendments and closure. The spec's session counts are now explicitly estimates.
+
+**Harder than expected:** the guard's false-positive rate, three rounds (118 → 12 →
+0). Every round was a design flaw, not a typo.
+
+**Debt incurred:** D1 exact-token-only denylist; D2 fresh clone unprotected until
+doctor runs; D3 bare-domain detection off inside source files; D4 hand-rolled schema
+validator implements only a subset of draft 2020-12.
+
+### Gotchas worth keeping
+
+- **`vswhere` needs `-prerelease -all`** or it silently ignores Insiders/Preview
+  Visual Studio and a present MSVC toolchain looks absent.
+- **The tooling shell inherits a stale `PATH`** — freshly installed toolchains look
+  missing. `doctor` reads the registry `PATH` to tell the two cases apart.
+- **`npm` is a `.cmd` shim**; `CreateProcess` cannot run it directly, so it must go
+  through `cmd /c`.
+- **Canonical licence texts trip the guard** — GPL cites `fsf.org`, Apache-2.0 cites
+  `apache.org`. Both are legal infrastructure, not content sources, so they belong in
+  `INFRASTRUCTURE_DOMAINS`, not the allowlist (ADR-0010 scopes the allowlist to
+  content and metadata sources). Each fix got a regression vector; selftest is now 32.
+- **`windows-latest` ships Rust, Node and MSVC but not FFmpeg.** The E1 job caught
+  this on its first run, which is the job working. It now installs FFmpeg per
+  `SETUP.md`, exercising that instruction rather than assuming it.
+- **Bash heredocs in this environment break on prose apostrophes.** Write generator
+  scripts to the scratchpad and execute them instead.
+
+### Evidence (§10.8)
+
+| Claim | Artefact |
+|---|---|
+| E1 — fresh clone builds | CI job "Fresh clone builds (E1)", run 33327204841. Proven to detect a real missing prerequisite (no FFmpeg) on run 33326995943. Limitation stated in the evidence string: the runner ships Rust/Node/MSVC, so it proves a clean checkout builds, not that SETUP.md is complete from nothing. Bare-machine pass outstanding as P6. |
+| E2 — CI green on branch and main | Branch run 33327097633; main run 33327204841 at `cc6a89e`, all five jobs. |
+| Phase 0 complete | `python tools/state/validate_state.py --check` → 8 of 8 criteria met with evidence. Tag `phase-00`. |
+| Guard still clean after the licence files | selftest 32/32; `--tree` and `--history` clean. |
+
+### Blockers
+
+None. B1 cleared by the E1 CI job.
+
+### Next session
+
+**Phase 1, spikes first, in order A → B → C**, before any other Phase 1 work. Each is
+throwaway code in `spikes/`, ~2 hour timebox, findings to `docs/RISKS.md` and numbers
+to `docs/eval-results.md`. **If a spike's trigger fires, escalate under §10.9 and
+stop** — do not proceed hoping it works out.
+
+Note the author's ordering overrides the earlier suggestion to run Spike C first;
+A → B → C is the spec's own order and the author reaffirmed it.

@@ -4,61 +4,46 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 1.2.0** · 2 session(s) completed · last updated 2026-08-31
+**Spec version 1.2.0** · 3 session(s) completed · last updated 2026-08-31
 
 ---
 
 ## Where we are right now
 
-**Phase 0 — Bootstrap and Project Infrastructure** (`in_progress`, branch `phase/00-bootstrap`)
+**Phase 1 — Application Shell and Capability Tiers** (`not_started`, branch `phase/01-application-shell`)
 
-7 of 8 exit criteria met with evidence.
+0 of 7 exit criteria met with evidence.
 
-> Split into 0a (rails), 0b (documents) and 0c (lean-profile amendments, rulings on the open items, and E1). spec_version 1.2.0 shifts the project to the lean documentation profile of ADR-0016: shipping is the priority, learning is deferred.
+> Spikes A, B then C run FIRST, before any other Phase 1 work, in that order. Each is throwaway code in spikes/, timeboxed to ~2 hours, with findings written to docs/RISKS.md and numbers to docs/eval-results.md. A failed spike escalates under SPEC.md 10.9 and stops.
 
-### Subtasks — 15/17 complete
+### Subtasks — 0/10 complete
 
-- [x] **0.1** git init, .gitignore, .env.example, phase branch, public GitHub repo, secret scanning + push protection · `bb6222a`
-- [x] **0.2** Directory skeleton per SPEC.md §7 including the amended additions · `bb6222a`
-- [x] **0.3** SPEC.md audit, 7 ADRs, 17 amendments to spec_version 1.1.0 · `7bbd241`
-- [x] **0.4** tools/doctor/ prerequisite checker and core.hooksPath bootstrap · `deecf52`
-- [x] **0.5** tools/guard/ posture guard, denylist, allowlist, self-test · `deecf52`
-- [x] **0.6** Secret scanning: stdlib fallback + pinned gitleaks in CI · `78932d4`
-- [x] **0.7** .githooks/ pre-commit and commit-msg via core.hooksPath · `deecf52`
-- [x] **0.8** CI workflow, four jobs on windows-latest · `0aa6e23`
-- [x] **0.9** Verify the rails fire on deliberate plants · `0aa6e23`
-- [x] **0.10** LICENSE (GPL-3.0), README.md with pitch drafted, CONTRIBUTING.md, CHANGELOG.md · `66fd304`
-- [x] **0.11** PROJECT_STATE.json with all 28 phases and exit criteria + JSON schema; PROGRESS.md · `66fd304`
-- [x] **0.12** docs/SETUP.md with live-verified §14 service terms · `66fd304`
-- [x] **0.13** docs/GLOSSARY.md (30 terms), docs/HOW_IT_WORKS.md skeleton · `66fd304`
-- [x] **0.14** docs/RISKS.md (R1–R10 with concrete triggers), docs/DECISIONS_PENDING.md · `66fd304`
-- [x] **0.15** Seed ADRs 0002–0008 (numbers reserved in docs/adr/README.md) · `66fd304`
-- [~] **0.16** docs/learning/phase-00-notes.md written; the five self-check questions must now be ASKED IN CHAT and answered before Phase 0 is done (SPEC.md 10.10)
-- [~] **0.17** Lean-profile amendments (ADR-0016), rulings P2/P3/P4 (ADR-0017/0018/0019), E1 fresh-clone CI job, docs/eval-results.md
+- [ ] **1.1** Spike A - libmpv in a Tauri v2 window (R1). Try BOTH render-API-into-texture and child-window-overlay; record what each costs
+- [ ] **1.2** Spike B - librqbit sequential streaming (R2). Measure time-to-first-usable-bytes against a legal well-seeded torrent; audit runtime per-piece priority control
+- [ ] **1.3** Spike C - ort/ONNX on Windows (R3). Measure QUERY-embedding p95 specifically; escalate above ~30ms
+- [ ] **1.4** Tauri v2 + React + TS strict + Vite + Tailwind building
+- [ ] **1.5** Window: custom title bar, remembered size/position, min 1024x640
+- [ ] **1.6** Left nav rail, five destinations, collapse/expand
+- [ ] **1.7** Typed IPC with generated TS types - changing a Rust signature must break the TS build
+- [ ] **1.8** tiers.rs - detect RAM, cores, GPU/hw-decode; classify Tier 0/1/2; persist with manual override
+- [ ] **1.9** Settings screen showing detected hardware and what the tier enables, in plain language
+- [ ] **1.10** tracing to rotating file in data/logs/; error boundary; Rust panic handler writing a crash report
 
 ### Exit criteria
 
-- [x] **E1** `git clone` on a clean machine + following `docs/SETUP.md` produces a working dev environment.
-      - *Evidence:* CI job 'Fresh clone builds (E1)' in .github/workflows/ci.yml: clones the branch fresh on a clean windows-latest runner with no local state, runs tools/doctor/doctor.py (must exit 0), asserts doctor bootstrapped core.hooksPath, builds per docs/SETUP.md, and re-runs the guard selftest and tree scan. LIMITATION, stated honestly: windows-latest ships Rust, Node, MSVC and the Windows SDK preinstalled, so this proves a clean CHECKOUT builds and that doctor runs green - it does NOT prove SETUP.md's install instructions are complete for a bare machine. A Windows Sandbox pass on a bare image is outstanding as P6. Chosen over a one-time manual check because it is repeatable and catches SETUP.md rotting later. Proven to detect a genuinely missing prerequisite: its first run failed because windows-latest ships no FFmpeg, and doctor reported exactly that (run 33326995943). The job now installs FFmpeg per SETUP.md, so it exercises that instruction rather than assuming it.
-- [ ] **E2** CI passes on `phase/00-bootstrap`, and again on `main` after the merge. (§10.5 puts all phase work on a branch, so "green on `main`" can only be verified post-merge; both are required.)
-- [x] **E3** `PROJECT_STATE.json` validates against its schema and enumerates all 28 phases with their exit criteria.
-      - *Evidence:* python tools/state/validate_state.py --check -> 'PROJECT_STATE.json valid - 28 phases, 154 exit criteria'. The phase table is GENERATED from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the spec; build_state.py --check enforces that in CI. Schema at docs/schemas/project-state.schema.json. Verified to reject bad input: three planted violations (met-with-null-evidence, evidence 'looks good', and the spec's own anti-example next_action 'continue the torrent engine') produced 5 errors, exit 1.
-- [x] **E4** Eight seed ADRs exist and are non-trivial.
-      - *Evidence:* docs/adr/0001-0008 written and indexed in docs/adr/README.md. Each has Context / Decision / Consequences / Alternatives Considered, and each Alternatives section records what was actually rejected and why - ADR-0005 names sqlite-vec as the alternative most likely worth revisiting, ADR-0007 flags that GPL-3.0 makes the three extracted crates unusable by most of the Rust ecosystem (logged as P4). Seven further ADRs 0009-0015 came out of the Phase 0 spec audit.
-- [x] **E5** The posture guard fails CI when fed a deliberately-planted test string, and passes on the clean tree. Verify it actually works — an unverified guard is worse than none, because it produces false confidence.
-      - *Evidence:* Planted an RFC 2606 default_source_url + tracker announce URL, staged it: `python tools/guard/guard.py --staged` → exit 1, 2 findings (default-source-key, tracker-announce). Plant removed; `--tree` and `--history` → exit 0 clean. `--selftest` → 30/30 checks, covering 12 must-fire and 16 must-not-fire vectors.
-- [x] **E6** Secret scanning fails CI on a deliberately-planted fake key.
-      - *Evidence:* Planted a fake TMDB key and a fake GitHub token: `python tools/guard/secretscan.py --staged` → exit 1, 2 findings (generic-api-key-assignment, github-token). The plant exposed a real bug — `a` in the placeholder-exclusion list disabled the generic rule for any value starting with `a` — fixed in 78932d4.
-- [x] **E7** `doctor` correctly reports a missing prerequisite when one is removed from PATH.
-      - *Evidence:* PATH stripped of FFmpeg and Node: `python tools/doctor/doctor.py --no-fix` → 3 required MISS (Node.js, npm, FFmpeg), exit 1, each with an actionable fix line. Full PATH → all required ok, exit 0.
-- [x] **E8** `docs/RISKS.md` exists with all Appendix D risks and at least one concrete trigger condition each.
-      - *Evidence:* docs/RISKS.md covers all ten Appendix D risks plus a new R11 (third-party API terms change), each with owner, likelihood, impact, mitigation and at least one CONCRETE trigger. Examples: R3 fires if Spike C query-embedding p95 exceeds ~30 ms; R7 fires at 30 days without a commit; R10 fires if tools/guard/allowlist.txt gains a line without an ADR. R3's impact was raised to Moderate/Severe by ADR-0015.
+- [ ] **E1** All three spikes completed, with findings and measurements recorded in `docs/RISKS.md`.
+- [ ] **E2** Any spike that failed has an ADR recording the fallback decision and the author's approval.
+- [ ] **E3** App launches to interactive in < 2 s on the dev machine (Tier 2 target; the governing budget is §2.3's < 4 s on Tier 0).
+- [ ] **E4** IPC types are generated, not hand-written; changing a Rust command signature breaks the TypeScript build.
+- [ ] **E5** Tier detection is correct on the dev machine and on a deliberately-constrained run (simulate Tier 0 via override).
+- [ ] **E6** Idle RAM < 200 MB on the dev machine (Tier 2 target; the governing budget is §2.3's < 250 MB on Tier 0).
+- [ ] **E7** A deliberately-triggered panic writes a crash log and shows a graceful error screen.
 
 ---
 
 ## What's next
 
-Phase 0 is not done. Two things remain, in this order. (1) ASK THE AUTHOR the five self-check questions at the end of docs/learning/phase-00-notes.md, in chat, and wait for real answers (SPEC.md 10.10). If they struggle on one, re-explain that concept differently and fix the note; if they struggle on most, say plainly that we went too fast and propose simplifying. (2) The author runs a clean-machine check for E1: clone the repo on a machine that has not built it, follow docs/SETUP.md, and confirm tools/doctor/doctor.py reports what is missing and that the build works - then record it as manual: evidence. Only then merge phase/00-bootstrap to main, confirm CI green on main to close E2, and tag phase-00. Phase 1 begins with the three de-risking spikes, and SPIKE C RUNS FIRST because ADR-0015 raised R3 to Moderate/Severe.
+Start Phase 1 on branch phase/01-application-shell. Run the three de-risking spikes FIRST, in order A then B then C, before any other Phase 1 work - SPEC.md 15 is explicit that discovering a failure in Phase 8 is catastrophic while discovering it now costs a day. Spike A: prove libmpv can render video inside a Tauri v2 window under Rust control with HTML UI drawn over it; try BOTH the render-API-into-a-texture and child-window-overlay approaches and record what each costs. Throwaway code in spikes/spike-a-libmpv/. Timebox ~2 hours. Write findings to docs/RISKS.md under R1 and any numbers to docs/eval-results.md. If the trigger in R1 fires (no frame rendered in the timebox, or UI cannot be composited without flicker or z-order failure), escalate under 10.9 and STOP - do not proceed to the rest of Phase 1 hoping it works out.
 
 ---
 
@@ -74,7 +59,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 
 | | # | Phase | Tier | Depends on | Sessions | Criteria met |
 |---|---|---|---|---|---|---|
-| [~] | 0 | Bootstrap and Project Infrastructure | A | nothing | 1 | 7/8 |
+| [x] | 0 | Bootstrap and Project Infrastructure | A | nothing | 1 | 8/8 |
 | [ ] | 1 | Application Shell and Capability Tiers | A | 0 | 1–2 | 0/7 |
 | [ ] | 2 | Design System and Visual Language | A | 1 | 1–2 | 0/5 |
 | [ ] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 0/5 |
