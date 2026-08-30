@@ -23,7 +23,116 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{w, BOOL, Interface, PCWSTR};
 
 mod mpv;
+mod snapshot;
 use mpv::*;
+
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicI64, Ordering};
+
+/// Shared bits the pause command needs. Spike-grade: a real implementation
+/// would not reach for statics.
+struct PauseCtx {
+    mpv: Mpv,
+    video_child: isize,
+}
+static CTX: Mutex<Option<PauseCtx>> = Mutex::new(None);
+static PAUSE_T0: AtomicI64 = AtomicI64::new(0);
+
+fn now_us() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_micros() as i64
+}
+
+/// THE measurement (blocker B2, option 1). Pause, capture, downscale, encode,
+/// hand to the webview. The clock stops in `overlay_painted`.
+#[tauri::command]
+fn pause_and_capture(app: tauri::AppHandle) -> Result<String, String> {
+    use tauri::Emitter;
+    let t0 = std::time::Instant::now();
+    PAUSE_T0.store(now_us(), Ordering::SeqCst);
+
+    let guard = CTX.lock().unwrap();
+    let ctx = guard.as_ref().ok_or("no context")?;
+
+    ctx.mpv.set_property("pause", "yes")?;
+    let t_pause = t0.elapsed();
+
+    let frame = unsafe {
+        snapshot::screenshot_raw(ctx.mpv.raw(), ctx.mpv.command_node_fn(), ctx.mpv.free_node_fn())?
+    };
+    let t_capture = t0.elapsed();
+
+    let (rgb, w, h) = snapshot::downscale_to_rgb(&frame, 960, 540);
+    let t_scale = t0.elapsed();
+
+    let mut jpeg = Vec::new();
+    jpeg_encoder::Encoder::new(&mut jpeg, 78)
+        .encode(&rgb, w as u16, h as u16, jpeg_encoder::ColorType::Rgb)
+        .map_err(|e| e.to_string())?;
+    let t_encode = t0.elapsed();
+
+    let uri = format!("data:image/jpeg;base64,{}", b64(&jpeg));
+    let t_b64 = t0.elapsed();
+
+    println!(
+        "  capture {}x{} {} -> {}x{}  jpeg {} KB",
+        frame.width, frame.height, frame.format, w, h, jpeg.len() / 1024
+    );
+    println!(
+        "  set-pause {:.1} | screenshot-raw {:.1} | downscale {:.1} | jpeg {:.1} | base64 {:.1} ms",
+        t_pause.as_secs_f64() * 1000.0,
+        (t_capture - t_pause).as_secs_f64() * 1000.0,
+        (t_scale - t_capture).as_secs_f64() * 1000.0,
+        (t_encode - t_scale).as_secs_f64() * 1000.0,
+        (t_b64 - t_encode).as_secs_f64() * 1000.0,
+    );
+
+    app.emit("pause-frame", uri).map_err(|e| e.to_string())?;
+    Ok("ok".into())
+}
+
+/// The webview has painted the still frame. Stop the clock, then hide the video
+/// child — hiding only now means there is never a frame of blank window.
+#[tauri::command]
+fn overlay_painted() {
+    let elapsed_ms = (now_us() - PAUSE_T0.load(Ordering::SeqCst)) as f64 / 1000.0;
+    if let Some(ctx) = CTX.lock().unwrap().as_ref() {
+        unsafe {
+            let _ = ShowWindow(HWND(ctx.video_child as *mut _), SW_HIDE);
+        }
+    }
+    let verdict = if elapsed_ms < 200.0 { "WITHIN" } else { "OVER" };
+    println!("PAUSE -> OVERLAY VISIBLE   {elapsed_ms:>7.1} ms   [{verdict} the 200 ms budget]");
+}
+
+#[tauri::command]
+fn resume(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Emitter;
+    if let Some(ctx) = CTX.lock().unwrap().as_ref() {
+        unsafe {
+            let _ = ShowWindow(HWND(ctx.video_child as *mut _), SW_SHOW);
+        }
+        ctx.mpv.set_property("pause", "no")?;
+    }
+    app.emit("resume", ()).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn b64(data: &[u8]) -> String {
+    const T: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
+    for c in data.chunks(3) {
+        let b = [c[0], *c.get(1).unwrap_or(&0), *c.get(2).unwrap_or(&0)];
+        let n = ((b[0] as u32) << 16) | ((b[1] as u32) << 8) | b[2] as u32;
+        out.push(T[(n >> 18 & 63) as usize] as char);
+        out.push(T[(n >> 12 & 63) as usize] as char);
+        out.push(if c.len() > 1 { T[(n >> 6 & 63) as usize] as char } else { '=' });
+        out.push(if c.len() > 2 { T[(n & 63) as usize] as char } else { '=' });
+    }
+    out
+}
 
 /// The mpv host child needs no behaviour of its own; mpv paints it.
 unsafe extern "system" fn video_host_proc(
@@ -54,6 +163,7 @@ fn main() {
     let (dll, video) = (args[1].clone(), args[2].clone());
 
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![pause_and_capture, overlay_painted, resume])
         .setup(move |app| {
             let win = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                 .title("Spike A - transparent WebView2 over libmpv")
@@ -173,11 +283,41 @@ fn main() {
                 let t0 = Instant::now();
                 m.command(&["loadfile", &video]).ok();
 
+                // The pause command needs the handle too. Spike-grade sharing:
+                // a second Mpv over the same DLL would be a second mpv instance,
+                // so instead the event pump gets a raw pointer and CTX owns it.
+                let raw_handle = m.raw() as usize;
+                let cmd_node = m.command_node_fn();
+                let free_node = m.free_node_fn();
+                *CTX.lock().unwrap() = Some(PauseCtx {
+                    mpv: m,
+                    video_child: video_child.0 as isize,
+                });
+                let _ = (raw_handle, cmd_node, free_node);
+
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    // Wait for playback to be genuinely running before pausing.
+                    std::thread::sleep(Duration::from_millis(2500));
+                    for round in 1..=3 {
+                        println!("--- pause cycle {round} ---");
+                        if let Err(e) = pause_and_capture(handle.clone()) {
+                            println!("  pause failed: {e}");
+                        }
+                        std::thread::sleep(Duration::from_millis(1400));
+                        let _ = resume(handle.clone());
+                        std::thread::sleep(Duration::from_millis(1600));
+                    }
+                    println!("--- cycles complete ---");
+                });
+
                 // Pump mpv events on a worker so the Tauri event loop stays free.
                 std::thread::spawn(move || {
                     let mut reported = false;
                     loop {
-                        let (id, text) = m.wait_event(0.25);
+                        let guard = CTX.lock().unwrap();
+                        let Some(ctx) = guard.as_ref() else { break };
+                        let (id, text) = ctx.mpv.wait_event(0.05);
                         if let Some(t) = text {
                             println!("  mpv {t}");
                         }
@@ -187,11 +327,12 @@ fn main() {
                                 "FIRST FRAME           {:>7.1} ms  (into a Tauri child HWND)",
                                 t0.elapsed().as_secs_f64() * 1000.0
                             );
-                            println!("  hwdec-current       {:?}", m.get_property("hwdec-current"));
+                            println!("  hwdec-current       {:?}",
+                                ctx.mpv.get_property("hwdec-current"));
                         }
-                        if id == MPV_EVENT_SHUTDOWN {
-                            break;
-                        }
+                        let done = id == MPV_EVENT_SHUTDOWN;
+                        drop(guard);
+                        if done { break; }
                         std::thread::sleep(Duration::from_millis(10));
                     }
                 });

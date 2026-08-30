@@ -83,6 +83,29 @@ download, no posture question.
 | Compositing: HTML over video, child-window z-order | **FAILS** — 3 distinct attempts, see `docs/RISKS.md` R1 | 2026-08-31 | `a286489` | `spike-a-tauri` |
 | Compositing: HTML beside video, video on top | works | 2026-08-31 | `a286489` | `SPIKE_ZORDER=top` |
 
+### B2 option 1 — still-frame substitution for the pause overlay
+
+On pause: capture via `screenshot-raw window`, downscale, JPEG, render as an
+`<img>` in the page with the overlay composited over it normally, then hide the
+video child HWND. Window 1680x960 -> capture 1680x960 `bgr0` -> 945x540 JPEG, 37-39 KB.
+
+**`screenshot-raw window` captures at WINDOW resolution, not source resolution**, so
+this cost does not scale with a 4K source — which is what lets it hold the budget.
+
+| Measurement | Value | Date | Commit | Command |
+|---|---|---|---|---|
+| **Pause -> overlay visible (§11 budget: < 200 ms)** | **161.0 / 95.4 / 140.1 ms** — all WITHIN, **debug build** | 2026-08-31 | `cec9d1e` | `spike-a-tauri`, 3 cycles |
+| ├ `set pause=yes` | 0.2 / 14.8 / 25.0 ms | 2026-08-31 | `cec9d1e` | as above |
+| ├ `screenshot-raw window` | 19.6 / 47.5 / 58.6 ms | 2026-08-31 | `cec9d1e` | as above |
+| ├ downscale to 945x540 (box filter) | ~20 ms | 2026-08-31 | `cec9d1e` | as above |
+| ├ JPEG encode q78 | ~41 ms | 2026-08-31 | `cec9d1e` | as above |
+| └ base64 for the data URI | ~0.7 ms | 2026-08-31 | `cec9d1e` | as above |
+
+Timing is measured end to end: pause requested -> webview has painted, confirmed by
+a double `requestAnimationFrame` before the page reports back, so the number
+reflects pixels on screen rather than a promise to paint. **Unoptimised build**;
+downscale and JPEG are pure compute and should improve materially in release.
+
 Note: first-frame figures include window creation and process start, and are **not**
 the §2.3 "play → first frame < 500 ms" budget, which is measured from a warm player
 in the real app. Recorded as a Spike A baseline only.

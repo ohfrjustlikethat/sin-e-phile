@@ -55,6 +55,8 @@ type FnWaitEvent = unsafe extern "C" fn(*mut mpv_handle, f64) -> *mut mpv_event;
 type FnErrorString = unsafe extern "C" fn(c_int) -> *const c_char;
 type FnRequestLogMessages = unsafe extern "C" fn(*mut mpv_handle, *const c_char) -> c_int;
 type FnFree = unsafe extern "C" fn(*mut c_void);
+type FnCommandNodeRaw = unsafe extern "C" fn(*mut mpv_handle, *mut c_void, *mut c_void) -> c_int;
+type FnFreeNodeContentsRaw = unsafe extern "C" fn(*mut c_void);
 
 pub struct Mpv {
     handle: *mut mpv_handle,
@@ -71,6 +73,8 @@ pub struct Mpv {
     error_string: RawFn<FnErrorString>,
     request_log_messages: RawFn<FnRequestLogMessages>,
     free: RawFn<FnFree>,
+    command_node: RawFn<FnCommandNodeRaw>,
+    free_node_contents: RawFn<FnFreeNodeContentsRaw>,
 }
 
 /// A resolved symbol, detached from the `Library` borrow.
@@ -113,6 +117,8 @@ impl Mpv {
             let error_string = resolve(&lib, b"mpv_error_string\0")?;
             let request_log_messages = resolve(&lib, b"mpv_request_log_messages\0")?;
             let free = resolve(&lib, b"mpv_free\0")?;
+            let command_node = resolve(&lib, b"mpv_command_node\0")?;
+            let free_node_contents = resolve(&lib, b"mpv_free_node_contents\0")?;
 
             let handle = (create.0)();
             if handle.is_null() {
@@ -132,6 +138,8 @@ impl Mpv {
                 error_string,
                 request_log_messages,
                 free,
+                command_node,
+                free_node_contents,
             })
         }
     }
@@ -210,6 +218,24 @@ impl Mpv {
             };
             (id, text)
         }
+    }
+}
+
+impl Mpv {
+    /// Raw handle, for the node API in `snapshot.rs`.
+    ///
+    /// SAFETY: the caller must not outlive this `Mpv`, and must be the only
+    /// thread driving it.
+    pub unsafe fn raw(&self) -> *mut mpv_handle {
+        self.handle
+    }
+
+    pub fn command_node_fn(&self) -> crate::snapshot::FnCommandNode {
+        unsafe { std::mem::transmute(self.command_node.0) }
+    }
+
+    pub fn free_node_fn(&self) -> crate::snapshot::FnFreeNodeContents {
+        unsafe { std::mem::transmute(self.free_node_contents.0) }
     }
 }
 

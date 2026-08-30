@@ -1,7 +1,7 @@
 {
   "spec_version": "1.2.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-08-31T18:10:00Z",
+  "last_updated": "2026-08-31T19:30:00Z",
   "sessions_completed": 3,
   "current_phase": {
     "number": 1,
@@ -1463,12 +1463,15 @@
       "id": "B2",
       "raised": "2026-08-31T18:10:00Z",
       "needs_user": true,
-      "description": "Spike A, risk R1. libmpv embeds in a Tauri v2 window and hardware-decodes correctly (d3d11va), first frame ~1.0-1.2 s, survives resize. But HTML UI CANNOT be composited OVER the video using child-window z-order, which SPEC.md 4 requires for the player chrome and Phase 11 requires for the pause overlay. Root cause: a transparent WebView2 composites against what is behind the WINDOW, not against sibling child HWNDs - a Windows compositing property, not a Tauri bug. The render-API-into-a-texture approach, which Spike A also mandates, is untested and is materially more work. Needs a decision on which path to spend time on before Phase 1 continues. Options and a recommendation are in the session report and docs/RISKS.md under R1.",
+      "description": "Spike A, risk R1. libmpv embeds in a Tauri v2 window and hardware-decodes correctly (d3d11va), first frame ~1.0-1.2 s, survives resize. But HTML UI CANNOT be composited OVER the video using child-window z-order, which SPEC.md 4 requires for the player chrome and Phase 11 requires for the pause overlay. Root cause: a transparent WebView2 composites against what is behind the WINDOW, not against sibling child HWNDs - a Windows compositing property, not a Tauri bug. The render-API-into-a-texture approach, which Spike A also mandates, is untested and is materially more work. Needs a decision on which path to spend time on before Phase 1 continues. Options and a recommendation are in the session report and docs/RISKS.md under R1. UPDATE 2026-08-31: option 1 (still-frame substitution) WORKS - pause to overlay visible measured at 161/95/140 ms across three cycles, all within the 200 ms budget, on a DEBUG build. So Phase 11's pause overlay is NOT blocked, and the problem shrinks to chrome-over-PLAYING-video only. DECISION DEADLINE: before Phase 8. Phases 2-7 are independent of compositing and proceed regardless; only 8 and 11 depend on it, and 11 is now substantially unblocked.",
       "attempts": [
         "Attempt 1: Tauri transparent(true) with the mpv child at HWND_BOTTOM. Video never appeared; the webview painted opaque over it.",
         "Attempt 2: additionally set ICoreWebView2Controller2::put_DefaultBackgroundColor to A=0. The call succeeded (verified, not assumed) and the video still never appeared, which identified the root cause: transparency composites against the window's background, not against sibling child HWNDs.",
-        "Attempt 3: inverted the z-order, mpv child at HWND_TOP inset 120px. Video renders correctly and COVERS the HTML wherever they overlap. So the mechanism yields UI beside video, never UI over video."
-      ]
+        "Attempt 3: inverted the z-order, mpv child at HWND_TOP inset 120px. Video renders correctly and COVERS the HTML wherever they overlap. So the mechanism yields UI beside video, never UI over video.",
+        "Option 1 (still-frame substitution), 2026-08-31: WORKS. screenshot-raw window -> downscale 945x540 -> JPEG 37-39 KB -> data URI -> <img> under the HTML overlay, then hide the video HWND. 161/95/140 ms end to end, within the 200 ms budget, debug build. Captures at WINDOW resolution so the cost does not scale with a 4K source."
+      ],
+      "decision_deadline": "before Phase 8",
+      "decide_by_phase": 8
     }
   ],
   "decisions_pending": [
@@ -1489,6 +1492,12 @@
       "text": "Windows Sandbox pass on a genuinely bare machine. The E1 CI job proves a clean checkout builds, but windows-latest ships Rust, Node and MSVC preinstalled, so it does not prove SETUP.md is complete from nothing.",
       "raised": "2026-08-31",
       "decide_by_phase": 27
+    },
+    {
+      "id": "P7",
+      "text": "B2 / R1: how to composite player chrome over PLAYING video. Phase 11's pause overlay is solved by still-frame substitution (measured, within budget). Ranked fallbacks per the author: 1) DirectComposition visual hosting if tractable without forking wry; 2) still-frame plus a reserved chrome strip during playback; 3) layered TOP-LEVEL window, DWM-composited, which is a different mechanism from child-HWND z-order and is untried; 4) HTML5 plus remux, last. Chrome-beside-video is explicitly NOT on the list - amend SPEC.md 4 deliberately rather than back into it. DEADLINE: before Phase 8.",
+      "raised": "2026-08-31",
+      "decide_by_phase": 8
     }
   ],
   "adrs": [
