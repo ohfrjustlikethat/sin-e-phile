@@ -1,0 +1,93 @@
+{
+  "_comment": "INTERIM STATE, written at the end of session 0a. SPEC.md §10.4 requires state to never be more than one subtask stale, so this exists rather than waiting for 0b. Session 0b replaces it with the full 28-phase enumeration and adds docs/schemas/project-state.schema.json.",
+
+  "spec_version": "1.1.0",
+  "project": "sin-e-phile",
+  "last_updated": "2026-08-30T14:05:00Z",
+  "sessions_completed": 1,
+
+  "current_phase": {
+    "number": 0,
+    "slug": "bootstrap",
+    "status": "in_progress",
+    "branch": "phase/00-bootstrap",
+    "started_at": "2026-08-30T11:40:00Z",
+    "note": "Split into 0a (safety rails, complete) and 0b (documents and state, not started) by the author, on the basis that Phase 0 as specified is honestly ~2 sessions of writing.",
+
+    "subtasks": [
+      { "id": "0.1", "text": "git init, .gitignore, .env.example, phase branch, public GitHub repo, secret scanning + push protection", "status": "complete", "commit": "bb6222a" },
+      { "id": "0.2", "text": "Directory skeleton per SPEC.md §7 including the amended additions", "status": "complete", "commit": "bb6222a" },
+      { "id": "0.3", "text": "SPEC.md audit, 7 ADRs, 17 amendments to spec_version 1.1.0", "status": "complete", "commit": "7bbd241" },
+      { "id": "0.4", "text": "tools/doctor/ prerequisite checker and core.hooksPath bootstrap", "status": "complete", "commit": "deecf52" },
+      { "id": "0.5", "text": "tools/guard/ posture guard, denylist, allowlist, self-test", "status": "complete", "commit": "deecf52" },
+      { "id": "0.6", "text": "Secret scanning: stdlib fallback + pinned gitleaks in CI", "status": "complete", "commit": "78932d4" },
+      { "id": "0.7", "text": ".githooks/ pre-commit and commit-msg via core.hooksPath", "status": "complete", "commit": "deecf52" },
+      { "id": "0.8", "text": "CI workflow, four jobs on windows-latest", "status": "complete", "commit": "0aa6e23" },
+      { "id": "0.9", "text": "Verify the rails fire on deliberate plants", "status": "complete", "commit": "0aa6e23" },
+
+      { "id": "0.10", "text": "LICENSE (GPL-3.0), README.md with pitch drafted, CONTRIBUTING.md, CHANGELOG.md", "status": "not_started", "commit": null },
+      { "id": "0.11", "text": "PROJECT_STATE.json with all 28 phases and exit criteria + JSON schema; PROGRESS.md", "status": "not_started", "commit": null },
+      { "id": "0.12", "text": "docs/SETUP.md with live-verified §14 service terms", "status": "not_started", "commit": null },
+      { "id": "0.13", "text": "docs/GLOSSARY.md (30 terms), docs/HOW_IT_WORKS.md skeleton", "status": "not_started", "commit": null },
+      { "id": "0.14", "text": "docs/RISKS.md (R1–R10 with concrete triggers), docs/DECISIONS_PENDING.md", "status": "not_started", "commit": null },
+      { "id": "0.15", "text": "Seed ADRs 0002–0008 (numbers reserved in docs/adr/README.md)", "status": "not_started", "commit": null },
+      { "id": "0.16", "text": "docs/learning/phase-00-notes.md, then ASK the five self-check questions in chat (§10.10)", "status": "not_started", "commit": null }
+    ],
+
+    "exit_criteria": [
+      { "id": "E1", "text": "git clone on a clean machine + docs/SETUP.md produces a working dev environment", "met": false, "evidence": null },
+      { "id": "E2", "text": "CI passes on phase/00-bootstrap, and on main after merge", "met": false, "evidence": "Half met: CI green on phase/00-bootstrap — run 33314370192, all four jobs pass. The main-after-merge half is pending the merge at the end of 0b." },
+      { "id": "E3", "text": "PROJECT_STATE.json validates against its schema and enumerates all 28 phases with exit criteria", "met": false, "evidence": null },
+      { "id": "E4", "text": "Eight seed ADRs exist and are non-trivial", "met": false, "evidence": "ADR-0001 written; 0002–0008 reserved with titles in docs/adr/README.md, to be written in 0b. Note that 0009–0015 also exist, from this session's rulings." },
+      { "id": "E5", "text": "The posture guard fails CI when fed a deliberately-planted test string, and passes on the clean tree", "met": true, "evidence": "Planted an RFC 2606 default_source_url + tracker announce URL, staged it: `python tools/guard/guard.py --staged` → exit 1, 2 findings (default-source-key, tracker-announce). Plant removed; `--tree` and `--history` → exit 0 clean. `--selftest` → 30/30 checks, covering 12 must-fire and 16 must-not-fire vectors." },
+      { "id": "E6", "text": "Secret scanning fails CI on a deliberately-planted fake key", "met": true, "evidence": "Planted a fake TMDB key and a fake GitHub token: `python tools/guard/secretscan.py --staged` → exit 1, 2 findings (generic-api-key-assignment, github-token). The plant exposed a real bug — `a` in the placeholder-exclusion list disabled the generic rule for any value starting with `a` — fixed in 78932d4." },
+      { "id": "E7", "text": "doctor correctly reports a missing prerequisite when one is removed from PATH", "met": true, "evidence": "PATH stripped of FFmpeg and Node: `python tools/doctor/doctor.py --no-fix` → 3 required MISS (Node.js, npm, FFmpeg), exit 1, each with an actionable fix line. Full PATH → all required ok, exit 0." },
+      { "id": "E8", "text": "docs/RISKS.md exists with all Appendix D risks and at least one concrete trigger each", "met": false, "evidence": null }
+    ]
+  },
+
+  "phases": [
+    { "number": 0, "slug": "bootstrap", "status": "in_progress", "completion_commit": null },
+    { "_comment": "Phases 1–27 enumerated in session 0b, with exit criteria copied from SPEC.md §15." }
+  ],
+
+  "next_action": "Run session 0b. Start with subtask 0.11: write PROJECT_STATE.json enumerating all 28 phases with their exit criteria copied verbatim from SPEC.md §15, plus docs/schemas/project-state.schema.json to validate it, replacing this interim file. Then work 0.10 and 0.12–0.16 in the order listed in the subtasks array. Phase 0 is NOT done until the five self-check questions in docs/learning/phase-00-notes.md have been asked in chat and answered (§10.10).",
+
+  "blockers": [],
+
+  "decisions_pending": [
+    { "id": "P1", "text": "GPL-3.0 'source only, no compiled installers published' versus Phase 27's packaging deliverables and the §2.3 installed-size budget. Raised in the session 0a audit as item 12; deferred rather than resolved. Belongs in docs/DECISIONS_PENDING.md in 0b.", "raised": "2026-08-30" }
+  ],
+
+  "adrs": [
+    { "id": "0001", "title": "Record architecture decisions", "date": "2026-08-30" },
+    { "id": "0009", "title": "Posture guard denylist design", "date": "2026-08-30" },
+    { "id": "0010", "title": "Source allowlist and its governance", "date": "2026-08-30" },
+    { "id": "0011", "title": "Fixture site-tag redaction policy", "date": "2026-08-30" },
+    { "id": "0012", "title": "Dev tooling in Python; git hooks via core.hooksPath", "date": "2026-08-30" },
+    { "id": "0013", "title": "TMDB is optional; the catalogue is offline-first", "date": "2026-08-30" },
+    { "id": "0014", "title": "Embedding artefacts ship via GitHub Releases", "date": "2026-08-30" },
+    { "id": "0015", "title": "Tier 0 embeds queries but never documents", "date": "2026-08-30" }
+  ],
+
+  "environment": {
+    "rust_version": "1.98.0",
+    "cargo_version": "1.98.0",
+    "node_version": "24.20.0",
+    "npm_version": "11.19.0",
+    "python_version": "3.12.10",
+    "msvc_version": "14.50.35717 (VS Enterprise 2026 Insiders — vswhere needs -prerelease to find it)",
+    "windows_sdk": "10.0.26100",
+    "webview2": "151.0.4129.107",
+    "ffmpeg_version": "9.0",
+    "verified_at": "2026-08-30T13:10:00Z",
+    "verified_how": "tools/doctor/doctor.py exit 0, plus a real cargo new/build/run round trip",
+    "configured_services": []
+  },
+
+  "known_debt": [
+    { "id": "D1", "text": "The hashed denylist matches exact tokens only — no substring, fuzzy, or homoglyph matching. Accepted in ADR-0009; the structural matcher covers the shapes that carry real risk. Revisit only if a near-miss is ever observed.", "phase_raised": 0 },
+    { "id": "D2", "text": "A fresh clone is unprotected by the git hooks until tools/doctor runs once, because core.hooksPath is per-clone config. CI is the backstop. Accepted in ADR-0012.", "phase_raised": 0 },
+    { "id": "D3", "text": "Bare-domain detection is disabled inside source files (attribute access is shaped identically). URLs are still checked everywhere, as is the denylist. Documented in tools/guard/README.md.", "phase_raised": 0 }
+  ]
+}

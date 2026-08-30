@@ -26,14 +26,14 @@ jobs:
     name: Posture guard and secret scan
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # Required: the guard scans every blob that has ever existed, so a
           # violation that was committed and then deleted is still caught.
           # A shallow clone would silently reduce this check to a tree scan.
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -85,7 +85,7 @@ jobs:
     name: Rust — fmt, clippy, test
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Detect a Rust workspace
         id: detect
@@ -122,7 +122,7 @@ jobs:
     name: Frontend — lint, test, build
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Detect a Node project
         id: detect
@@ -135,7 +135,7 @@ jobs:
             echo "::notice::No package.json yet — frontend checks skipped until Phase 1."
           fi
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         if: steps.detect.outputs.present == 'true'
         with:
           node-version: "24"
@@ -160,9 +160,9 @@ jobs:
     name: Repository hygiene
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
