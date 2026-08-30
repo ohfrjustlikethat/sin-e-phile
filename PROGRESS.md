@@ -16,11 +16,11 @@
 
 > ALL THREE SPIKES COMPLETE. R1 retired (ADR-0021: still-frame on pause + region cutouts during playback). R2 retired (librqbit already provides most of the Phase 7 scheduler). R3 retired (query embedding p95 1.63 ms against a 30 ms trigger). No spike failed and no fallback was taken. Phase 1 proceeds to subtasks 1.4-1.10.
 
-### Subtasks — 1/10 complete
+### Subtasks — 3/10 complete
 
 - [x] **1.1** Spike A - libmpv in a Tauri v2 window (R1). DONE: embeds, d3d11va hardware decode, survives resize. Compositing solved by still-frame on pause + SetWindowRgn cutouts during playback. Both approaches the spec mandates were evaluated; DirectComposition (wry #1762) rejected as unmerged and retained as an upgrade path. · `28eb3d6`
-- [~] **1.2** Spike B - librqbit sequential streaming (R2). DONE: TTFB 1.0/2.9/3.1 s, seek re-prioritisation 0.6/0.8/2.4 s, both well inside targets. API audit found ManagedTorrent::stream gives a position-tracking 32 MiB priority window the picker already honours, so Phase 7 largely tunes rather than builds. librqbit has NO webseed support - Phase 6's InternetArchiveBackend must use direct HTTP.
-- [~] **1.3** Spike C - ort/ONNX on Windows (R3). DONE: query-embedding p95 1.63 ms true length / 8.13 ms padded, against a 30 ms trigger. Load 82 ms, resident +51.6 MB, 384 dims. Tier 0 VM measurement outstanding as P8.
+- [x] **1.2** Spike B - librqbit sequential streaming (R2). DONE: TTFB 1.0/2.9/3.1 s, seek re-prioritisation 0.6/0.8/2.4 s, both well inside targets. API audit found ManagedTorrent::stream gives a position-tracking 32 MiB priority window the picker already honours, so Phase 7 largely tunes rather than builds. librqbit has NO webseed support - Phase 6's InternetArchiveBackend must use direct HTTP. · `1f96eb3`
+- [x] **1.3** Spike C - ort/ONNX on Windows (R3). DONE: query-embedding p95 1.63 ms true length / 8.13 ms padded, against a 30 ms trigger. Load 82 ms, resident +51.6 MB, 384 dims. Tier 0 VM measurement outstanding as P8. · `1f96eb3`
 - [ ] **1.4** Tauri v2 + React + TS strict + Vite + Tailwind building
 - [ ] **1.5** Window: custom title bar, remembered size/position, min 1024x640
 - [ ] **1.6** Left nav rail, five destinations, collapse/expand
