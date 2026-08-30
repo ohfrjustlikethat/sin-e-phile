@@ -1,0 +1,176 @@
+name: CI
+
+# SPEC.md §12.4. Order matters: the cheap correctness gates run first, and the
+# posture guard and secret scan run on every push regardless of what else fails,
+# because a §2.1 violation reaching the remote is the expensive kind of mistake.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────────────
+  # The safety rails (SPEC.md §12.5, §12.6). Deliberately a separate job with no
+  # `needs:`, so it runs in parallel and reports even when the build is broken.
+  # ───────────────────────────────────────────────────────────────────────────
+  posture:
+    name: Posture guard and secret scan
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Required: the guard scans every blob that has ever existed, so a
+          # violation that was committed and then deleted is still caught.
+          # A shallow clone would silently reduce this check to a tree scan.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Guard self-test (prove the guard fires before trusting it)
+        run: python tools/guard/guard.py --selftest
+
+      - name: Posture guard — working tree
+        run: python tools/guard/guard.py --tree
+
+      - name: Posture guard — full history
+        run: python tools/guard/guard.py --history
+
+      - name: Install gitleaks (pinned, checksum-verified)
+        shell: pwsh
+        env:
+          # Pinned per SPEC.md 12.6 / ADR-0012. The checksum was taken from the
+          # release's own checksums.txt on 2026-08-30 and verified against the
+          # downloaded asset locally. Bumping the version REQUIRES re-taking it:
+          #   gh release download vX.Y.Z --repo gitleaks/gitleaks --pattern "*checksums*"
+          GITLEAKS_VERSION: "8.30.1"
+          GITLEAKS_SHA256: "d29144deff3a68aa93ced33dddf84b7fdc26070add4aa0f4513094c8332afc4e"
+        run: |
+          $url = "https://github.com/gitleaks/gitleaks/releases/download/v$env:GITLEAKS_VERSION/gitleaks_${env:GITLEAKS_VERSION}_windows_x64.zip"
+          Invoke-WebRequest -Uri $url -OutFile gitleaks.zip
+          $actual = (Get-FileHash gitleaks.zip -Algorithm SHA256).Hash.ToLower()
+          Write-Host "gitleaks sha256: $actual"
+          if ($actual -ne $env:GITLEAKS_SHA256.ToLower()) {
+            Write-Error "gitleaks checksum mismatch. Expected $($env:GITLEAKS_SHA256), got $actual. Update GITLEAKS_SHA256 in ci.yml after verifying the release."
+            exit 1
+          }
+          Expand-Archive gitleaks.zip -DestinationPath gitleaks-bin
+          echo "$PWD\gitleaks-bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Secret scan — full history (authoritative)
+        run: gitleaks detect --source . --redact --no-banner --exit-code 1
+
+      - name: Secret scan — regex fallback (verifies the pre-commit path works)
+        run: python tools/guard/secretscan.py --tree
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Rust. Phase 0 has no crate yet, so these steps are skipped until one exists.
+  # They are wired now so that Phase 1's first commit is already covered.
+  # ───────────────────────────────────────────────────────────────────────────
+  rust:
+    name: Rust — fmt, clippy, test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect a Rust workspace
+        id: detect
+        shell: bash
+        run: |
+          if [ -f Cargo.toml ] || [ -f src-tauri/Cargo.toml ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No Cargo.toml yet — Rust checks skipped until Phase 1."
+          fi
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.detect.outputs.present == 'true'
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        if: steps.detect.outputs.present == 'true'
+
+      - run: cargo fmt --all --check
+        if: steps.detect.outputs.present == 'true'
+
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+        if: steps.detect.outputs.present == 'true'
+
+      - run: cargo test --all-features
+        if: steps.detect.outputs.present == 'true'
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Frontend. Same arrangement — wired now, active from Phase 1.
+  # ───────────────────────────────────────────────────────────────────────────
+  frontend:
+    name: Frontend — lint, test, build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect a Node project
+        id: detect
+        shell: bash
+        run: |
+          if [ -f package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No package.json yet — frontend checks skipped until Phase 1."
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.detect.outputs.present == 'true'
+        with:
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci
+        if: steps.detect.outputs.present == 'true'
+
+      - run: npm run lint
+        if: steps.detect.outputs.present == 'true'
+
+      - run: npm run test
+        if: steps.detect.outputs.present == 'true'
+
+      - run: npm run build
+        if: steps.detect.outputs.present == 'true'
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Repository hygiene that does not need a toolchain.
+  # ───────────────────────────────────────────────────────────────────────────
+  hygiene:
+    name: Repository hygiene
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: PROJECT_STATE.json is valid JSON and matches its schema
+        shell: bash
+        run: |
+          if [ -f PROJECT_STATE.json ]; then
+            python -c "import json; json.load(open('PROJECT_STATE.json')); print('PROJECT_STATE.json parses')"
+          else
+            echo "::notice::PROJECT_STATE.json not present yet — written in session 0b."
+          fi
+
+      - name: Doctor runs and reports (does not gate CI)
+        continue-on-error: true
+        run: python tools/doctor/doctor.py --no-fix

@@ -61,7 +61,12 @@ SECRET_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
         re.compile(
             r"""(?i)\b\w*(?:api[_-]?key|apikey|secret|token|password|passwd|client[_-]?secret|access[_-]?key)\w*\b"""
             r"""\s*[:=]\s*["'`]"""
-            r"""(?!(?:your|my|the|a|some|xxx|placeholder|example|changeme|redacted|dummy|fake|test|sample|insert|todo|none|null|<)[\w-]*["'`])"""
+            # Skip obvious placeholders so .env.example stays committable.
+            # Every alternative here must be a DISTINCTIVE word: short, common
+            # ones like `a`, `my` or `the` match the start of real secrets
+            # (`a1b2c3…` begins with `a`) and silently disable the whole rule.
+            r"""(?!(?:your|placeholder|example|changeme|change_me|redacted|dummy|"""
+            r"""fake|sample|insert|todo|none|null|xxx|<)[\w-]*["'`])"""
             r"""([A-Za-z0-9_\-./+=]{20,})["'`]"""
         ),
         "A secret-shaped value assigned to a key-shaped name.",
