@@ -22,7 +22,7 @@
 - [x] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres · `048180a`
 - [ ] **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device)
 - [ ] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering
-- [ ] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules
+- [~] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules
 - [ ] **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline
 - [ ] **4.7** Per-profile TMDB key from settings, never shipped (ADR-0027); every TMDB-dependent surface degrades to the typographic state
 - [ ] **4.8** Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding, blurhash placeholders
@@ -46,7 +46,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.5 (brought forward): load title.principals for core titles only and MEASURE the result, using the loader pattern in tools/ingest/src/load.rs. R4 is REOPENED - the 3.11 GB projection that justified the >=10 core threshold is now known to be 2.56x low on the one component that has been measured (titles projected 450 MB, actually 1,153 MB). Credits are the largest remaining unknown and must be measured before AniList, not after. See docs/eval-results.md.
+Phase 4: write the title.akas loader in tools/ingest/src/ (romaji/native/english variants for core titles, SPEC.md 6.2) and MEASURE it. That is the last unmeasured component of R4, and the >=10 core threshold should be decided once, on measured data for all of them - see docs/eval-results.md. Both R4 triggers are now in play: 2,427 MB of 4 GB and ~45 min of 2 hours used, with akas, AniList, MovieLens and the embedding build still to run.
 
 ---
 

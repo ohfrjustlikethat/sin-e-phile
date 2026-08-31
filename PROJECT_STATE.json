@@ -1,7 +1,7 @@
 {
   "spec_version": "1.7.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-08-31T21:49:06Z",
+  "last_updated": "2026-08-31T22:12:00Z",
   "sessions_completed": 5,
   "current_phase": {
     "number": 4,
@@ -39,7 +39,7 @@
       {
         "id": "4.5",
         "text": "External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules",
-        "status": "not_started",
+        "status": "in_progress",
         "commit": null
       },
       {
@@ -717,7 +717,7 @@
         {
           "id": "4.5",
           "text": "External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules",
-          "status": "not_started",
+          "status": "in_progress",
           "commit": null
         },
         {
@@ -1786,7 +1786,7 @@
       ]
     }
   ],
-  "next_action": "Phase 4 subtask 4.5 (brought forward): load title.principals for core titles only and MEASURE the result, using the loader pattern in tools/ingest/src/load.rs. R4 is REOPENED - the 3.11 GB projection that justified the >=10 core threshold is now known to be 2.56x low on the one component that has been measured (titles projected 450 MB, actually 1,153 MB). Credits are the largest remaining unknown and must be measured before AniList, not after. See docs/eval-results.md.",
+  "next_action": "Phase 4: write the title.akas loader in tools/ingest/src/ (romaji/native/english variants for core titles, SPEC.md 6.2) and MEASURE it. That is the last unmeasured component of R4, and the >=10 core threshold should be decided once, on measured data for all of them - see docs/eval-results.md. Both R4 triggers are now in play: 2,427 MB of 4 GB and ~45 min of 2 hours used, with akas, AniList, MovieLens and the embedding build still to run.",
   "blockers": [],
   "decisions_pending": [
     {

@@ -476,3 +476,55 @@ closer to **7 GB**, well over.
 **R4 is open again, and the >= 10 core threshold should be treated as provisional
 until credits are actually loaded and measured.** That is the next measurement, and
 it should happen before AniList rather than after.
+
+### Credits, actually loaded — and the projections were wrong in both directions
+
+`./target/release/ingest credits`, 2026-09-01, commit `afc5408`. Release build.
+
+| Metric | Value |
+|---|---|
+| People loaded | 2,736,235 |
+| Credits loaded | **10,079,841** |
+| Core titles with at least one credit | 838,133 of 854,752 (98%) |
+| Mean credits per title | 12.0 |
+| People dropped (absent from `name.basics`) | 1,604 |
+| **Database** | **2,427 MB** (+1,069 MB for people and credits) |
+| **Load time** | **2,234 s** for the resumed portion |
+
+Integrity, checked: zero credits pointing at a missing person, zero pointing at a
+missing title, zero attached to a non-core title, and only roles the migration 0002
+`CHECK` constraint allows.
+
+**The projections were wrong in BOTH directions, which is the useful finding:**
+
+| Component | Projected | Measured | Error |
+|---|---|---|---|
+| titles | 450 MB | 1,153 MB | **2.6x under** |
+| people + credits | 1,921 MB | 1,069 MB | **1.8x over** |
+
+A method that is 2.6x low on one component and 1.8x high on the next is not biased —
+it is **unreliable**, and no correction factor fixes that. The multiplier was
+corrected once already, from 2.4 to 6.2, and this shows that was treating a symptom.
+Projections are now labelled as projections wherever they are printed, and the R4
+position is stated from measurements only.
+
+### R4 position, on measured data
+
+| Component | Status |
+|---|---|
+| titles (index tier) | **1,153 MB measured** |
+| people + credits (core tier) | **1,069 MB measured** |
+| alternative titles (core tier) | not yet loaded |
+| embedding artefact | not yet built (~330 MB at ADR-0014's rate for 854,752 core titles) |
+| AniList, MovieLens | not yet loaded |
+
+**Measured so far: 2,427 MB of a 4 GB trigger.** Roughly 1.6 GB of headroom for four
+components, one of which is projected at 812 MB by a method now known to be
+unreliable.
+
+**Time is now a live concern too, and was not before.** Titles 219 s plus credits
+2,234 s plus the failed first attempt is roughly 45 minutes of a two-hour budget,
+with `title.akas`, AniList, MovieLens and the embedding build still to run.
+
+**Both of R4's triggers are in play.** Neither is breached; neither is comfortably
+clear.
