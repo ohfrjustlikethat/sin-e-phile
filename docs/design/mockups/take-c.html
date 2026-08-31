@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>sin-e-phile — Take C, Signal</title>
+<link rel="stylesheet" href="./fonts.css">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   TAKE C — "Signal"
+
+   Spotify-led. Hierarchy you can read from across a room: enormous heavy display
+   type against very quiet metadata, and a much bigger jump between levels than
+   the other two takes. Denser and more browsing-oriented — this is the take that
+   assumes you open the app to find something, not to admire it.
+
+   Display : Archivo 800, very tight tracking, set large
+   UI      : Inter, small and quiet, doing nothing clever
+   Accent  : Instrument Serif for a single editorial line per screen
+   Radius  : 2px on artwork, 0 on everything else. Two values.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --void: #000000;
+  --base: #0A0A0A;
+  --surface: #141312;
+  --raised: #1F1D1B;
+  --line-subtle: #1C1A18;
+  --line: #2C2926;
+  --line-strong: #423E39;
+  --ink: #F5F2ED;
+  --ink-muted: #9A948C;
+  --ink-faint: #6B655D;
+  --oxblood: #8E2B34;
+  --oxblood-bright: #C4434F;
+
+  --display: "Archivo", system-ui, sans-serif;
+  --serif: "Instrument Serif", Georgia, serif;
+  --ui: "Inter", system-ui, sans-serif;
+  --mono: "JetBrains Mono", monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--base); color: var(--ink);
+  font-family: var(--ui); font-size: 14px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+.label { font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.16em; color: var(--ink-faint); }
+
+.app { display: flex; height: 100vh; overflow: hidden; }
+.rail { width: 210px; flex-shrink: 0; background: var(--void); padding: 26px 0; border-right: 1px solid var(--line-subtle); }
+.brand { font-family: var(--display); font-weight: 800; font-size: 19px; letter-spacing: -0.05em; padding: 0 24px 26px; text-transform: uppercase; }
+.nav a { display: block; padding: 10px 24px; color: var(--ink-faint); text-decoration: none; font-size: 13.5px; font-weight: 500; }
+.nav a.on { color: var(--ink); box-shadow: inset 3px 0 0 var(--oxblood-bright); }
+.nav .sep { height: 1px; background: var(--line-subtle); margin: 18px 24px; }
+.main { flex: 1; overflow-y: auto; }
+
+/* ── HOME ────────────────────────────────────────────────────────────────── */
+/* Billboard is shorter than Take A's and the type is much heavier — the trade is
+   less atmosphere, more titles above the fold. */
+.hero { position: relative; height: 50vh; }
+.hero img { filter: saturate(0.88) contrast(1.06); }
+.hero::after { content:""; position:absolute; inset:0; background: linear-gradient(105deg, rgba(0,0,0,0.94) 0%, rgba(0,0,0,0.55) 46%, transparent 78%); }
+.hero-copy { position: absolute; left: 52px; top: 50%; transform: translateY(-50%); z-index: 2; max-width: 620px; }
+.hero-copy h1 {
+  font-family: var(--display); font-weight: 800; font-size: 66px; line-height: 0.88;
+  letter-spacing: -0.05em; text-transform: uppercase; margin: 14px 0 12px;
+}
+.hero-copy .line { font-family: var(--serif); font-size: 21px; color: var(--ink-muted); line-height: 1.4; margin-bottom: 20px; max-width: 460px; }
+.meta { display: flex; gap: 16px; font-size: 11px; color: var(--ink-faint); letter-spacing: 0.09em; text-transform: uppercase; font-weight: 500; }
+.actions { display: flex; gap: 10px; margin-top: 24px; align-items: center; }
+.play { background: var(--oxblood); color: var(--ink); border: 0; border-radius: 0; padding: 15px 32px; font-family: var(--ui); font-size: 11.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer; }
+.ghost { background: transparent; color: var(--ink-muted); border: 1px solid var(--line-strong); padding: 15px 22px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; border-radius: 0; }
+
+.sec { padding: 46px 52px 0; }
+.sec-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 20px; }
+.sec-head h2 { font-family: var(--display); font-weight: 800; font-size: 26px; letter-spacing: -0.035em; text-transform: uppercase; line-height: 1; }
+.sec-head .why { font-size: 11px; color: var(--ink-faint); letter-spacing: 0.04em; max-width: 300px; text-align: right; }
+
+/* Irregular: a 2-up feature followed by smaller tiles. */
+.grid { display: flex; gap: 16px; align-items: stretch; }
+.tile { flex-shrink: 0; width: 168px; }
+.tile.big { width: 300px; }
+.tile .frame { aspect-ratio: 16/10; border-radius: 2px; overflow: hidden; background: var(--surface); border: 1px solid var(--line-subtle); margin-bottom: 10px; }
+.tile.big .frame { aspect-ratio: 4/3; }
+.tile h3 { font-family: var(--display); font-weight: 700; font-size: 14.5px; letter-spacing: -0.02em; line-height: 1.18; margin-bottom: 3px; }
+.tile.big h3 { font-size: 21px; letter-spacing: -0.035em; }
+.tile .sub { font-size: 10.5px; color: var(--ink-faint); letter-spacing: 0.05em; }
+
+.typo { height: 100%; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; background: var(--surface); }
+.typo .n { font-family: var(--mono); font-size: 9.5px; color: var(--oxblood-bright); letter-spacing: 0.1em; }
+.typo .t { font-family: var(--display); font-weight: 800; font-size: 23px; line-height: 0.98; letter-spacing: -0.04em; text-transform: uppercase; }
+.typo .d { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); }
+
+/* ── DETAIL ──────────────────────────────────────────────────────────────── */
+.d-hero { height: 44vh; position: relative; }
+.d-hero::after { content:""; position:absolute; inset:0; background: linear-gradient(to top, var(--base) 4%, transparent 72%); }
+.d-wrap { padding: 0 52px 70px; margin-top: -70px; position: relative; z-index: 2; }
+.d-title { font-family: var(--display); font-weight: 800; font-size: 76px; line-height: 0.86; letter-spacing: -0.055em; text-transform: uppercase; margin-bottom: 16px; max-width: 860px; }
+.d-line { font-family: var(--serif); font-size: 24px; color: var(--ink-muted); margin-bottom: 20px; }
+.d-cols { display: grid; grid-template-columns: 1.6fr 1fr; gap: 60px; margin-top: 40px; }
+.d-cols p { color: var(--ink-muted); font-size: 15px; line-height: 1.72; }
+.fact { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line-subtle); font-size: 12px; }
+.fact .k { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); }
+.stills { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-top: 44px; }
+.stills div { aspect-ratio: 16/9; border-radius: 2px; overflow: hidden; border: 1px solid var(--line-subtle); }
+
+/* ── PLAYER (ADR-0020: solid opaque panel, hard edge) ────────────────────── */
+.player { position: relative; height: 100vh; background: var(--void); }
+.chrome { position: absolute; left: 0; right: 0; bottom: 0; background: var(--base); border-top: 1px solid var(--line-strong); padding: 20px 52px 22px; }
+.chrome-top { display: flex; align-items: baseline; gap: 18px; margin-bottom: 16px; }
+.chrome-title { font-family: var(--display); font-weight: 800; font-size: 24px; letter-spacing: -0.045em; text-transform: uppercase; }
+.chrome-sub { font-family: var(--serif); font-size: 16px; color: var(--ink-muted); }
+.scrub { height: 4px; background: var(--line); position: relative; margin-bottom: 14px; }
+.scrub .buf { position:absolute; inset: 0 41% 0 0; background: var(--line-strong); }
+.scrub .done { position:absolute; inset: 0 62% 0 0; background: var(--oxblood-bright); }
+.controls { display: flex; align-items: center; gap: 20px; }
+.controls .t { font-family: var(--mono); font-size: 11.5px; color: var(--ink-muted); }
+.icon { width: 20px; height: 20px; stroke: var(--ink); fill: none; stroke-width: 1.5; }
+.icon.q { stroke: var(--ink-muted); }
+.spacer { flex: 1; }
+.pill { border: 1px solid var(--line-strong); padding: 5px 11px; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-muted); font-weight: 500; }
+
+.screen-tag { position: sticky; top: 0; z-index: 40; background: var(--oxblood); color: var(--ink); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; padding: 7px 52px; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div class="brand">sin·e·phile</div>
+    <nav class="nav">
+      <a href="#" class="on">Home</a><a href="#">Films</a><a href="#">TV Shows</a>
+      <a href="#">Watchlist</a><a href="#">Live</a>
+      <div class="sep"></div><a href="#">Settings</a>
+    </nav>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+
+<script src="./data.js"></script>
+<script>
+const f = FILMS;
+const no = (n) => String(n).padStart(3, "0");
+
+const tile = (x, i, big) => `
+  <article class="tile ${big ? "big" : ""}">
+    <div class="frame"><img src="${still(x.stills[i % x.stills.length])}" alt=""></div>
+    <h3>${x.title}</h3>
+    <div class="sub">${x.director} · ${x.year}</div>
+  </article>`;
+
+const typoTile = (x) => `
+  <article class="tile">
+    <div class="frame">
+      <div class="typo">
+        <div class="n">№ ${no(x.spine)}</div>
+        <div class="t">${x.title}</div>
+        <div class="d">${x.director} · ${x.year}</div>
+      </div>
+    </div>
+    <h3>${x.title}</h3>
+    <div class="sub">${x.director} · ${x.year}</div>
+  </article>`;
+
+const WHY = {
+  resume: "Picked up where you left off",
+  safe: "Three Val Lewton pictures finished in a row",
+  blindspot: "You have never watched anything from the USSR",
+  deepcut: "High ratings, almost no audience",
+};
+
+const sec = (r) => `
+  <section class="sec">
+    <div class="sec-head">
+      <h2>${r.label}</h2>
+      <div class="why">${WHY[r.intent]}</div>
+    </div>
+    <div class="grid">
+      ${r.keys.map((k, i) => tile(f[k], i, i === 0)).join("")}
+      ${r.intent === "deepcut" ? typoTile(NO_ARTWORK) : ""}
+    </div>
+  </section>`;
+
+const h = f.detour;
+document.getElementById("main").innerHTML = `
+  <div class="screen-tag">Take C — Home</div>
+  <section class="hero">
+    <img src="${still(h.stills[2])}" alt="">
+    <div class="hero-copy">
+      <div class="label">Beloved by people like you, seen by almost no one</div>
+      <h1>${h.title}</h1>
+      <div class="line">Shot in six days on almost nothing, and the poverty is the point.</div>
+      <div class="meta"><span>${h.year}</span><span>${mins(h.runtime)}</span><span>${h.director}</span><span>${h.genres[0]}</span></div>
+      <div class="actions"><button class="play">Play</button><button class="ghost">Watchlist</button></div>
+    </div>
+  </section>
+  ${RAILS.map(sec).join("")}
+  <div style="height:60px"></div>
+
+  <div class="screen-tag">Take C — Film detail</div>
+  <div class="d-hero"><img src="${still(f.chien.stills[2])}" alt=""></div>
+  <div class="d-wrap">
+    <div class="label" style="margin-bottom:14px">№ ${no(f.chien.spine)} · Short · Not in your library</div>
+    <h1 class="d-title">${f.chien.title}</h1>
+    <div class="d-line">Luis Buñuel &amp; Salvador Dalí, ${f.chien.year}</div>
+    <div class="meta"><span>${mins(f.chien.runtime)}</span><span>${f.chien.country}</span><span>${f.chien.genres.join(" · ")}</span><span>${f.chien.rating} / 10</span></div>
+    <div class="actions" style="margin-top:22px"><button class="play">Play</button><button class="ghost">Trailer</button><button class="ghost">Watchlist</button></div>
+    <div class="d-cols">
+      <div>
+        <p>${f.chien.synopsis}</p>
+        <div class="stills">${f.chien.stills.map((s) => `<div><img src="${still(s)}" alt=""></div>`).join("")}</div>
+      </div>
+      <div>
+        <div class="label" style="margin-bottom:12px">Details</div>
+        <div class="fact"><span class="k">Director</span><span>${f.chien.director}</span></div>
+        <div class="fact"><span class="k">Cast</span><span>${f.chien.cast[0]}</span></div>
+        <div class="fact"><span class="k">Country</span><span>${f.chien.country}</span></div>
+        <div class="fact"><span class="k">Runtime</span><span>${mins(f.chien.runtime)}</span></div>
+        <div class="fact"><span class="k">Available</span><span>Stream · 1080p</span></div>
+        <div class="fact"><span class="k">Why this source</span><span>Only 1080p copy</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen-tag">Take C — Player, chrome visible</div>
+  <section class="player">
+    <img src="${still(f.scarlet.stills[2])}" alt="">
+    <div class="chrome">
+      <div class="chrome-top">
+        <span class="chrome-title">${f.scarlet.title}</span>
+        <span class="chrome-sub">Fritz Lang, ${f.scarlet.year}</span>
+        <div class="spacer"></div>
+        <span class="label">Local file · 1080p · No transcode</span>
+      </div>
+      <div class="scrub"><div class="buf"></div><div class="done"></div></div>
+      <div class="controls">
+        <svg class="icon" viewBox="0 0 20 20"><path d="M6 4l10 6-10 6V4z" fill="currentColor" stroke="none"/></svg>
+        <svg class="icon q" viewBox="0 0 20 20"><path d="M3 10h4l4-4v8l-4-4H3z"/><path d="M14 7a4 4 0 010 6"/></svg>
+        <span class="t">01:03:47</span><span class="t" style="color:var(--ink-faint)">/ 01:42:00</span>
+        <div class="spacer"></div>
+        <span class="pill">English</span><span class="pill">Subtitles · English</span>
+        <svg class="icon q" viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12"/><path d="M6 13h8"/></svg>
+        <svg class="icon q" viewBox="0 0 20 20"><path d="M3 7V3h4M17 7V3h-4M3 13v4h4M17 13v4h-4"/></svg>
+      </div>
+    </div>
+  </section>
+`;
+
+// Screenshot support: ?screen=0|1|2 scrolls the main pane to that screen, so
+// each can be captured at real size instead of as one enormous full-page image.
+{
+  const want = new URLSearchParams(location.search).get("screen");
+  if (want !== null) {
+    const go = () => {
+      const tags = document.querySelectorAll(".screen-tag");
+      const t = tags[Number(want)];
+      if (t) document.getElementById("main").scrollTop = t.offsetTop;
+    };
+    requestAnimationFrame(() => requestAnimationFrame(go));
+    window.addEventListener("load", () => setTimeout(go, 400));
+  }
+}
+</script>
+</body>
+</html>

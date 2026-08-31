@@ -338,37 +338,100 @@ Detect on first run, store in config, allow manual override in settings. Re-dete
 
 ## 9. Design System — "Charcoal & Oxblood"
 
-Phase 2 builds this properly. These are the starting tokens; refine them in the design phase but keep the character.
+Phase 2 builds this properly. **Read §9.0 before anything else in this section:**
+the palette and type below serve a direction, and the direction is the part that
+must not be compromised.
+
+### 9.0 The direction, and the test it must pass
+
+**References, in order of influence.** MUBI leads.
+
+| | What to take |
+|---|---|
+| **MUBI** | Near-black ground, full-bleed film stills, enormous breathing room, almost no chrome, magazine-like layout, tiny uppercase metadata labels. **The page should feel edited, not generated.** |
+| **Spotify** | Aggressive weight contrast. Very heavy headings against very quiet metadata, tight tracking on large type. Hierarchy readable from across a room. |
+| **Criterion Channel** | The feeling of a curated collection — numbered, catalogued, cared for. Editorial serif used sparingly for titles. |
+| **Netflix** | **Mechanics only**: rails, hover behaviour, the billboard hero. Take none of its visual language. |
+
+The target is an application that feels like every media need can be met, and met
+tastefully. **Premium means considered, not decorated.**
+
+#### It must not look AI-generated
+
+A first-class requirement, not a preference. The design system is **audited against
+this checklist**, and a component that fails it is a defect regardless of how clean
+it looks.
+
+**Banned, no exceptions:**
+
+- Purple, violet or indigo anywhere in the palette
+- Glassmorphism, decorative `backdrop-blur`, glow or bloom
+- Gradient text, gradient buttons, gradient anything as decoration
+- Emoji as icons or in UI copy
+- Bento-box grids
+- Drop shadows as the primary depth cue
+- Tailwind's default palette values (`slate`, `zinc`, `indigo`, …)
+- **Inter — or any neutral UI sans — used as the DISPLAY face.** The single biggest tell.
+- **Uniform rounding.** At most **two** radius values in the entire system, and at
+  least one must be `0` or `2px`.
+- **Uniform sizing.** If every card is the same size and every gap is the same, it
+  reads as generated. Build deliberate irregularity.
+
+**Required instead:**
+
+- Depth from **surface value and 1px lines**, never shadows
+- A real display typeface, used large, with tight tracking
+- Small uppercase metadata labels with **wide** tracking — the MUBI tell
+- **Artwork carries all the colour**; chrome stays near-neutral
+- Asymmetry and editorial layout — aligned to a grid, not identical within it
+- Idiosyncratic details: rule lines, spine numbers, small caps, a deliberate quirk
+  a template would not have
+
+#### The test
+
+> **Would this screenshot pass as a MUBI or Criterion screen?**
+>
+> If it would pass as a generic dark SaaS dashboard, it has failed — regardless of
+> how clean it is.
+
+Apply it to every screen before calling it done.
 
 ### 9.1 Colour
 
+Near-black and neutral. The greys are **warm** (R ≥ G ≥ B), because the ink is a
+warm cream and a cool grey ground fights it — that mismatch is a large part of why
+a palette reads as generic.
+
+The steps are **deliberately non-linear**: a large jump from ground to surface, then
+small ones. Elevation is therefore rare and means something, rather than being a
+gentle ramp every panel sits somewhere on.
+
 ```css
 :root {
-  /* Ground */
-  --void:            #0C0C0E;  /* behind everything, player letterbox */
-  --base:            #131316;  /* app background */
-  --surface:         #1A1A1E;  /* cards, panels, rails */
-  --raised:          #232328;  /* hover, elevated cards */
-  --overlay:         #2C2C32;  /* menus, popovers */
-  --scrim:           rgba(12,12,14,0.82);
+  /* Ground — true black behind artwork, so stills sit on nothing */
+  --void:            #000000;  /* player letterbox, behind full-bleed stills */
+  --base:            #0A0A0A;  /* app background */
+  --surface:         #141312;  /* cards, rails, panels */
+  --raised:          #1F1D1B;  /* hover, elevated cards */
+  --overlay:         #262421;  /* menus, popovers */
+  --scrim:           rgba(0,0,0,0.86);
 
-  /* Line */
-  --line-subtle:     #26262C;
-  --line:            #35353E;
-  --line-strong:     #4A4A55;
+  /* Line — depth comes from these, not from shadows */
+  --line-subtle:     #1C1A18;
+  --line:            #2C2926;
+  --line-strong:     #423E39;
 
   /* Type — warm cream, never pure white */
-  --ink:             #F2EFE9;
-  --ink-muted:       #A8A49C;
-  --ink-faint:       #6E6A64;
+  --ink:             #F5F2ED;
+  --ink-muted:       #9A948C;
+  --ink-faint:       #6B655D;
 
-  /* Accent — oxblood */
-  --oxblood:         #8C2F39;
-  --oxblood-hover:   #A03642;
-  --oxblood-bright:  #C04A56;  /* focus rings, active state, progress */
-  --oxblood-deep:    #551D24;  /* pressed, deep fills */
-  --oxblood-wash:    rgba(140,47,57,0.14);
-  --oxblood-glow:    rgba(192,74,86,0.30);
+  /* Accent — oxblood, kept: see the note below */
+  --oxblood:         #8E2B34;
+  --oxblood-hover:   #A6333E;
+  --oxblood-bright:  #C4434F;  /* focus rings, active state, progress */
+  --oxblood-deep:    #4E171C;  /* pressed, deep fills */
+  --oxblood-wash:    rgba(142,43,52,0.16);
 
   /* Semantic — deliberately distinct from oxblood */
   --success:         #4E7A5C;
@@ -378,20 +441,39 @@ Phase 2 builds this properly. These are the starting tokens; refine them in the 
 }
 ```
 
+**Why oxblood stays.** It is not a technology colour. It reads as cinema — velvet,
+Criterion's spine red, a curtain — and it is the one element that stops a near-black
+neutral palette from being anonymous. The revision raises its chroma slightly so it
+separates from a warmer ground.
+
 **Colour rules:**
-- Oxblood is for *intent*: the play button, focus rings, progress bars, the active nav item, "continue watching" markers. It is never decorative and never a large fill.
-- Posters and stills are the colour in this app. The chrome recedes. If a screen looks colourful, the artwork is doing it.
-- `--danger` and `--oxblood` must never appear adjacent. Destructive actions use `--danger` with a text label, never colour alone.
-- Verify every text/background pair at WCAG AA (4.5:1 body, 3:1 large). `--ink-faint` on `--surface` is the one to watch — check it.
-- Poster cards get a 1px `--line-subtle` border and a subtle inner shadow so light artwork doesn't bleed into the surface.
+
+- Oxblood is for *intent*: the play button, focus rings, progress, the active nav
+  item, continue-watching markers. **Never decorative, never a large fill.**
+- **Posters and stills are the colour in this app.** The chrome recedes. If a screen
+  looks colourful, the artwork is doing it.
+- `--danger` and `--oxblood` must never appear adjacent. Destructive actions use
+  `--danger` with a text label, never colour alone.
+- Verify every text/background pair at WCAG AA (4.5:1 body, 3:1 large).
+  `--ink-faint` on `--surface` is the one to watch — **check it**.
+- Poster cards get a 1px `--line-subtle` border so light artwork does not bleed into
+  the surface. **No shadow.**
 
 ### 9.2 Type
 
-- **Display** (titles, hero, section headers): a high-contrast serif with optical sizing — evaluate `Fraunces` (variable) and `Instrument Serif`. This is what separates the app from every sans-serif streaming clone and signals "film" rather than "content".
-- **UI** (body, labels, metadata): `Inter` variable, tabular numerals enabled for runtimes and dates.
-- **Mono** (technical panels, expert source view, logs): `JetBrains Mono`.
-- Scale: 12 / 13 / 14 / 16 / 20 / 26 / 34 / 46 / 62. Display sizes get tighter tracking (−0.02em), small UI sizes get looser (+0.01em).
-- Ship font files locally. No network font requests.
+Type is most of this design. MUBI and Spotify both use commercial faces (a Söhne-like
+grotesque; Circular), so the equivalents here must be **free and self-hostable**.
+
+- **Display** — a grotesque with real character, used **large with tight tracking**
+  (−0.02 to −0.04em). Candidates evaluated in Phase 2: Bricolage Grotesque, Archivo,
+  Instrument Sans, Geist, Space Grotesk.
+- **Editorial** — a serif for film titles and pull quotes, used **sparingly**:
+  Instrument Serif or Newsreader.
+- **UI and metadata only** — Inter or Geist. **Never the display face** (§9.0).
+- **Mono** — JetBrains Mono, for technical panels, the expert source view and logs.
+- Scale: 12 / 13 / 14 / 16 / 20 / 26 / 34 / 46 / 62 / 84. Display sizes take tighter
+  tracking; small uppercase labels take **+0.12 to +0.16em**, which is the MUBI tell.
+- **Ship font files locally. No network font requests, ever.**
 
 ### 9.3 Motion
 
@@ -400,26 +482,34 @@ Phase 2 builds this properly. These are the starting tokens; refine them in the 
 - Rail scroll: native momentum, snap to card edges, never a jump-by-page carousel.
 - Player chrome: fades in 120 ms, out 400 ms after 2.5 s idle.
 - **Player chrome during playback is a solid, opaque panel with a hard edge**
-  (ADR-0020). No gradient scrim beneath it, and no blur-behind. This is a platform
+  (ADR-0020). No gradient scrim beneath it and no blur-behind. This is a platform
   constraint made into a deliberate design: on Windows a native video surface always
   paints above the webview, so the chrome is *cut out* of the video window
   (`SetWindowRgn`) rather than composited over it — and a window region is binary, so
   there is no per-pixel alpha through the hole. Rounded corners are permitted **only
   with a matching rounded region**: the hole and the opaque chrome must be the same
   shape, because any part of a hole the chrome does not paint shows the desktop
-  through the transparent window. The **pause overlay is exempt** and keeps its dim
-  and blur — it composites over a captured still frame, where everything is HTML
-  (ADR-0021).
-- `prefers-reduced-motion` disables all scale and parallax, keeps opacity fades at 100 ms.
+  through the transparent window. **A crisp opaque panel suits this brief anyway.**
+  The **pause overlay is exempt** and keeps its dim and blur — it composites over a
+  captured still frame, where everything is HTML (ADR-0021).
+- `prefers-reduced-motion` disables all scale and parallax, keeps opacity fades at
+  100 ms.
 
 ### 9.4 Layout
 
-- 8px base grid. Rails: 24px gutters, cards 200×300 (film) / 320×180 (episode, landscape).
-- Content max-width 1680px, centred, with rails bleeding to the viewport edge (the Netflix trick that makes the catalogue feel endless).
+- 8px base grid. **Card sizes are deliberately not uniform** (§9.0): a rail mixes
+  sizes by editorial weight rather than repeating one tile.
+- Rails: 24px gutters, cards 200×300 (film) / 320×180 (episode, landscape) as the
+  *base* sizes, with featured items larger.
+- Content max-width 1680px, centred, with rails bleeding to the viewport edge.
 - Left nav rail: 72px collapsed (icons), 240px expanded, remembers state.
-- Every interactive element has a visible `--oxblood-bright` focus ring. Full keyboard navigation is a Phase 2 requirement, not a Phase 27 retrofit.
-
----
+- **Generous vertical rhythm.** Breathing room is the MUBI signal and the easiest
+  thing to lose to density. When in doubt, more space.
+- Every interactive element has a visible `--oxblood-bright` focus ring. Full keyboard
+  navigation is a Phase 2 requirement, not a Phase 27 retrofit.
+- **`PosterCard` has a designed artwork-free state** (ADR-0013): a typographic
+  title card, not a grey rectangle. Given this brief it should be genuinely
+  beautiful — for a film app a typographic card is arguably the better default.
 
 ## 10. Session Protocol and State Management
 
@@ -1457,6 +1547,23 @@ Face recognition, live TV, manga and comics, casting and watch-together. Fully i
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 1.4.0 — 2026-09-01 (Phase 2, design brief)
+
+`SPEC.md` §9 rewritten to carry the author's design brief, which specifies a visual
+direction the original section did not. [ADR-0023](docs/adr/0023-visual-direction.md).
+
+| # | Section | What changed |
+|---|---|---|
+| A8 | **§9.0 (new)** | The direction: MUBI leads, then Spotify, Criterion, and Netflix for mechanics only. A **banned list** (purple, glassmorphism, gradients, emoji, bento grids, shadows-as-depth, Tailwind defaults, Inter as display, uniform rounding, uniform sizing) and a **required list** (depth from value and 1px lines, a real display face, wide-tracked uppercase metadata, artwork carries colour, asymmetry, idiosyncratic details). Plus **the test**: would this pass as a MUBI or Criterion screen? If it would pass as a generic dark SaaS dashboard, it has failed. |
+| A9 | §9.1 | Palette revised. Greys are now **warm** (R ≥ G ≥ B) to match the warm cream ink, and the value steps are **non-linear** so elevation is rare and meaningful. Ground goes to true black behind artwork. Oxblood **stays**, with slightly raised chroma — argued in the ADR. |
+| A10 | §9.2 | Display face must be a **grotesque with character**, never Inter or any neutral UI sans. Editorial serif for film titles. Small uppercase labels take **+0.12–0.16em** tracking. Scale extended to 84. |
+| A11 | §9.4 | **Card sizes deliberately non-uniform**; generous vertical rhythm; `PosterCard`'s artwork-free state must be beautiful rather than a fallback. |
+
+Carried into §9.3 from Phase 1: ADR-0020's solid opaque player panel, which this
+brief treats as suiting the direction rather than as a limitation.
+
+---
 
 ### spec_version 1.3.0 — 2026-08-31 (Phase 1, Spike A)
 

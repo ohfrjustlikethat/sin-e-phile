@@ -1,5 +1,5 @@
 {
-  "spec_version": "1.3.0",
+  "spec_version": "1.4.0",
   "project": "sin-e-phile",
   "last_updated": "2026-09-01T04:00:00Z",
   "sessions_completed": 5,
@@ -7,11 +7,17 @@
     "number": 2,
     "slug": "design-system",
     "title": "Design System and Visual Language",
-    "status": "not_started",
+    "status": "in_progress",
     "branch": "phase/02-design-system",
     "started_at": "2026-09-01T04:00:00Z",
     "note": "Phase 2 builds the visual language BEFORE any product UI. Two constraints carry over from Phase 1: ADR-0020 removed the gradient scrim under player chrome, so the design system must produce a solid opaque panel; and ADR-0013 requires every artwork-bearing surface to have a designed artwork-free state, so PosterCard needs a typographic fallback rather than a grey rectangle.",
     "subtasks": [
+      {
+        "id": "2.0",
+        "text": "THREE static HTML mockups of Home, film detail, and player-with-chrome, as three interpretations within the SPEC.md 9.0 brief, with REAL artwork and metadata. Author chooses before any token or component code.",
+        "status": "in_progress",
+        "commit": null
+      },
       {
         "id": "2.1",
         "text": "All SPEC.md 9 tokens as CSS custom properties consumed by the Tailwind theme; fonts bundled locally, no network font requests",
@@ -419,6 +425,68 @@
           "text": "`docs/specs/design-system.md` documents every token and component with usage rules.",
           "met": false,
           "evidence": null
+        }
+      ],
+      "subtasks": [
+        {
+          "id": "2.0",
+          "text": "THREE static HTML mockups of Home, film detail, and player-with-chrome, as three interpretations within the SPEC.md 9.0 brief, with REAL artwork and metadata. Author chooses before any token or component code.",
+          "status": "in_progress",
+          "commit": null
+        },
+        {
+          "id": "2.1",
+          "text": "All SPEC.md 9 tokens as CSS custom properties consumed by the Tailwind theme; fonts bundled locally, no network font requests",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "2.2",
+          "text": "Component gallery route /design, dev-only, rendering every primitive in every state",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "2.3",
+          "text": "Primitives: Button, IconButton, Input, Select, Toggle, Slider, Tabs, Tooltip, Popover, Dialog, Toast, Skeleton, Spinner, Badge, ProgressBar, Rating",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "2.4",
+          "text": "Media primitives: PosterCard (with the ADR-0013 typographic artwork-free state), EpisodeCard, ChannelCard, Rail, HeroBanner, EmptyState",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "2.5",
+          "text": "Rail: virtualised, momentum scroll, edge-bleed, keyboard-navigable, 60fps with 500 cards",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "2.6",
+          "text": "Focus management with visible rings and correct tab order; full keyboard navigation; Ctrl+K command palette shell",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "2.7",
+          "text": "prefers-reduced-motion support throughout (the global rule exists from Phase 1; verify per component)",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "2.8",
+          "text": "Contrast audit script failing CI if any text token pair drops below WCAG AA; --ink-faint on --surface is the one to check",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "2.9",
+          "text": "docs/specs/design-system.md documenting every token and component with usage rules",
+          "status": "not_started",
+          "commit": null
         }
       ]
     },
@@ -1640,6 +1708,11 @@
       "id": "0022",
       "title": "Testable logic lives outside the Tauri crate",
       "date": "2026-08-31"
+    },
+    {
+      "id": "0023",
+      "title": "Visual direction: editorial, near-black, and not AI-generated",
+      "date": "2026-09-01"
     }
   ],
   "environment": {
