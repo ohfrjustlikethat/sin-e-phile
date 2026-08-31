@@ -199,7 +199,8 @@ async fn credits(db: &Db, datasets: &Path) -> Result<(), JobError> {
         &principals,
         &core,
     )?);
-    tracing::info!("  {} people needed", needed.len());
+    let needed_count = needed.len();
+    tracing::info!("  {needed_count} people needed");
 
     let mut job = Job::begin(db, "imdb-credits").await?;
     if job.is_resuming().await? {
@@ -208,8 +209,18 @@ async fn credits(db: &Db, datasets: &Path) -> Result<(), JobError> {
 
     tracing::info!("loading people");
     sinephile_ingest::credits::load_people(&mut job, names, needed).await?;
+    // Read back which people actually landed. principals references nconsts that
+    // name.basics does not have, and a credit cannot exist without its person.
+    let loaded = Arc::new(sinephile_ingest::credits::loaded_people(db).await?);
+    let missing = needed_count.saturating_sub(loaded.len());
+    if missing > 0 {
+        tracing::warn!(
+            "{missing} people referenced by title.principals are absent from              name.basics; their credits are dropped"
+        );
+    }
+
     tracing::info!("loading credits");
-    sinephile_ingest::credits::load_credits(&mut job, principals, core).await?;
+    sinephile_ingest::credits::load_credits(&mut job, principals, core, loaded).await?;
     job.finish().await?;
 
     let (people, credits) = sinephile_ingest::credits::counts(db).await?;

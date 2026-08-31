@@ -114,6 +114,10 @@ fn principals() -> String {
         &["tt0000001", "3", "nm0000003", "production_designer", &n, &n],
         // Belongs to a NON-core title — must not be loaded at all.
         &["tt0000002", "1", "nm0000009", "actor", &n, "[\"Nobody\"]"],
+        // A person title.principals references but name.basics does not contain.
+        // This is real: 1,604 of them across the live core-tier load, and it failed
+        // the whole batch with a foreign key error until credits were filtered.
+        &["tt0000001", "4", "nm9999999", "actor", &n, "[\"A Ghost\"]"],
     ])
 }
 
@@ -205,7 +209,9 @@ async fn load_all(db: &Db, fx: &Fx) {
     credits::load_people(&mut job, fx.names.clone(), needed)
         .await
         .expect("people");
-    credits::load_credits(&mut job, fx.principals.clone(), core)
+    // Read back what actually landed rather than assuming the intent was honoured.
+    let loaded = Arc::new(credits::loaded_people(db).await.expect("loaded people"));
+    credits::load_credits(&mut job, fx.principals.clone(), core, loaded)
         .await
         .expect("credits");
 }
@@ -316,4 +322,39 @@ async fn billing_order_is_kept_so_a_cast_list_reads_correctly() {
     .await
     .expect("query");
     assert_eq!(billing, vec![1, 2], "IMDb's ordering column survives");
+}
+
+#[tokio::test]
+async fn a_credit_whose_person_is_missing_is_dropped_not_fatal() {
+    // The real failure. IMDb's title.principals references nconsts that
+    // name.basics does not contain, and the foreign key rejects the WHOLE batch of
+    // 20,000 rather than the offending row — so the credit is filtered out before
+    // the insert. Inventing a placeholder person to satisfy the constraint would put
+    // people in the catalogue who do not exist.
+    let (db, fx) = loaded_db().await;
+    load_all(&db, &fx).await;
+
+    let ghosts: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM credits WHERE person_id = 9999999")
+        .fetch_one(db.pool())
+        .await
+        .expect("query");
+    assert_eq!(ghosts, 0, "the credit was dropped");
+
+    // And the good credits in the same batch survived, which is the whole point.
+    let kept: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM credits")
+        .fetch_one(db.pool())
+        .await
+        .expect("query");
+    assert_eq!(kept, 2, "the actor and the director both landed");
+}
+
+#[tokio::test]
+async fn loaded_people_reports_what_is_actually_in_the_table() {
+    let (db, fx) = loaded_db().await;
+    load_all(&db, &fx).await;
+
+    let loaded = credits::loaded_people(&db).await.expect("loaded");
+    assert!(loaded.contains(&1), "Toshiro Mifune");
+    assert!(loaded.contains(&2), "Akira Kurosawa");
+    assert!(!loaded.contains(&9_999_999), "the ghost was never inserted");
 }

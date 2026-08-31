@@ -202,15 +202,38 @@ async fn insert_people(
     Ok(())
 }
 
+/// The person ids actually present in the database.
+///
+/// Read back rather than assumed. `title.principals` references people that
+/// `name.basics` does not contain — roughly 34 per three million rows, and 1,604
+/// across the real core-tier load. A credit cannot exist without its person, so
+/// those must be dropped; inventing a placeholder person to satisfy the constraint
+/// would put people in the catalogue who do not exist.
+///
+/// The foreign key caught this, which it only could because migration 0001 turns
+/// `foreign_keys` ON per connection. Without that PRAGMA SQLite would have accepted
+/// every one of them as an orphaned credit pointing at nothing.
+pub async fn loaded_people(db: &Db) -> Result<HashSet<u32>, JobError> {
+    let ids: Vec<i64> = sqlx::query_scalar("SELECT id FROM people")
+        .fetch_all(db.pool())
+        .await?;
+    Ok(ids.into_iter().map(|id| id as u32).collect())
+}
+
 /// Step 3 — the credits themselves, for core titles only.
+///
+/// Returns how many credits were dropped for referencing a person `name.basics` does
+/// not have, so the loss is reported rather than silent.
 pub async fn load_credits(
     job: &mut Job<'_>,
     principals: std::path::PathBuf,
     core: std::sync::Arc<HashMap<u32, i64>>,
+    people: std::sync::Arc<HashSet<u32>>,
 ) -> Result<(), JobError> {
     job.run_step("title.principals", move |tx, cursor| {
         let principals = principals.clone();
         let core = std::sync::Arc::clone(&core);
+        let people = std::sync::Arc::clone(&people);
         Box::pin(async move {
             let mut reader = TsvReader::open(&principals)?;
             imdb::check_columns(&reader, &imdb::TITLE_PRINCIPALS)?;
@@ -218,7 +241,7 @@ pub async fn load_credits(
             let mut pending: Vec<Credit> = Vec::new();
             if let Some(cursor) = cursor.as_deref() {
                 reader.seek_past("tconst", cursor)?;
-                if let Some(credit) = credit_from(&reader, &core) {
+                if let Some(credit) = credit_from(&reader, &core, &people) {
                     pending.push(credit);
                 }
             }
@@ -228,7 +251,7 @@ pub async fn load_credits(
                 if !reader.advance()? {
                     break;
                 }
-                if let Some(credit) = credit_from(&reader, &core) {
+                if let Some(credit) = credit_from(&reader, &core, &people) {
                     pending.push(credit);
                 }
                 if let Some(row) = reader.current_row() {
@@ -260,10 +283,22 @@ struct Credit {
     billing: Option<i64>,
 }
 
-fn credit_from(reader: &TsvReader, core: &HashMap<u32, i64>) -> Option<Credit> {
+fn credit_from(
+    reader: &TsvReader,
+    core: &HashMap<u32, i64>,
+    people: &HashSet<u32>,
+) -> Option<Credit> {
     let row = reader.current_row()?;
     let media_item_id = *core.get(&row.get("tconst").and_then(tconst_id)?)?;
-    let person_id = row.get("nconst").and_then(nconst_id)? as i64;
+    let person = row.get("nconst").and_then(nconst_id)?;
+    // A credit whose person is not in the table cannot be stored. IMDb's principals
+    // reference nconsts that name.basics does not contain, and the foreign key
+    // rejects the whole batch of 20,000 rather than just that row — so it is
+    // filtered here instead.
+    if !people.contains(&person) {
+        return None;
+    }
+    let person_id = person as i64;
     let role = role(row.get("category")?)?;
 
     // IMDb writes characters as a JSON array: `["Kambei Shimada"]`. Taking the first
