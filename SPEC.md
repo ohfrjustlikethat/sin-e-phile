@@ -162,7 +162,7 @@ Do not revisit these without writing an ADR that explains what changed. They wer
 | State (FE) | **Zustand** for client state, **TanStack Query** for backend-derived state | Avoids Redux ceremony; Query handles caching/invalidation correctly, which matters enormously here. |
 | Torrent engine | **librqbit** (in-process Rust) | Sequential download and streaming support built in; no external process; full control over piece prioritisation, which is what makes instant playback possible. |
 | Player core | **libmpv** (embedded, custom UI drawn over it) | Plays everything, hardware decode (D3D11VA/NVDEC/QSV), frame-accurate seek, first-class ASS/SSA rendering, per-track audio and subtitle delay control. Used by Jellyfin and Stremio for the same reasons. |
-| Database | **SQLite** via `sqlx` (compile-time checked queries), WAL mode | Single file, portable, fast, zero setup. `sqlx` catches SQL errors at compile time — valuable for a learner. |
+| Database | **SQLite** via `sqlx`, WAL mode | Single file, portable, fast, zero setup — the whole database is one file you can copy, which is what makes §2.4's portability promise true. `sqlx` is a mature async Rust driver with a good migration story. **Not** chosen for its compile-time `query!` macros, which this project does not use (ADR-0026): SQLite gives them too little nullability information, so most columns would need hand-written `as "col!"` assertions, and dynamic SQL cannot use them at all. Schema drift is caught instead by a test that exercises every repository method against a freshly migrated database. |
 | Full-text search | **SQLite FTS5** (BM25) | Built in, no extra dependency. |
 | Vector search | **HNSW** (`hnsw_rs` or `instant-distance`), persisted to disk | Sub-millisecond ANN over the catalogue. |
 | Embeddings | **ONNX Runtime** (`ort` crate) running a quantised sentence-transformer (`bge-small-en-v1.5` or `all-MiniLM-L6-v2`, INT8) | ~90 MB, CPU-viable, no API, no cost, works offline. |
@@ -567,7 +567,7 @@ This section governs how Claude Code operates. It matters more than any individu
 
 ### 10.2 Session start ritual — mandatory, every session
 
-1. **Read only these** (ADR-0016): `PROJECT_STATE.json`, the **last** `SESSION_LOG.md` entry, and §15's entry for the current phase. `CLAUDE.md` loads automatically and carries the standing rules, so **do not re-read `SPEC.md` end to end.** Read another section only when the work actually touches it — or on a cold resume (§10.11), which keeps its fuller reading list.
+1. **Read two files** (ADR-0028): `PROJECT_STATE.json`, and the current phase document it names — `docs/phases/phase-NN-<slug>.md`, generated from §15 by `tools/phasedoc/generate.py`. That is the reading list. `CLAUDE.md` loads automatically and carries the standing rules, so **do not re-read `SPEC.md` end to end**, and do not hunt across four sources. Read a `SPEC.md` section only when the work actually touches it — or on a cold resume (§10.11), which keeps its fuller reading list. `/next` performs this ritual; `/unstuck` rebuilds it from disk after a compaction or a crash. See `docs/COMMANDS.md`.
 2. **Verify state against reality**: run `git status`, `git log --oneline -10`, `cargo test`, `npm test`. If the repository disagrees with `PROJECT_STATE.json`, **the repository is right**. Correct the state file, and record the discrepancy in `SESSION_LOG.md`.
 3. Report to the author in **five lines or fewer**: current phase, what's done, what's next, blockers, anything needing a decision. Do not restate the spec back. Findings are bullets, not tables. Prose is for when something genuinely needs arguing (ADR-0016).
 4. If there are blockers with `needs_user: true`, raise them *before* planning.
@@ -862,7 +862,7 @@ All free. Phase 0 verifies current terms for each and records them in `docs/SETU
 
 | Service | Needed for | Cost | Notes |
 |---|---|---|---|
-| **TMDB** | Artwork, rich detail, cast headshots | Free API key, instant, non-commercial | Register at themoviedb.org → Settings → API. **Optional** — offered in onboarding as ~30 seconds of work, with a "later" option that is not a dead end (ADR-0013). |
+| **TMDB** | Artwork, rich detail, cast headshots | **The user's own free key**, instant, non-commercial | Register at themoviedb.org → Settings → API. **Optional** — offered in onboarding as ~30 seconds of work, with a "later" that is not a dead end (ADR-0013). **No key ever ships with the application** (ADR-0027): each user supplies their own, per profile, in settings, under their own acceptance of TMDB's terms, and may remove it at any time. Every TMDB-dependent surface degrades to the §9.4 typographic treatment rather than breaking. |
 | **AniList** | Anime metadata, relations, absolute/seasonal numbering | Free, public GraphQL, no key | Required for anime. |
 | **Jikan** | MyAnimeList mirror, supplementary anime data | Free, no key, rate-limited | Optional fallback. |
 | **IMDb datasets** | Offline title/rating/crew index | Free download, no account | `datasets.imdbws.com`. Non-commercial use. |
@@ -1547,6 +1547,26 @@ Face recognition, live TV, manga and comics, casting and watch-together. Fully i
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 1.6.0 — 2026-09-01 (the navigation system)
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A14 | §13.2, §11.1 | **Per-phase documents are reinstated**, with a narrower job than the ones A5 cut: `docs/phases/phase-NN-<slug>.md` is a **generated working file** — goal, deliverables, exit criteria as a live checklist, subtask log, closing evidence — not a hand-written narrative. Phase *retrospectives* still fold into the `SESSION_LOG.md` entry, so A5's actual point stands. Generation by `tools/phasedoc/generate.py` is what makes it affordable. Removing these while the session ritual still pointed at them left every session following a pointer to nothing for two phases. | [0028](docs/adr/0028-navigation-system.md) |
+| A15 | §10.2 | **The session reading list is two files**: `PROJECT_STATE.json` and the current phase document. Narrows A1 further in the same direction. Six commands (`/status` `/next` `/finish` `/closephase` `/unstuck` `/decide`) encode the rituals; `docs/COMMANDS.md` is the cheat sheet. | [0028](docs/adr/0028-navigation-system.md) |
+| A16 | §10.5, §12.6 | **`tools/statecheck` runs in CI and on pre-push**, failing if the repository could not be picked up by a session that knows nothing: missing or mismatched phase doc, stale `PROGRESS.md`, an unclosed phase behind the current one, a `next_action` that is a direction rather than an instruction, or **a code commit not recorded in `PROJECT_STATE.json`**. The last makes "finished work but forgot to record it" mechanically impossible. | [0028](docs/adr/0028-navigation-system.md) |
+| A17 | §10 (new protocol) | **How a decision is put to the author**: the decision in one sentence, 2–3 options with honest costs, a recommendation, and **the default taken if the answer is "your call"**. Where a reasonable default exists and nothing is blocked, the default is taken and recorded rather than the session blocking on a reply. | [0028](docs/adr/0028-navigation-system.md) |
+
+---
+
+### spec_version 1.5.0 — 2026-09-01 (Phase 3 close)
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A12 | §2 (technology table) | **The rationale for `sqlx` is corrected.** It was "compile-time checked queries… valuable for a learner"; the data layer does not use the `query!` macros and will not. SQLite gives them too little nullability information, so most columns would need hand-written `as "col!"` assertions — which are unchecked assertions by the author, not guarantees — and dynamic SQL cannot use them at all. The real reasons are single-file portability, WAL, and a mature async driver. A test exercising **every repository method against a freshly migrated database** is the compensating control, and is a standing requirement. | [0026](docs/adr/0026-runtime-checked-sql.md) |
+| A13 | §14 | **No TMDB key ever ships.** Each user supplies their own, per profile, in settings, under their own acceptance of TMDB's terms, removable at any time. Every TMDB-dependent surface degrades to the §9.4 typographic treatment. Closes P2; the drafted enquiry to TMDB is not sent and no longer tracked. | [0027](docs/adr/0027-tmdb-per-user-key.md) |
+
+---
 
 ### spec_version 1.4.0 — 2026-09-01 (Phase 2, design brief)
 

@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **1.4.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **1.6.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -27,32 +27,32 @@ you remember from a previous session.
 
 ## Session start ritual — run this every session, without being asked
 
-1. **Read only these** (`SPEC.md` §10.2, ADR-0016): `PROJECT_STATE.json`, the **last**
-   `SESSION_LOG.md` entry, and **§15's entry for the current phase**. Read another
-   `SPEC.md` section only when the work actually touches it. **Do not re-read
-   `SPEC.md` end to end.**
-2. Run `tools/doctor` and fix or report any missing prerequisite before anything else.
-3. If the phase names risks, read those entries in `docs/RISKS.md`.
-4. **Verify state against reality.** Run `git status`, `git log --oneline -10`,
-   `cargo test`, `npm test`. If the repository disagrees with `PROJECT_STATE.json`,
-   **the repository is right.** Correct the state file and record the discrepancy in
-   `SESSION_LOG.md`.
-5. Report to the author in five lines or fewer: current phase → what's done → what's
-   next → blockers → anything needing a decision. Bullets, not tables. Do not restate
-   the spec back to them.
+**Read two files: `PROJECT_STATE.json`, and the current phase doc it names
+(`docs/phases/phase-NN-<slug>.md`). That is the reading list.** Not `SPEC.md` end to
+end, and never a hunt. Read a `SPEC.md` section only when the work actually touches
+it — §15's entry for the phase is already what the phase doc is generated from.
+
+1. Read those two.
+2. Run `python tools/statecheck/check.py`. If it fails, run `/unstuck` instead of
+   planning — there is no point planning against a state you cannot trust.
+3. Run `python tools/doctor/doctor.py` and fix or report any missing prerequisite.
+4. **Verify state against reality**: `git status`, `git log --oneline -10`,
+   `cargo test --workspace`, `npm test`. If the repository disagrees with
+   `PROJECT_STATE.json`, **the repository is right.** Correct the state file and
+   record the discrepancy in `SESSION_LOG.md`.
+5. Report in five lines or fewer: phase → done → next → blockers → decisions waiting.
+   Bullets, not tables. Do not restate the spec.
 6. Raise any blocker with `needs_user: true` *before* planning.
 7. Produce a plan. **Wait for approval before implementing.**
 
-**There is no `docs/phases/phase-NN-*.md`.** Per-phase documents were dropped by
-ADR-0016 (A5); phase retrospectives fold into the `SESSION_LOG.md` entry. The phase
-specification lives in `SPEC.md` §15 and the working record in `PROJECT_STATE.json`.
+Steps 1–7 are what `/next` does. See `docs/COMMANDS.md` for the six commands.
 
-**If `last_updated` in `PROJECT_STATE.json` is more than 14 days old**, run the
-cold-resume ritual in `SPEC.md` §10.11 instead: the full start ritual, the last
-**five** session-log entries, **every ADR written since the last completed phase**,
-every test suite and eval harness compared against the recorded numbers,
-`cargo update --dry-run` and `npm outdated` for drift, then a full re-orientation
-briefing. Assume they have forgotten everything, because they have.
+**If `last_updated` is more than 14 days old**, run the cold-resume ritual in
+`SPEC.md` §10.11 instead: the last **five** session-log entries, **every ADR written
+since the last completed phase**, every test suite and eval harness compared against
+the recorded numbers, `cargo update --dry-run` and `npm outdated` for drift, then a
+full re-orientation briefing. Assume they have forgotten everything, because they
+have.
 
 ## Session end ritual — never end a session without all of these
 
@@ -82,7 +82,7 @@ subtask stale.
 
 ---
 
-## Four protocols that matter more than any feature
+## Five protocols that matter more than any feature
 
 ### Evidence, not opinion (`SPEC.md` §10.8)
 
@@ -125,6 +125,29 @@ which is what makes a gate meaningful rather than a formality.
 Struggling on one → re-explain differently and fix that note. Struggling on most →
 say directly that we went too fast, and propose simplifying the implementation or
 splitting the phase. Do not accept "yeah I get it". Ask them to explain it back.
+
+### How to ask the author for a decision
+
+**Never dump the raw problem.** Doing the analysis and handing over the conclusion is
+the job; handing over the confusion is not. Every decision put to the author has four
+parts:
+
+- **The decision**, in one sentence.
+- **Two or three options**, with honest costs — including for the one you prefer.
+  "Slightly more work" is not a cost. "An extra `cargo sqlx prepare` after every
+  schema change for 24 more phases" is.
+- **Your recommendation**, and why, in one line.
+- **The default you will take if the answer is "your call".**
+
+That last line matters most: it means the author can answer in two words and you keep
+moving.
+
+**Never block on a decision where a reasonable default exists.** Take the default,
+record it, and say that you did. Only a decision that is genuinely the author's to
+make — one where proceeding either way would be unsafe or would waste real work —
+stops the session.
+
+`/decide` lists everything currently open in this shape.
 
 ### Nothing blocks development, including the author's learning (ADR-0016 A3)
 
@@ -214,9 +237,11 @@ Do not revisit without an ADR explaining what changed.
 critical path, no server component of any kind, no Docker, no cross-platform
 abstractions.
 
-**TMDB is optional, not required** (ADR-0013). The app is fully functional on the
-offline IMDb + MovieLens catalogue with no key. TMDB enrichment is additive, never
-load-bearing.
+**TMDB is optional, and no key ever ships** (ADR-0013, ADR-0027). The app is fully
+functional on the offline IMDb + MovieLens catalogue with no key. Each user supplies
+their **own** key, per profile, in settings, under their own acceptance of TMDB's
+terms, removable at any time. Every TMDB-dependent surface degrades to the §9.4
+typographic treatment rather than breaking.
 
 ---
 
@@ -252,6 +277,15 @@ test binary dies at load with `STATUS_ENTRYPOINT_NOT_FOUND`. Therefore:
   it belongs in a crate instead. "Is this testable?" and "does this belong in
   `src-tauri`?" have the same answer.
 
+**SQL is runtime-checked, and one test is what makes that safe** (ADR-0026). The
+`query!` macros are not used: SQLite gives them too little nullability information,
+so most columns would need hand-written `as "col!"` assertions, and dynamic SQL
+cannot use them at all. Instead,
+`crates/persistence/tests/repository_surface.rs` exercises **every** repository
+method against a freshly migrated database. **A new repository method without a line
+in that file does not pass review** — it is the whole of the protection, and its
+absence is invisible.
+
 Consequently: **business logic never lives in `src-tauri/src/commands/`**, and **raw
 SQL never appears anywhere under `src-tauri/`** — it lives in `crates/persistence/`,
 with `src-tauri/src/persistence/` containing re-exports and nothing else. `tools/guard`
@@ -267,6 +301,9 @@ CLAUDE.md                this file — the standing rules
 PROJECT_STATE.json       machine-readable resume state (schema-validated)
 PROGRESS.md              generated from PROJECT_STATE.json — never edit by hand
 SESSION_LOG.md           append-only session history, incl. phase retrospectives
+docs/phases/             ONE file per phase — what a session reads to know its job
+docs/COMMANDS.md         the six slash commands, and the tools behind them
+.claude/skills/          the slash commands themselves
 docs/adr/                architecture decision records
 docs/learning/           the author's explainers — a deliverable, not a nicety
 docs/specs/              protocol and algorithm specifications (build inputs)
@@ -289,6 +326,8 @@ crates/                  extracted, independently testable crates
 tools/guard/             posture guard + secret scanner
 tools/doctor/            prerequisite checks
 tools/state/             state build + schema validation
+tools/statecheck/        five checks that make being lost impossible
+tools/phasedoc/          generates and maintains docs/phases/
 tools/contrast/          WCAG AA token audit
 tools/uiaudit/           headless-Chrome UI audit (fps, focus, keyboard, motion)
 tools/ingest/            offline dataset ingestion
@@ -302,7 +341,14 @@ spikes/                  throwaway de-risking experiments
 
 ## Commands
 
+**Six commands.** `/status` · `/next` · `/finish` · `/closephase` · `/unstuck` ·
+`/decide`. Full cheat sheet in `docs/COMMANDS.md`; the skills themselves are in
+`.claude/skills/<name>/SKILL.md`.
+
 ```bash
+python tools/statecheck/check.py         # is the repo resumable by a cold session?
+python tools/phasedoc/generate.py --log N  # keep the phase doc current
+
 npm run tauri dev          # run the app in development
 npm run tauri build        # production build
 cargo test --workspace     # Rust tests (never from inside src-tauri)
