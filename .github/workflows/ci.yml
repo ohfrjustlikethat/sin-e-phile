@@ -106,13 +106,25 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         if: steps.detect.outputs.present == 'true'
 
+      # `tauri::generate_context!()` reads `frontendDist` at COMPILE time and
+      # panics if the directory is absent, so cargo cannot run at all without it.
+      # This job checks RUST correctness, not the bundled frontend, so a stub is
+      # the honest minimum. The real end-to-end build - npm build, then cargo -
+      # is covered by the fresh-clone (E1) job.
+      - name: Stub the frontend dist so generate_context! can resolve it
+        if: steps.detect.outputs.present == 'true'
+        shell: bash
+        run: |
+          mkdir -p dist
+          [ -f dist/index.html ] || echo '<!doctype html><title>ci stub</title>' > dist/index.html
+
       - run: cargo fmt --all --check
         if: steps.detect.outputs.present == 'true'
 
-      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
         if: steps.detect.outputs.present == 'true'
 
-      - run: cargo test --all-features
+      - run: cargo test --workspace --all-features
         if: steps.detect.outputs.present == 'true'
 
   # ───────────────────────────────────────────────────────────────────────────
@@ -203,15 +215,18 @@ jobs:
         working-directory: fresh
         shell: bash
         run: |
-          if [ -f Cargo.toml ] || [ -f src-tauri/Cargo.toml ]; then
-            cargo build --locked
-          else
-            echo "::notice::No Rust workspace yet - nothing to build until Phase 1."
-          fi
+          # Frontend FIRST: generate_context! resolves frontendDist at compile
+          # time, so the Rust build fails without dist/ present. This is the
+          # order docs/SETUP.md describes and the order a real build uses.
           if [ -f package.json ]; then
             npm ci && npm run build
           else
             echo "::notice::No Node project yet - nothing to build until Phase 1."
+          fi
+          if [ -f Cargo.toml ] || [ -f src-tauri/Cargo.toml ]; then
+            cargo build --locked
+          else
+            echo "::notice::No Rust workspace yet - nothing to build until Phase 1."
           fi
 
       - name: Safety rails work on a fresh clone
