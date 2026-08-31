@@ -1,7 +1,7 @@
 {
   "spec_version": "1.6.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-08-31T20:33:32Z",
+  "last_updated": "2026-08-31T21:10:37Z",
   "sessions_completed": 5,
   "current_phase": {
     "number": 4,
@@ -21,8 +21,8 @@
       {
         "id": "4.2",
         "text": "IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "048180a"
       },
       {
         "id": "4.3",
@@ -693,8 +693,8 @@
         {
           "id": "4.2",
           "text": "IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "048180a"
         },
         {
           "id": "4.3",
@@ -1744,7 +1744,7 @@
       ]
     }
   ],
-  "next_action": "Phase 4 subtask 4.2, second half: write the title.basics loader as steps on the runner in tools/ingest/src/job.rs, inserting through MediaRepository, tagging each title with its tier from CatalogueScope::DEFAULT in tools/ingest/src/imdb.rs. Needs migration 0006 adding an in_core column to media_items so Phase 5 knows which titles have embeddings. R4 is measured and answered - see docs/eval-results.md - but headroom is thin at 3.11 GB of a 4 GB trigger.",
+  "next_action": "Phase 4 subtask 4.5 (brought forward): load title.principals for core titles only and MEASURE the result, using the loader pattern in tools/ingest/src/load.rs. R4 is REOPENED - the 3.11 GB projection that justified the >=10 core threshold is now known to be 2.56x low on the one component that has been measured (titles projected 450 MB, actually 1,153 MB). Credits are the largest remaining unknown and must be measured before AniList, not after. See docs/eval-results.md.",
   "blockers": [],
   "decisions_pending": [
     {
@@ -1958,6 +1958,11 @@
       "id": "D11",
       "phase_raised": 3,
       "text": "The data layer uses runtime-checked sqlx::query() rather than the compile-time-checked query! macros. SPEC.md's tech table gives compile-time checking as the REASON sqlx was chosen ('valuable for a learner'), so this is a deviation the author should rule on. Cost of converting: query! needs literal SQL, so archive.rs's dynamically-built preference query cannot use it at all; SQLite nullability inference is weak, so most columns need `as \"col!\"` annotations; and it adds sqlx-cli plus a `cargo sqlx prepare` step after every schema change. Benefit: SQL typos fail the build instead of a test. Raised at the end of Phase 3, not decided."
+    },
+    {
+      "id": "D12",
+      "phase_raised": 4,
+      "text": "A title released AFTER the last ingestion run is not in the catalogue at all: the IMDb datasets are a snapshot and IMDb refreshes daily. With a TMDB key, subtask 4.6's live clients can fill the gap on demand; with no key - which ADR-0027 makes the default - nothing currently covers it. Surfaced by the author asking whether new releases would be available. Owner: subtask 4.9's first-run flow."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

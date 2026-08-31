@@ -121,6 +121,28 @@ async fn migrations_run_forward_on_a_fresh_database() {
 }
 
 #[tokio::test]
+async fn the_embedded_migrations_match_the_files_on_disk() {
+    // `sqlx::migrate!` embeds the directory at compile time, and adding a file does
+    // not reliably bust cargo's cache. A stale embed means the binary quietly
+    // carries an older schema than the source says it does — which cost an hour
+    // when migration 0006 was added, failing as "no column named in_core" against a
+    // tree where the column was plainly there. build.rs now forces the rebuild;
+    // this makes the failure loud if that ever stops working.
+    let on_disk = std::fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/migrations"))
+        .expect("migrations directory")
+        .filter_map(Result::ok)
+        .filter(|e| e.file_name().to_string_lossy().ends_with(".up.sql"))
+        .count() as i64;
+
+    assert_eq!(
+        Db::latest_schema_version(),
+        on_disk,
+        "the binary carries {} migrations but {on_disk} are on disk — the embedded          set is stale. Touch a file in crates/persistence/src/ and rebuild.",
+        Db::latest_schema_version()
+    );
+}
+
+#[tokio::test]
 async fn every_table_the_spec_names_exists() {
     let db = Db::in_memory().await.expect("open");
     // SPEC.md Phase 3 lists these by name. If one is missing the schema is not

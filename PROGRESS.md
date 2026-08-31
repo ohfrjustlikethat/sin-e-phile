@@ -16,10 +16,10 @@
 
 > The catalogue. Three constraints carry in: ADR-0013 and ADR-0027 mean the app must be complete and good-looking with NO TMDB key and no key ever ships; ADR-0026 means SQL is runtime-checked, so every new repository method needs a line in crates/persistence/tests/repository_surface.rs; and R4 (ingestion larger or slower than expected) is this phase's named risk — measure before committing to a shape, and scope by a popularity threshold rather than ingesting everything.
 
-### Subtasks — 1/12 complete
+### Subtasks — 2/12 complete
 
 - [x] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts · `4a78d64`
-- [~] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres
+- [x] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres · `048180a`
 - [ ] **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device)
 - [ ] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering
 - [ ] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules
@@ -45,7 +45,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.2, second half: write the title.basics loader as steps on the runner in tools/ingest/src/job.rs, inserting through MediaRepository, tagging each title with its tier from CatalogueScope::DEFAULT in tools/ingest/src/imdb.rs. Needs migration 0006 adding an in_core column to media_items so Phase 5 knows which titles have embeddings. R4 is measured and answered - see docs/eval-results.md - but headroom is thin at 3.11 GB of a 4 GB trigger.
+Phase 4 subtask 4.5 (brought forward): load title.principals for core titles only and MEASURE the result, using the loader pattern in tools/ingest/src/load.rs. R4 is REOPENED - the 3.11 GB projection that justified the >=10 core threshold is now known to be 2.56x low on the one component that has been measured (titles projected 450 MB, actually 1,153 MB). Credits are the largest remaining unknown and must be measured before AniList, not after. See docs/eval-results.md.
 
 ---
 
@@ -107,6 +107,7 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D9** (raised in Phase 2) Rail's roving tabindex sets tabIndex imperatively on the first focusable descendant of each mounted item rather than threading it through the render prop. Correct today because `render` returns caller-owned markup, but it silently does nothing if a card's first focusable element is not its main control. Revisit in Phase 9, when real screens use Rail with more complex cards.
 - **D10** (raised in Phase 2) The UI audit (tools/uiaudit) drives the design gallery, not real product screens - those do not exist until Phase 9. Its budgets prove the Rail component holds 60fps, not that any real screen does. Revisit in Phase 9: point the audit at the Home screen too.
 - **D11** (raised in Phase 3) The data layer uses runtime-checked sqlx::query() rather than the compile-time-checked query! macros. SPEC.md's tech table gives compile-time checking as the REASON sqlx was chosen ('valuable for a learner'), so this is a deviation the author should rule on. Cost of converting: query! needs literal SQL, so archive.rs's dynamically-built preference query cannot use it at all; SQLite nullability inference is weak, so most columns need `as "col!"` annotations; and it adds sqlx-cli plus a `cargo sqlx prepare` step after every schema change. Benefit: SQL typos fail the build instead of a test. Raised at the end of Phase 3, not decided.
+- **D12** (raised in Phase 4) A title released AFTER the last ingestion run is not in the catalogue at all: the IMDb datasets are a snapshot and IMDb refreshes daily. With a TMDB key, subtask 4.6's live clients can fill the gap on demand; with no key - which ADR-0027 makes the default - nothing currently covers it. Surfaced by the author asking whether new releases would be available. Owner: subtask 4.9's first-run flow.
 
 ---
 

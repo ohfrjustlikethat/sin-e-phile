@@ -4,7 +4,7 @@
 //! in 4.2 onward. Until then this binary can show job state and reset a job, which
 //! is what makes the resume behaviour inspectable by hand rather than only by test.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use sinephile_ingest::{Job, JobError};
 use sinephile_persistence::{paths, DataLocation, Db};
@@ -16,6 +16,8 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            from evidence (SPEC.md R4). Writes nothing. --quick
                            skips title.principals and title.akas, which are the
                            large ones and the whole point.
+  ingest imdb              download and load the IMDb catalogue. Resumable —
+                           re-run it after an interruption and it carries on.
   ingest status            show every job and its steps
   ingest reset <name>      discard a job's progress so the next run starts clean
 
@@ -66,6 +68,7 @@ async fn main() -> Result<(), JobError> {
             sinephile_ingest::measure::report(&measurement);
             Ok(())
         }
+        "imdb" => imdb(&db, &dir.join("datasets")).await,
         "status" => status(&db).await,
         "reset" => match args.get(1) {
             Some(name) => {
@@ -84,6 +87,68 @@ async fn main() -> Result<(), JobError> {
             std::process::exit(2);
         }
     }
+}
+
+/// Download and load the IMDb catalogue.
+async fn imdb(db: &Db, datasets: &Path) -> Result<(), JobError> {
+    use std::sync::Arc;
+    use std::time::Instant;
+
+    let started = Instant::now();
+    let downloader = sinephile_ingest::Downloader::new();
+
+    for dataset in [
+        &sinephile_ingest::imdb::TITLE_RATINGS,
+        &sinephile_ingest::imdb::TITLE_BASICS,
+    ] {
+        let path = datasets.join(dataset.filename);
+        let result = downloader.fetch(&dataset.url(), &path, |_| {}).await?;
+        tracing::info!(
+            "{}: {:.1} MB{}",
+            dataset.name,
+            result.bytes as f64 / 1_048_576.0,
+            if result.fetched {
+                ""
+            } else {
+                " (already had it)"
+            }
+        );
+        sinephile_ingest::download::verify_gzip(&path)?;
+    }
+
+    let ratings_path = datasets.join(sinephile_ingest::imdb::TITLE_RATINGS.filename);
+    tracing::info!("reading ratings");
+    let votes = Arc::new(sinephile_ingest::load::load_votes(&ratings_path)?);
+    let averages = Arc::new(sinephile_ingest::load::load_average_ratings(&ratings_path)?);
+    tracing::info!("  {} rated titles", votes.len());
+
+    let mut job = Job::begin(db, "imdb").await?;
+    if job.is_resuming().await? {
+        tracing::info!("resuming a previous run");
+    }
+
+    tracing::info!("loading titles");
+    sinephile_ingest::load::load_titles(
+        &mut job,
+        datasets.join(sinephile_ingest::imdb::TITLE_BASICS.filename),
+        votes,
+        averages,
+        sinephile_ingest::imdb::CatalogueScope::DEFAULT,
+    )
+    .await?;
+    job.finish().await?;
+
+    let (total, core) = sinephile_ingest::load::counts(db).await?;
+    let bytes = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
+    println!();
+    println!("  {total} titles indexed, {core} in the core tier");
+    println!(
+        "  database {:.0} MB · {:.0}s",
+        bytes as f64 / 1_048_576.0,
+        started.elapsed().as_secs_f64()
+    );
+    println!();
+    Ok(())
 }
 
 async fn status(db: &Db) -> Result<(), JobError> {

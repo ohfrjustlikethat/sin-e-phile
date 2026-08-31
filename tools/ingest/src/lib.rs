@@ -10,6 +10,7 @@
 pub mod download;
 pub mod imdb;
 pub mod job;
+pub mod load;
 pub mod measure;
 pub mod tsv;
 

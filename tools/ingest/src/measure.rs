@@ -74,13 +74,33 @@ impl Measurement {
 
     /// A projected database size, stated as a projection.
     ///
-    /// SQLite overhead per row plus the indexes in migration 0001 come to roughly
-    /// 2.4x the raw field bytes, measured against the Phase 3 benchmark: 500,000
-    /// synthetic rows produced a 145.4 MB database. That ratio is the honest
-    /// multiplier, and it is recorded here rather than hidden in a constant.
+    /// # This projection was wrong once, by roughly half
+    ///
+    /// The first version used 2.4x the `media_items` field bytes — the ratio from
+    /// the Phase 3 benchmark, where 500,000 synthetic rows produced a 145.4 MB
+    /// database. It projected 450 MB for the index tier. **The real load passed
+    /// 900 MB.**
+    ///
+    /// The Phase 3 benchmark inserted into `media_items` and `titles` and nothing
+    /// else. A real load also writes `external_ids` (with a UNIQUE index),
+    /// `media_genres`, and a second `titles` row wherever the original title differs
+    /// — none of which the 2.4x captured, because none of them existed in the
+    /// fixture it was derived from.
+    ///
+    /// The lesson is narrow and worth keeping: **a multiplier is only valid for the
+    /// shape it was measured on.** Reusing it across a different set of tables is
+    /// not a projection, it is a guess wearing a number's clothes.
+    ///
+    /// `ROW_MULTIPLIER` is now derived from the real load recorded in
+    /// `docs/eval-results.md`, and a projection is labelled as such wherever it is
+    /// printed.
     pub fn projected_bytes(&self, kept: u64) -> u64 {
-        const SQLITE_OVERHEAD: f64 = 2.4;
-        (kept as f64 * self.mean_row_bytes * SQLITE_OVERHEAD) as u64
+        // Measured: the real index-tier load — 2,701,195 titles producing a
+        // 1,153 MB database — divided by the field bytes counted here. Covers
+        // media_items, titles, external_ids, media_genres and every index on them.
+        // The projection it replaces said 450 MB, so it was 2.56x low.
+        const ROW_MULTIPLIER: f64 = 6.2;
+        (kept as f64 * self.mean_row_bytes * ROW_MULTIPLIER) as u64
     }
 }
 
@@ -484,17 +504,21 @@ mod tests {
     }
 
     #[test]
-    fn the_projection_is_grounded_in_the_phase_3_measurement() {
+    fn the_projection_uses_the_multiplier_measured_on_a_real_load() {
+        // Was 2.4, taken from the Phase 3 benchmark — which only ever inserted into
+        // media_items and titles. A real load also writes external_ids with its
+        // UNIQUE index, media_genres, and a second titles row where the original
+        // name differs, and it came in at roughly twice the projection.
+        //
+        // A multiplier is only valid for the shape it was measured on.
         let m = Measurement {
-            titles_total: 0,
-            titles_kept_type: 0,
-            by_type: vec![],
-            histogram: VoteHistogram::new(),
             mean_row_bytes: 100.0,
             ..Default::default()
         };
-        // 500,000 rows x 100 bytes x 2.4 = 120 MB, the same order as the 145.4 MB
-        // the Phase 3 benchmark actually produced.
-        assert_eq!(m.projected_bytes(500_000), 120_000_000);
+        assert_eq!(m.projected_bytes(1_000_000), 620_000_000);
+        assert!(
+            m.projected_bytes(1_000_000) > (1_000_000.0 * 100.0 * 2.4) as u64,
+            "the corrected multiplier must not be smaller than the one it replaced"
+        );
     }
 }

@@ -403,3 +403,76 @@ inside it. Credits alone are 62% of the projected total. The lever, if it is nee
 is the core vote threshold: >= 50 votes cuts the core from 854,752 titles to roughly
 330,000. That would not reduce credits proportionally — popular titles have larger
 casts — but it is the largest single reduction available.
+
+### Correction: the size projection was wrong by roughly half
+
+The table above projected **450 MB** for the index tier. The real load passed
+**900 MB before it had finished**, and the projection method was the reason.
+
+The 2.4x multiplier came from the Phase 3 benchmark, where 500,000 synthetic rows
+produced a 145.4 MB database. That benchmark inserted into `media_items` and `titles`
+and nothing else. A real load also writes `external_ids` with its UNIQUE index,
+`media_genres`, and a second `titles` row wherever the original title differs — none
+of which the multiplier could capture, because none of them existed in the fixture it
+was derived from.
+
+**A multiplier is only valid for the shape it was measured on.** Reusing it across a
+different set of tables is not a projection; it is a guess wearing a number's
+clothes. The measurement was real and the arithmetic on top of it was not.
+
+This matters for R4: if titles are roughly 2x the projection, the 3.11 GB total is
+closer to 5-6 GB, which is **over** the 4 GB trigger rather than comfortably under
+it. The measured index-tier figure below replaces the projection, and the credits and
+akas projections are still unverified and should be treated as suspect for the same
+reason.
+
+### The index tier, actually loaded
+
+`./target/release/ingest imdb` against the live IMDb datasets, 2026-09-01,
+commit `048180a`. Release build, dev machine.
+
+| Metric | Value |
+|---|---|
+| Titles indexed | **2,701,195** |
+| In the core tier | **854,752** |
+| `titles` rows | 2,870,270 |
+| `external_ids` rows | 2,701,195 |
+| `media_genres` rows | 4,448,436 |
+| Distinct genres | 28 |
+| **Database** | **1,153 MB** (+46 MB WAL) |
+| **Load time** | **219 s** |
+
+Counts matched the measurement exactly — 2,701,195 and 854,752 were both predicted —
+because the scope logic is the same code. **The size was not:** projected 450 MB,
+actual 1,153 MB, **2.56x low**. The multiplier is corrected to 6.2 and is now derived
+from this load rather than from the Phase 3 fixture.
+
+Integrity, checked rather than assumed: no null or empty titles, no literal `\N`
+leaking through as a value, every rating within 0-100, no duplicate IMDb ids, no
+media item without a title row, no media item without an external id.
+
+Resumability was demonstrated on real data, not fixtures. The first run was killed at
+2,350,000 items; restarting picked up from that checkpoint and finished, with no
+duplicate and no gap.
+
+**Load time is 219 s against R4's two-hour trigger.** Time was never the risk.
+
+### R4, reopened
+
+The two-tier scope was accepted on a projection of **3.11 GB**. That projection is
+now known to be low by 2.56x on the one component that has been measured:
+
+| Component | Projected | Measured |
+|---|---|---|
+| titles (index tier) | 450 MB | **1,153 MB** |
+| credits (core tier) | 1,921 MB | not yet loaded |
+| alternative titles (core tier) | 812 MB | not yet loaded |
+
+Taking the two unmeasured figures at face value gives **3.9 GB**, which is at R4's
+4 GB trigger rather than under it. If they are wrong in the same direction and by a
+similar factor — and they were produced by the same kind of reasoning — the total is
+closer to **7 GB**, well over.
+
+**R4 is open again, and the >= 10 core threshold should be treated as provisional
+until credits are actually loaded and measured.** That is the next measurement, and
+it should happen before AniList rather than after.
