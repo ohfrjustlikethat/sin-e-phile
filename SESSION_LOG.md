@@ -293,3 +293,107 @@ stop** — do not proceed hoping it works out.
 
 Note the author's ordering overrides the earlier suggestion to run Spike C first;
 A → B → C is the spec's own order and the author reaffirmed it.
+
+
+---
+
+## Session 4 — 2026-08-31 — Phase 1: all three spikes, then the application shell
+
+**Phase:** 1 — Application Shell and Capability Tiers · **Branch:** `phase/01-application-shell`
+**Spec version:** 1.3.0 · **Status:** code-complete, 7/7 exit criteria evidenced, not yet merged
+
+### What was done
+
+**All three de-risking spikes, and none failed** — so no fallback was taken on any
+locked technology decision, and R1, R2 and R3 are all retired.
+
+**Spike A** ran long and is written up in full in `docs/learning/phase-01-notes.md`
+by the author's request, for the Phase 27 case study. Short version: HTML cannot be
+composited over video on Windows using child-HWND z-order, confirmed independently
+by `ventic/ventic` who ship the same architecture. Solved by inverting the problem
+(ADR-0021): still-frame substitution on pause, region cutouts during playback.
+`SPEC.md` §9.3 amended deliberately (ADR-0020) rather than carrying a requirement
+the platform cannot meet.
+
+**Spike B** — librqbit. TTFB 1.0/2.9/3.1 s against a 20 s trigger; seek
+re-prioritisation 0.6/0.8/2.4 s against a 5 s target. The API audit mattered more
+than the numbers: `ManagedTorrent::stream` gives a position-tracking 32 MiB priority
+window that the piece picker already honours, so **much of the Phase 7 scheduler
+already exists**. Also found that **librqbit has no webseed support**, which means
+Phase 6's Internet Archive backend must use direct HTTP rather than torrents (D6).
+
+**Spike C** — `ort`. Query-embedding p95 **1.63 ms** at true query length, 8.13 ms
+padded, against a 30 ms trigger. Load 82 ms, resident +51.6 MB.
+
+**The application shell**: Tauri v2 + React 19 + TS strict + Vite + Tailwind 4,
+custom title bar, five-destination nav rail, generated IPC, `crates/tiers`, Settings,
+logging and a crash handler.
+
+### Evidence (§10.8)
+
+| Claim | Artefact |
+|---|---|
+| Cold start to interactive | 515 / 660 ms, release, logged as `cold_start_ms` in `data/logs/` |
+| Idle RAM | 42.2 MB (`WorkingSet64`), release binary 10.1 MB |
+| Rust signature change breaks the TS build | Added a `u32` arg to `has_capability` → `ipc.ts` regenerated → `npm run build` failed `TS2554` at `SettingsScreen.tsx(145,64)`. Reverted, clean. |
+| Deliberate panic writes a crash log | `SINEPHILE_PANIC_TEST=1` → `crash-1788162818.txt` with version, location, message, backtrace |
+| Tier detection | `Capable`, 32189 MB, 24 cores, RTX 5070 Ti, hw decode — logged at startup; 8 boundary tests in `crates/tiers` |
+| Test + lint status | `cargo test --workspace` 8 passed; clippy and fmt clean; `npm test` 9 passed; lint and build clean |
+
+### What broke, and what it taught
+
+**`cargo test` cannot run inside `src-tauri` on Windows at all.** Every test binary
+dies at load with `STATUS_ENTRYPOINT_NOT_FOUND`, because tao imports comctl32 **v6**
+entry points and `cargo test` binaries get no side-by-side manifest. Three fixes were
+tried and all failed: rustflags apply to every dependency (`LNK1327`),
+`rustc-link-arg` duplicates the manifest `tauri-build` already embeds (`CVT1100`),
+and `rustc-link-arg-tests` — which would be exactly right — **is rejected by stable
+cargo**, verified in an isolated crate.
+
+**This is the session's most consequential finding.** It would have blocked unit tests
+for the filename parser, the source scorer, the aligner and the recommender.
+ADR-0022: `src-tauri` carries no test harness and all testable logic lives in
+`crates/`. That makes §7's `crates/` split **load-bearing rather than aspirational** —
+it was framed as being about reuse, and it turns out to be the only way pure logic is
+testable at all.
+
+**Specta forbids `u64`/`usize` across the IPC boundary**, because JS numbers are f64
+and would lose precision above 2^53. `u32` is not a workaround here but the correct
+type: 4 billion MB is four petabytes of RAM.
+
+**Cold start was nearly measured dishonestly.** Timing to `MainWindowHandle` gave
+267 ms — for a window with nothing in it. The window is now created hidden and
+revealed only when the frontend reports it has painted, which roughly doubles the
+number to something true.
+
+**A scripted edit wrote a literal newline into Rust source** instead of the `\n`
+escape. Output was still correct, so only CI's `cargo fmt --check` caught it.
+
+**CI caught two ordering bugs local runs could not**, because `dist/` already existed
+locally: `tauri::generate_context!()` resolves `frontendDist` at *compile* time, so no
+cargo command runs without it, and the fresh-clone job built Rust before the frontend.
+Also widened the Rust job to `--workspace`, which had been silently skipping
+`crates/tiers` and its 8 tests.
+
+**Guard needed three additions**, each with a regression vector rather than an
+exemption: npm registry and funding domains (lockfiles are committed per R8), a
+`SELF_IDENTIFIERS` set for the app's own reverse-DNS bundle id, and `src-tauri/gen/`
+ignored as build output. Selftest is now 37 checks.
+
+### Blockers
+
+None.
+
+### What the next session should do first
+
+Verify CI is green on `phase/01-application-shell`, then merge to `main`, confirm
+green there, and tag `phase-01`. Then **Phase 2 — design system**, which depends only
+on Phase 1 and is unblocked.
+
+**The understanding gate does not fire yet.** ADR-0016 moved it to tier boundaries,
+so the questions written in the Phase 1 note accumulate and are asked with Phases 1–8
+at the end of Phase 8.
+
+Two items outstanding for the author, neither blocking: **P8** (Tier 0 embedding
+measurement on constrained hardware, before Phase 21) and the **TMDB enquiry** still
+drafted and unsent at `docs/correspondence/tmdb-ai-clause.md`.
