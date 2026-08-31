@@ -21,13 +21,13 @@
 - [x] **1.1** Spike A - libmpv in a Tauri v2 window (R1). DONE: embeds, d3d11va hardware decode, survives resize. Compositing solved by still-frame on pause + SetWindowRgn cutouts during playback. Both approaches the spec mandates were evaluated; DirectComposition (wry #1762) rejected as unmerged and retained as an upgrade path. · `28eb3d6`
 - [x] **1.2** Spike B - librqbit sequential streaming (R2). DONE: TTFB 1.0/2.9/3.1 s, seek re-prioritisation 0.6/0.8/2.4 s, both well inside targets. API audit found ManagedTorrent::stream gives a position-tracking 32 MiB priority window the picker already honours, so Phase 7 largely tunes rather than builds. librqbit has NO webseed support - Phase 6's InternetArchiveBackend must use direct HTTP. · `1f96eb3`
 - [x] **1.3** Spike C - ort/ONNX on Windows (R3). DONE: query-embedding p95 1.63 ms true length / 8.13 ms padded, against a 30 ms trigger. Load 82 ms, resident +51.6 MB, 384 dims. Tier 0 VM measurement outstanding as P8. · `1f96eb3`
-- [x] **1.4** Tauri v2 + React + TS strict + Vite + Tailwind building · `d1510d7`
-- [x] **1.5** Window: custom title bar, remembered size/position, min 1024x640 · `d1510d7`
-- [x] **1.6** Left nav rail, five destinations, collapse/expand · `d1510d7`
-- [x] **1.7** Typed IPC with generated TS types - changing a Rust signature must break the TS build · `d1510d7`
-- [x] **1.8** tiers.rs - detect RAM, cores, GPU/hw-decode; classify Tier 0/1/2; persist with manual override · `d1510d7`
-- [x] **1.9** Settings screen showing detected hardware and what the tier enables, in plain language · `d1510d7`
-- [x] **1.10** tracing to rotating file in data/logs/; error boundary; Rust panic handler writing a crash report · `d1510d7`
+- [x] **1.4** Tauri v2 + React + TS strict + Vite + Tailwind building · `0a259d2`
+- [x] **1.5** Window: custom title bar, remembered size/position, min 1024x640 · `0a259d2`
+- [x] **1.6** Left nav rail, five destinations, collapse/expand · `0a259d2`
+- [x] **1.7** Typed IPC with generated TS types - changing a Rust signature must break the TS build · `0a259d2`
+- [x] **1.8** tiers.rs - detect RAM, cores, GPU/hw-decode; classify Tier 0/1/2; persist with manual override · `0a259d2`
+- [x] **1.9** Settings screen showing detected hardware and what the tier enables, in plain language · `0a259d2`
+- [x] **1.10** tracing to rotating file in data/logs/; error boundary; Rust panic handler writing a crash report · `0a259d2`
 
 ### Exit criteria
 

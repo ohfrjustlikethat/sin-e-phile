@@ -34,43 +34,43 @@
         "id": "1.4",
         "text": "Tauri v2 + React + TS strict + Vite + Tailwind building",
         "status": "complete",
-        "commit": "d1510d7"
+        "commit": "0a259d2"
       },
       {
         "id": "1.5",
         "text": "Window: custom title bar, remembered size/position, min 1024x640",
         "status": "complete",
-        "commit": "d1510d7"
+        "commit": "0a259d2"
       },
       {
         "id": "1.6",
         "text": "Left nav rail, five destinations, collapse/expand",
         "status": "complete",
-        "commit": "d1510d7"
+        "commit": "0a259d2"
       },
       {
         "id": "1.7",
         "text": "Typed IPC with generated TS types - changing a Rust signature must break the TS build",
         "status": "complete",
-        "commit": "d1510d7"
+        "commit": "0a259d2"
       },
       {
         "id": "1.8",
         "text": "tiers.rs - detect RAM, cores, GPU/hw-decode; classify Tier 0/1/2; persist with manual override",
         "status": "complete",
-        "commit": "d1510d7"
+        "commit": "0a259d2"
       },
       {
         "id": "1.9",
         "text": "Settings screen showing detected hardware and what the tier enables, in plain language",
         "status": "complete",
-        "commit": "d1510d7"
+        "commit": "0a259d2"
       },
       {
         "id": "1.10",
         "text": "tracing to rotating file in data/logs/; error boundary; Rust panic handler writing a crash report",
         "status": "complete",
-        "commit": "d1510d7"
+        "commit": "0a259d2"
       }
     ],
     "exit_criteria": [
@@ -358,43 +358,43 @@
           "id": "1.4",
           "text": "Tauri v2 + React + TS strict + Vite + Tailwind building",
           "status": "complete",
-          "commit": "d1510d7"
+          "commit": "0a259d2"
         },
         {
           "id": "1.5",
           "text": "Window: custom title bar, remembered size/position, min 1024x640",
           "status": "complete",
-          "commit": "d1510d7"
+          "commit": "0a259d2"
         },
         {
           "id": "1.6",
           "text": "Left nav rail, five destinations, collapse/expand",
           "status": "complete",
-          "commit": "d1510d7"
+          "commit": "0a259d2"
         },
         {
           "id": "1.7",
           "text": "Typed IPC with generated TS types - changing a Rust signature must break the TS build",
           "status": "complete",
-          "commit": "d1510d7"
+          "commit": "0a259d2"
         },
         {
           "id": "1.8",
           "text": "tiers.rs - detect RAM, cores, GPU/hw-decode; classify Tier 0/1/2; persist with manual override",
           "status": "complete",
-          "commit": "d1510d7"
+          "commit": "0a259d2"
         },
         {
           "id": "1.9",
           "text": "Settings screen showing detected hardware and what the tier enables, in plain language",
           "status": "complete",
-          "commit": "d1510d7"
+          "commit": "0a259d2"
         },
         {
           "id": "1.10",
           "text": "tracing to rotating file in data/logs/; error boundary; Rust panic handler writing a crash report",
           "status": "complete",
-          "commit": "d1510d7"
+          "commit": "0a259d2"
         }
       ],
       "note": "All three spikes complete and no fallback taken (R1, R2, R3 all retired). The application shell is built: Tauri v2 + React 19 + TS strict + Vite + Tailwind 4, generated IPC, tiers.rs, Settings, logging and panic handler. ADR-0022 moved testable logic into crates/ because cargo test cannot run inside src-tauri on Windows at all."
