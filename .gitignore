@@ -61,3 +61,4 @@ src-tauri/gen/
 Thumbs.db
 desktop.ini
 tools/uiaudit/out/
+data/

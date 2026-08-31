@@ -1,108 +1,120 @@
 {
   "spec_version": "1.4.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-08-31T13:19:08Z",
+  "last_updated": "2026-08-31T14:39:21Z",
   "sessions_completed": 5,
   "current_phase": {
-    "number": 2,
-    "slug": "design-system",
-    "title": "Design System and Visual Language",
-    "status": "complete",
-    "branch": "phase/02-design-system",
-    "started_at": "2026-09-01T04:00:00Z",
-    "note": "Phase 2 builds the visual language BEFORE any product UI. Two constraints carry over from Phase 1: ADR-0020 removed the gradient scrim under player chrome, so the design system must produce a solid opaque panel; and ADR-0013 requires every artwork-bearing surface to have a designed artwork-free state, so PosterCard needs a typographic fallback rather than a grey rectangle.",
+    "number": 3,
+    "slug": "data-layer",
+    "title": "Data Layer and Portable Storage",
+    "branch": "phase/03-data-layer",
+    "started_at": "2026-08-31T14:39:21Z",
+    "status": "in_progress",
+    "note": "The schema everything else depends on, designed once. Two constraints carry over: ADR-0022 puts all SQL in crates/persistence with src-tauri/src/persistence/ as re-exports only (guard-enforced), and SPEC.md 6.2 requires anime's absolute-vs-seasonal numbering and title variants designed NOW rather than patched in Phase 12. media_kind carries all eight values from the start so Phases 24-25 need no migration.",
     "subtasks": [
       {
-        "id": "2.0",
-        "text": "THREE static HTML mockups of Home, film detail, and player-with-chrome, as three interpretations within the SPEC.md 9.0 brief, with REAL artwork and metadata. Author chooses before any token or component code.",
-        "status": "complete",
-        "commit": "aebbd7f"
+        "id": "3.1",
+        "text": "crates/persistence: sqlx + SQLite with WAL, pinned versions, committed .sqlx/ offline metadata so CI compiles without a live database; src-tauri/src/persistence/ re-exports only (guard-enforced, ADR-0022)",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "2.1",
-        "text": "All SPEC.md 9 tokens as CSS custom properties consumed by the Tailwind theme; fonts bundled locally, no network font requests",
-        "status": "complete",
-        "commit": "aebbd7f"
+        "id": "3.2",
+        "text": "Path resolution: portable ./data/ next to the executable by default, %APPDATA% installed-mode as an opt-in; override and detection",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "2.2",
-        "text": "Component gallery route /design, dev-only, rendering every primitive in every state",
-        "status": "complete",
-        "commit": "aebbd7f"
+        "id": "3.3",
+        "text": "Migration system: forward and backward migrations, with backup-on-migrate",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "2.3",
-        "text": "Primitives: Button, IconButton, Input, Select, Toggle, Slider, Tabs, Tooltip, Popover, Dialog, Toast, Skeleton, Spinner, Badge, ProgressBar, Rating",
-        "status": "complete",
-        "commit": "aebbd7f"
+        "id": "3.4",
+        "text": "Schema - identity: media_items with the eight-value media_kind discriminator, external_ids, titles (romaji/native/english variants)",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "2.4",
-        "text": "Media primitives: PosterCard (with the ADR-0013 typographic artwork-free state), EpisodeCard, ChannelCard, Rail, HeroBanner, EmptyState",
-        "status": "complete",
-        "commit": "aebbd7f"
+        "id": "3.5",
+        "text": "Schema - people and taxonomy: people, credits, genres, keywords",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "2.5",
-        "text": "Rail: virtualised, momentum scroll, edge-bleed, keyboard-navigable, 60fps with 500 cards",
-        "status": "complete",
-        "commit": "aebbd7f"
+        "id": "3.6",
+        "text": "Schema - series: series, seasons, episodes with BOTH seasonal and absolute numbering, plus the reconciliation table (SPEC.md 6.2 - designed now, not patched in Phase 12)",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "2.6",
-        "text": "Focus management with visible rings and correct tab order; full keyboard navigation; Ctrl+K command palette shell",
-        "status": "complete",
-        "commit": "aebbd7f"
+        "id": "3.7",
+        "text": "Schema - user and config: profiles, watch_events, playback_positions, watchlist_items, collections, local_files, local_file_matches, sources_config, settings",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "2.7",
-        "text": "prefers-reduced-motion support throughout (the global rule exists from Phase 1; verify per component)",
-        "status": "complete",
-        "commit": "aebbd7f"
+        "id": "3.8",
+        "text": "Repository-pattern access layer over the whole schema",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "2.8",
-        "text": "Contrast audit script failing CI if any text token pair drops below WCAG AA; --ink-faint on --surface is the one to check",
-        "status": "complete",
-        "commit": "aebbd7f"
+        "id": "3.9",
+        "text": "Export/import of a whole profile as a portable archive",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "2.9",
-        "text": "docs/specs/design-system.md documenting every token and component with usage rules",
-        "status": "complete",
-        "commit": "aebbd7f"
+        "id": "3.10",
+        "text": "Migration round-trip integration tests: forward and backward against a populated database (E1)",
+        "status": "not_started",
+        "commit": null
+      },
+      {
+        "id": "3.11",
+        "text": "500,000 synthetic media items; indexed lookup under 100 ms, insertion timed separately (amendment 15); numbers into docs/PERFORMANCE.md and docs/eval-results.md",
+        "status": "not_started",
+        "commit": null
+      },
+      {
+        "id": "3.12",
+        "text": "ER diagram in docs/ARCHITECTURE.md (E2), and an ADR recording why the schema is generic over media kind (E5)",
+        "status": "not_started",
+        "commit": null
       }
     ],
     "exit_criteria": [
       {
         "id": "E1",
-        "text": "Every primitive renders correctly in the gallery, in all states.",
-        "met": true,
-        "evidence": "Rendered headless at 1500px across all four gallery tabs with 0 page errors; screenshots in tools/uiaudit/out/. Every primitive shown in loading, disabled, error and empty states; PosterCard shown in both ADR-0013 states side by side."
+        "text": "All migrations run forward and backward cleanly against a populated database.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E2",
-        "text": "The entire gallery is navigable by keyboard alone with visible focus at every step.",
-        "met": true,
-        "evidence": "node tools/uiaudit/run.mjs: 45 Tab stops walked, 0 without a visible focus ring, 0 off-screen. Rail exposes exactly 1 tab stop; ArrowRight/End reach card 499 of 500 (roving tabindex)."
+        "text": "Schema documented with an entity-relationship diagram in `docs/ARCHITECTURE.md`.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E3",
-        "text": "Contrast audit passes.",
-        "met": true,
-        "evidence": "python tools/contrast/audit.py -> \"29 enforced pairs pass WCAG AA (3 decorative recorded, not enforced)\"; runs in CI."
+        "text": "A database populated with 500,000 synthetic media items answers indexed lookups in under 100 ms. (The 100 ms budget is the lookup alone; bulk insertion of the 500,000 rows has no time budget and is measured and recorded separately in `docs/PERFORMANCE.md`.)",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E4",
-        "text": "A rail of 500 poster cards scrolls at 60 fps with no dropped frames.",
-        "met": true,
-        "evidence": "node tools/uiaudit/run.mjs -> 200 sampled frames flicking 500 cards: median 16.7ms, p95 16.7ms, worst 16.8ms, 0 frames over 33.3ms, 14/500 cards mounted. Harness verified to fail on a reintroduced regression."
+        "text": "Copying the app folder to another location and launching it preserves all data.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E5",
-        "text": "`docs/specs/design-system.md` documents every token and component with usage rules.",
-        "met": true,
-        "evidence": "docs/specs/design-system.md - tokens, layout invariants, all 21 components, Rail virtualisation + keyboard contract, motion, measured numbers, and rules for extending it."
+        "text": "An ADR records why the schema is generic over media kind.",
+        "met": false,
+        "evidence": null
       }
     ]
   },
@@ -497,7 +509,7 @@
       "title": "Data Layer and Portable Storage",
       "depends_on": "1",
       "sessions": "1–2",
-      "status": "not_started",
+      "status": "in_progress",
       "completion_commit": null,
       "exit_criteria": [
         {
@@ -529,6 +541,80 @@
           "text": "An ADR records why the schema is generic over media kind.",
           "met": false,
           "evidence": null
+        }
+      ],
+      "subtasks": [
+        {
+          "id": "3.1",
+          "text": "crates/persistence: sqlx + SQLite with WAL, pinned versions, committed .sqlx/ offline metadata so CI compiles without a live database; src-tauri/src/persistence/ re-exports only (guard-enforced, ADR-0022)",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "3.2",
+          "text": "Path resolution: portable ./data/ next to the executable by default, %APPDATA% installed-mode as an opt-in; override and detection",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "3.3",
+          "text": "Migration system: forward and backward migrations, with backup-on-migrate",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "3.4",
+          "text": "Schema - identity: media_items with the eight-value media_kind discriminator, external_ids, titles (romaji/native/english variants)",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "3.5",
+          "text": "Schema - people and taxonomy: people, credits, genres, keywords",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "3.6",
+          "text": "Schema - series: series, seasons, episodes with BOTH seasonal and absolute numbering, plus the reconciliation table (SPEC.md 6.2 - designed now, not patched in Phase 12)",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "3.7",
+          "text": "Schema - user and config: profiles, watch_events, playback_positions, watchlist_items, collections, local_files, local_file_matches, sources_config, settings",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "3.8",
+          "text": "Repository-pattern access layer over the whole schema",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "3.9",
+          "text": "Export/import of a whole profile as a portable archive",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "3.10",
+          "text": "Migration round-trip integration tests: forward and backward against a populated database (E1)",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "3.11",
+          "text": "500,000 synthetic media items; indexed lookup under 100 ms, insertion timed separately (amendment 15); numbers into docs/PERFORMANCE.md and docs/eval-results.md",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "3.12",
+          "text": "ER diagram in docs/ARCHITECTURE.md (E2), and an ADR recording why the schema is generic over media kind (E5)",
+          "status": "not_started",
+          "commit": null
         }
       ]
     },
@@ -1571,7 +1657,7 @@
       ]
     }
   ],
-  "next_action": "Phase 2 is DONE: merged to main, tagged phase-02, CI green on main (run 33397473458 on the branch, and the main run after the merge - all 5 jobs pass, including the two new audit steps). Start Phase 3: read docs/phases/phase-03-*.md, then SPEC.md 15's Phase 3 entry, and plan before implementing. The understanding gate does NOT fire here - ADR-0016 moved it to tier boundaries, so the five questions in docs/learning/phase-02-notes.md accumulate and are asked together with Phases 1-8 at the end of Phase 8.",
+  "next_action": "Phase 3 subtask 3.1: create crates/persistence with sqlx + SQLite, WAL, pinned versions.",
   "blockers": [],
   "decisions_pending": [
     {
