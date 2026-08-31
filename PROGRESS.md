@@ -10,7 +10,7 @@
 
 ## Where we are right now
 
-**Phase 3 — Data Layer and Portable Storage** (`awaiting_review`, branch `phase/03-data-layer`)
+**Phase 3 — Data Layer and Portable Storage** (`complete`, branch `phase/03-data-layer`)
 
 5 of 5 exit criteria met with evidence.
 
@@ -67,7 +67,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 0 | Bootstrap and Project Infrastructure | A | nothing | 1 | 8/8 |
 | [x] | 1 | Application Shell and Capability Tiers | A | 0 | 1–2 | 7/7 |
 | [x] | 2 | Design System and Visual Language | A | 1 | 1–2 | 5/5 |
-| [?] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 5/5 |
+| [x] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 5/5 |
 | [ ] | 4 | Metadata Backbone | A | 3 | 2–3 | 0/7 |
 | [ ] | 5 | Semantic Search Engine | A | 4 | 2 | 0/5 |
 | [ ] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 0/6 |

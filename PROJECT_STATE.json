@@ -1,7 +1,7 @@
 {
   "spec_version": "1.4.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-08-31T15:03:44Z",
+  "last_updated": "2026-08-31T15:27:56Z",
   "sessions_completed": 5,
   "current_phase": {
     "number": 3,
@@ -9,7 +9,7 @@
     "title": "Data Layer and Portable Storage",
     "branch": "phase/03-data-layer",
     "started_at": "2026-08-31T14:39:21Z",
-    "status": "awaiting_review",
+    "status": "complete",
     "note": "The schema everything else depends on, designed once. Two constraints carry over: ADR-0022 puts all SQL in crates/persistence with src-tauri/src/persistence/ as re-exports only (guard-enforced), and SPEC.md 6.2 requires anime's absolute-vs-seasonal numbering and title variants designed NOW rather than patched in Phase 12. media_kind carries all eight values from the start so Phases 24-25 need no migration.",
     "subtasks": [
       {
@@ -509,7 +509,7 @@
       "title": "Data Layer and Portable Storage",
       "depends_on": "1",
       "sessions": "1–2",
-      "status": "awaiting_review",
+      "status": "complete",
       "note": "The schema everything else depends on, designed once. Two constraints carry over: ADR-0022 puts all SQL in crates/persistence with src-tauri/src/persistence/ as re-exports only (guard-enforced), and SPEC.md 6.2 requires anime's absolute-vs-seasonal numbering and title variants designed NOW rather than patched in Phase 12. media_kind carries all eight values from the start so Phases 24-25 need no migration.",
       "subtasks": [
         {
@@ -617,7 +617,7 @@
           "evidence": "docs/adr/0025-generic-media-schema.md, verified by tests/migrations.rs::all_eight_media_kinds_are_accepted."
         }
       ],
-      "completion_commit": null
+      "completion_commit": "65f5147"
     },
     {
       "number": 4,
