@@ -162,7 +162,7 @@ Do not revisit these without writing an ADR that explains what changed. They wer
 | State (FE) | **Zustand** for client state, **TanStack Query** for backend-derived state | Avoids Redux ceremony; Query handles caching/invalidation correctly, which matters enormously here. |
 | Torrent engine | **librqbit** (in-process Rust) | Sequential download and streaming support built in; no external process; full control over piece prioritisation, which is what makes instant playback possible. |
 | Player core | **libmpv** (embedded, custom UI drawn over it) | Plays everything, hardware decode (D3D11VA/NVDEC/QSV), frame-accurate seek, first-class ASS/SSA rendering, per-track audio and subtitle delay control. Used by Jellyfin and Stremio for the same reasons. |
-| Database | **SQLite** via `sqlx` (compile-time checked queries), WAL mode | Single file, portable, fast, zero setup. `sqlx` catches SQL errors at compile time — valuable for a learner. |
+| Database | **SQLite** via `sqlx`, WAL mode | Single file, portable, fast, zero setup — the whole database is one file you can copy, which is what makes §2.4's portability promise true. `sqlx` is a mature async Rust driver with a good migration story. **Not** chosen for its compile-time `query!` macros, which this project does not use (ADR-0026): SQLite gives them too little nullability information, so most columns would need hand-written `as "col!"` assertions, and dynamic SQL cannot use them at all. Schema drift is caught instead by a test that exercises every repository method against a freshly migrated database. |
 | Full-text search | **SQLite FTS5** (BM25) | Built in, no extra dependency. |
 | Vector search | **HNSW** (`hnsw_rs` or `instant-distance`), persisted to disk | Sub-millisecond ANN over the catalogue. |
 | Embeddings | **ONNX Runtime** (`ort` crate) running a quantised sentence-transformer (`bge-small-en-v1.5` or `all-MiniLM-L6-v2`, INT8) | ~90 MB, CPU-viable, no API, no cost, works offline. |
@@ -862,7 +862,7 @@ All free. Phase 0 verifies current terms for each and records them in `docs/SETU
 
 | Service | Needed for | Cost | Notes |
 |---|---|---|---|
-| **TMDB** | Artwork, rich detail, cast headshots | Free API key, instant, non-commercial | Register at themoviedb.org → Settings → API. **Optional** — offered in onboarding as ~30 seconds of work, with a "later" option that is not a dead end (ADR-0013). |
+| **TMDB** | Artwork, rich detail, cast headshots | **The user's own free key**, instant, non-commercial | Register at themoviedb.org → Settings → API. **Optional** — offered in onboarding as ~30 seconds of work, with a "later" that is not a dead end (ADR-0013). **No key ever ships with the application** (ADR-0027): each user supplies their own, per profile, in settings, under their own acceptance of TMDB's terms, and may remove it at any time. Every TMDB-dependent surface degrades to the §9.4 typographic treatment rather than breaking. |
 | **AniList** | Anime metadata, relations, absolute/seasonal numbering | Free, public GraphQL, no key | Required for anime. |
 | **Jikan** | MyAnimeList mirror, supplementary anime data | Free, no key, rate-limited | Optional fallback. |
 | **IMDb datasets** | Offline title/rating/crew index | Free download, no account | `datasets.imdbws.com`. Non-commercial use. |
@@ -1547,6 +1547,15 @@ Face recognition, live TV, manga and comics, casting and watch-together. Fully i
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 1.5.0 — 2026-09-01 (Phase 3 close)
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A12 | §2 (technology table) | **The rationale for `sqlx` is corrected.** It was "compile-time checked queries… valuable for a learner"; the data layer does not use the `query!` macros and will not. SQLite gives them too little nullability information, so most columns would need hand-written `as "col!"` assertions — which are unchecked assertions by the author, not guarantees — and dynamic SQL cannot use them at all. The real reasons are single-file portability, WAL, and a mature async driver. A test exercising **every repository method against a freshly migrated database** is the compensating control, and is a standing requirement. | [0026](docs/adr/0026-runtime-checked-sql.md) |
+| A13 | §14 | **No TMDB key ever ships.** Each user supplies their own, per profile, in settings, under their own acceptance of TMDB's terms, removable at any time. Every TMDB-dependent surface degrades to the §9.4 typographic treatment. Closes P2; the drafted enquiry to TMDB is not sent and no longer tracked. | [0027](docs/adr/0027-tmdb-per-user-key.md) |
+
+---
 
 ### spec_version 1.4.0 — 2026-09-01 (Phase 2, design brief)
 

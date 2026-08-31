@@ -1,3 +1,11 @@
+> **CLOSED, UNSENT — 2026-09-01 (ADR-0027).** The author closed this: no key ever
+> ships, each user supplies their own under their own acceptance of TMDB's terms,
+> and nothing derived is redistributed. The posture stands without a ruling, so the
+> enquiry is not sent and is no longer tracked. Kept because the analysis below is
+> the useful part and the Phase 27 case study may want it.
+
+---
+
 # Draft enquiry to TMDB — the AI/ML training clause
 
 **Status:** drafted 2026-08-31, **not yet sent**. For the author to send.

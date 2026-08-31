@@ -1,5 +1,5 @@
 {
-  "spec_version": "1.4.0",
+  "spec_version": "1.5.0",
   "project": "sin-e-phile",
   "last_updated": "2026-08-31T15:27:56Z",
   "sessions_completed": 5,
@@ -1684,12 +1684,6 @@
       "text": "Spike C measured query-embedding latency on the Tier 2 dev machine only. ADR-0015 also asked for a constrained VM approximating Tier 0. Unpadded headroom is ~18x so this does not block Phase 5, but the padded worst case with a 3-4x Tier 0 penalty lands at 24-33 ms, close to the 30 ms trigger. Measure before Phase 21 signs off the 80 ms search budget.",
       "raised": "2026-08-31",
       "decide_by_phase": 21
-    },
-    {
-      "id": "P9",
-      "text": "Convert the data layer to sqlx's compile-time-checked query! macros, or accept runtime-checked queries? SPEC.md 2 names compile-time checking as the REASON sqlx was chosen. Phase 3 shipped runtime-checked; see known_debt for the cost on both sides. See docs/DECISIONS_PENDING.md.",
-      "raised": "2026-09-01",
-      "decide_by_phase": 4
     }
   ],
   "adrs": [

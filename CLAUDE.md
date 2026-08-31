@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **1.4.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **1.5.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -214,9 +214,11 @@ Do not revisit without an ADR explaining what changed.
 critical path, no server component of any kind, no Docker, no cross-platform
 abstractions.
 
-**TMDB is optional, not required** (ADR-0013). The app is fully functional on the
-offline IMDb + MovieLens catalogue with no key. TMDB enrichment is additive, never
-load-bearing.
+**TMDB is optional, and no key ever ships** (ADR-0013, ADR-0027). The app is fully
+functional on the offline IMDb + MovieLens catalogue with no key. Each user supplies
+their **own** key, per profile, in settings, under their own acceptance of TMDB's
+terms, removable at any time. Every TMDB-dependent surface degrades to the §9.4
+typographic treatment rather than breaking.
 
 ---
 
@@ -251,6 +253,15 @@ test binary dies at load with `STATUS_ENTRYPOINT_NOT_FOUND`. Therefore:
 - Ask at *every* phase: if logic is going into `src-tauri` that ought to be testable,
   it belongs in a crate instead. "Is this testable?" and "does this belong in
   `src-tauri`?" have the same answer.
+
+**SQL is runtime-checked, and one test is what makes that safe** (ADR-0026). The
+`query!` macros are not used: SQLite gives them too little nullability information,
+so most columns would need hand-written `as "col!"` assertions, and dynamic SQL
+cannot use them at all. Instead,
+`crates/persistence/tests/repository_surface.rs` exercises **every** repository
+method against a freshly migrated database. **A new repository method without a line
+in that file does not pass review** — it is the whole of the protection, and its
+absence is invisible.
 
 Consequently: **business logic never lives in `src-tauri/src/commands/`**, and **raw
 SQL never appears anywhere under `src-tauri/`** — it lives in `crates/persistence/`,
