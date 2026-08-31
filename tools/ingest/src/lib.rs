@@ -7,6 +7,12 @@
 //! The resumability lives in [`job`], and is built on one rule: a checkpoint commits
 //! in the same transaction as the work it describes.
 
+pub mod download;
+pub mod imdb;
 pub mod job;
+pub mod measure;
+pub mod tsv;
 
+pub use download::{Downloaded, Downloader, Progress};
 pub use job::{Batch, Job, JobError, StepOutcome, StepProgress, StepStatus};
+pub use tsv::{Row, TsvReader};

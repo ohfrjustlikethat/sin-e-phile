@@ -25,6 +25,17 @@ sqlx = { version = "=0.8.6", default-features = false, features = [
 ] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
 thiserror = "2"
+
+# rustls rather than native-tls: no OpenSSL build story on Windows, which is the
+# only platform this ships on. `stream` gives a chunked body so a 1 GB dataset is
+# never held in memory. Version pinned (standing rule 15).
+reqwest = { version = "=0.12.24", default-features = false, features = [
+    "rustls-tls", "stream", "gzip",
+] }
+futures-util = "=0.3.31"
+# miniz_oxide backend (the default) — pure Rust, so no C toolchain requirement
+# beyond the MSVC one already needed.
+flate2 = "=1.1.4"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 

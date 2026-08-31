@@ -318,3 +318,47 @@ Both numbers pass the Phase 3 criterion, which is the point worth recording: the
 criterion would have been met with the scan in place, and the failure would have
 surfaced in Phase 5, whose 80 ms p95 search budget sits on top of this lookup against
 a catalogue an order of magnitude larger than this fixture.
+
+## Phase 4 — IMDb catalogue shape (R4 measurement)
+
+`cargo build -p sinephile-ingest --release && ./target/release/ingest measure`
+
+Measured against the live IMDb datasets on 2026-09-01, commit `f7907fd`. This is the
+measurement **R4's mitigation requires before committing to a shape**. It writes
+nothing to the database.
+
+| Metric | Value |
+|---|---|
+| Titles in `title.basics` | 12,754,307 |
+| Of a type this catalogue would keep | 2,832,564 |
+| `tvEpisode` rows (excluded — they arrive via `title.episode`) | 9,860,692 (77%) |
+| Rated titles in `title.ratings` | 1,711,804 |
+| Kept-type titles with **no** votes at all | 2,023,574 (71% of kept) |
+| Archives | 224.0 MB compressed, 1,084.2 MB raw |
+| Download | 25 s (9.3 MB/s) |
+| Scan, both files, release build | 8 s |
+
+**Titles kept by vote threshold**, and the projected database for that many rows
+(2.4x SQLite overhead, the ratio measured in Phase 3 — 500,000 synthetic rows
+produced 145.4 MB):
+
+| Threshold | Titles | Projected |
+|---|---|---|
+| everything of a kept type | 2,832,564 | 471 MB |
+| >= 0 votes (rated only) | 808,990 | 135 MB |
+| >= 10 | 700,529 | 117 MB |
+| >= 50 | 330,344 | 55 MB |
+| >= 100 | 236,438 | 39 MB |
+| >= 500 | 103,060 | 17 MB |
+| >= 1,000 | 69,304 | 12 MB |
+| >= 10,000 | 15,855 | 3 MB |
+
+**R4's triggers are 2 hours of ingestion or a 4 GB database.** On `title.basics`
+alone, neither is close: the whole kept set projects to 471 MB and the scan takes 8
+seconds. Excluding `tvEpisode` removes 77% of IMDb before any threshold is applied.
+
+**This does not clear R4.** It measures one of six datasets. `title.principals`
+(cast and crew) is the largest by a wide margin and has roughly 90 million rows, and
+both it and `title.akas` scale with the number of titles kept — so the threshold
+chosen here multiplies through them. Measuring those is the next thing, and the
+threshold should not be treated as settled until it is.

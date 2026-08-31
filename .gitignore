@@ -62,3 +62,6 @@ Thumbs.db
 desktop.ini
 tools/uiaudit/out/
 data/
+
+# Downloaded IMDb datasets — hundreds of MB, re-fetchable, never committed.
+data/datasets/

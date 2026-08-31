@@ -12,6 +12,9 @@ use sinephile_persistence::{paths, DataLocation, Db};
 const USAGE: &str = "\
 ingest — offline dataset ingestion (SPEC.md Phase 4)
 
+  ingest measure           download the two smallest datasets and report the
+                           catalogue's shape, so the scope threshold is chosen
+                           from evidence (SPEC.md R4). Writes nothing.
   ingest status            show every job and its steps
   ingest reset <name>      discard a job's progress so the next run starts clean
 
@@ -54,6 +57,13 @@ async fn main() -> Result<(), JobError> {
     let db = Db::open_in(&dir).await?;
 
     match command {
+        "measure" => {
+            // Deliberately does not touch the database it was handed — a
+            // measurement that mutates state cannot be re-run to check itself.
+            let measurement = sinephile_ingest::measure::run(&dir.join("datasets")).await?;
+            sinephile_ingest::measure::report(&measurement);
+            Ok(())
+        }
         "status" => status(&db).await,
         "reset" => match args.get(1) {
             Some(name) => {

@@ -19,7 +19,7 @@
 ### Subtasks — 1/12 complete
 
 - [x] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts · `4a78d64`
-- [ ] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres
+- [~] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres
 - [ ] **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device)
 - [ ] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering
 - [ ] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules
@@ -45,7 +45,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.2: IMDb dataset download, verification and normalisation into media_items/titles/people/credits/genres, built as steps on the runner in tools/ingest/src/job.rs. Read docs/phases/phase-04-metadata-backbone.md; R4 says measure the size and time before committing to a shape, and scope by a popularity threshold rather than ingesting everything.
+Phase 4 subtask 4.2, second half: with the R4 threshold decided, write the title.basics loader as steps on the runner in tools/ingest/src/job.rs, inserting through MediaRepository. Download, gzip verification, the streaming TSV reader and the measurement pass are done - see docs/eval-results.md for the measured catalogue shape. R4 is NOT cleared: only title.basics was measured, and title.principals has ~90M rows.
 
 ---
 
