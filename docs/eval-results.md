@@ -362,3 +362,44 @@ seconds. Excluding `tvEpisode` removes 77% of IMDb before any threshold is appli
 both it and `title.akas` scale with the number of titles kept — so the threshold
 chosen here multiplies through them. Measuring those is the next thing, and the
 threshold should not be treated as settled until it is.
+
+### The two-tier scope, measured against all four large datasets
+
+`./target/release/ingest measure` (full, not `--quick`), 2026-09-01, commit `6d9e429`.
+Author's ruling: **A for the index, C for enrichment** — every kept-type title enters
+the catalogue; only the popular core gets cast, crew, akas and embeddings.
+
+| Tier | Rule | Titles |
+|---|---|---|
+| index | any kept type, non-adult | 2,701,195 |
+| core | >= 10 votes, **or** unrated and released within 2 years | 854,752 |
+
+| Dataset | Rows total | Rows for core titles | Kept |
+|---|---|---|---|
+| `title.principals` | 101,540,407 | 10,493,168 | 10.3% |
+| `title.akas` | 59,142,985 | 5,910,737 | 10.0% |
+
+**Projected database**
+
+| | Size |
+|---|---|
+| titles (index tier) | 450 MB |
+| credits (core tier) | 1,921 MB |
+| alternative titles (core tier) | 812 MB |
+| **total** | **3.11 GB** |
+| the same load **without** the core tier | **26.53 GB** |
+
+**R4's fear was justified, and the two-tier scope is what answers it.** Ingesting
+credits and akas for every title would produce a **26.53 GB** database — six and a
+half times over R4's 4 GB trigger. Restricting enrichment to the core tier is an
+**8.5x reduction** and brings it to 3.11 GB.
+
+Full scan of all four datasets: **174 seconds**. R4's other trigger is two hours, so
+time is not close to being a problem — size was always the real risk.
+
+**Headroom is thin and should not be treated as settled.** 3.11 GB is 78% of the 4 GB
+trigger, and AniList, MovieLens and the embedding artefact all still have to fit
+inside it. Credits alone are 62% of the projected total. The lever, if it is needed,
+is the core vote threshold: >= 50 votes cuts the core from 854,752 titles to roughly
+330,000. That would not reduce credits proportionally — popular titles have larger
+casts — but it is the largest single reduction available.

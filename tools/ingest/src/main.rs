@@ -12,9 +12,10 @@ use sinephile_persistence::{paths, DataLocation, Db};
 const USAGE: &str = "\
 ingest — offline dataset ingestion (SPEC.md Phase 4)
 
-  ingest measure           download the two smallest datasets and report the
-                           catalogue's shape, so the scope threshold is chosen
-                           from evidence (SPEC.md R4). Writes nothing.
+  ingest measure [--quick] report the catalogue's shape so the scope is chosen
+                           from evidence (SPEC.md R4). Writes nothing. --quick
+                           skips title.principals and title.akas, which are the
+                           large ones and the whole point.
   ingest status            show every job and its steps
   ingest reset <name>      discard a job's progress so the next run starts clean
 
@@ -60,7 +61,8 @@ async fn main() -> Result<(), JobError> {
         "measure" => {
             // Deliberately does not touch the database it was handed — a
             // measurement that mutates state cannot be re-run to check itself.
-            let measurement = sinephile_ingest::measure::run(&dir.join("datasets")).await?;
+            let deep = !args.iter().any(|a| a == "--quick");
+            let measurement = sinephile_ingest::measure::run(&dir.join("datasets"), deep).await?;
             sinephile_ingest::measure::report(&measurement);
             Ok(())
         }

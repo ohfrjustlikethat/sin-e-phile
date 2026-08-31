@@ -139,6 +139,10 @@ pub struct Scope {
     /// just-released film also has none, so this is a separate decision from
     /// `min_votes` rather than a consequence of it.
     pub keep_unrated: bool,
+    /// Rescue unrated titles released within this many years, whatever
+    /// `keep_unrated` says. A film released last week has no votes yet, and that is
+    /// exactly when a discovery-first app must be able to find it.
+    pub unrated_recent_years: Option<i64>,
     /// IMDb's adult flag.
     pub keep_adult: bool,
 }
@@ -149,10 +153,22 @@ impl Scope {
     pub const EVERYTHING: Scope = Scope {
         min_votes: 0,
         keep_unrated: true,
+        unrated_recent_years: None,
         keep_adult: true,
     };
 
     pub fn keeps(&self, title_type: &str, votes: Option<i64>, is_adult: bool) -> bool {
+        self.keeps_with_year(title_type, votes, is_adult, None)
+    }
+
+    /// As `keeps`, with the release year available for the recent-unrated rescue.
+    pub fn keeps_with_year(
+        &self,
+        title_type: &str,
+        votes: Option<i64>,
+        is_adult: bool,
+        year: Option<i64>,
+    ) -> bool {
         if !KEPT_TYPES.contains(&title_type) {
             return false;
         }
@@ -161,9 +177,106 @@ impl Scope {
         }
         match votes {
             Some(votes) => votes >= self.min_votes,
-            None => self.keep_unrated,
+            None => {
+                if self.keep_unrated {
+                    return true;
+                }
+                // A missing year cannot be rescued: whether it is recent is
+                // unknowable, and guessing yes would readmit most of the long tail.
+                match (self.unrated_recent_years, year) {
+                    (Some(window), Some(year)) => year >= current_year() - window,
+                    _ => false,
+                }
+            }
         }
     }
+}
+
+/// The two-tier catalogue (author's ruling, 2026-09-01: "a combination of C and A").
+///
+/// # Why two tiers rather than one threshold
+///
+/// The measurement showed the size risk is not where R4 assumed. `title.basics` at
+/// its widest is 471 MB — nowhere near the 4 GB trigger — because excluding
+/// `tvEpisode` already removes 77% of IMDb. What is genuinely large is
+/// `title.principals` (roughly 90 million cast and crew rows) and `title.akas`, and
+/// **both scale with the number of titles kept**.
+///
+/// So the filter belongs where the cost is, not where the rows are counted:
+///
+/// - **index** — every kept-type title enters `media_items`. The catalogue is
+///   complete and everything is findable, which is what §1's "vastest library"
+///   actually promises.
+/// - **core** — only titles clearing the popularity bar get the expensive parts:
+///   cast, crew, alternative titles, and the Phase 5 embedding documents.
+///
+/// This is R4's own fallback — *"ship a core index of well-known titles, fetch the
+/// long tail live on demand"* — with the halves reassigned by what measurement
+/// showed: the title index is cheap enough to be complete, and **enrichment** is
+/// what gets rationed.
+///
+/// An obscure 1913 short is therefore findable by name, with its year and genre, and
+/// simply has no cast list until someone asks for it. That is a better failure than
+/// not existing.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CatalogueScope {
+    /// What enters the catalogue at all.
+    pub index: Scope,
+    /// What additionally gets cast, crew, akas and embeddings.
+    pub core: Scope,
+}
+
+impl CatalogueScope {
+    /// The shipped default, chosen from the measured table in `docs/eval-results.md`.
+    pub const DEFAULT: CatalogueScope = CatalogueScope {
+        // A: everything of a keepable type. Adult titles are excluded from the index
+        // entirely rather than merely from the core — they are not what this app is
+        // for, and IMDb flags them reliably.
+        index: Scope {
+            min_votes: 0,
+            keep_unrated: true,
+            unrated_recent_years: None,
+            keep_adult: false,
+        },
+        // C: ten votes means *someone* has seen it, plus a rescue for anything from
+        // the last two years, which has had no time to accumulate any.
+        core: Scope {
+            min_votes: 10,
+            keep_unrated: false,
+            unrated_recent_years: Some(2),
+            keep_adult: false,
+        },
+    };
+
+    pub fn in_index(&self, title_type: &str, votes: Option<i64>, is_adult: bool) -> bool {
+        self.index.keeps(title_type, votes, is_adult)
+    }
+
+    pub fn in_core(
+        &self,
+        title_type: &str,
+        votes: Option<i64>,
+        is_adult: bool,
+        year: Option<i64>,
+    ) -> bool {
+        self.core.keeps_with_year(title_type, votes, is_adult, year)
+    }
+}
+
+/// The current year, for the recent-unrated rescue.
+///
+/// Read from the clock rather than baked in, so the two-year window keeps moving. A
+/// frozen constant would quietly stop rescuing new releases a year after shipping,
+/// and nothing would report it.
+fn current_year() -> i64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let seconds = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    // Good enough for a year boundary: being a day out at New Year changes nothing
+    // about which titles are rescued.
+    1970 + seconds / 31_557_600
 }
 
 /// A vote-count histogram, for choosing the threshold from evidence.
@@ -258,6 +371,7 @@ mod tests {
         let scope = Scope {
             min_votes: 100,
             keep_unrated: false,
+            unrated_recent_years: None,
             keep_adult: false,
         };
         assert!(scope.keeps("movie", Some(100), false));
@@ -278,6 +392,7 @@ mod tests {
         let keep = Scope {
             min_votes: 1_000,
             keep_unrated: true,
+            unrated_recent_years: None,
             keep_adult: false,
         };
         assert!(keep.keeps("movie", None, false));
@@ -302,6 +417,77 @@ mod tests {
         assert_eq!(histogram.at_least(100), 4, "200 x3 and 20,000");
         assert_eq!(histogram.at_least(10_000), 1);
         assert_eq!(histogram.at_least(1_000_000), 0);
+    }
+
+    #[test]
+    fn the_index_keeps_everything_and_the_core_does_not() {
+        // The author's ruling: A for the index, C for enrichment.
+        let scope = CatalogueScope::DEFAULT;
+
+        // An obscure 1913 short with two votes: in the catalogue, not enriched.
+        assert!(scope.in_index("short", Some(2), false));
+        assert!(!scope.in_core("short", Some(2), false, Some(1913)));
+
+        // A well-known film: both.
+        assert!(scope.in_index("movie", Some(400_000), false));
+        assert!(scope.in_core("movie", Some(400_000), false, Some(1954)));
+
+        // Never seen by anyone, no year: indexed, not enriched.
+        assert!(scope.in_index("video", None, false));
+        assert!(!scope.in_core("video", None, false, None));
+    }
+
+    #[test]
+    fn a_new_release_with_no_votes_is_still_enriched() {
+        // The reason the plain ">= 10 votes" option was rejected: a film released
+        // last week has no votes, and that is exactly when it must be findable AND
+        // have its cast.
+        let scope = CatalogueScope::DEFAULT;
+        let this_year = current_year();
+
+        assert!(scope.in_core("movie", None, false, Some(this_year)));
+        assert!(scope.in_core("movie", None, false, Some(this_year - 1)));
+        assert!(
+            !scope.in_core("movie", None, false, Some(this_year - 20)),
+            "the rescue is for new releases, not for the whole unrated long tail"
+        );
+    }
+
+    #[test]
+    fn adult_titles_are_excluded_from_the_index_entirely() {
+        let scope = CatalogueScope::DEFAULT;
+        assert!(!scope.in_index("movie", Some(100_000), true));
+        assert!(!scope.in_core("movie", Some(100_000), true, Some(2020)));
+    }
+
+    #[test]
+    fn the_core_is_always_a_subset_of_the_index() {
+        // If this ever fails, something would be enriched that is not in the
+        // catalogue at all — a foreign key waiting to happen.
+        let scope = CatalogueScope::DEFAULT;
+        let year = current_year();
+        for title_type in ["movie", "short", "tvSeries", "videoGame"] {
+            for votes in [None, Some(0), Some(9), Some(10), Some(1_000_000)] {
+                for adult in [false, true] {
+                    for y in [None, Some(1913), Some(year)] {
+                        if scope.in_core(title_type, votes, adult, y) {
+                            assert!(
+                                scope.in_index(title_type, votes, adult),
+                                "core but not indexed: {title_type} {votes:?} adult={adult} year={y:?}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_recent_window_moves_with_the_clock() {
+        // A baked-in year would stop rescuing new releases a year after shipping,
+        // silently.
+        assert!(current_year() >= 2026, "the clock is readable");
+        assert!(current_year() < 2100, "and not obviously wrong");
     }
 
     #[test]

@@ -45,7 +45,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.2, second half: with the R4 threshold decided, write the title.basics loader as steps on the runner in tools/ingest/src/job.rs, inserting through MediaRepository. Download, gzip verification, the streaming TSV reader and the measurement pass are done - see docs/eval-results.md for the measured catalogue shape. R4 is NOT cleared: only title.basics was measured, and title.principals has ~90M rows.
+Phase 4 subtask 4.2, second half: write the title.basics loader as steps on the runner in tools/ingest/src/job.rs, inserting through MediaRepository, tagging each title with its tier from CatalogueScope::DEFAULT in tools/ingest/src/imdb.rs. Needs migration 0006 adding an in_core column to media_items so Phase 5 knows which titles have embeddings. R4 is measured and answered - see docs/eval-results.md - but headroom is thin at 3.11 GB of a 4 GB trigger.
 
 ---
 
