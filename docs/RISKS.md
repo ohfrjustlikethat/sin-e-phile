@@ -21,7 +21,7 @@ fallback taken — the ADR records what happened).
 | **Likelihood** | Medium |
 | **Impact** | **Severe** — Phase 8 and everything downstream |
 | **Owner** | Phase 1 (Spike A), Phase 8 |
-| **Status** | `open` |
+| **Status** | **`retired`** — resolved by ADR-0021, see below |
 
 Rendering a native video surface with a webview UI drawn over it is the fiddliest
 integration in this project. Everything from Phase 8 onward assumes it works.
@@ -39,6 +39,145 @@ cannot draw HTML UI over the video without flicker or z-order failure.
 2. libVLC, which has friendlier bindings.
 3. HTML5 `<video>` with FFmpeg remuxing, accepting the codec limitations.
 
+### Spike A findings — 2026-08-31, dev machine (Tier 2)
+
+**Status: `spiked`, partially answered, escalated under §10.9 as blocker B2.**
+
+libmpv `20260830-git-e8673660ab`, Tauri 2.11.5, WebView2 151.0.4129.107.
+
+**What works — and it is most of the risk:**
+
+| Question | Answer |
+|---|---|
+| Does libmpv drive from Rust on Windows? | **Yes.** Loaded dynamically with `libloading`; ~10 FFI declarations, no bindgen, no pkg-config, **and no MSVC import library** — the MinGW `libmpv.dll.a` never has to be converted. |
+| Hardware decode? | **Yes — d3d11va**, selected automatically, VO `gpu-next` `d3d11[nv12]`. |
+| Render into a child HWND via `wid`? | **Yes.** First frame 970–1023 ms in a bare Win32 host, 1019–1192 ms inside a Tauri window. |
+| Survive a mid-playback parent resize? | **Yes.** `time-pos` advanced through it; surface not torn down. |
+| Does it work inside a *Tauri* window? | **Yes.** The Tauri top-level HWND accepts a sibling child alongside the `Chrome_WidgetWin_*` webview host. |
+
+**What does not work — and it is the part R1 is actually about:**
+
+**HTML UI cannot be composited *over* the video using child-window z-order.**
+Three genuinely distinct attempts:
+
+1. **Tauri `transparent(true)`, video child at `HWND_BOTTOM`.** Video never
+   appeared. The webview painted opaque over it.
+2. **Plus `ICoreWebView2Controller2::put_DefaultBackgroundColor` = `A=0`.** The call
+   succeeded (verified, not assumed). Video still never appeared. **A transparent
+   webview composites against what is behind the *window*, not against sibling
+   child HWNDs** — which is the root cause, and it is a Windows compositing
+   property, not a Tauri bug.
+3. **Inverted: video child at `HWND_TOP`, inset 120 px.** Video renders correctly
+   and **covers** the HTML wherever they overlap. HTML renders fine outside the
+   video rect.
+
+**Conclusion.** The child-window approach gives **UI *beside* video, never UI *over*
+video.** That is insufficient for `SPEC.md` §4, which requires custom player chrome
+drawn over the video with auto-hide, and for Phase 11's pause overlay, which is the
+project's signature screen.
+
+**The render-API-into-a-texture approach — the other approach Spike A mandates —
+remains untested.** `render_gl.h` is present in the dev build. Testing it means
+creating a GL or D3D11 context, an `mpv_render_context`, and a present path, which is
+materially more work than the three attempts above.
+
+Escalated per §10.9 rather than continuing: see blocker **B2** in
+`PROJECT_STATE.json` for the costed options.
+
+### RESOLVED — 2026-08-31, ADR-0021
+
+**R1 is closed.** libmpv embeds in a Tauri v2 window, hardware-decodes (d3d11va), and
+the compositing problem is solved by two mechanisms, one per surface:
+
+- **Paused:** still-frame substitution — 161/95/140 ms, within §11's 200 ms budget.
+- **Playing:** region cutouts via `SetWindowRgn` — no flicker across 12 toggles,
+  median 0.467 ms, hit-testing pixel-exact.
+
+**No patched or forked dependency is required.** Stock Tauri, stock wry.
+
+Cost: `SPEC.md` §9.3's gradient scrim and blur-behind under playback chrome are
+removed (ADR-0020), amended deliberately. wry PR #1762 (DirectComposition) is
+retained as an upgrade path, not a dependency.
+
+### Prior-art survey — 2026-08-31 (B2 step ②)
+
+**The core finding is independently confirmed by a shipped project.** `ventic/ventic`
+(126★, Nuxt + Tauri + embedded mpv, streams torrents, and — notably — ships with no
+sources, the same posture as this project) states it plainly in
+`src-tauri/src/player.rs`:
+
+> "The native surface always paints above the webview, so DOM controls can never be
+> composited on top of the video."
+
+So this is not a mistake in our spike. It is the known behaviour, reached
+independently by someone shipping the same architecture.
+
+**A fifth option exists that was not on the original list: region cutouts.**
+ventic's solution is to invert the problem — rather than compositing the UI over the
+video, **cut holes in the video window** where the chrome goes, and let the page
+underneath show through:
+
+> "Shaping gets the same result the other way round: cut the control-bar rectangles
+> *out* of mpv's window and the page underneath shows through the holes — rendering
+> and input both, since a window's input region follows its bounding shape. The video
+> window itself never changes size for the UI, so nothing rescales when a bar
+> appears."
+
+They use the X11 Shape extension. **The Windows equivalent is `SetWindowRgn`**, and
+child windows are clipped to their parent's region — so setting a region on the video
+child we own clips mpv's own render window inside it. Untested here, but cheap to
+test and it builds directly on the configuration that already works (attempt 3).
+
+*Caveat to verify:* the comment references a `player_windows.rs` that **is not
+present in the repository** — only the X11 and macOS backends ship. So the Windows
+half of this is our inference from a working Linux implementation, not an observed
+Windows precedent.
+
+**Its cost is real and specific:** a window region is **binary, not per-pixel alpha**.
+Hard-edged holes only. `SPEC.md` §9.3's gradient scrim under the player chrome, and
+any blur-behind, cannot survive a region cutout — the chrome becomes an opaque panel
+with a hard edge (rounded corners are possible via `CreateRoundRectRgn`; soft edges
+are not).
+
+### DirectComposition: the path exists, but is unmerged
+
+**wry PR [#1762]** — "feat(windows): add DirectComposition (visual) hosting for
+WebView2" — adds exactly the capability option A needs.
+
+| | |
+|---|---|
+| State | **Open, mergeable, `blocked`, and has NO REVIEWS** |
+| Opened / last updated | 2026-07-07 / 2026-07-22 |
+| Author | external contributor, not a Tauri maintainer |
+| Size | 1 commit, 5 files, +740/−26 |
+| Runtime verification | production use in a Windows PDF app, as a **wry 0.55.1 fork**; not run on Windows by the PR's CI |
+
+**Crucially, it would not require forking Tauri.** The PR ships
+`register_composition_visual_target(hwnd, visual)` specifically for this case — in
+its own words, "the piece that lets a Tauri app opt a window into composition hosting
+today **with no `tauri-runtime-wry` changes**". So the integration is a
+`[patch.crates-io]` override of **wry alone**, pinned to a commit — a dependency
+override, not a fork we author or maintain.
+
+**But the ongoing burden is real:** the branch lives in a contributor's fork, is
+unreviewed after ~6 weeks, and the adjacent request #391 (offscreen rendering) has
+been open **since 2021** — so wry has historically not prioritised this area. Pinning
+to an unmerged branch means owning the rebase whenever Tauri's wry requirement moves.
+Under R8's pin-and-do-not-upgrade policy that is bounded, but it is not zero, and it
+lands on a beginner.
+
+Known gaps the PR itself flags: OLE drag-drop untested in composition mode, touch/pen
+best-effort, and JS `window.close()` destroys the host window.
+
+### Existing mpv-in-Tauri plugins
+
+`nini22P/tauri-plugin-libmpv` (21★) and `tauri-plugin-mpv` (29★) exist and work by
+passing the **Tauri top-level HWND** as `wid`, so mpv creates its own child inside it,
+with `"transparent": true` and a transparent CSS background. That is a different
+configuration from the one tested in attempts 1–3 (where we created the child
+ourselves), and it is worth one cheap test — though ventic's finding suggests the
+outcome is the same, since the native surface still ends up above the webview.
+
 ---
 
 ## R2 — librqbit's streaming control is insufficient for the Phase 7 scheduler
@@ -48,7 +187,31 @@ cannot draw HTML UI over the video without flicker or z-order failure.
 | **Likelihood** | Medium |
 | **Impact** | **Severe** — the "8 seconds to first frame" promise |
 | **Owner** | Phase 1 (Spike B), Phase 7 |
-| **Status** | `open` |
+| **Status** | **`retired`** — Spike B, 2026-08-31 |
+
+### RESOLVED — Spike B
+
+**Neither trigger fired.** Time to first usable bytes **1.0 / 2.9 / 3.1 s** across
+three runs against a legal well-seeded Linux ISO (trigger: > 20 s). Seek
+re-prioritisation **0.6 / 0.8 / 2.4 s** (Phase 7 exit criterion: < 5 s). End-to-end
+time to playable bytes 3.3–5.3 s, inside §2.3's 8 s budget, untuned.
+
+**The API question — which was the real gate — is answered better than expected.**
+`ManagedTorrent::stream(file_id)` is public and yields an `AsyncRead + AsyncSeek`
+stream; each open stream maintains a 32 MiB lookahead window from its read position,
+and the piece picker consumes those as `priority_pieces` ahead of its normal queue.
+Seeking moves the window immediately. **Much of the Phase 7 deadline scheduler
+already exists**, so that phase shifts toward driving, tuning and instrumenting
+librqbit's rather than building one.
+
+Two limitations, neither trigger-worthy: the 32 MiB lookahead is a compile-time
+constant, and there is no public API for arbitrary per-piece priority (control is
+indirect, via stream position).
+
+**Separate finding that changes a Phase 6 assumption: librqbit has no webseed
+(BEP-19) support.** Internet Archive torrents depend on webseeds, so the
+`InternetArchiveBackend` should resolve to **direct HTTP**, not torrents. Numbers in
+`docs/eval-results.md`.
 
 **Mitigation.** Spike B measures real numbers against a legal, well-seeded torrent
 and audits whether the API exposes enough control to build a deadline scheduler.
@@ -72,7 +235,21 @@ roughly a week, but it is the proven path that every serious client uses.
 | **Likelihood** | Low–Medium |
 | **Impact** | **Moderate/Severe** — raised from Moderate by ADR-0015 |
 | **Owner** | Phase 1 (Spike C), Phase 5 |
-| **Status** | `open` |
+| **Status** | **`retired`** — Spike C, 2026-08-31 |
+
+### RESOLVED — Spike C
+
+**No trigger fired.** `ort` builds and runs on Windows with no toolchain beyond what
+`docs/SETUP.md` already requires. Query-embedding **p95 = 1.63 ms** at true query
+length, **8.13 ms** padded to 128 tokens — against a 30 ms trigger, so roughly 18×
+headroom in the realistic case. Model load 82 ms; resident **+51.6 MB**, comfortably
+inside the 250 MB Tier 0 idle budget. 384-dimensional output as ADR-0014 assumed.
+
+**Caveat, recorded rather than glossed:** these are **Tier 2** numbers. ADR-0015 also
+asked for a constrained VM approximating Tier 0, which has not been run — logged as
+**P8**. Taking the padded worst case with a 3–4× Tier 0 penalty lands at 24–33 ms,
+which is close enough to the trigger that the Tier 0 measurement should exist before
+Phase 21 signs off the search budget.
 
 **Impact was raised during the Phase 0 audit.** ADR-0015 established that query
 embedding runs on *all* tiers, so an unusable `ort` breaks semantic search

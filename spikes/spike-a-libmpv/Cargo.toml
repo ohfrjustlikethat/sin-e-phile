@@ -1,0 +1,27 @@
+[package]
+name = "spike-a-libmpv"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# SPIKE. Throwaway code (SPEC.md Phase 1, risk R1). Not the Phase 8 design.
+
+[dependencies]
+libloading = "0.8"
+
+[dependencies.windows]
+version = "0.58"
+features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_LibraryLoader",
+]
+
+[[bin]]
+name = "step1-own-window"
+path = "src/bin/step1_own_window.rs"
+
+[[bin]]
+name = "step2-child-hwnd"
+path = "src/bin/step2_child_hwnd.rs"

@@ -1,0 +1,71 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+/* Tailwind v4 is CSS-first: the theme is declared here rather than in a JS
+   config, and every value points at the tokens above so there is exactly one
+   definition of each colour. */
+@theme inline {
+  --color-void: var(--void);
+  --color-base: var(--base);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-overlay: var(--overlay);
+
+  --color-line-subtle: var(--line-subtle);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+
+  --color-oxblood: var(--oxblood);
+  --color-oxblood-hover: var(--oxblood-hover);
+  --color-oxblood-bright: var(--oxblood-bright);
+  --color-oxblood-deep: var(--oxblood-deep);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--base);
+  color: var(--ink);
+  font-family: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  /* §9.2: tabular numerals for runtimes and dates. */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden; /* the app manages its own scroll regions */
+}
+
+/* §9.4: every interactive element gets a visible focus ring. Full keyboard
+   navigation is a Phase 2 requirement, not a Phase 27 retrofit — so the ring is
+   defined globally from Phase 1 rather than added later. */
+:focus-visible {
+  outline: 2px solid var(--oxblood-bright);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+::selection {
+  background: var(--oxblood-wash);
+}
+
+/* The app is a desktop window, not a web page. */
+* {
+  user-select: none;
+}
+input,
+textarea,
+[contenteditable] {
+  user-select: text;
+}

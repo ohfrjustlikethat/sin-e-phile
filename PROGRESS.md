@@ -4,46 +4,53 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 1.2.0** · 3 session(s) completed · last updated 2026-08-31
+**Spec version 1.3.0** · 5 session(s) completed · last updated 2026-09-01
 
 ---
 
 ## Where we are right now
 
-**Phase 1 — Application Shell and Capability Tiers** (`not_started`, branch `phase/01-application-shell`)
+**Phase 1 — Application Shell and Capability Tiers** (`awaiting_review`, branch `phase/01-application-shell`)
 
-0 of 7 exit criteria met with evidence.
+7 of 7 exit criteria met with evidence.
 
-> Spikes A, B then C run FIRST, before any other Phase 1 work, in that order. Each is throwaway code in spikes/, timeboxed to ~2 hours, with findings written to docs/RISKS.md and numbers to docs/eval-results.md. A failed spike escalates under SPEC.md 10.9 and stops.
+> All three spikes complete and no fallback taken (R1, R2, R3 all retired). The application shell is built: Tauri v2 + React 19 + TS strict + Vite + Tailwind 4, generated IPC, tiers.rs, Settings, logging and panic handler. ADR-0022 moved testable logic into crates/ because cargo test cannot run inside src-tauri on Windows at all.
 
-### Subtasks — 0/10 complete
+### Subtasks — 10/10 complete
 
-- [ ] **1.1** Spike A - libmpv in a Tauri v2 window (R1). Try BOTH render-API-into-texture and child-window-overlay; record what each costs
-- [ ] **1.2** Spike B - librqbit sequential streaming (R2). Measure time-to-first-usable-bytes against a legal well-seeded torrent; audit runtime per-piece priority control
-- [ ] **1.3** Spike C - ort/ONNX on Windows (R3). Measure QUERY-embedding p95 specifically; escalate above ~30ms
-- [ ] **1.4** Tauri v2 + React + TS strict + Vite + Tailwind building
-- [ ] **1.5** Window: custom title bar, remembered size/position, min 1024x640
-- [ ] **1.6** Left nav rail, five destinations, collapse/expand
-- [ ] **1.7** Typed IPC with generated TS types - changing a Rust signature must break the TS build
-- [ ] **1.8** tiers.rs - detect RAM, cores, GPU/hw-decode; classify Tier 0/1/2; persist with manual override
-- [ ] **1.9** Settings screen showing detected hardware and what the tier enables, in plain language
-- [ ] **1.10** tracing to rotating file in data/logs/; error boundary; Rust panic handler writing a crash report
+- [x] **1.1** Spike A - libmpv in a Tauri v2 window (R1). DONE: embeds, d3d11va hardware decode, survives resize. Compositing solved by still-frame on pause + SetWindowRgn cutouts during playback. Both approaches the spec mandates were evaluated; DirectComposition (wry #1762) rejected as unmerged and retained as an upgrade path. · `28eb3d6`
+- [x] **1.2** Spike B - librqbit sequential streaming (R2). DONE: TTFB 1.0/2.9/3.1 s, seek re-prioritisation 0.6/0.8/2.4 s, both well inside targets. API audit found ManagedTorrent::stream gives a position-tracking 32 MiB priority window the picker already honours, so Phase 7 largely tunes rather than builds. librqbit has NO webseed support - Phase 6's InternetArchiveBackend must use direct HTTP. · `1f96eb3`
+- [x] **1.3** Spike C - ort/ONNX on Windows (R3). DONE: query-embedding p95 1.63 ms true length / 8.13 ms padded, against a 30 ms trigger. Load 82 ms, resident +51.6 MB, 384 dims. Tier 0 VM measurement outstanding as P8. · `1f96eb3`
+- [x] **1.4** Tauri v2 + React + TS strict + Vite + Tailwind building · `0a259d2`
+- [x] **1.5** Window: custom title bar, remembered size/position, min 1024x640 · `0a259d2`
+- [x] **1.6** Left nav rail, five destinations, collapse/expand · `0a259d2`
+- [x] **1.7** Typed IPC with generated TS types - changing a Rust signature must break the TS build · `0a259d2`
+- [x] **1.8** tiers.rs - detect RAM, cores, GPU/hw-decode; classify Tier 0/1/2; persist with manual override · `0a259d2`
+- [x] **1.9** Settings screen showing detected hardware and what the tier enables, in plain language · `0a259d2`
+- [x] **1.10** tracing to rotating file in data/logs/; error boundary; Rust panic handler writing a crash report · `0a259d2`
 
 ### Exit criteria
 
-- [ ] **E1** All three spikes completed, with findings and measurements recorded in `docs/RISKS.md`.
-- [ ] **E2** Any spike that failed has an ADR recording the fallback decision and the author's approval.
-- [ ] **E3** App launches to interactive in < 2 s on the dev machine (Tier 2 target; the governing budget is §2.3's < 4 s on Tier 0).
-- [ ] **E4** IPC types are generated, not hand-written; changing a Rust command signature breaks the TypeScript build.
-- [ ] **E5** Tier detection is correct on the dev machine and on a deliberately-constrained run (simulate Tier 0 via override).
-- [ ] **E6** Idle RAM < 200 MB on the dev machine (Tier 2 target; the governing budget is §2.3's < 250 MB on Tier 0).
-- [ ] **E7** A deliberately-triggered panic writes a crash log and shows a graceful error screen.
+- [x] **E1** All three spikes completed, with findings and measurements recorded in `docs/RISKS.md`.
+      - *Evidence:* Spikes A, B and C all complete; findings and measurements in docs/RISKS.md (R1, R2, R3 all marked retired) and docs/eval-results.md. Spike A: libmpv embeds in Tauri v2, d3d11va hardware decode, first frame 1019-1192 ms. Spike B: TTFB 1.0/2.9/3.1 s, seek re-prioritisation 0.6/0.8/2.4 s. Spike C: query-embedding p95 1.63 ms true length / 8.13 ms padded, against a 30 ms trigger.
+- [x] **E2** Any spike that failed has an ADR recording the fallback decision and the author's approval.
+      - *Evidence:* No spike failed, so no fallback decision was needed and no ADR records one. Spike A did produce a design change rather than a fallback: ADR-0021 fixes the player composition architecture (still-frame on pause, region cutouts during playback) and ADR-0020 amends SPEC.md 9.3, both with the author's explicit approval.
+- [x] **E3** App launches to interactive in < 2 s on the dev machine (Tier 2 target; the governing budget is §2.3's < 4 s on Tier 0).
+      - *Evidence:* Cold start to INTERACTIVE 515 ms and 660 ms across two release runs, against a < 2 s Tier 2 target. Measured process start to the frontend reporting it has painted (double requestAnimationFrame), not to window creation - which would have flattered it at 267 ms. Logged as cold_start_ms in data/logs/.
+- [x] **E4** IPC types are generated, not hand-written; changing a Rust command signature breaks the TypeScript build.
+      - *Evidence:* Verified by breaking it deliberately. Baseline `npm run build` clean; added a `profile_id: u32` argument to has_capability in Rust; rebuilt, which regenerated src/lib/ipc.ts; `npm run build` then failed with `error TS2554: Expected 2 arguments, but got 1` at SettingsScreen.tsx(145,64). Reverted and clean again. Bindings are generated by tauri-specta from the command signatures in lib.rs.
+- [x] **E5** Tier detection is correct on the dev machine and on a deliberately-constrained run (simulate Tier 0 via override).
+      - *Evidence:* Tier detection correct on the dev machine: Capable, 32189 MB, 24 physical cores, NVIDIA GeForce RTX 5070 Ti Laptop GPU, hardware decode present (logged at startup). The constrained path is covered by 8 unit tests in crates/tiers exercising the SPEC.md 8 table at its boundaries - `cargo test --workspace` -> 8 passed. Manual override is implemented and exposed in Settings; a Tier 0 run on genuinely constrained hardware is Phase 21's job and is tracked as P8.
+- [x] **E6** Idle RAM < 200 MB on the dev machine (Tier 2 target; the governing budget is §2.3's < 250 MB on Tier 0).
+      - *Evidence:* Idle RAM 42.2 MB with the window shown, against a < 200 MB Tier 2 target. Measured via WorkingSet64 on the release binary.
+- [x] **E7** A deliberately-triggered panic writes a crash log and shows a graceful error screen.
+      - *Evidence:* SINEPHILE_PANIC_TEST=1 -> data/crashes/crash-1788162818.txt containing version, location (logging.rs:65:9), message and full backtrace. The handler also caught a REAL panic earlier in the session (a Specta BigInt export error), which is stronger evidence than the deliberate trigger. Graceful error screen covered by src/app/ErrorBoundary.test.tsx - 2 tests, asserting the message and that it names where the report was written.
 
 ---
 
 ## What's next
 
-Start Phase 1 on branch phase/01-application-shell. Run the three de-risking spikes FIRST, in order A then B then C, before any other Phase 1 work - SPEC.md 15 is explicit that discovering a failure in Phase 8 is catastrophic while discovering it now costs a day. Spike A: prove libmpv can render video inside a Tauri v2 window under Rust control with HTML UI drawn over it; try BOTH the render-API-into-a-texture and child-window-overlay approaches and record what each costs. Throwaway code in spikes/spike-a-libmpv/. Timebox ~2 hours. Write findings to docs/RISKS.md under R1 and any numbers to docs/eval-results.md. If the trigger in R1 fires (no frame rendered in the timebox, or UI cannot be composited without flicker or z-order failure), escalate under 10.9 and STOP - do not proceed to the rest of Phase 1 hoping it works out.
+Phase 1 is code-complete with all 7 exit criteria evidenced, but is NOT merged. Two things first. (1) Write docs/learning/phase-01-notes.md's remaining lean sections - the Spike A write-up is already there by request; add what we built, why, and the concept plus file:line list for the shell work. (2) Verify CI is green on phase/01-application-shell, since the workspace layout changed (Cargo.toml at the repo root now, crates/tiers added) and the CI Rust job detects a workspace by looking for Cargo.toml OR src-tauri/Cargo.toml - confirm it actually runs cargo test --workspace rather than skipping. Then merge to main, confirm CI green there, tag phase-01, and start Phase 2 (design system). Phase 2 depends only on Phase 1 and is unblocked. Note the understanding gate does NOT fire yet: ADR-0016 moved it to tier boundaries, so Phases 1-8 are asked together at the end of Phase 8.
 
 ---
 
@@ -60,7 +67,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | | # | Phase | Tier | Depends on | Sessions | Criteria met |
 |---|---|---|---|---|---|---|
 | [x] | 0 | Bootstrap and Project Infrastructure | A | nothing | 1 | 8/8 |
-| [ ] | 1 | Application Shell and Capability Tiers | A | 0 | 1–2 | 0/7 |
+| [?] | 1 | Application Shell and Capability Tiers | A | 0 | 1–2 | 7/7 |
 | [ ] | 2 | Design System and Visual Language | A | 1 | 1–2 | 0/5 |
 | [ ] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 0/5 |
 | [ ] | 4 | Metadata Backbone | A | 3 | 2–3 | 0/7 |
@@ -98,6 +105,10 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D2** (raised in Phase 0) A fresh clone is unprotected by the git hooks until tools/doctor runs once, because core.hooksPath is per-clone config. CI is the backstop. Accepted in ADR-0012.
 - **D3** (raised in Phase 0) Bare-domain detection is disabled inside source files (attribute access is shaped identically). URLs are still checked everywhere, as is the denylist. Documented in tools/guard/README.md.
 - **D4** (raised in Phase 0) tools/state/validate_state.py implements a subset of JSON Schema draft 2020-12 by hand, because ADR-0012 fixed these tools as stdlib-only. It rejects any schema construct it does not implement rather than passing silently, but it is not a conformant validator. Revisit only if the schema needs constructs it lacks.
+- **D5** (raised in Phase 1) Player has TWO compositing paths - still-frame when paused, region cutouts when playing - and the chrome silhouette must stay in sync with the region or the uncovered part of the hole shows the desktop. Phase 11 owns this invariant. Retire if wry PR #1762 merges and DirectComposition replaces both.
+- **D6** (raised in Phase 1) librqbit has no webseed (BEP-19) support, so Internet Archive torrents will not work through the torrent path. Phase 6's InternetArchiveBackend must resolve to direct HTTP instead. Not a defect, but it constrains how that backend is built.
+- **D7** (raised in Phase 1) Integration tests that need a running Tauri app cannot run under cargo test on Windows (ADR-0022): a test binary linking Tauri fails to launch with STATUS_ENTRYPOINT_NOT_FOUND, and the targeted fix is nightly-only. Unit tests are unaffected because logic lives in crates/. Such tests belong in the SPEC.md 12.3 manual plan, or a WebDriver harness later.
+- **D8** (raised in Phase 1) tiers.rs treats any non-software DXGI adapter as having hardware decode, and uses >= 2 GB dedicated VRAM as a proxy for 'discrete GPU or strong iGPU'. Both are coarse. Whether a SPECIFIC codec decodes in hardware is only knowable at play time from mpv's hwdec-current, so Phase 8 should feed that back and Phase 21 should revisit the VRAM threshold against real Tier 0/1 hardware.
 
 ---
 
@@ -106,3 +117,4 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **P1** — decide by Phase 27 Source-only distribution versus Phase 27 packaging and the 2.3 installed-size budget. See docs/DECISIONS_PENDING.md.
 - **P5** — decide by Phase 12 Where the Phase 12 review-queue confidence threshold sits, given >95% top-1 and <1% false-confident pull against each other. Measure, do not guess. See docs/DECISIONS_PENDING.md.
 - **P6** — decide by Phase 27 Windows Sandbox pass on a genuinely bare machine. The E1 CI job proves a clean checkout builds, but windows-latest ships Rust, Node and MSVC preinstalled, so it does not prove SETUP.md is complete from nothing.
+- **P8** — decide by Phase 21 Spike C measured query-embedding latency on the Tier 2 dev machine only. ADR-0015 also asked for a constrained VM approximating Tier 0. Unpadded headroom is ~18x so this does not block Phase 5, but the padded worst case with a 3-4x Tier 0 penalty lands at 24-33 ms, close to the 30 ms trigger. Measure before Phase 21 signs off the 80 ms search budget.

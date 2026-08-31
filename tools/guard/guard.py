@@ -155,8 +155,22 @@ INFRASTRUCTURE_DOMAINS = frozenset(
         "json-schema.org", "semver.org", "conventionalcommits.org", "keepachangelog.com",
         "rustup.rs", "git-scm.com", "visualstudio.microsoft.com", "gitleaks.io",
         "adr.github.io", "pola.rs", "serde.rs",
+        # Package registries and funding links that appear in generated lockfiles.
+        # Lockfiles are committed deliberately (R8), so these must be permitted —
+        # but as INFRASTRUCTURE, not on the allowlist, which ADR-0010 scopes to
+        # content and metadata sources.
+        "npmjs.org", "eslint.org", "opencollective.com", "tidelift.com",
     }
 )
+
+# The application's own reverse-DNS bundle identifier. Domain-shaped by
+# convention (Tauri, Windows and macOS all require this form), but it is not a
+# host anything connects to — it is this project's name for itself.
+#
+# Deliberately NOT in the allowlist (ADR-0010 scopes that to content and metadata
+# SOURCES) and not in INFRASTRUCTURE_DOMAINS (it is not third-party tooling).
+# A separate one-entry set keeps both of those honest, and keeps this visible.
+SELF_IDENTIFIERS = frozenset({"dev.sinephile.app"})
 
 # Domains are found two ways, because a path segment like `/manifest.json` and a
 # filename like `Movie.2019.x264-GROUP.mkv` otherwise look exactly like domains.
@@ -170,6 +184,10 @@ URL_RE = re.compile(
     r"((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24})",
     re.IGNORECASE,
 )
+
+# `[profile.dev]`, `[tool.poetry.group.dev.dependencies]` — a section header, not
+# a host. Anchored to the whole line so it cannot swallow anything else.
+TOML_TABLE_RE = re.compile(r"^\s*\[\[?[A-Za-z0-9_.\-]+\]\]?\s*(#.*)?$")
 
 BARE_DOMAIN_RE = re.compile(
     r"(?<![/\w.@-])((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24})(?![\w-])",
@@ -295,6 +313,10 @@ def extract_domains(line: str, urls_only: bool = False) -> list[str]:
     found: list[str] = [m.group(1) for m in URL_RE.finditer(line)]
     if urls_only:
         return found
+    # A TOML table header is not a domain. `[profile.dev]` and `[tool.x.dev]`
+    # match the shape exactly, and config files are scanned for bare domains.
+    if TOML_TABLE_RE.match(line):
+        return found
     for match in BARE_DOMAIN_RE.finditer(line):
         candidate = match.group(1)
         if candidate.rsplit(".", 1)[-1].lower() in KNOWN_TLDS:
@@ -309,6 +331,8 @@ def domain_is_permitted(domain: str, allowlist: set[str]) -> bool:
     `archive.org` also allows `ia801234.us.archive.org`.
     """
     d = domain.lower().removeprefix("www.")
+    if d in SELF_IDENTIFIERS:
+        return True
     if d in RESERVED_EXACT or d.endswith(RESERVED_SUFFIXES):
         return True
     for known in (INFRASTRUCTURE_DOMAINS | allowlist):

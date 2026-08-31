@@ -1,0 +1,55 @@
+﻿[package]
+name = "sin-e-phile"
+version = "0.1.0"
+description = "A Windows desktop media engine. Ships no content sources."
+authors = ["Jonathan Majors"]
+license = "GPL-3.0-only"
+edition = "2021"
+rust-version = "1.82"
+
+[lib]
+name = "sin_e_phile_lib"
+# No test harness for this crate, deliberately (ADR-0022).
+#
+# A test binary that links Tauri pulls in tao's comctl32 v6 imports but gets no
+# side-by-side manifest from `cargo test`, so it cannot launch at all — it dies
+# with STATUS_ENTRYPOINT_NOT_FOUND before running a single test. The fix that
+# would target only test binaries, `cargo::rustc-link-arg-tests`, is nightly-only.
+#
+# So this crate stays what SPEC.md §7 already says it should be: a thin IPC and
+# wiring layer with no logic worth testing. Everything testable lives in
+# `crates/`, where it can be tested properly.
+test = false
+# Desktop only (SPEC.md 2.4). The staticlib/cdylib types exist for Tauri mobile,`n# which this project explicitly does not target, and they break `cargo test` with`n# STATUS_ENTRYPOINT_NOT_FOUND on Windows.`ncrate-type = ["rlib"]
+
+[[bin]]
+name = "sin-e-phile"
+path = "src/main.rs"
+test = false
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+# Pinned. SPEC.md standing rule 15: never upgraded mid-phase for its own sake.
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-window-state = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+specta = "=2.0.0-rc.25"
+specta-typescript = "=0.0.12"
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
+sinephile-tiers = { path = "../crates/tiers" }
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
+tracing-appender = "0.2"
+time = { version = "0.3", features = ["formatting", "macros"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common"] }
+
+[features]
+# Tauri's own default feature set is opted into explicitly rather than inherited.
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

@@ -106,9 +106,14 @@ def run_selftest() -> int:
     # every domain in it must be reserved, infrastructure, allowlisted, or a
     # pinned placeholder. This is what stops the full exemption being a hole.
     print("\n  vectors.py contains no real undeclared domains")
+    # Line by line, so the same per-line rules the guard applies (TOML headers,
+    # code-file handling) apply here too. Scanning the whole file as one blob
+    # would silently disagree with the guard.
     vectors_text = (GUARD_DIR / "tests" / "vectors.py").read_text(encoding="utf-8")
     stray = {
-        d for d in extract_domains(vectors_text)
+        d
+        for line in vectors_text.splitlines()
+        for d in extract_domains(line)
         if not domain_is_permitted(d, allow) and d.lower() not in PINNED_PLACEHOLDERS
     }
     if not stray:

@@ -1,0 +1,26 @@
+﻿[package]
+name = "sinephile-tiers"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "Hardware capability tier detection and gating (SPEC.md 8)."
+
+# Deliberately does NOT depend on tauri.
+#
+# Test binaries that link tauri pull in tao's comctl32 v6 imports, and a `cargo
+# test` binary gets no side-by-side manifest, so it fails to launch at all with
+# STATUS_ENTRYPOINT_NOT_FOUND. `cargo::rustc-link-arg-tests` would fix that but
+# is nightly-only. Keeping pure logic in tauri-free crates is the portable
+# answer, and it is what SPEC.md 7's `crates/` directory is for. See ADR-0022.
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+specta = { version = "=2.0.0-rc.25", features = ["derive"] }
+
+[target.'cfg(windows)'.dependencies]
+sysinfo = "0.33"
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common"] }
+
+[target.'cfg(not(windows))'.dependencies]
+sysinfo = "0.33"

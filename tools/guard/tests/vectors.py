@@ -39,7 +39,10 @@ DENYLIST_VECTORS: list[str] = [
 # to fire on. Not real sites, deliberately boring, and pinned so the set cannot
 # grow without an explicit edit. selftest.py imports these to audit this file:
 # every domain here must be reserved, infrastructure, allowlisted, or listed below.
-PINNED_PLACEHOLDERS: frozenset[str] = frozenset({"some-metadata-site.io"})
+PINNED_PLACEHOLDERS: frozenset[str] = frozenset({
+    "some-metadata-site.io",  # undeclared-domain vector
+    "profile.dev",            # TOML table header vector - a section name, not a host
+})
 
 # ── Vectors that MUST be caught. (label, content, expected rule) ──────────────
 
@@ -132,4 +135,10 @@ SHOULD_PASS: list[tuple[str, str]] = [
     # allowlist to content and metadata sources only).
     ("LICENSE header", "Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>"),
     ("Apache-2.0 licence body", "    http://www.apache.org/licenses/LICENSE-2.0"),
+    ("TOML table header", "[profile.dev]"),
+    ("nested TOML table header", "[tool.poetry.group.dev.dependencies]"),
+    # Lockfiles are committed (R8) and are full of registry and funding URLs.
+    ("npm lockfile resolved URL", '"resolved": "https://registry.npmjs.org/react/-/react-19.2.8.tgz"'),
+    ("funding URL in package metadata", '"url": "https://opencollective.com/eslint"'),
+    ("the app's own bundle identifier", '"identifier": "dev.sinephile.app",'),
 ]

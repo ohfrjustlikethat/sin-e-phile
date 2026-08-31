@@ -1,0 +1,13 @@
+[package]
+name = "spike-b-librqbit"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# SPIKE. Throwaway (SPEC.md Phase 1, risk R2). Not the Phase 7 design.
+
+[dependencies]
+librqbit = "9"
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
