@@ -37,6 +37,7 @@ A local catalogue of hundreds of thousands of titles that works offline, enriche
 - [ ] **4.10** The embedding artefact producer (ADR-0014): deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date; published as a GitHub Release asset
 - [ ] **4.11** Hand-checked 50-title anime ID-mapping fixture including long-running shonen, split-cour seasons, and films tied to series
 - [ ] **4.12** Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits
+- [ ] **4.13** Incremental catalogue refresh (ADR-0030): re-fetch title.basics/ratings/episode and insert only the tail past the highest id already stored, reusing TsvReader::seek_past. Plus AniList airing schedules, which need no key. See docs/specs/catalogue-freshness.md.
 
 ## Risks named by this phase
 

@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 1.6.0** · 5 session(s) completed · last updated 2026-08-31
+**Spec version 1.7.0** · 5 session(s) completed · last updated 2026-08-31
 
 ---
 
@@ -16,7 +16,7 @@
 
 > The catalogue. Three constraints carry in: ADR-0013 and ADR-0027 mean the app must be complete and good-looking with NO TMDB key and no key ever ships; ADR-0026 means SQL is runtime-checked, so every new repository method needs a line in crates/persistence/tests/repository_surface.rs; and R4 (ingestion larger or slower than expected) is this phase's named risk — measure before committing to a shape, and scope by a popularity threshold rather than ingesting everything.
 
-### Subtasks — 2/12 complete
+### Subtasks — 2/13 complete
 
 - [x] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts · `4a78d64`
 - [x] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres · `048180a`
@@ -30,6 +30,7 @@
 - [ ] **4.10** The embedding artefact producer (ADR-0014): deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date; published as a GitHub Release asset
 - [ ] **4.11** Hand-checked 50-title anime ID-mapping fixture including long-running shonen, split-cour seasons, and films tied to series
 - [ ] **4.12** Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits
+- [ ] **4.13** Incremental catalogue refresh (ADR-0030): re-fetch title.basics/ratings/episode and insert only the tail past the highest id already stored, reusing TsvReader::seek_past. Plus AniList airing schedules, which need no key. See docs/specs/catalogue-freshness.md.
 
 ### Exit criteria
 
@@ -68,13 +69,13 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [~] | 4 | Metadata Backbone | A | 3 | 2–3 | 0/7 |
 | [ ] | 5 | Semantic Search Engine | A | 4 | 2 | 0/5 |
 | [ ] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 0/6 |
-| [ ] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 0/6 |
+| [ ] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 0/8 |
 | [ ] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 0/6 |
 | [ ] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 0/6 |
 | [ ] | 10 | Subtitle Pipeline | B | 8 | 2 | 0/6 |
 | [ ] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 0/5 |
 | [ ] | 12 | Local Library Engine | B | 4 | 2–3 | 0/6 |
-| [ ] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 0/5 |
+| [ ] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 0/8 |
 | [ ] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 0/6 |
 | [ ] | 15 | Taste Model | B | 5, 14 | 2 | 0/5 |
 | [ ] | 16 | Recommendation Engine | B | 15 | 2–3 | 0/6 |

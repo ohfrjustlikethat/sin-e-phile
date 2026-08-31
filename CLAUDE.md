@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **1.6.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **1.7.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -181,6 +181,9 @@ then build.
 3. Plan before implementing. Wait for approval.
 4. Small commits, conventional messages, always-buildable `main`.
 5. **No content source URLs, indexer names, scrapers, or catalogues. Ever. Anywhere**
+   — and when the qBittorrent backend lands, **it is a transport only**: its search
+   plugins, RSS feeds and tracker lists are never read, which would be this same
+   violation arriving by the back door (ADR-0029).
    — not in code, config, tests, docs, or commit history. See `SPEC.md` §2.1. This is
    not negotiable and there is no convenient exception. `tools/guard` enforces this in
    CI and pre-commit, scanning history as well as the working tree. **Never suppress
@@ -223,7 +226,7 @@ Do not revisit without an ADR explaining what changed.
 | Backend | Rust (stable) |
 | Frontend | React 18+ / TypeScript strict / Vite / Tailwind |
 | State | Zustand (client) + TanStack Query (server) |
-| Torrent | librqbit, in-process |
+| Torrent | librqbit in-process — required, and the **only streaming path**. A user's own qBittorrent optionally as a bulk-download backend, **never bundled** (ADR-0029) |
 | Player | libmpv, embedded, custom UI over it |
 | Database | SQLite via `sqlx`, WAL, portable `./data/` |
 | Text search | SQLite FTS5 (BM25) |
@@ -236,6 +239,12 @@ Do not revisit without an ADR explaining what changed.
 **Explicit non-choices:** no Electron, no bundled qBittorrent, no cloud LLM in the
 critical path, no server component of any kind, no Docker, no cross-platform
 abstractions.
+
+**The catalogue refreshes in layers** (ADR-0030, `docs/specs/catalogue-freshness.md`).
+The IMDb datasets are a snapshot, so: incremental refresh past the highest id already
+stored, AniList airing schedules (no key), **search-triggered backfill** when a miss
+finds a source anyway, and full re-ingest. Backfill is the one that stops an
+out-of-date catalogue being a dead end.
 
 **TMDB is optional, and no key ever ships** (ADR-0013, ADR-0027). The app is fully
 functional on the offline IMDb + MovieLens catalogue with no key. Each user supplies
@@ -320,7 +329,8 @@ src-tauri/src/           Rust application — thin
   persistence/           re-exports of crates/persistence — nothing else
 src/                     React frontend
   design-system/         tokens and primitives
-  features/              home, films, tv, watchlist, live, player, search, settings
+  features/              home, films, tv, watchlist, live, player, search,
+                         downloads, settings
 crates/                  extracted, independently testable crates
   tiers/  persistence/  filename-parser/  subtitle-align/  source-protocol/
 tools/guard/             posture guard + secret scanner

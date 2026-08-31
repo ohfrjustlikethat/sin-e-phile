@@ -1,7 +1,7 @@
 {
-  "spec_version": "1.6.0",
+  "spec_version": "1.7.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-08-31T21:10:37Z",
+  "last_updated": "2026-08-31T21:49:06Z",
   "sessions_completed": 5,
   "current_phase": {
     "number": 4,
@@ -81,6 +81,12 @@
       {
         "id": "4.12",
         "text": "Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits",
+        "status": "not_started",
+        "commit": null
+      },
+      {
+        "id": "4.13",
+        "text": "Incremental catalogue refresh (ADR-0030): re-fetch title.basics/ratings/episode and insert only the tail past the highest id already stored, reusing TsvReader::seek_past. Plus AniList airing schedules, which need no key. See docs/specs/catalogue-freshness.md.",
         "status": "not_started",
         "commit": null
       }
@@ -189,7 +195,6 @@
           "evidence": "docs/RISKS.md covers all ten Appendix D risks plus a new R11 (third-party API terms change), each with owner, likelihood, impact, mitigation and at least one CONCRETE trigger. Examples: R3 fires if Spike C query-embedding p95 exceeds ~30 ms; R7 fires at 30 days without a commit; R10 fires if tools/guard/allowlist.txt gains a line without an ADR. R3's impact was raised to Moderate/Severe by ADR-0015."
         }
       ],
-      "note": "Split into 0a (rails), 0b (documents) and 0c (lean-profile amendments, rulings on the open items, and E1). spec_version 1.2.0 shifts the project to the lean documentation profile of ADR-0016: shipping is the priority, learning is deferred.",
       "subtasks": [
         {
           "id": "0.1",
@@ -293,7 +298,8 @@
           "status": "complete",
           "commit": "cc6a89e"
         }
-      ]
+      ],
+      "note": "Split into 0a (rails), 0b (documents) and 0c (lean-profile amendments, rulings on the open items, and E1). spec_version 1.2.0 shifts the project to the lean documentation profile of ADR-0016: shipping is the priority, learning is deferred."
     },
     {
       "number": 1,
@@ -419,7 +425,38 @@
       "sessions": "1–2",
       "status": "complete",
       "completion_commit": "3c2077f",
-      "note": "Phase 2 builds the visual language BEFORE any product UI. Two constraints carry over from Phase 1: ADR-0020 removed the gradient scrim under player chrome, so the design system must produce a solid opaque panel; and ADR-0013 requires every artwork-bearing surface to have a designed artwork-free state, so PosterCard needs a typographic fallback rather than a grey rectangle.",
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "Every primitive renders correctly in the gallery, in all states.",
+          "met": true,
+          "evidence": "Rendered headless at 1500px across all four gallery tabs with 0 page errors; screenshots in tools/uiaudit/out/. Every primitive shown in loading, disabled, error and empty states; PosterCard shown in both ADR-0013 states side by side."
+        },
+        {
+          "id": "E2",
+          "text": "The entire gallery is navigable by keyboard alone with visible focus at every step.",
+          "met": true,
+          "evidence": "node tools/uiaudit/run.mjs: 45 Tab stops walked, 0 without a visible focus ring, 0 off-screen. Rail exposes exactly 1 tab stop; ArrowRight/End reach card 499 of 500 (roving tabindex)."
+        },
+        {
+          "id": "E3",
+          "text": "Contrast audit passes.",
+          "met": true,
+          "evidence": "python tools/contrast/audit.py -> \"29 enforced pairs pass WCAG AA (3 decorative recorded, not enforced)\"; runs in CI."
+        },
+        {
+          "id": "E4",
+          "text": "A rail of 500 poster cards scrolls at 60 fps with no dropped frames.",
+          "met": true,
+          "evidence": "node tools/uiaudit/run.mjs -> 200 sampled frames flicking 500 cards: median 16.7ms, p95 16.7ms, worst 16.8ms, 0 frames over 33.3ms, 14/500 cards mounted. Harness verified to fail on a reintroduced regression."
+        },
+        {
+          "id": "E5",
+          "text": "`docs/specs/design-system.md` documents every token and component with usage rules.",
+          "met": true,
+          "evidence": "docs/specs/design-system.md - tokens, layout invariants, all 21 components, Rail virtualisation + keyboard contract, motion, measured numbers, and rules for extending it."
+        }
+      ],
       "subtasks": [
         {
           "id": "2.0",
@@ -482,38 +519,7 @@
           "commit": "aebbd7f"
         }
       ],
-      "exit_criteria": [
-        {
-          "id": "E1",
-          "text": "Every primitive renders correctly in the gallery, in all states.",
-          "met": true,
-          "evidence": "Rendered headless at 1500px across all four gallery tabs with 0 page errors; screenshots in tools/uiaudit/out/. Every primitive shown in loading, disabled, error and empty states; PosterCard shown in both ADR-0013 states side by side."
-        },
-        {
-          "id": "E2",
-          "text": "The entire gallery is navigable by keyboard alone with visible focus at every step.",
-          "met": true,
-          "evidence": "node tools/uiaudit/run.mjs: 45 Tab stops walked, 0 without a visible focus ring, 0 off-screen. Rail exposes exactly 1 tab stop; ArrowRight/End reach card 499 of 500 (roving tabindex)."
-        },
-        {
-          "id": "E3",
-          "text": "Contrast audit passes.",
-          "met": true,
-          "evidence": "python tools/contrast/audit.py -> \"29 enforced pairs pass WCAG AA (3 decorative recorded, not enforced)\"; runs in CI."
-        },
-        {
-          "id": "E4",
-          "text": "A rail of 500 poster cards scrolls at 60 fps with no dropped frames.",
-          "met": true,
-          "evidence": "node tools/uiaudit/run.mjs -> 200 sampled frames flicking 500 cards: median 16.7ms, p95 16.7ms, worst 16.8ms, 0 frames over 33.3ms, 14/500 cards mounted. Harness verified to fail on a reintroduced regression."
-        },
-        {
-          "id": "E5",
-          "text": "`docs/specs/design-system.md` documents every token and component with usage rules.",
-          "met": true,
-          "evidence": "docs/specs/design-system.md - tokens, layout invariants, all 21 components, Rail virtualisation + keyboard contract, motion, measured numbers, and rules for extending it."
-        }
-      ]
+      "note": "Phase 2 builds the visual language BEFORE any product UI. Two constraints carry over from Phase 1: ADR-0020 removed the gradient scrim under player chrome, so the design system must produce a solid opaque panel; and ADR-0013 requires every artwork-bearing surface to have a designed artwork-free state, so PosterCard needs a typographic fallback rather than a grey rectangle."
     },
     {
       "number": 3,
@@ -522,7 +528,39 @@
       "depends_on": "1",
       "sessions": "1–2",
       "status": "complete",
-      "note": "The schema everything else depends on, designed once. Two constraints carry over: ADR-0022 puts all SQL in crates/persistence with src-tauri/src/persistence/ as re-exports only (guard-enforced), and SPEC.md 6.2 requires anime's absolute-vs-seasonal numbering and title variants designed NOW rather than patched in Phase 12. media_kind carries all eight values from the start so Phases 24-25 need no migration.",
+      "completion_commit": "65f5147",
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "All migrations run forward and backward cleanly against a populated database.",
+          "met": true,
+          "evidence": "crates/persistence/tests/migrations.rs - 9 tests. `migrations_roll_back_against_a_populated_database` populates a FILE database across all four migrations then rolls back one at a time to 0 and asserts no tables survive; `the_ladder_can_be_climbed_twice` re-applies afterwards, which is what catches a down script that drops a table but forgets its indexes. Command: cargo test -p sinephile-persistence."
+        },
+        {
+          "id": "E2",
+          "text": "Schema documented with an entity-relationship diagram in `docs/ARCHITECTURE.md`.",
+          "met": true,
+          "evidence": "docs/ARCHITECTURE.md - mermaid ER diagram covering all 19 tables plus episode_numbering, with the four design decisions and the load-bearing PRAGMA configuration."
+        },
+        {
+          "id": "E3",
+          "text": "A database populated with 500,000 synthetic media items answers indexed lookups in under 100 ms. (The 100 ms budget is the lookup alone; bulk insertion of the 500,000 rows has no time budget and is measured and recorded separately in `docs/PERFORMANCE.md`.)",
+          "met": true,
+          "evidence": "cargo test -p sinephile-persistence --release --test benchmark -- --ignored --nocapture, 500,000 synthetic rows: by_id p99 0.098ms, by_exact_title p99 0.179ms, by_external_id p99 0.120ms against a 100ms budget. Bulk insert 43.7s (11,440 rows/sec), database 145.4 MB, timed separately per amendment 15. Recorded in docs/eval-results.md and docs/PERFORMANCE.md. The benchmark found idx_titles_text silently full-scanning (26.679ms -> 0.081ms p50, 330x) because its collation did not match the query's."
+        },
+        {
+          "id": "E4",
+          "text": "Copying the app folder to another location and launching it preserves all data.",
+          "met": true,
+          "evidence": "crates/persistence/tests/portability.rs - 5 tests. `a_copied_data_folder_keeps_everything` writes a populated installation, checkpoints the WAL, copies the whole data folder to another path with a directory-tree copy, opens it there and asserts catalogue, watch history, resume position and settings all survive; `nothing_in_the_database_records_where_it_lives` introspects the schema and fails if any new path-shaped column appears. Found a real bug: open_in probed writability before creating the directory, which failed on every fresh portable install."
+        },
+        {
+          "id": "E5",
+          "text": "An ADR records why the schema is generic over media kind.",
+          "met": true,
+          "evidence": "docs/adr/0025-generic-media-schema.md, verified by tests/migrations.rs::all_eight_media_kinds_are_accepted."
+        }
+      ],
       "subtasks": [
         {
           "id": "3.1",
@@ -597,39 +635,7 @@
           "commit": "593fcc8"
         }
       ],
-      "exit_criteria": [
-        {
-          "id": "E1",
-          "text": "All migrations run forward and backward cleanly against a populated database.",
-          "met": true,
-          "evidence": "crates/persistence/tests/migrations.rs - 9 tests. `migrations_roll_back_against_a_populated_database` populates a FILE database across all four migrations then rolls back one at a time to 0 and asserts no tables survive; `the_ladder_can_be_climbed_twice` re-applies afterwards, which is what catches a down script that drops a table but forgets its indexes. Command: cargo test -p sinephile-persistence."
-        },
-        {
-          "id": "E2",
-          "text": "Schema documented with an entity-relationship diagram in `docs/ARCHITECTURE.md`.",
-          "met": true,
-          "evidence": "docs/ARCHITECTURE.md - mermaid ER diagram covering all 19 tables plus episode_numbering, with the four design decisions and the load-bearing PRAGMA configuration."
-        },
-        {
-          "id": "E3",
-          "text": "A database populated with 500,000 synthetic media items answers indexed lookups in under 100 ms. (The 100 ms budget is the lookup alone; bulk insertion of the 500,000 rows has no time budget and is measured and recorded separately in `docs/PERFORMANCE.md`.)",
-          "met": true,
-          "evidence": "cargo test -p sinephile-persistence --release --test benchmark -- --ignored --nocapture, 500,000 synthetic rows: by_id p99 0.098ms, by_exact_title p99 0.179ms, by_external_id p99 0.120ms against a 100ms budget. Bulk insert 43.7s (11,440 rows/sec), database 145.4 MB, timed separately per amendment 15. Recorded in docs/eval-results.md and docs/PERFORMANCE.md. The benchmark found idx_titles_text silently full-scanning (26.679ms -> 0.081ms p50, 330x) because its collation did not match the query's."
-        },
-        {
-          "id": "E4",
-          "text": "Copying the app folder to another location and launching it preserves all data.",
-          "met": true,
-          "evidence": "crates/persistence/tests/portability.rs - 5 tests. `a_copied_data_folder_keeps_everything` writes a populated installation, checkpoints the WAL, copies the whole data folder to another path with a directory-tree copy, opens it there and asserts catalogue, watch history, resume position and settings all survive; `nothing_in_the_database_records_where_it_lives` introspects the schema and fails if any new path-shaped column appears. Found a real bug: open_in probed writability before creating the directory, which failed on every fresh portable install."
-        },
-        {
-          "id": "E5",
-          "text": "An ADR records why the schema is generic over media kind.",
-          "met": true,
-          "evidence": "docs/adr/0025-generic-media-schema.md, verified by tests/migrations.rs::all_eight_media_kinds_are_accepted."
-        }
-      ],
-      "completion_commit": "65f5147"
+      "note": "The schema everything else depends on, designed once. Two constraints carry over: ADR-0022 puts all SQL in crates/persistence with src-tauri/src/persistence/ as re-exports only (guard-enforced), and SPEC.md 6.2 requires anime's absolute-vs-seasonal numbering and title variants designed NOW rather than patched in Phase 12. media_kind carries all eight values from the start so Phases 24-25 need no migration."
     },
     {
       "number": 4,
@@ -753,6 +759,12 @@
         {
           "id": "4.12",
           "text": "Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "4.13",
+          "text": "Incremental catalogue refresh (ADR-0030): re-fetch title.basics/ratings/episode and insert only the tail past the highest id already stored, reusing TsvReader::seek_past. Plus AniList airing schedules, which need no key. See docs/specs/catalogue-freshness.md.",
           "status": "not_started",
           "commit": null
         }
@@ -887,6 +899,18 @@
         },
         {
           "id": "E6",
+          "text": "Measured against qBittorrent on both axes and both numbers published: time-to-first-frame on a healthy swarm, and sustained bulk throughput on the same torrent. Losing on bulk is a finding, not a failure — ADR-0029 exists so the project does not have to win that comparison — but the comparison must be made rather than left implicit.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E7",
+          "text": "Binding to a specific network interface works, verified by disabling that adapter mid-download and confirming traffic stops rather than falling back.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E8",
           "text": "`docs/specs/streaming-scheduler.md` explains the algorithm with a diagram.",
           "met": false,
           "evidence": null
@@ -1139,24 +1163,42 @@
         },
         {
           "id": "E2",
-          "text": "Downloads survive an app restart and resume.",
+          "text": "A download completed through the qBittorrent backend files into the library identically to one completed through librqbit, verified by comparing the resulting rows.",
           "met": false,
           "evidence": null
         },
         {
           "id": "E3",
-          "text": "A completed download is automatically matched and appears in the local library with no user action.",
+          "text": "With qBittorrent configured but not running, a queued download falls back to librqbit rather than failing.",
           "met": false,
           "evidence": null
         },
         {
           "id": "E4",
-          "text": "Bandwidth limits are actually respected, verified by measurement.",
+          "text": "`tools/guard` rejects any code path that reads qBittorrent's search plugins, RSS feeds or tracker configuration.",
           "met": false,
           "evidence": null
         },
         {
           "id": "E5",
+          "text": "Downloads survive an app restart and resume.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E6",
+          "text": "A completed download is automatically matched and appears in the local library with no user action.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E7",
+          "text": "Bandwidth limits are actually respected, verified by measurement.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E8",
           "text": "The recommendation reason is a single readable sentence.",
           "met": false,
           "evidence": null
