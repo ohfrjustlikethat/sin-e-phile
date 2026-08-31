@@ -122,14 +122,19 @@ def check_progress(_: dict) -> list[Problem]:
     exists to report, so the original is restored either way and the fix is left
     to the caller.
     """
-    before = PROGRESS.read_text(encoding="utf-8") if PROGRESS.exists() else ""
+    # BYTES, not text. `read_text` normalises newlines and `write_text` translates
+    # them back to the platform default, so the first version silently rewrote
+    # PROGRESS.md from LF to CRLF on every run — and then compared normalised text,
+    # which made it blind to the damage it was doing. CI saw a 118-line diff on a
+    # file whose content had not changed at all.
+    before = PROGRESS.read_bytes() if PROGRESS.exists() else b""
     subprocess.run(
         [sys.executable, str(VALIDATE), "--progress"],
         cwd=REPO, capture_output=True, text=True,
     )
-    after = PROGRESS.read_text(encoding="utf-8") if PROGRESS.exists() else ""
+    after = PROGRESS.read_bytes() if PROGRESS.exists() else b""
     if after != before:
-        PROGRESS.write_text(before, encoding="utf-8")
+        PROGRESS.write_bytes(before)
         return [Problem(
             "PROGRESS.md",
             "is out of sync with PROJECT_STATE.json",
