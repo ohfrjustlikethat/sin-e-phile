@@ -16,7 +16,7 @@
         "id": "4.1",
         "text": "tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts",
         "status": "complete",
-        "commit": null
+        "commit": "4a78d64"
       },
       {
         "id": "4.2",
@@ -688,7 +688,7 @@
           "id": "4.1",
           "text": "tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts",
           "status": "complete",
-          "commit": null
+          "commit": "4a78d64"
         },
         {
           "id": "4.2",

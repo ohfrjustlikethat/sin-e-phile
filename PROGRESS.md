@@ -18,7 +18,7 @@
 
 ### Subtasks — 1/12 complete
 
-- [x] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts
+- [x] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts · `4a78d64`
 - [ ] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres
 - [ ] **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device)
 - [ ] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering

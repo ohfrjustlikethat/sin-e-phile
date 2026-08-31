@@ -64,6 +64,35 @@ def load() -> dict:
 
 
 # ---------------------------------------------------------------------------
+# 0 — the state file is valid at all
+# ---------------------------------------------------------------------------
+
+def check_schema(_: dict) -> list[Problem]:
+    """Run the schema and evidence validator.
+
+    statecheck did not do this, so a subtask marked complete with a null commit
+    reached CI and failed there instead of at pre-push. Pre-push is meant to be the
+    stricter gate, not the looser one — anything CI checks about the state file
+    should fail here first.
+    """
+    result = subprocess.run(
+        [sys.executable, str(VALIDATE), "--check"],
+        cwd=REPO, capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    if result.returncode == 0:
+        return []
+    detail = [
+        line.strip() for line in (result.stderr or "").splitlines()
+        if line.strip().startswith("$.")
+    ]
+    return [Problem(
+        "state file schema",
+        "; ".join(detail[:3]) or "validate_state --check failed",
+        "python tools/state/validate_state.py --check",
+    )]
+
+
+# ---------------------------------------------------------------------------
 # 1 — the current phase has a document, and it matches
 # ---------------------------------------------------------------------------
 
@@ -229,6 +258,7 @@ def check_state_follows_code(_: dict) -> list[Problem]:
 
 
 CHECKS = [
+    ("state file is schema-valid", check_schema),
     ("phase document exists and matches", check_phase_doc),
     ("PROGRESS.md in sync", check_progress),
     ("phases behind current are closed", check_phases_closed),
@@ -299,7 +329,7 @@ def selftest() -> int:
 
     # And the real ones, which must be quiet on a healthy tree.
     for label, check in CHECKS:
-        if check in (check_next_action, check_phases_closed):
+        if check in (check_next_action, check_phases_closed):  # covered above
             continue
         if check(state):
             failures.append(f"{label} fires on a healthy tree")
