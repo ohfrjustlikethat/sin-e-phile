@@ -18,6 +18,8 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            large ones and the whole point.
   ingest imdb              download and load the IMDb catalogue. Resumable —
                            re-run it after an interruption and it carries on.
+  ingest credits           load cast and crew for core-tier titles. Needs
+                           `ingest imdb` to have run first.
   ingest status            show every job and its steps
   ingest reset <name>      discard a job's progress so the next run starts clean
 
@@ -69,6 +71,7 @@ async fn main() -> Result<(), JobError> {
             Ok(())
         }
         "imdb" => imdb(&db, &dir.join("datasets")).await,
+        "credits" => credits(&db, &dir.join("datasets")).await,
         "status" => status(&db).await,
         "reset" => match args.get(1) {
             Some(name) => {
@@ -145,6 +148,78 @@ async fn imdb(db: &Db, datasets: &Path) -> Result<(), JobError> {
     println!(
         "  database {:.0} MB · {:.0}s",
         bytes as f64 / 1_048_576.0,
+        started.elapsed().as_secs_f64()
+    );
+    println!();
+    Ok(())
+}
+
+/// Cast and crew for core-tier titles — the R4 measurement that decides whether the
+/// >=10 vote threshold survives.
+async fn credits(db: &Db, datasets: &Path) -> Result<(), JobError> {
+    use std::sync::Arc;
+    use std::time::Instant;
+
+    let started = Instant::now();
+    let before = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
+    let downloader = sinephile_ingest::Downloader::new();
+
+    for dataset in [
+        &sinephile_ingest::imdb::TITLE_PRINCIPALS,
+        &sinephile_ingest::imdb::NAME_BASICS,
+    ] {
+        let path = datasets.join(dataset.filename);
+        let result = downloader.fetch(&dataset.url(), &path, |_| {}).await?;
+        tracing::info!(
+            "{}: {:.1} MB{}",
+            dataset.name,
+            result.bytes as f64 / 1_048_576.0,
+            if result.fetched {
+                ""
+            } else {
+                " (already had it)"
+            }
+        );
+        sinephile_ingest::download::verify_gzip(&path)?;
+    }
+
+    let principals = datasets.join(sinephile_ingest::imdb::TITLE_PRINCIPALS.filename);
+    let names = datasets.join(sinephile_ingest::imdb::NAME_BASICS.filename);
+
+    tracing::info!("reading core title ids");
+    let core = Arc::new(sinephile_ingest::credits::core_title_ids(db).await?);
+    if core.is_empty() {
+        eprintln!("ingest: no core titles — run `ingest imdb` first");
+        std::process::exit(2);
+    }
+    tracing::info!("  {} core titles", core.len());
+
+    tracing::info!("scanning title.principals for the people they reference");
+    let needed = Arc::new(sinephile_ingest::credits::scan_needed_people(
+        &principals,
+        &core,
+    )?);
+    tracing::info!("  {} people needed", needed.len());
+
+    let mut job = Job::begin(db, "imdb-credits").await?;
+    if job.is_resuming().await? {
+        tracing::info!("resuming a previous run");
+    }
+
+    tracing::info!("loading people");
+    sinephile_ingest::credits::load_people(&mut job, names, needed).await?;
+    tracing::info!("loading credits");
+    sinephile_ingest::credits::load_credits(&mut job, principals, core).await?;
+    job.finish().await?;
+
+    let (people, credits) = sinephile_ingest::credits::counts(db).await?;
+    let after = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
+    println!();
+    println!("  {people} people, {credits} credits");
+    println!(
+        "  database {:.0} MB (+{:.0} MB) · {:.0}s",
+        after as f64 / 1_048_576.0,
+        (after.saturating_sub(before)) as f64 / 1_048_576.0,
         started.elapsed().as_secs_f64()
     );
     println!();
