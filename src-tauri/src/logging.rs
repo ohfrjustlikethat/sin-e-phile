@@ -110,8 +110,7 @@ fn install_panic_handler() {
             String::new(),
             "This file was written locally and sent nowhere (SPEC.md 2.7).".to_string(),
         ]
-        .join("
-");
+        .join("\n");
 
         let _ = std::fs::write(&path, &report);
         tracing::error!(location = %location, message = %message, report = %path.display(), "PANIC");
