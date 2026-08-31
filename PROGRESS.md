@@ -18,16 +18,16 @@
 
 ### Subtasks — 10/10 complete
 
-- [x] **2.0** THREE static HTML mockups of Home, film detail, and player-with-chrome, as three interpretations within the SPEC.md 9.0 brief, with REAL artwork and metadata. Author chooses before any token or component code.
-- [x] **2.1** All SPEC.md 9 tokens as CSS custom properties consumed by the Tailwind theme; fonts bundled locally, no network font requests
-- [x] **2.2** Component gallery route /design, dev-only, rendering every primitive in every state
-- [x] **2.3** Primitives: Button, IconButton, Input, Select, Toggle, Slider, Tabs, Tooltip, Popover, Dialog, Toast, Skeleton, Spinner, Badge, ProgressBar, Rating
-- [x] **2.4** Media primitives: PosterCard (with the ADR-0013 typographic artwork-free state), EpisodeCard, ChannelCard, Rail, HeroBanner, EmptyState
-- [x] **2.5** Rail: virtualised, momentum scroll, edge-bleed, keyboard-navigable, 60fps with 500 cards
-- [x] **2.6** Focus management with visible rings and correct tab order; full keyboard navigation; Ctrl+K command palette shell
-- [x] **2.7** prefers-reduced-motion support throughout (the global rule exists from Phase 1; verify per component)
-- [x] **2.8** Contrast audit script failing CI if any text token pair drops below WCAG AA; --ink-faint on --surface is the one to check
-- [x] **2.9** docs/specs/design-system.md documenting every token and component with usage rules
+- [x] **2.0** THREE static HTML mockups of Home, film detail, and player-with-chrome, as three interpretations within the SPEC.md 9.0 brief, with REAL artwork and metadata. Author chooses before any token or component code. · `aebbd7f`
+- [x] **2.1** All SPEC.md 9 tokens as CSS custom properties consumed by the Tailwind theme; fonts bundled locally, no network font requests · `aebbd7f`
+- [x] **2.2** Component gallery route /design, dev-only, rendering every primitive in every state · `aebbd7f`
+- [x] **2.3** Primitives: Button, IconButton, Input, Select, Toggle, Slider, Tabs, Tooltip, Popover, Dialog, Toast, Skeleton, Spinner, Badge, ProgressBar, Rating · `aebbd7f`
+- [x] **2.4** Media primitives: PosterCard (with the ADR-0013 typographic artwork-free state), EpisodeCard, ChannelCard, Rail, HeroBanner, EmptyState · `aebbd7f`
+- [x] **2.5** Rail: virtualised, momentum scroll, edge-bleed, keyboard-navigable, 60fps with 500 cards · `aebbd7f`
+- [x] **2.6** Focus management with visible rings and correct tab order; full keyboard navigation; Ctrl+K command palette shell · `aebbd7f`
+- [x] **2.7** prefers-reduced-motion support throughout (the global rule exists from Phase 1; verify per component) · `aebbd7f`
+- [x] **2.8** Contrast audit script failing CI if any text token pair drops below WCAG AA; --ink-faint on --surface is the one to check · `aebbd7f`
+- [x] **2.9** docs/specs/design-system.md documenting every token and component with usage rules · `aebbd7f`
 
 ### Exit criteria
 

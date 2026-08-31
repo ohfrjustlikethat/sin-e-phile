@@ -16,71 +16,61 @@
         "id": "2.0",
         "text": "THREE static HTML mockups of Home, film detail, and player-with-chrome, as three interpretations within the SPEC.md 9.0 brief, with REAL artwork and metadata. Author chooses before any token or component code.",
         "status": "complete",
-        "commit": null,
-        "evidence": "docs/design/mockups/{take-a,take-b,take-c}.html with 24 real stills; author chose \"B, but with A's hero size\"; recorded in ADR-0024"
+        "commit": "aebbd7f"
       },
       {
         "id": "2.1",
         "text": "All SPEC.md 9 tokens as CSS custom properties consumed by the Tailwind theme; fonts bundled locally, no network font requests",
         "status": "complete",
-        "commit": null,
-        "evidence": "src/styles/tokens.css + @theme inline in src/styles/global.css; 9 @font-face from public/fonts/*.woff2, no network font request; `python tools/contrast/audit.py` -> 29 enforced pairs pass"
+        "commit": "aebbd7f"
       },
       {
         "id": "2.2",
         "text": "Component gallery route /design, dev-only, rendering every primitive in every state",
         "status": "complete",
-        "commit": null,
-        "evidence": "src/features/design/DesignGallery.tsx, dev-only #design route in src/app/App.tsx; rendered headless, 4 tabs, 0 page errors (tools/uiaudit/out/results.json)"
+        "commit": "aebbd7f"
       },
       {
         "id": "2.3",
         "text": "Primitives: Button, IconButton, Input, Select, Toggle, Slider, Tabs, Tooltip, Popover, Dialog, Toast, Skeleton, Spinner, Badge, ProgressBar, Rating",
         "status": "complete",
-        "commit": null,
-        "evidence": "src/design-system/primitives/ - 15 primitives; screenshot tools/uiaudit/out/primitives.png"
+        "commit": "aebbd7f"
       },
       {
         "id": "2.4",
         "text": "Media primitives: PosterCard (with the ADR-0013 typographic artwork-free state), EpisodeCard, ChannelCard, Rail, HeroBanner, EmptyState",
         "status": "complete",
-        "commit": null,
-        "evidence": "src/design-system/media/ - PosterCard (both ADR-0013 states), EpisodeCard, ChannelCard, HeroBanner, EmptyState; real artwork from public/stills/"
+        "commit": "aebbd7f"
       },
       {
         "id": "2.5",
         "text": "Rail: virtualised, momentum scroll, edge-bleed, keyboard-navigable, 60fps with 500 cards",
         "status": "complete",
-        "commit": null,
-        "evidence": "node tools/uiaudit/run.mjs -> 14/500 cards mounted, median 16.7ms, p95 16.7ms, worst 16.8ms, 0 dropped frames. Verified to FAIL on regression: reverting min-w-0 gives \"rail is not scrollable\", exit 1"
+        "commit": "aebbd7f"
       },
       {
         "id": "2.6",
         "text": "Focus management with visible rings and correct tab order; full keyboard navigation; Ctrl+K command palette shell",
         "status": "complete",
-        "commit": null,
-        "evidence": "node tools/uiaudit/run.mjs -> 45 Tab stops, 18 distinct, 0 without a visible focus ring, 0 off-screen; rail is 1 tab stop and End reaches card 499/500 via roving tabindex"
+        "commit": "aebbd7f"
       },
       {
         "id": "2.7",
         "text": "prefers-reduced-motion support throughout (the global rule exists from Phase 1; verify per component)",
         "status": "complete",
-        "commit": null,
-        "evidence": "node tools/uiaudit/run.mjs -> 38 non-opacity transitions normally, 0 under prefers-reduced-motion. Verified to FAIL on regression: removing transition-property:opacity gives \"180 non-opacity transitions survive\", exit 1"
+        "commit": "aebbd7f"
       },
       {
         "id": "2.8",
         "text": "Contrast audit script failing CI if any text token pair drops below WCAG AA; --ink-faint on --surface is the one to check",
         "status": "complete",
-        "commit": null,
-        "evidence": "tools/contrast/audit.py wired into .github/workflows/ci.yml (\"Contrast audit (WCAG AA)\"); 29 enforced pairs pass, 3 decorative recorded not enforced"
+        "commit": "aebbd7f"
       },
       {
         "id": "2.9",
         "text": "docs/specs/design-system.md documenting every token and component with usage rules",
         "status": "complete",
-        "commit": null,
-        "evidence": "docs/specs/design-system.md"
+        "commit": "aebbd7f"
       }
     ],
     "exit_criteria": [
