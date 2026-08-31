@@ -273,6 +273,16 @@ jobs:
       - name: PROJECT_STATE.json validates against its schema
         run: python tools/state/validate_state.py --check
 
+      # Every check here exists because that exact thing went wrong in this
+      # repository silently, and was found by reading rather than by a tool. The
+      # last one — "the most recent code commit is recorded in the state file" —
+      # is the one that makes forgetting mechanically impossible.
+      - name: statecheck — the repository is resumable by a cold session
+        run: python tools/statecheck/check.py
+
+      - name: statecheck fires when it should
+        run: python tools/statecheck/check.py --selftest
+
       - name: PROGRESS.md is up to date with PROJECT_STATE.json
         shell: bash
         run: |

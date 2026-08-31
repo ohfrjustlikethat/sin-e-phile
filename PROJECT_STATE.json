@@ -1,5 +1,5 @@
 {
-  "spec_version": "1.5.0",
+  "spec_version": "1.6.0",
   "project": "sin-e-phile",
   "last_updated": "2026-08-31T15:27:56Z",
   "sessions_completed": 5,
@@ -14,7 +14,7 @@
     "subtasks": [
       {
         "id": "3.1",
-        "text": "crates/persistence: sqlx + SQLite with WAL, pinned versions, committed .sqlx/ offline metadata so CI compiles without a live database; src-tauri/src/persistence/ re-exports only (guard-enforced, ADR-0022)",
+        "text": "crates/persistence: sqlx + SQLite with WAL, pinned versions; runtime-checked queries with tests/repository_surface.rs as the compensating control (ADR-0026); src-tauri/src/persistence/ re-exports only, guard-enforced (ADR-0022)",
         "status": "complete",
         "commit": "593fcc8"
       },
@@ -514,7 +514,7 @@
       "subtasks": [
         {
           "id": "3.1",
-          "text": "crates/persistence: sqlx + SQLite with WAL, pinned versions, committed .sqlx/ offline metadata so CI compiles without a live database; src-tauri/src/persistence/ re-exports only (guard-enforced, ADR-0022)",
+          "text": "crates/persistence: sqlx + SQLite with WAL, pinned versions; runtime-checked queries with tests/repository_surface.rs as the compensating control (ADR-0026); src-tauri/src/persistence/ re-exports only, guard-enforced (ADR-0022)",
           "status": "complete",
           "commit": "593fcc8"
         },
@@ -1658,7 +1658,7 @@
       ]
     }
   ],
-  "next_action": "Phase 3 is complete with all five exit criteria evidenced. Verify CI green on phase/03-data-layer, merge, tag phase-03. THEN: the author owes a ruling on P9 (sqlx compile-time query! macros vs runtime-checked queries) BEFORE Phase 4 starts, because Phase 4's ingestion pipeline writes far more SQL than Phase 3 did and converting later costs more.",
+  "next_action": "Finish the navigation system on chore/navigation-system: write the six skills under .claude/skills/<name>/SKILL.md (status, next, finish, closephase, unstuck, decide), docs/COMMANDS.md as the cheat sheet, and CLAUDE.md's fifth protocol on how to ask for a decision. Then generate the Phase 4 doc with `python tools/phasedoc/generate.py --open 4` and start Phase 4 from SPEC.md 15.",
   "blockers": [],
   "decisions_pending": [
     {

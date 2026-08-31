@@ -1,0 +1,33 @@
+#!/bin/sh
+# sin-e-phile pre-push hook.
+#
+# The last moment before work leaves this machine. Two questions:
+#   1. Is there anything in the FULL HISTORY that must never be published?
+#   2. Could a session that knows nothing pick this repository up?
+#
+# The second is `tools/statecheck`. Every one of its checks exists because that
+# exact thing went wrong here silently — including "finished the work, forgot to
+# record it", which is the one this hook is really for.
+#
+# Activated by `git config core.hooksPath .githooks`, which tools/doctor does.
+
+set -e
+
+PY="${PYTHON:-python}"
+command -v "$PY" >/dev/null 2>&1 || PY=python3
+
+if ! command -v "$PY" >/dev/null 2>&1; then
+    echo "pre-push: Python not found — cannot verify the repository is resumable." >&2
+    echo "          Run tools/doctor/doctor.py, or install Python 3.12+." >&2
+    exit 1
+fi
+
+"$PY" tools/guard/guard.py --history || exit 1
+
+if ! "$PY" tools/statecheck/check.py; then
+    echo "" >&2
+    echo "pre-push: the repository would not be resumable by a session that knows" >&2
+    echo "          nothing. Fix the above, or push with --no-verify if you are" >&2
+    echo "          deliberately pushing a work-in-progress branch." >&2
+    exit 1
+fi

@@ -567,7 +567,7 @@ This section governs how Claude Code operates. It matters more than any individu
 
 ### 10.2 Session start ritual — mandatory, every session
 
-1. **Read only these** (ADR-0016): `PROJECT_STATE.json`, the **last** `SESSION_LOG.md` entry, and §15's entry for the current phase. `CLAUDE.md` loads automatically and carries the standing rules, so **do not re-read `SPEC.md` end to end.** Read another section only when the work actually touches it — or on a cold resume (§10.11), which keeps its fuller reading list.
+1. **Read two files** (ADR-0028): `PROJECT_STATE.json`, and the current phase document it names — `docs/phases/phase-NN-<slug>.md`, generated from §15 by `tools/phasedoc/generate.py`. That is the reading list. `CLAUDE.md` loads automatically and carries the standing rules, so **do not re-read `SPEC.md` end to end**, and do not hunt across four sources. Read a `SPEC.md` section only when the work actually touches it — or on a cold resume (§10.11), which keeps its fuller reading list. `/next` performs this ritual; `/unstuck` rebuilds it from disk after a compaction or a crash. See `docs/COMMANDS.md`.
 2. **Verify state against reality**: run `git status`, `git log --oneline -10`, `cargo test`, `npm test`. If the repository disagrees with `PROJECT_STATE.json`, **the repository is right**. Correct the state file, and record the discrepancy in `SESSION_LOG.md`.
 3. Report to the author in **five lines or fewer**: current phase, what's done, what's next, blockers, anything needing a decision. Do not restate the spec back. Findings are bullets, not tables. Prose is for when something genuinely needs arguing (ADR-0016).
 4. If there are blockers with `needs_user: true`, raise them *before* planning.
@@ -1547,6 +1547,17 @@ Face recognition, live TV, manga and comics, casting and watch-together. Fully i
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 1.6.0 — 2026-09-01 (the navigation system)
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A14 | §13.2, §11.1 | **Per-phase documents are reinstated**, with a narrower job than the ones A5 cut: `docs/phases/phase-NN-<slug>.md` is a **generated working file** — goal, deliverables, exit criteria as a live checklist, subtask log, closing evidence — not a hand-written narrative. Phase *retrospectives* still fold into the `SESSION_LOG.md` entry, so A5's actual point stands. Generation by `tools/phasedoc/generate.py` is what makes it affordable. Removing these while the session ritual still pointed at them left every session following a pointer to nothing for two phases. | [0028](docs/adr/0028-navigation-system.md) |
+| A15 | §10.2 | **The session reading list is two files**: `PROJECT_STATE.json` and the current phase document. Narrows A1 further in the same direction. Six commands (`/status` `/next` `/finish` `/closephase` `/unstuck` `/decide`) encode the rituals; `docs/COMMANDS.md` is the cheat sheet. | [0028](docs/adr/0028-navigation-system.md) |
+| A16 | §10.5, §12.6 | **`tools/statecheck` runs in CI and on pre-push**, failing if the repository could not be picked up by a session that knows nothing: missing or mismatched phase doc, stale `PROGRESS.md`, an unclosed phase behind the current one, a `next_action` that is a direction rather than an instruction, or **a code commit not recorded in `PROJECT_STATE.json`**. The last makes "finished work but forgot to record it" mechanically impossible. | [0028](docs/adr/0028-navigation-system.md) |
+| A17 | §10 (new protocol) | **How a decision is put to the author**: the decision in one sentence, 2–3 options with honest costs, a recommendation, and **the default taken if the answer is "your call"**. Where a reasonable default exists and nothing is blocked, the default is taken and recorded rather than the session blocking on a reply. | [0028](docs/adr/0028-navigation-system.md) |
+
+---
 
 ### spec_version 1.5.0 — 2026-09-01 (Phase 3 close)
 

@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 1.4.0** · 5 session(s) completed · last updated 2026-08-31
+**Spec version 1.6.0** · 5 session(s) completed · last updated 2026-08-31
 
 ---
 
@@ -18,7 +18,7 @@
 
 ### Subtasks — 12/12 complete
 
-- [x] **3.1** crates/persistence: sqlx + SQLite with WAL, pinned versions, committed .sqlx/ offline metadata so CI compiles without a live database; src-tauri/src/persistence/ re-exports only (guard-enforced, ADR-0022) · `593fcc8`
+- [x] **3.1** crates/persistence: sqlx + SQLite with WAL, pinned versions; runtime-checked queries with tests/repository_surface.rs as the compensating control (ADR-0026); src-tauri/src/persistence/ re-exports only, guard-enforced (ADR-0022) · `593fcc8`
 - [x] **3.2** Path resolution: portable ./data/ next to the executable by default, %APPDATA% installed-mode as an opt-in; override and detection · `593fcc8`
 - [x] **3.3** Migration system: forward and backward migrations, with backup-on-migrate · `593fcc8`
 - [x] **3.4** Schema - identity: media_items with the eight-value media_kind discriminator, external_ids, titles (romaji/native/english variants) · `593fcc8`
@@ -48,7 +48,7 @@
 
 ## What's next
 
-Phase 3 is complete with all five exit criteria evidenced. Verify CI green on phase/03-data-layer, merge, tag phase-03. THEN: the author owes a ruling on P9 (sqlx compile-time query! macros vs runtime-checked queries) BEFORE Phase 4 starts, because Phase 4's ingestion pipeline writes far more SQL than Phase 3 did and converting later costs more.
+Finish the navigation system on chore/navigation-system: write the six skills under .claude/skills/<name>/SKILL.md (status, next, finish, closephase, unstuck, decide), docs/COMMANDS.md as the cheat sheet, and CLAUDE.md's fifth protocol on how to ask for a decision. Then generate the Phase 4 doc with `python tools/phasedoc/generate.py --open 4` and start Phase 4 from SPEC.md 15.
 
 ---
 
@@ -119,4 +119,3 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **P5** — decide by Phase 12 Where the Phase 12 review-queue confidence threshold sits, given >95% top-1 and <1% false-confident pull against each other. Measure, do not guess. See docs/DECISIONS_PENDING.md.
 - **P6** — decide by Phase 27 Windows Sandbox pass on a genuinely bare machine. The E1 CI job proves a clean checkout builds, but windows-latest ships Rust, Node and MSVC preinstalled, so it does not prove SETUP.md is complete from nothing.
 - **P8** — decide by Phase 21 Spike C measured query-embedding latency on the Tier 2 dev machine only. ADR-0015 also asked for a constrained VM approximating Tier 0. Unpadded headroom is ~18x so this does not block Phase 5, but the padded worst case with a 3-4x Tier 0 penalty lands at 24-33 ms, close to the 30 ms trigger. Measure before Phase 21 signs off the 80 ms search budget.
-- **P9** — decide by Phase 4 Convert the data layer to sqlx's compile-time-checked query! macros, or accept runtime-checked queries? SPEC.md 2 names compile-time checking as the REASON sqlx was chosen. Phase 3 shipped runtime-checked; see known_debt for the cost on both sides. See docs/DECISIONS_PENDING.md.
