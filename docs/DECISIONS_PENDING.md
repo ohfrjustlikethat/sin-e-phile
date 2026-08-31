@@ -99,3 +99,55 @@ portfolio claim that a stranger can build this.
 | **P3** — can a MovieLens-derived matrix be redistributed? | [ADR-0019](adr/0019-movielens-matrix-computed-on-device.md) | Never ship one. Ingestion downloads MovieLens and computes the item-item matrix on the user's machine, so the question never arises. Deliberately a different answer from §8's shipped embeddings: embeddings computed from metadata we assemble are ours to publish; a matrix derived from GroupLens' ratings is not clearly ours. |
 | **P7** — the visual direction, and how player chrome is composited | [ADR-0023](adr/0023-visual-direction.md), [ADR-0021](adr/0021-player-composition-architecture.md) | The compositing half was resolved in Phase 1: still-frame substitution on pause, region cutouts during playback, no patched dependency. The design half is resolved by the author's brief — MUBI-led editorial direction, warm near-black palette, an explicit banned list, and a falsifiable test ("would this pass as a MUBI or Criterion screen?"). ADR-0020's solid opaque player panel is treated as suiting the direction rather than as a limitation. |
 | **P4** — licensing the extracted crates for actual reuse | [ADR-0017](adr/0017-dual-license-extracted-crates.md) | `filename-parser`, `subtitle-align` and `source-protocol` are **MIT OR Apache-2.0**; the app stays GPL-3.0 from libmpv and FFmpeg linkage. Binding design constraint: **`subtitle-align` must not depend on FFmpeg** — it takes PCM samples or a precomputed VAD signal, and extraction lives in the app. Licence-clean, and testable without spawning a process. |
+
+
+---
+
+## P9 — compile-time-checked SQL, or runtime-checked?
+
+**Raised:** 2026-09-01 (Phase 3) · **Decide by:** before Phase 4 · **Owner:** the author
+
+`SPEC.md` §2's technology table says: *"SQLite via `sqlx` (compile-time checked
+queries)… `sqlx` catches SQL errors at compile time — valuable for a learner."*
+
+Phase 3 shipped the data layer using **runtime-checked** `sqlx::query()`, not the
+compile-time-checked `query!` / `query_as!` macros. That is a deviation from the
+stated rationale for the dependency, so it is being put in front of the author
+rather than quietly kept.
+
+### What compile-time checking would buy
+
+A typo'd column name, a wrong table, or a query that does not match the schema fails
+the **build** instead of a test. For a learner that is genuinely valuable — it is the
+same argument as Rust's type system, applied to SQL.
+
+### What it costs, honestly
+
+- **Dynamic SQL cannot use it at all.** `query!` needs a literal string. The
+  archive's source-preference query is built with `format!`, so it stays
+  runtime-checked regardless. The rule would have an exception from day one.
+- **SQLite nullability inference is weak.** sqlx cannot tell whether a column in a
+  join is nullable, so most columns need `as "column!"` annotations. This is churn
+  across every query, and the annotations are themselves unchecked assertions —
+  getting one wrong turns a compile-time guarantee into a runtime panic.
+- **It adds a build prerequisite and a ritual.** `cargo sqlx prepare` must be re-run
+  after every schema change, `sqlx-cli` must be installed (so `tools/doctor` grows a
+  check), and the `.sqlx/` cache must be committed or CI needs a live database.
+
+### The options
+
+1. **Convert now.** Highest cost, but Phase 3 is the smallest the data layer will
+   ever be — Phase 4's ingestion pipeline writes far more SQL.
+2. **Accept runtime-checked, and amend `SPEC.md` §2** to say sqlx was chosen for
+   async SQLite with a good migration story, which is true and is what is actually
+   being used.
+3. **Convert selectively** — macros for static queries, runtime for dynamic — and
+   document the boundary.
+
+**Recommendation: (1) or (2), not (3).** A rule with a documented exception is a rule
+people follow; a rule applied case by case is one that erodes. If the compile-time
+guarantee is worth having it is worth having everywhere it can apply, and if it is
+not, the spec should stop claiming it. What should *not* happen is the spec saying one
+thing and the code doing another, which is the situation today.
+
+The timing matters: converting is cheapest now and gets steadily more expensive.

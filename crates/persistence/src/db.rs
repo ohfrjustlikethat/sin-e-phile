@@ -91,8 +91,14 @@ impl Db {
         Ok(db)
     }
 
-    /// Open the database for the given data directory.
+    /// Open the database for the given data directory, creating it if absent.
     pub async fn open_in(data_dir: &Path) -> Result<Self, DbError> {
+        // Create BEFORE probing. The writability probe writes a file into the
+        // directory, so running it first on a first launch — where `data/` does
+        // not exist yet — reported "not writable" for a directory that was merely
+        // absent. That is the normal case on a fresh portable install.
+        std::fs::create_dir_all(data_dir)
+            .map_err(|e| DbError::Path(PathError::Create(data_dir.to_path_buf(), e)))?;
         paths::assert_writable(data_dir)?;
         Self::open(&paths::database_path(data_dir)).await
     }
