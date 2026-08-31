@@ -1,120 +1,132 @@
 {
   "spec_version": "1.6.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-08-31T15:27:56Z",
+  "last_updated": "2026-08-31T18:43:02Z",
   "sessions_completed": 5,
   "current_phase": {
-    "number": 3,
-    "slug": "data-layer",
-    "title": "Data Layer and Portable Storage",
-    "branch": "phase/03-data-layer",
-    "started_at": "2026-08-31T14:39:21Z",
-    "status": "complete",
-    "note": "The schema everything else depends on, designed once. Two constraints carry over: ADR-0022 puts all SQL in crates/persistence with src-tauri/src/persistence/ as re-exports only (guard-enforced), and SPEC.md 6.2 requires anime's absolute-vs-seasonal numbering and title variants designed NOW rather than patched in Phase 12. media_kind carries all eight values from the start so Phases 24-25 need no migration.",
+    "number": 4,
+    "slug": "metadata-backbone",
+    "title": "Metadata Backbone",
+    "branch": "phase/04-metadata-backbone",
+    "started_at": "2026-08-31T18:43:02Z",
+    "status": "in_progress",
+    "note": "The catalogue. Three constraints carry in: ADR-0013 and ADR-0027 mean the app must be complete and good-looking with NO TMDB key and no key ever ships; ADR-0026 means SQL is runtime-checked, so every new repository method needs a line in crates/persistence/tests/repository_surface.rs; and R4 (ingestion larger or slower than expected) is this phase's named risk — measure before committing to a shape, and scope by a popularity threshold rather than ingesting everything.",
     "subtasks": [
       {
-        "id": "3.1",
-        "text": "crates/persistence: sqlx + SQLite with WAL, pinned versions; runtime-checked queries with tests/repository_surface.rs as the compensating control (ADR-0026); src-tauri/src/persistence/ re-exports only, guard-enforced (ADR-0022)",
-        "status": "complete",
-        "commit": "593fcc8"
+        "id": "4.1",
+        "text": "tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "3.2",
-        "text": "Path resolution: portable ./data/ next to the executable by default, %APPDATA% installed-mode as an opt-in; override and detection",
-        "status": "complete",
-        "commit": "593fcc8"
+        "id": "4.2",
+        "text": "IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "3.3",
-        "text": "Migration system: forward and backward migrations, with backup-on-migrate",
-        "status": "complete",
-        "commit": "593fcc8"
+        "id": "4.3",
+        "text": "MovieLens join for ratings and popularity (ADR-0019, on-device)",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "3.4",
-        "text": "Schema - identity: media_items with the eight-value media_kind discriminator, external_ids, titles (romaji/native/english variants)",
-        "status": "complete",
-        "commit": "593fcc8"
+        "id": "4.4",
+        "text": "AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "3.5",
-        "text": "Schema - people and taxonomy: people, credits, genres, keywords",
-        "status": "complete",
-        "commit": "593fcc8"
+        "id": "4.5",
+        "text": "External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "3.6",
-        "text": "Schema - series: series, seasons, episodes with BOTH seasonal and absolute numbering, plus the reconciliation table (SPEC.md 6.2 - designed now, not patched in Phase 12)",
-        "status": "complete",
-        "commit": "593fcc8"
+        "id": "4.6",
+        "text": "Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "3.7",
-        "text": "Schema - user and config: profiles, watch_events, playback_positions, watchlist_items, collections, local_files, local_file_matches, sources_config, settings",
-        "status": "complete",
-        "commit": "593fcc8"
+        "id": "4.7",
+        "text": "Per-profile TMDB key from settings, never shipped (ADR-0027); every TMDB-dependent surface degrades to the typographic state",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "3.8",
-        "text": "Repository-pattern access layer over the whole schema",
-        "status": "complete",
-        "commit": "593fcc8"
+        "id": "4.8",
+        "text": "Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding, blurhash placeholders",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "3.9",
-        "text": "Export/import of a whole profile as a portable archive",
-        "status": "complete",
-        "commit": "593fcc8"
+        "id": "4.9",
+        "text": "First-run flow: usable during the background build, searching what is ingested so far",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "3.10",
-        "text": "Migration round-trip integration tests: forward and backward against a populated database (E1)",
-        "status": "complete",
-        "commit": "593fcc8"
+        "id": "4.10",
+        "text": "The embedding artefact producer (ADR-0014): deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date; published as a GitHub Release asset",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "3.11",
-        "text": "500,000 synthetic media items; indexed lookup under 100 ms, insertion timed separately (amendment 15); numbers into docs/PERFORMANCE.md and docs/eval-results.md",
-        "status": "complete",
-        "commit": "593fcc8"
+        "id": "4.11",
+        "text": "Hand-checked 50-title anime ID-mapping fixture including long-running shonen, split-cour seasons, and films tied to series",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "3.12",
-        "text": "ER diagram in docs/ARCHITECTURE.md (E2), and an ADR recording why the schema is generic over media kind (E5)",
-        "status": "complete",
-        "commit": "593fcc8"
+        "id": "4.12",
+        "text": "Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits",
+        "status": "not_started",
+        "commit": null
       }
     ],
     "exit_criteria": [
       {
         "id": "E1",
-        "text": "All migrations run forward and backward cleanly against a populated database.",
-        "met": true,
-        "evidence": "crates/persistence/tests/migrations.rs - 9 tests. `migrations_roll_back_against_a_populated_database` populates a FILE database across all four migrations then rolls back one at a time to 0 and asserts no tables survive; `the_ladder_can_be_climbed_twice` re-applies afterwards, which is what catches a down script that drops a table but forgets its indexes. Command: cargo test -p sinephile-persistence."
+        "text": "Full ingestion completes on the dev machine and the resulting database is under a documented size budget.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E2",
-        "text": "Schema documented with an entity-relationship diagram in `docs/ARCHITECTURE.md`.",
-        "met": true,
-        "evidence": "docs/ARCHITECTURE.md - mermaid ER diagram covering all 19 tables plus episode_numbering, with the four design decisions and the load-bearing PRAGMA configuration."
+        "text": "Ingestion killed mid-run resumes correctly.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E3",
-        "text": "A database populated with 500,000 synthetic media items answers indexed lookups in under 100 ms. (The 100 ms budget is the lookup alone; bulk insertion of the 500,000 rows has no time budget and is measured and recorded separately in `docs/PERFORMANCE.md`.)",
-        "met": true,
-        "evidence": "cargo test -p sinephile-persistence --release --test benchmark -- --ignored --nocapture, 500,000 synthetic rows: by_id p99 0.098ms, by_exact_title p99 0.179ms, by_external_id p99 0.120ms against a 100ms budget. Bulk insert 43.7s (11,440 rows/sec), database 145.4 MB, timed separately per amendment 15. Recorded in docs/eval-results.md and docs/PERFORMANCE.md. The benchmark found idx_titles_text silently full-scanning (26.679ms -> 0.081ms p50, 330x) because its collation did not match the query's."
+        "text": "Catalogue lookups work with the network disconnected.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E4",
-        "text": "Copying the app folder to another location and launching it preserves all data.",
-        "met": true,
-        "evidence": "crates/persistence/tests/portability.rs - 5 tests. `a_copied_data_folder_keeps_everything` writes a populated installation, checkpoints the WAL, copies the whole data folder to another path with a directory-tree copy, opens it there and asserts catalogue, watch history, resume position and settings all survive; `nothing_in_the_database_records_where_it_lives` introspects the schema and fails if any new path-shaped column appears. Found a real bug: open_in probed writability before creating the directory, which failed on every fresh portable install."
+        "text": "Rate limits are never exceeded under a stress test of 1,000 rapid lookups.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E5",
-        "text": "An ADR records why the schema is generic over media kind.",
-        "met": true,
-        "evidence": "docs/adr/0025-generic-media-schema.md, verified by tests/migrations.rs::all_eight_media_kinds_are_accepted."
+        "text": "Anime titles resolve across AniList and TMDB with correct ID mapping for a hand-checked set of 50 titles including tricky cases (long-running shonen, split-cour seasons, films tied to series).",
+        "met": false,
+        "evidence": null
+      },
+      {
+        "id": "E6",
+        "text": "The catalogue is fully usable with no TMDB key (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.",
+        "met": false,
+        "evidence": null
+      },
+      {
+        "id": "E7",
+        "text": "The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.",
+        "met": false,
+        "evidence": null
       }
     ]
   },
@@ -625,7 +637,7 @@
       "title": "Metadata Backbone",
       "depends_on": "3",
       "sessions": "2–3",
-      "status": "not_started",
+      "status": "in_progress",
       "completion_commit": null,
       "exit_criteria": [
         {
@@ -669,6 +681,80 @@
           "text": "The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.",
           "met": false,
           "evidence": null
+        }
+      ],
+      "subtasks": [
+        {
+          "id": "4.1",
+          "text": "tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "4.2",
+          "text": "IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "4.3",
+          "text": "MovieLens join for ratings and popularity (ADR-0019, on-device)",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "4.4",
+          "text": "AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "4.5",
+          "text": "External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "4.6",
+          "text": "Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "4.7",
+          "text": "Per-profile TMDB key from settings, never shipped (ADR-0027); every TMDB-dependent surface degrades to the typographic state",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "4.8",
+          "text": "Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding, blurhash placeholders",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "4.9",
+          "text": "First-run flow: usable during the background build, searching what is ingested so far",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "4.10",
+          "text": "The embedding artefact producer (ADR-0014): deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date; published as a GitHub Release asset",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "4.11",
+          "text": "Hand-checked 50-title anime ID-mapping fixture including long-running shonen, split-cour seasons, and films tied to series",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "4.12",
+          "text": "Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits",
+          "status": "not_started",
+          "commit": null
         }
       ]
     },
@@ -1658,7 +1744,7 @@
       ]
     }
   ],
-  "next_action": "Finish the navigation system on chore/navigation-system: write the six skills under .claude/skills/<name>/SKILL.md (status, next, finish, closephase, unstuck, decide), docs/COMMANDS.md as the cheat sheet, and CLAUDE.md's fifth protocol on how to ask for a decision. Then generate the Phase 4 doc with `python tools/phasedoc/generate.py --open 4` and start Phase 4 from SPEC.md 15.",
+  "next_action": "Phase 4 subtask 4.1: build the resumable job runner in tools/ingest/ with checkpointing, so a killed ingestion resumes rather than restarts (exit criterion E2). Read docs/phases/phase-04-metadata-backbone.md first; R4 in docs/RISKS.md is this phase's named risk.",
   "blockers": [],
   "decisions_pending": [
     {

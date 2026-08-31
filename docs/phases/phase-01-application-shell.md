@@ -38,9 +38,9 @@ Tauri v2 + React + TypeScript (strict) + Vite + Tailwind wired and building. Win
 
 ## Risks named by this phase
 
-- **R1** — see docs/RISKS.md
-- **R2** — see docs/RISKS.md
-- **R3** — see docs/RISKS.md
+- **R1** — libmpv cannot be cleanly embedded in a Tauri v2 window
+- **R2** — librqbit's streaming control is insufficient for the Phase 7 scheduler
+- **R3** — ONNX Runtime is painful to build on Windows, or too slow on Tier 0
 
 ## Learning note
 
@@ -109,4 +109,4 @@ What Tauri actually is (webview + Rust process, not a browser); how IPC works an
 
 ### Next phase starts by
 
-Phase 3 is complete with all five exit criteria evidenced. Verify CI green on phase/03-data-layer, merge, tag phase-03. THEN: the author owes a ruling on P9 (sqlx compile-time query! macros vs runtime-checked queries) BEFORE Phase 4 starts, because Phase 4's ingestion pipeline writes far more SQL than Phase 3 did and converting later costs more.
+Phase 4 subtask 4.1: build the resumable job runner in tools/ingest/ with checkpointing, so a killed ingestion resumes rather than restarts (exit criterion E2). Read docs/phases/phase-04-metadata-backbone.md first; R4 in docs/RISKS.md is this phase's named risk.

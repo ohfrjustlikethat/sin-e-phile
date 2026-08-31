@@ -10,45 +10,42 @@
 
 ## Where we are right now
 
-**Phase 3 — Data Layer and Portable Storage** (`complete`, branch `phase/03-data-layer`)
+**Phase 4 — Metadata Backbone** (`in_progress`, branch `phase/04-metadata-backbone`)
 
-5 of 5 exit criteria met with evidence.
+0 of 7 exit criteria met with evidence.
 
-> The schema everything else depends on, designed once. Two constraints carry over: ADR-0022 puts all SQL in crates/persistence with src-tauri/src/persistence/ as re-exports only (guard-enforced), and SPEC.md 6.2 requires anime's absolute-vs-seasonal numbering and title variants designed NOW rather than patched in Phase 12. media_kind carries all eight values from the start so Phases 24-25 need no migration.
+> The catalogue. Three constraints carry in: ADR-0013 and ADR-0027 mean the app must be complete and good-looking with NO TMDB key and no key ever ships; ADR-0026 means SQL is runtime-checked, so every new repository method needs a line in crates/persistence/tests/repository_surface.rs; and R4 (ingestion larger or slower than expected) is this phase's named risk — measure before committing to a shape, and scope by a popularity threshold rather than ingesting everything.
 
-### Subtasks — 12/12 complete
+### Subtasks — 0/12 complete
 
-- [x] **3.1** crates/persistence: sqlx + SQLite with WAL, pinned versions; runtime-checked queries with tests/repository_surface.rs as the compensating control (ADR-0026); src-tauri/src/persistence/ re-exports only, guard-enforced (ADR-0022) · `593fcc8`
-- [x] **3.2** Path resolution: portable ./data/ next to the executable by default, %APPDATA% installed-mode as an opt-in; override and detection · `593fcc8`
-- [x] **3.3** Migration system: forward and backward migrations, with backup-on-migrate · `593fcc8`
-- [x] **3.4** Schema - identity: media_items with the eight-value media_kind discriminator, external_ids, titles (romaji/native/english variants) · `593fcc8`
-- [x] **3.5** Schema - people and taxonomy: people, credits, genres, keywords · `593fcc8`
-- [x] **3.6** Schema - series: series, seasons, episodes with BOTH seasonal and absolute numbering, plus the reconciliation table (SPEC.md 6.2 - designed now, not patched in Phase 12) · `593fcc8`
-- [x] **3.7** Schema - user and config: profiles, watch_events, playback_positions, watchlist_items, collections, local_files, local_file_matches, sources_config, settings · `593fcc8`
-- [x] **3.8** Repository-pattern access layer over the whole schema · `593fcc8`
-- [x] **3.9** Export/import of a whole profile as a portable archive · `593fcc8`
-- [x] **3.10** Migration round-trip integration tests: forward and backward against a populated database (E1) · `593fcc8`
-- [x] **3.11** 500,000 synthetic media items; indexed lookup under 100 ms, insertion timed separately (amendment 15); numbers into docs/PERFORMANCE.md and docs/eval-results.md · `593fcc8`
-- [x] **3.12** ER diagram in docs/ARCHITECTURE.md (E2), and an ADR recording why the schema is generic over media kind (E5) · `593fcc8`
+- [ ] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts
+- [ ] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres
+- [ ] **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device)
+- [ ] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering
+- [ ] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules
+- [ ] **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline
+- [ ] **4.7** Per-profile TMDB key from settings, never shipped (ADR-0027); every TMDB-dependent surface degrades to the typographic state
+- [ ] **4.8** Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding, blurhash placeholders
+- [ ] **4.9** First-run flow: usable during the background build, searching what is ingested so far
+- [ ] **4.10** The embedding artefact producer (ADR-0014): deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date; published as a GitHub Release asset
+- [ ] **4.11** Hand-checked 50-title anime ID-mapping fixture including long-running shonen, split-cour seasons, and films tied to series
+- [ ] **4.12** Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits
 
 ### Exit criteria
 
-- [x] **E1** All migrations run forward and backward cleanly against a populated database.
-      - *Evidence:* crates/persistence/tests/migrations.rs - 9 tests. `migrations_roll_back_against_a_populated_database` populates a FILE database across all four migrations then rolls back one at a time to 0 and asserts no tables survive; `the_ladder_can_be_climbed_twice` re-applies afterwards, which is what catches a down script that drops a table but forgets its indexes. Command: cargo test -p sinephile-persistence.
-- [x] **E2** Schema documented with an entity-relationship diagram in `docs/ARCHITECTURE.md`.
-      - *Evidence:* docs/ARCHITECTURE.md - mermaid ER diagram covering all 19 tables plus episode_numbering, with the four design decisions and the load-bearing PRAGMA configuration.
-- [x] **E3** A database populated with 500,000 synthetic media items answers indexed lookups in under 100 ms. (The 100 ms budget is the lookup alone; bulk insertion of the 500,000 rows has no time budget and is measured and recorded separately in `docs/PERFORMANCE.md`.)
-      - *Evidence:* cargo test -p sinephile-persistence --release --test benchmark -- --ignored --nocapture, 500,000 synthetic rows: by_id p99 0.098ms, by_exact_title p99 0.179ms, by_external_id p99 0.120ms against a 100ms budget. Bulk insert 43.7s (11,440 rows/sec), database 145.4 MB, timed separately per amendment 15. Recorded in docs/eval-results.md and docs/PERFORMANCE.md. The benchmark found idx_titles_text silently full-scanning (26.679ms -> 0.081ms p50, 330x) because its collation did not match the query's.
-- [x] **E4** Copying the app folder to another location and launching it preserves all data.
-      - *Evidence:* crates/persistence/tests/portability.rs - 5 tests. `a_copied_data_folder_keeps_everything` writes a populated installation, checkpoints the WAL, copies the whole data folder to another path with a directory-tree copy, opens it there and asserts catalogue, watch history, resume position and settings all survive; `nothing_in_the_database_records_where_it_lives` introspects the schema and fails if any new path-shaped column appears. Found a real bug: open_in probed writability before creating the directory, which failed on every fresh portable install.
-- [x] **E5** An ADR records why the schema is generic over media kind.
-      - *Evidence:* docs/adr/0025-generic-media-schema.md, verified by tests/migrations.rs::all_eight_media_kinds_are_accepted.
+- [ ] **E1** Full ingestion completes on the dev machine and the resulting database is under a documented size budget.
+- [ ] **E2** Ingestion killed mid-run resumes correctly.
+- [ ] **E3** Catalogue lookups work with the network disconnected.
+- [ ] **E4** Rate limits are never exceeded under a stress test of 1,000 rapid lookups.
+- [ ] **E5** Anime titles resolve across AniList and TMDB with correct ID mapping for a hand-checked set of 50 titles including tricky cases (long-running shonen, split-cour seasons, films tied to series).
+- [ ] **E6** The catalogue is fully usable with no TMDB key (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.
+- [ ] **E7** The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.
 
 ---
 
 ## What's next
 
-Finish the navigation system on chore/navigation-system: write the six skills under .claude/skills/<name>/SKILL.md (status, next, finish, closephase, unstuck, decide), docs/COMMANDS.md as the cheat sheet, and CLAUDE.md's fifth protocol on how to ask for a decision. Then generate the Phase 4 doc with `python tools/phasedoc/generate.py --open 4` and start Phase 4 from SPEC.md 15.
+Phase 4 subtask 4.1: build the resumable job runner in tools/ingest/ with checkpointing, so a killed ingestion resumes rather than restarts (exit criterion E2). Read docs/phases/phase-04-metadata-backbone.md first; R4 in docs/RISKS.md is this phase's named risk.
 
 ---
 
@@ -68,7 +65,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 1 | Application Shell and Capability Tiers | A | 0 | 1–2 | 7/7 |
 | [x] | 2 | Design System and Visual Language | A | 1 | 1–2 | 5/5 |
 | [x] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 5/5 |
-| [ ] | 4 | Metadata Backbone | A | 3 | 2–3 | 0/7 |
+| [~] | 4 | Metadata Backbone | A | 3 | 2–3 | 0/7 |
 | [ ] | 5 | Semantic Search Engine | A | 4 | 2 | 0/5 |
 | [ ] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 0/6 |
 | [ ] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 0/6 |
