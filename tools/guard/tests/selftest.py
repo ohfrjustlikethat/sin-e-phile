@@ -142,8 +142,17 @@ def run_selftest() -> int:
     ARCH_SHOULD_PASS = [
         ("re-export line", "src-tauri/src/persistence/mod.rs",
          "pub use sinephile_persistence::{Db, MediaRepository};"),
+        # rustfmt wraps a long re-export across four lines, three of which look
+        # like nothing in particular. The line-based first version of this check
+        # rejected every multi-line re-export in the very file it protects.
+        ("rustfmt-wrapped re-export", "src-tauri/src/persistence/mod.rs",
+         "pub use sinephile_persistence::model::{" 
+         + "\n    EpisodeNumbering, IdSource, MediaItem, MediaKind,"
+         + "\n};"),
         ("doc comment in the re-export module", "src-tauri/src/persistence/mod.rs",
          "//! Re-exports of crates/persistence (ADR-0022)."),
+        ("attribute in the re-export module", "src-tauri/src/persistence/mod.rs",
+         "#[allow(unused_imports)]"),
         ("SQL in a crate is fine", "crates/persistence/src/lib.rs",
          'sqlx::query("SELECT 1").execute(&pool).await?;'),
         ("SQL in a migration is fine", "crates/persistence/migrations/001.sql",

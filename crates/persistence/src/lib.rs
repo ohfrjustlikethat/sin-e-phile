@@ -8,11 +8,13 @@
 //! Windows at all, and `SPEC.md` Phase 3 requires integration tests for migrations
 //! forward *and* backward. Putting the data layer here is what makes that possible.
 
+pub mod archive;
 pub mod db;
 pub mod model;
 pub mod paths;
 pub mod repositories;
 
+pub use archive::{ArchiveError, Archiver, ImportSummary, ProfileArchive};
 pub use db::{Db, DbError, SqlitePool};
 pub use model::{
     EpisodeNumbering, IdSource, MediaItem, MediaKind, NewMediaItem, Title, TitleVariant,

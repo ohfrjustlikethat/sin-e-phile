@@ -3327,6 +3327,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "sinephile-persistence",
  "sinephile-tiers",
  "specta",
  "specta-typescript",

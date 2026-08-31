@@ -544,11 +544,35 @@ SQL_STATEMENT_RE = re.compile(
 )
 SQLX_RE = re.compile(r"sqlx")
 
-# A re-export module may contain only these. Anything else is logic.
+# A re-export module may contain only these statements. Checked per STATEMENT, not
+# per line: a rustfmt-wrapped `pub use foo::{A, B, C};` spans four lines, three of
+# which look like nothing in particular. The line-based first version rejected every
+# multi-line re-export in the file it was written to protect.
 REEXPORT_OK_RE = re.compile(
-    r"^\s*(//.*|/\*.*|\*.*|\*/|#!?\[.*|pub\s+use\s+.*|use\s+.*|pub\s+mod\s+.*"
-    r"|mod\s+.*|pub\s+type\s+.*|\}|\)|)$"
+    r"^(pub\s+use|use|pub\s+mod|mod|pub\s+type|pub\s+crate::|#!?\[)", re.S
 )
+
+
+def rust_statements(text: str):
+    """Yield (line_number, statement) with comments stripped.
+
+    Deliberately simple: this is a structural check on a module that is allowed to
+    contain almost nothing, not a Rust parser.
+    """
+    out, buf, start_line = [], [], 1
+    for n, raw in enumerate(text.splitlines(), 1):
+        line = raw.split("//")[0].rstrip()
+        if not line.strip():
+            continue
+        if not buf:
+            start_line = n
+        buf.append(line.strip())
+        if line.rstrip().endswith(";") or line.strip() in ("}", "};"):
+            out.append((start_line, " ".join(buf)))
+            buf = []
+    if buf:
+        out.append((start_line, " ".join(buf)))
+    return out
 
 
 def check_architecture(paths_and_text) -> list[str]:
@@ -560,17 +584,21 @@ def check_architecture(paths_and_text) -> list[str]:
             continue
 
         in_persistence = rel.startswith("src-tauri/src/persistence/")
+
         for n, line in enumerate(text.splitlines(), 1):
             if SQLX_RE.search(line) or SQL_STATEMENT_RE.search(line):
                 errors.append(
                     f"{rel}:{n}: SQL or sqlx under src-tauri/. Raw SQL lives in "
                     f"crates/persistence/ (ADR-0022); src-tauri re-exports it."
                 )
-            if in_persistence and not REEXPORT_OK_RE.match(line):
-                errors.append(
-                    f"{rel}:{n}: src-tauri/src/persistence/ contains re-exports and "
-                    f"nothing else. This line is logic: {line.strip()[:60]}"
-                )
+
+        if in_persistence:
+            for n, statement in rust_statements(text):
+                if not REEXPORT_OK_RE.match(statement):
+                    errors.append(
+                        f"{rel}:{n}: src-tauri/src/persistence/ contains re-exports "
+                        f"and nothing else. This is logic: {statement[:60]}"
+                    )
     return errors
 
 
