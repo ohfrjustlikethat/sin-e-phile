@@ -165,6 +165,25 @@ jobs:
       - run: npm run build
         if: steps.detect.outputs.present == 'true'
 
+      # Phase 2. WCAG AA is a spec requirement (SPEC.md §9.1), and contrast is
+      # exactly the kind of thing that regresses invisibly when a token is nudged
+      # for aesthetic reasons. The audit reads the real token values out of
+      # src/styles/tokens.css and fails the build on any enforced pair below its
+      # threshold, so the failure lands on the commit that caused it.
+      - name: Contrast audit (WCAG AA)
+        if: steps.detect.outputs.present == 'true'
+        run: python tools/contrast/audit.py
+
+      # Phase 2. Drives the real design gallery in headless Chrome and asserts the
+      # things a screenshot cannot: that the virtualised rail holds 60fps with 500
+      # cards, that every focus stop has a visible ring, that the rail is reachable
+      # end-to-end by keyboard, and that prefers-reduced-motion leaves nothing but
+      # opacity animating. Every one of these caught a real bug the day it was
+      # written, which is the argument for running it on every push.
+      - name: UI audit (60fps · focus · keyboard · reduced motion)
+        if: steps.detect.outputs.present == 'true'
+        run: node tools/uiaudit/run.mjs --ci
+
   # ───────────────────────────────────────────────────────────────────────────
   # E1 — a fresh clone on a clean runner produces a working dev environment.
   #

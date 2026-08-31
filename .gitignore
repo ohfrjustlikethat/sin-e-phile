@@ -60,3 +60,4 @@ src-tauri/gen/
 *.swp
 Thumbs.db
 desktop.ini
+tools/uiaudit/out/

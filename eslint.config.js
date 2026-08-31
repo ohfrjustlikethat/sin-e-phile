@@ -15,6 +15,9 @@ export default tseslint.config(
       "crates/**",
       "spikes/**",
       "node_modules/**",
+      // Standalone static HTML, deliberately not part of the app build. They are
+      // a record of what was chosen in Phase 2 (ADR-0024), kept as they were shown.
+      "docs/design/mockups/**",
     ],
   },
   js.configs.recommended,
@@ -37,5 +40,21 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
       "no-console": ["warn", { allow: ["error", "warn"] }],
     },
+  },
+  {
+    // tools/ are Node scripts, not app code: they run under Node, they have no
+    // DOM, and printing a measurement to stdout is the entire point of a harness.
+    files: ["tools/**/*.mjs", "*.config.js"],
+    languageOptions: {
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        fetch: "readonly",
+        WebSocket: "readonly",
+        Buffer: "readonly",
+        URL: "readonly",
+      },
+    },
+    rules: { "no-console": "off" },
   },
 );

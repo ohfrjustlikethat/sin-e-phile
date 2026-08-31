@@ -26,13 +26,19 @@ if (!root) throw new Error("#root is missing from index.html");
 // nested rAFs: the first fires before the paint, the second after it. The
 // backend reveals the window at that point, so cold start is measured to
 // something the user could see, and there is never a flash of empty window.
-requestAnimationFrame(() =>
-  requestAnimationFrame(() => {
-    void commands.frontendReady().catch(() => {
-      /* running outside Tauri (vitest, browser) — nothing to reveal */
-    });
-  }),
-);
+//
+// Guarded on the shell being present: `@tauri-apps/api` reads
+// `window.__TAURI_INTERNALS__` and throws without it, and this file runs in a
+// plain browser whenever the design gallery is opened there.
+if ("__TAURI_INTERNALS__" in window) {
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      void commands.frontendReady().catch(() => {
+        /* the backend will reveal the window on its watchdog instead */
+      });
+    }),
+  );
+}
 
 ReactDOM.createRoot(root).render(
   <React.StrictMode>

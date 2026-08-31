@@ -1,72 +1,157 @@
-/* Design tokens — SPEC.md §9.1, "Charcoal & Oxblood".
+/* Design tokens — SPEC.md §9.1, "Charcoal & Oxblood", as revised by ADR-0023 and
+ * implemented as Take B (ADR-0024).
  *
- * Phase 2 builds the design system properly. These are the starting tokens, held
- * as CSS custom properties so theming stays honest and Tailwind consumes them
- * rather than duplicating them.
+ * THE ONE PLACE a colour, size or duration is defined. Tailwind's theme in
+ * global.css points at these; nothing declares a raw hex anywhere else.
  *
- * COLOUR RULES (§9.1), which the Phase 2 contrast audit will enforce:
- *   - Oxblood is for INTENT — play, focus, progress, active nav. Never decorative,
- *     never a large fill.
- *   - Posters and stills are the colour in this app. The chrome recedes.
- *   - --danger and --oxblood must never appear adjacent.
- *   - Every text/background pair must pass WCAG AA. --ink-faint on --surface is
- *     the one to watch.
+ * Two structural properties matter more than the individual values:
+ *
+ *   1. THE GREYS ARE WARM (R >= G >= B). The ink is a warm cream, and a cool grey
+ *      ground fights it — that mismatch is a large part of why the original
+ *      palette read flat and generic.
+ *
+ *   2. THE VALUE STEPS ARE NON-LINEAR. A large jump from --base to --surface, then
+ *      small ones. Elevation is therefore rare and means something, rather than
+ *      being a gentle ramp every panel sits somewhere on.
+ *
+ * Every text/background pair used in the app is declared in tools/contrast/pairs.txt
+ * and checked against WCAG AA by tools/contrast/audit.py, which fails CI. Change a
+ * value here and the audit tells you what it broke.
  */
 
 :root {
-  /* Ground */
-  --void: #0c0c0e;
-  --base: #131316;
-  --surface: #1a1a1e;
-  --raised: #232328;
-  --overlay: #2c2c32;
-  --scrim: rgba(12, 12, 14, 0.82);
+  /* ── Ground ─────────────────────────────────────────────────────────────── */
+  --void: #000000; /* player letterbox, behind full-bleed stills */
+  --base: #0a0a0a; /* app background */
+  --surface: #141312; /* cards, rails, panels */
+  --raised: #1f1d1b; /* hover, elevated cards */
+  --overlay: #262421; /* menus, popovers */
+  --scrim: rgba(0, 0, 0, 0.86);
 
-  /* Line */
-  --line-subtle: #26262c;
-  --line: #35353e;
-  --line-strong: #4a4a55;
+  /* ── Line — depth comes from these, never from shadows (§9.0) ─────────────
+   * The first three are DECORATIVE separators: panel edges, rules, card outlines.
+   * They are deliberately hairline-quiet and are not required to hit 3:1, because
+   * WCAG 1.4.11 governs boundaries that IDENTIFY a component, not every rule.
+   *
+   * --line-interactive is different: it draws the boundary of buttons and inputs,
+   * which is exactly what 1.4.11 covers, so it is solved to 3:1 and the audit
+   * enforces it. Using a decorative line for a control is a real defect.
+   */
+  --line-subtle: #1c1a18;
+  --line: #2c2926;
+  --line-strong: #423e39;
+  --line-interactive: #6a635c; /* 3.15:1 on --surface — component boundaries */
 
-  /* Type — warm cream, never pure white */
-  --ink: #f2efe9;
-  --ink-muted: #a8a49c;
-  --ink-faint: #6e6a64;
+  /* ── Type — warm cream, never pure white ──────────────────────────────────
+   * Three levels, all clearing WCAG AA against every ground including --overlay,
+   * with real separation between them: 13.9:1 / 7.6:1 / 4.7:1.
+   * Each carries ~5% margin above its minimum, so a token never sits exactly on
+   * the line where a later tweak to a ground would silently break it.
+   *
+   * The originals were 17.7 / 5.2 / 2.7 — faint failed badly, and solving it alone
+   * would have pushed it into muted and collapsed a hierarchy level. Both were
+   * moved so the three steps stay distinguishable. Found by the contrast audit,
+   * exactly as §9.1 predicted ("--ink-faint on --surface is the one to watch").
+   */
+  --ink: #f5f2ed;
+  --ink-muted: #b9b5b0;
+  --ink-faint: #958d84;
 
-  /* Accent — oxblood */
-  --oxblood: #8c2f39;
-  --oxblood-hover: #a03642;
-  --oxblood-bright: #c04a56;
-  --oxblood-deep: #551d24;
-  --oxblood-wash: rgba(140, 47, 57, 0.14);
-  --oxblood-glow: rgba(192, 74, 86, 0.3);
+  /* ── Accent — oxblood. INTENT ONLY: play, focus, progress, active nav.
+   *    Never decorative, never a large fill (§9.1). ─────────────────────────── */
+  --oxblood: #8e2b34;
+  --oxblood-hover: #a6333e;
+  --oxblood-bright: #c4434f; /* focus rings, progress, marks — NON-TEXT (3:1) */
+  --oxblood-text: #cb5863; /* the accent carrying SMALL TEXT — spine numbers (4.5:1) */
+  --oxblood-deep: #4e171c; /* pressed, deep fills */
+  --oxblood-wash: rgba(142, 43, 52, 0.16);
+  /* Two accent tokens, deliberately. WCAG asks 3:1 of a focus ring and 4.5:1 of
+   * small text, and the design uses oxblood for both. One token cannot satisfy
+   * both without either failing the text or over-brightening the ring into pink. */
 
-  /* Semantic — deliberately distinct from oxblood */
-  --success: #4e7a5c;
+  /* ── Semantic — deliberately distinct from oxblood.
+   *    --danger and --oxblood must never appear adjacent (§9.1). ───────────── */
+  --success: #578866;
   --warning: #b8873f;
-  --danger: #d9503f;
-  --info: #5a7a8c;
+  --danger: #d9503f; /* vermilion, clearly hotter than oxblood */
+  --info: #608295;
 
-  /* Motion — §9.3 */
+  /* ── Type families (ADR-0024) ───────────────────────────────────────────────
+   * Bricolage Grotesque is the identity. Instrument Serif is for FILM TITLES
+   * ONLY — using it for UI headings collapses the distinction that makes it read
+   * as editorial. Inter never appears at display sizes (§9.0's biggest tell).
+   */
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-serif: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --font-ui: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+
+  /* ── Scale — §9.2. Display sizes take tighter tracking; small uppercase
+   *    labels take +0.12 to +0.16em, which is the MUBI tell. ───────────────── */
+  --text-2xs: 9.5px;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 26px;
+  --text-3xl: 34px;
+  --text-4xl: 46px;
+  --text-5xl: 62px;
+  --text-6xl: 84px;
+
+  --tracking-display: -0.045em;
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-label: 0.14em; /* small uppercase metadata */
+  --tracking-label-wide: 0.16em;
+
+  /* ── Radius — §9.0 permits at most TWO values, one of which must be 0 or 2px.
+   *    These are the two. There is no --radius-lg and there must never be. ─── */
+  --radius-none: 0;
+  --radius-sm: 2px;
+
+  /* ── Motion — §9.3 ──────────────────────────────────────────────────────── */
   --ease-standard: cubic-bezier(0.32, 0.72, 0, 1);
-  --dur-standard: 180ms;
   --dur-fast: 120ms;
+  --dur-standard: 180ms;
+  --dur-slow: 400ms;
+  --dwell-preview: 400ms; /* before a hover preview may begin */
 
-  /* Layout — §9.4 */
+  /* ── Layout — §9.4 ──────────────────────────────────────────────────────── */
   --rail-collapsed: 72px;
   --rail-expanded: 240px;
+  --index-col: 96px; /* the Take B index column — a layout invariant (ADR-0024) */
   --content-max: 1680px;
+  --hero-height: 74vh; /* Take A's hero, per the author's choice */
 }
 
-/* §9.3: prefers-reduced-motion disables scale and parallax and keeps opacity
-   fades at 100ms. Enforced globally rather than per-component so it cannot be
-   forgotten. */
+/* §9.3: prefers-reduced-motion disables all scale and parallax and keeps opacity
+ * fades at 100ms. Global rather than per-component, so it cannot be forgotten by
+ * a component author.
+ *
+ * `transition-property: opacity` is the load-bearing line, and it was missing.
+ * CSS defaults `transition-property` to `all`, so an earlier version of this rule
+ * — which set only `transition-duration` on `*` — made EVERY animatable property
+ * on EVERY element transition for 100ms. Reduced motion was adding motion that
+ * was not there before: colours crossfaded, and layout changes animated. Pinning
+ * the property to `opacity` is what actually implements the sentence above, and
+ * it makes transforms untransitionable rather than merely fast. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    transition-property: opacity !important;
     transition-duration: 100ms !important;
     scroll-behavior: auto !important;
+  }
+  /* Scale and parallax specifically: a static transform would otherwise survive,
+   * since forbidding the transition does not remove the transform itself. */
+  [data-motion="scale"],
+  [data-motion="parallax"] {
+    transform: none !important;
   }
 }

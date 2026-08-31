@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>sin-e-phile — Phase 2 mockups</title>
+<link rel="stylesheet" href="./fonts.css">
+<style>
+  :root {
+    --base:#0A0A0A; --surface:#141312; --line-subtle:#1C1A18; --line:#2C2926;
+    --line-strong:#423E39; --ink:#F5F2ED; --ink-muted:#9A948C; --ink-faint:#6B655D;
+    --oxblood:#8E2B34; --oxblood-bright:#C4434F;
+  }
+  * { box-sizing:border-box; margin:0; padding:0 }
+  body {
+    background:var(--base); color:var(--ink); font-family:"Inter",system-ui,sans-serif;
+    font-size:14px; line-height:1.6; padding:64px; -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:1080px; margin:0 auto }
+  .label { font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-faint) }
+  h1 { font-family:"Instrument Serif",Georgia,serif; font-weight:400; font-size:62px;
+       letter-spacing:-.025em; margin:14px 0 18px; line-height:1 }
+  .lede { color:var(--ink-muted); font-size:16px; max-width:660px; margin-bottom:12px }
+  .rule { height:1px; background:var(--line-subtle); margin:44px 0 }
+  .takes { display:grid; grid-template-columns:repeat(3,1fr); gap:22px }
+  .take { border:1px solid var(--line); background:var(--surface); padding:26px 24px 24px }
+  .take h2 { font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--oxblood-bright); margin-bottom:10px }
+  .take .name { font-family:"Instrument Serif",Georgia,serif; font-size:29px; line-height:1.05; margin-bottom:12px }
+  .take p { color:var(--ink-muted); font-size:13px; line-height:1.65; margin-bottom:16px }
+  .spec { border-top:1px solid var(--line-subtle); padding-top:14px; margin-bottom:18px }
+  .spec div { display:flex; justify-content:space-between; padding:5px 0; font-size:11.5px }
+  .spec .k { color:var(--ink-faint); text-transform:uppercase; letter-spacing:.1em; font-size:9.5px }
+  .links { display:flex; flex-direction:column; gap:6px }
+  .links a { color:var(--ink); text-decoration:none; border:1px solid var(--line-strong);
+             padding:9px 12px; font-size:11px; letter-spacing:.11em; text-transform:uppercase; text-align:center }
+  .links a:hover { background:var(--oxblood); border-color:var(--oxblood) }
+  .note { color:var(--ink-faint); font-size:12.5px; line-height:1.75; max-width:720px }
+  code { font-family:"JetBrains Mono",monospace; font-size:11.5px; color:var(--ink-muted) }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="label">Phase 2 · SPEC.md §9.0 · ADR-0023</div>
+  <h1>Three takes on one brief</h1>
+  <p class="lede">
+    Same content, same palette, same constraints. They differ in typography and
+    layout — which is what is being chosen between.
+  </p>
+  <p class="note">
+    Every still is a real frame pulled with FFmpeg from a public-domain film on the
+    Internet Archive. Real titles, real credits, real synopses. No placeholders, per
+    the brief — grey boxes hide exactly the problems worth seeing.
+  </p>
+
+  <div class="rule"></div>
+
+  <div class="takes">
+    <section class="take">
+      <h2>Take A</h2>
+      <div class="name">Editorial</div>
+      <p>
+        The most MUBI-led. Bets on emptiness: one enormous still, very little else,
+        and a serif that only appears at title sizes. Fewest titles above the fold,
+        most atmosphere.
+      </p>
+      <div class="spec">
+        <div><span class="k">Display</span><span>Instrument Serif</span></div>
+        <div><span class="k">UI</span><span>Instrument Sans</span></div>
+        <div><span class="k">Radius</span><span>0 only</span></div>
+        <div><span class="k">Hero</span><span>74vh</span></div>
+      </div>
+      <div class="links">
+        <a href="./take-a.html?screen=0">Home</a>
+        <a href="./take-a.html?screen=1">Film detail</a>
+        <a href="./take-a.html?screen=2">Player</a>
+      </div>
+    </section>
+
+    <section class="take">
+      <h2>Take B</h2>
+      <div class="name">Catalogue</div>
+      <p>
+        Criterion-led. The app as a collection that has been kept: spine numbers, a
+        hairline index column running down every screen, rule lines. Ordered density
+        rather than emptiness.
+      </p>
+      <div class="spec">
+        <div><span class="k">Display</span><span>Bricolage Grotesque 800</span></div>
+        <div><span class="k">Titles</span><span>Instrument Serif</span></div>
+        <div><span class="k">Radius</span><span>0 and 2px</span></div>
+        <div><span class="k">Hero</span><span>56vh</span></div>
+      </div>
+      <div class="links">
+        <a href="./take-b.html?screen=0">Home</a>
+        <a href="./take-b.html?screen=1">Film detail</a>
+        <a href="./take-b.html?screen=2">Player</a>
+      </div>
+    </section>
+
+    <section class="take">
+      <h2>Take C</h2>
+      <div class="name">Signal</div>
+      <p>
+        Spotify-led. Hierarchy readable across a room: very heavy display against
+        very quiet metadata, bigger jumps between levels. Assumes you opened the app
+        to find something, not to admire it.
+      </p>
+      <div class="spec">
+        <div><span class="k">Display</span><span>Archivo 800</span></div>
+        <div><span class="k">Editorial</span><span>Instrument Serif</span></div>
+        <div><span class="k">Radius</span><span>0 and 2px</span></div>
+        <div><span class="k">Hero</span><span>50vh</span></div>
+      </div>
+      <div class="links">
+        <a href="./take-c.html?screen=0">Home</a>
+        <a href="./take-c.html?screen=1">Film detail</a>
+        <a href="./take-c.html?screen=2">Player</a>
+      </div>
+    </section>
+  </div>
+
+  <div class="rule"></div>
+
+  <p class="note">
+    All three share the revised §9.1 palette: warm near-black greys, non-linear value
+    steps, oxblood reserved for intent. All three obey §9.0 — no purple, no glass, no
+    gradients as decoration, no emoji, no bento grids, depth from surface value and
+    1px lines only, at most two radius values, and deliberately irregular card sizes.
+    All three use the ADR-0020 solid opaque player panel, and all three show the
+    ADR-0013 typographic card for the film with no artwork.<br><br>
+    Fonts are self-hosted woff2 in <code>./fonts/</code> — no network requests, per §9.2.
+  </p>
+</div>
+</body>
+</html>

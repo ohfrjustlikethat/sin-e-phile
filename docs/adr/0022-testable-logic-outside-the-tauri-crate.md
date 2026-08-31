@@ -32,6 +32,12 @@ testing.
 re-exports them so call sites are unchanged. First instance: `crates/tiers`, holding
 the §8 tier logic with 8 unit tests.
 
+**This is an architectural constraint, not a preference** (author's ruling,
+2026-09-01). **Check it at every phase:** if logic is going into `src-tauri` that
+ought to be testable, it belongs in a crate instead. The question "is this testable?"
+and the question "does this belong in `src-tauri`?" have the same answer, and
+`src-tauri` stays what §7 already calls it — a thin IPC surface with no logic.
+
 ## Consequences
 
 - Unit tests run, on stable, with no nightly flag and no manifest games.
