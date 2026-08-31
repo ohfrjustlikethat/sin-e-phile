@@ -15,7 +15,7 @@ use std::path::Path;
 
 use sinephile_persistence::repositories::profiles::PlaybackPosition;
 use sinephile_persistence::repositories::{MediaRepository, ProfileRepository};
-use sinephile_persistence::{paths, Db, DataLocation, IdSource, NewMediaItem};
+use sinephile_persistence::{paths, DataLocation, Db, IdSource, NewMediaItem};
 
 /// Copy a directory tree, the way a user dragging a folder would.
 fn copy_dir(from: &Path, to: &Path) {
@@ -70,7 +70,10 @@ async fn a_copied_data_folder_keeps_everything() {
             )
             .await
             .expect("position");
-        profiles.set_setting("theme", "dark").await.expect("setting");
+        profiles
+            .set_setting("theme", "dark")
+            .await
+            .expect("setting");
 
         // Fold the WAL back in, as closing the app does. Without this the copy
         // below loses every write made since the last automatic checkpoint.
