@@ -122,19 +122,28 @@ def check_progress(_: dict) -> list[Problem]:
     exists to report, so the original is restored either way and the fix is left
     to the caller.
     """
-    # BYTES, not text. `read_text` normalises newlines and `write_text` translates
-    # them back to the platform default, so the first version silently rewrote
-    # PROGRESS.md from LF to CRLF on every run — and then compared normalised text,
-    # which made it blind to the damage it was doing. CI saw a 118-line diff on a
-    # file whose content had not changed at all.
+    # Compare NORMALISED, restore EXACT. The two halves are different problems and
+    # the first version got both wrong in the same line.
+    #
+    # Restore must be byte-exact: `write_text` translates newlines to the platform
+    # default, so the original silently rewrote PROGRESS.md from LF to CRLF on every
+    # run, while comparing normalised text — blind to the damage it was doing.
+    #
+    # Comparison must ignore newlines: git checks out with `core.autocrlf` on the
+    # Windows CI runner, so the working tree is CRLF while the generator writes LF.
+    # A byte comparison there fails on every run for a file whose content is
+    # identical, which is a check that cries wolf until it is deleted.
+    def normalise(raw: bytes) -> bytes:
+        return raw.replace(b"\r\n", b"\n")
+
     before = PROGRESS.read_bytes() if PROGRESS.exists() else b""
     subprocess.run(
         [sys.executable, str(VALIDATE), "--progress"],
         cwd=REPO, capture_output=True, text=True,
     )
     after = PROGRESS.read_bytes() if PROGRESS.exists() else b""
-    if after != before:
-        PROGRESS.write_bytes(before)
+    PROGRESS.write_bytes(before)
+    if normalise(after) != normalise(before):
         return [Problem(
             "PROGRESS.md",
             "is out of sync with PROJECT_STATE.json",
