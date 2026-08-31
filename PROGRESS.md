@@ -4,43 +4,49 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 1.3.0** · 5 session(s) completed · last updated 2026-09-01
+**Spec version 1.4.0** · 5 session(s) completed · last updated 2026-08-31
 
 ---
 
 ## Where we are right now
 
-**Phase 2 — Design System and Visual Language** (`not_started`, branch `phase/02-design-system`)
+**Phase 2 — Design System and Visual Language** (`complete`, branch `phase/02-design-system`)
 
-0 of 5 exit criteria met with evidence.
+5 of 5 exit criteria met with evidence.
 
 > Phase 2 builds the visual language BEFORE any product UI. Two constraints carry over from Phase 1: ADR-0020 removed the gradient scrim under player chrome, so the design system must produce a solid opaque panel; and ADR-0013 requires every artwork-bearing surface to have a designed artwork-free state, so PosterCard needs a typographic fallback rather than a grey rectangle.
 
-### Subtasks — 0/9 complete
+### Subtasks — 10/10 complete
 
-- [ ] **2.1** All SPEC.md 9 tokens as CSS custom properties consumed by the Tailwind theme; fonts bundled locally, no network font requests
-- [ ] **2.2** Component gallery route /design, dev-only, rendering every primitive in every state
-- [ ] **2.3** Primitives: Button, IconButton, Input, Select, Toggle, Slider, Tabs, Tooltip, Popover, Dialog, Toast, Skeleton, Spinner, Badge, ProgressBar, Rating
-- [ ] **2.4** Media primitives: PosterCard (with the ADR-0013 typographic artwork-free state), EpisodeCard, ChannelCard, Rail, HeroBanner, EmptyState
-- [ ] **2.5** Rail: virtualised, momentum scroll, edge-bleed, keyboard-navigable, 60fps with 500 cards
-- [ ] **2.6** Focus management with visible rings and correct tab order; full keyboard navigation; Ctrl+K command palette shell
-- [ ] **2.7** prefers-reduced-motion support throughout (the global rule exists from Phase 1; verify per component)
-- [ ] **2.8** Contrast audit script failing CI if any text token pair drops below WCAG AA; --ink-faint on --surface is the one to check
-- [ ] **2.9** docs/specs/design-system.md documenting every token and component with usage rules
+- [x] **2.0** THREE static HTML mockups of Home, film detail, and player-with-chrome, as three interpretations within the SPEC.md 9.0 brief, with REAL artwork and metadata. Author chooses before any token or component code.
+- [x] **2.1** All SPEC.md 9 tokens as CSS custom properties consumed by the Tailwind theme; fonts bundled locally, no network font requests
+- [x] **2.2** Component gallery route /design, dev-only, rendering every primitive in every state
+- [x] **2.3** Primitives: Button, IconButton, Input, Select, Toggle, Slider, Tabs, Tooltip, Popover, Dialog, Toast, Skeleton, Spinner, Badge, ProgressBar, Rating
+- [x] **2.4** Media primitives: PosterCard (with the ADR-0013 typographic artwork-free state), EpisodeCard, ChannelCard, Rail, HeroBanner, EmptyState
+- [x] **2.5** Rail: virtualised, momentum scroll, edge-bleed, keyboard-navigable, 60fps with 500 cards
+- [x] **2.6** Focus management with visible rings and correct tab order; full keyboard navigation; Ctrl+K command palette shell
+- [x] **2.7** prefers-reduced-motion support throughout (the global rule exists from Phase 1; verify per component)
+- [x] **2.8** Contrast audit script failing CI if any text token pair drops below WCAG AA; --ink-faint on --surface is the one to check
+- [x] **2.9** docs/specs/design-system.md documenting every token and component with usage rules
 
 ### Exit criteria
 
-- [ ] **E1** Every primitive renders correctly in the gallery, in all states.
-- [ ] **E2** The entire gallery is navigable by keyboard alone with visible focus at every step.
-- [ ] **E3** Contrast audit passes.
-- [ ] **E4** A rail of 500 poster cards scrolls at 60 fps with no dropped frames.
-- [ ] **E5** `docs/specs/design-system.md` documents every token and component with usage rules.
+- [x] **E1** Every primitive renders correctly in the gallery, in all states.
+      - *Evidence:* Rendered headless at 1500px across all four gallery tabs with 0 page errors; screenshots in tools/uiaudit/out/. Every primitive shown in loading, disabled, error and empty states; PosterCard shown in both ADR-0013 states side by side.
+- [x] **E2** The entire gallery is navigable by keyboard alone with visible focus at every step.
+      - *Evidence:* node tools/uiaudit/run.mjs: 45 Tab stops walked, 0 without a visible focus ring, 0 off-screen. Rail exposes exactly 1 tab stop; ArrowRight/End reach card 499 of 500 (roving tabindex).
+- [x] **E3** Contrast audit passes.
+      - *Evidence:* python tools/contrast/audit.py -> "29 enforced pairs pass WCAG AA (3 decorative recorded, not enforced)"; runs in CI.
+- [x] **E4** A rail of 500 poster cards scrolls at 60 fps with no dropped frames.
+      - *Evidence:* node tools/uiaudit/run.mjs -> 200 sampled frames flicking 500 cards: median 16.7ms, p95 16.7ms, worst 16.8ms, 0 frames over 33.3ms, 14/500 cards mounted. Harness verified to fail on a reintroduced regression.
+- [x] **E5** `docs/specs/design-system.md` documents every token and component with usage rules.
+      - *Evidence:* docs/specs/design-system.md - tokens, layout invariants, all 21 components, Rail virtualisation + keyboard contract, motion, measured numbers, and rules for extending it.
 
 ---
 
 ## What's next
 
-Start Phase 2 on branch phase/02-design-system. Begin with subtask 2.1: move the SPEC.md 9.1 tokens already in src/styles/tokens.css to their final form, bundle Inter, Fraunces or Instrument Serif, and JetBrains Mono locally as woff2 (9.2 forbids network font requests), and wire the 9.2 type scale into the Tailwind theme. Then 2.8 EARLY rather than last: the contrast audit is a script that fails CI, and writing it before the primitives means the tokens get fixed once rather than every component being retrofitted. Watch --ink-faint on --surface, which 9.1 names as the pair most likely to fail AA. Two constraints carry over: ADR-0020 means player chrome is a solid opaque panel with no gradient scrim, and ADR-0013 means PosterCard needs a designed typographic state for when no artwork exists. Phase 2 is 1-2 sessions.
+Phase 2 is code-complete with all five exit criteria evidenced. Verify CI is green on phase/02-design-system (the workflow now runs two new jobs: "Contrast audit (WCAG AA)" and "UI audit" - the UI audit needs Chrome on the runner, so check that step specifically). Then merge to main, confirm green, tag phase-02. Next is Phase 3; read docs/phases/phase-03-*.md first. The understanding gate does NOT fire here - ADR-0016 moved it to tier boundaries, so the five questions in docs/learning/phase-02-notes.md accumulate and are asked with Phases 1-8 at the end of Phase 8.
 
 ---
 
@@ -99,6 +105,8 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D6** (raised in Phase 1) librqbit has no webseed (BEP-19) support, so Internet Archive torrents will not work through the torrent path. Phase 6's InternetArchiveBackend must resolve to direct HTTP instead. Not a defect, but it constrains how that backend is built.
 - **D7** (raised in Phase 1) Integration tests that need a running Tauri app cannot run under cargo test on Windows (ADR-0022): a test binary linking Tauri fails to launch with STATUS_ENTRYPOINT_NOT_FOUND, and the targeted fix is nightly-only. Unit tests are unaffected because logic lives in crates/. Such tests belong in the SPEC.md 12.3 manual plan, or a WebDriver harness later.
 - **D8** (raised in Phase 1) tiers.rs treats any non-software DXGI adapter as having hardware decode, and uses >= 2 GB dedicated VRAM as a proxy for 'discrete GPU or strong iGPU'. Both are coarse. Whether a SPECIFIC codec decodes in hardware is only knowable at play time from mpv's hwdec-current, so Phase 8 should feed that back and Phase 21 should revisit the VRAM threshold against real Tier 0/1 hardware.
+- **D9** (raised in Phase 2) Rail's roving tabindex sets tabIndex imperatively on the first focusable descendant of each mounted item rather than threading it through the render prop. Correct today because `render` returns caller-owned markup, but it silently does nothing if a card's first focusable element is not its main control. Revisit in Phase 9, when real screens use Rail with more complex cards.
+- **D10** (raised in Phase 2) The UI audit (tools/uiaudit) drives the design gallery, not real product screens - those do not exist until Phase 9. Its budgets prove the Rail component holds 60fps, not that any real screen does. Revisit in Phase 9: point the audit at the Home screen too.
 
 ---
 

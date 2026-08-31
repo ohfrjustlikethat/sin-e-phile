@@ -1,0 +1,62 @@
+# Declared text/background pairs — SPEC.md §9.1, checked by audit.py against WCAG AA.
+#
+#   foreground | background | class | why it exists
+#
+# class:  body   normal text under 18.66px       -> 4.5:1
+#         large  text at/above 18.66px, or bold  -> 3.0:1
+#         ui     borders, icons, non-text        -> 3.0:1
+#
+# ADDING A LINE IS A DELIBERATE ACT. If a component needs a pair that is not here,
+# either the pair belongs in the design (add it, and make it pass) or the component
+# is inventing a combination the system does not have.
+#
+# §9.1 names --ink-faint on --surface as the one to watch. It is line 1 for that reason.
+
+--ink-faint       | --surface   | body  | metadata under cards, secondary labels in panels
+--ink-faint       | --base      | body  | metadata on the app ground
+--ink-faint       | --raised    | body  | metadata on a hovered card
+--ink-faint       | --overlay   | body  | secondary text in menus and popovers
+
+--ink-muted       | --surface   | body  | synopses, descriptions, inactive nav
+--ink-muted       | --base      | body  | body copy on the app ground
+--ink-muted       | --raised    | body  | body copy on hover
+--ink-muted       | --overlay   | body  | menu item text
+--ink-muted       | --void      | body  | player chrome secondary text
+
+--ink             | --surface   | body  | primary text on cards and panels
+--ink             | --base      | body  | primary text on the app ground
+--ink             | --raised    | body  | primary text on hover
+--ink             | --overlay   | body  | active menu item
+--ink             | --void      | body  | player chrome primary text
+--ink             | --oxblood   | body  | the play button label
+
+# Display type — large class. Film titles and section headings.
+--ink             | --surface   | large | card titles, section headings
+--ink             | --base      | large | hero and detail titles
+
+# Accent. Oxblood is intent only, so these are the states it appears in.
+--oxblood-text    | --surface   | body  | spine numbers, catalogue numbers on cards
+--oxblood-text    | --base      | body  | spine numbers on the app ground
+--oxblood-bright  | --void      | ui    | focus ring against the player letterbox
+--oxblood-bright  | --base      | ui    | focus ring on the app ground
+--oxblood-bright  | --surface   | ui    | focus ring on a card
+
+# Semantic. --danger and --oxblood must never be adjacent (§9.1), but both must read.
+--success         | --surface   | body  | "available locally", capability enabled
+--warning         | --surface   | body  | quota warnings, degraded source
+--danger          | --surface   | body  | destructive action labels
+--danger          | --base      | body  | error text on the app ground
+--info            | --surface   | body  | informational notes
+
+# Non-text.
+#
+# WCAG 1.4.11 requires 3:1 of boundaries that IDENTIFY a component — a button, an
+# input. It does not require it of every rule on the page. So the two are separated:
+# --line-interactive draws controls and is enforced; the decorative hairlines are
+# recorded so nobody can claim they were not considered, but not enforced, because
+# forcing them to 3:1 would destroy the quiet 1px depth model §9.0 requires.
+--line-interactive | --base      | ui         | button and input borders
+--line-interactive | --surface   | ui         | control borders on cards and panels
+--line-strong      | --surface   | decorative | card and panel outlines
+--line             | --base      | decorative | panel edges, the player chrome top rule
+--line-subtle      | --surface   | decorative | hairline rules between rows

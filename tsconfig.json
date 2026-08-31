@@ -24,7 +24,8 @@
     "noImplicitOverride": true,
     "noImplicitReturns": true,
     "types": [
-      "vitest/globals"
+      "vitest/globals",
+      "vite/client"
     ],
     "baseUrl": ".",
     "paths": {

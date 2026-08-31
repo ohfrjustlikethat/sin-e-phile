@@ -1,9 +1,86 @@
 @import "tailwindcss";
 @import "./tokens.css";
 
-/* Tailwind v4 is CSS-first: the theme is declared here rather than in a JS
-   config, and every value points at the tokens above so there is exactly one
-   definition of each colour. */
+/* ─── Fonts, self-hosted ──────────────────────────────────────────────────────
+ * SPEC.md §9.2: ship font files locally. No network font requests, ever — which
+ * is also what makes the app work offline (§2.6) and leak nothing (§2.7).
+ *
+ * `font-display: block` rather than `swap`: these faces ARE the design, and a
+ * flash of Segoe UI in their place would be a flash of the generic look §9.0
+ * exists to prevent. The files are local, so the block is imperceptible.
+ */
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/fonts/bricolage-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/fonts/bricolage-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/fonts/bricolage-800.woff2") format("woff2");
+  font-weight: 800;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("/fonts/instrument-serif-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/inter-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/inter-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/inter-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/jetbrains-mono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/jetbrains-mono-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: block;
+}
+
+/* ─── Tailwind theme ──────────────────────────────────────────────────────────
+ * Tailwind v4 is CSS-first, so the theme is declared here and every value points
+ * at a token. There is exactly one definition of each colour, in tokens.css, and
+ * the contrast audit reads that same file — so what the audit checks is what the
+ * app renders.
+ *
+ * §9.0 bans Tailwind's default palette by name. Nothing here re-exports it.
+ */
 @theme inline {
   --color-void: var(--void);
   --color-base: var(--base);
@@ -14,6 +91,7 @@
   --color-line-subtle: var(--line-subtle);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
+  --color-line-interactive: var(--line-interactive);
 
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
@@ -22,14 +100,29 @@
   --color-oxblood: var(--oxblood);
   --color-oxblood-hover: var(--oxblood-hover);
   --color-oxblood-bright: var(--oxblood-bright);
+  --color-oxblood-text: var(--oxblood-text);
   --color-oxblood-deep: var(--oxblood-deep);
 
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
   --color-info: var(--info);
+
+  --font-display: var(--font-display);
+  --font-serif: var(--font-serif);
+  --font-ui: var(--font-ui);
+  --font-mono: var(--font-mono);
+
+  /* §9.0: at most two radius values, one of them 0 or 2px. Tailwind's default
+   * scale (rounded-md, -lg, -xl, -full) is deliberately NOT re-exported, so
+   * `rounded-lg` simply does not exist in this codebase. */
+  --radius-none: var(--radius-none);
+  --radius-sm: var(--radius-sm);
+
+  --ease-standard: var(--ease-standard);
 }
 
+/* ─── Base ────────────────────────────────────────────────────────────────── */
 html,
 body,
 #root {
@@ -40,27 +133,40 @@ body {
   margin: 0;
   background: var(--base);
   color: var(--ink);
-  font-family: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
-  /* §9.2: tabular numerals for runtimes and dates. */
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  line-height: 1.5;
+  /* §9.2: tabular numerals, so runtimes and dates do not jitter as they update. */
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   overflow: hidden; /* the app manages its own scroll regions */
 }
 
-/* §9.4: every interactive element gets a visible focus ring. Full keyboard
-   navigation is a Phase 2 requirement, not a Phase 27 retrofit — so the ring is
-   defined globally from Phase 1 rather than added later. */
+/* §9.4: every interactive element gets a visible focus ring. Defined once,
+ * globally, because full keyboard navigation is a Phase 2 requirement and a
+ * per-component ring is a ring somebody eventually forgets. */
 :focus-visible {
   outline: 2px solid var(--oxblood-bright);
   outline-offset: 2px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
+}
+/* Mouse users do not get the ring; keyboard users always do. */
+:focus:not(:focus-visible) {
+  outline: none;
 }
 
 ::selection {
   background: var(--oxblood-wash);
+  color: var(--ink);
 }
 
 /* The app is a desktop window, not a web page. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
 * {
   user-select: none;
 }
@@ -68,4 +174,87 @@ input,
 textarea,
 [contenteditable] {
   user-select: text;
+}
+
+/* Scrollbars, so a rail does not get a light-grey system bar across it. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border: 3px solid var(--base);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--line-interactive);
+}
+
+/* ─── The two typographic primitives §9.0 requires ────────────────────────────
+ * Declared here rather than in a component because they appear across every
+ * surface, and their tracking is the design's most recognisable property.
+ */
+
+/* The MUBI tell: tiny uppercase metadata with very wide tracking. */
+.label {
+  font-family: var(--font-ui);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label-wide);
+  color: var(--ink-faint);
+}
+
+/* Criterion's catalogue number. Mono, because it is a number in a register. */
+.spine {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  color: var(--oxblood-text);
+}
+
+/* ─── Slider ──────────────────────────────────────────────────────────────────
+ * A native `range` restyled. The track is drawn with a gradient stop rather than
+ * two elements — this is a fill boundary, not decoration, so it is not the kind
+ * of gradient §9.0 bans.
+ */
+.sinephile-range::-webkit-slider-runnable-track {
+  height: 3px;
+  background: linear-gradient(
+    to right,
+    var(--oxblood-bright) 0,
+    var(--oxblood-bright) var(--pct),
+    var(--line) var(--pct),
+    var(--line) 100%
+  );
+}
+.sinephile-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 3px;
+  height: 14px;
+  margin-top: -5px;
+  background: var(--ink);
+  border-radius: var(--radius-none);
+}
+.sinephile-range::-moz-range-track {
+  height: 3px;
+  background: var(--line);
+}
+.sinephile-range::-moz-range-progress {
+  height: 3px;
+  background: var(--oxblood-bright);
+}
+.sinephile-range::-moz-range-thumb {
+  width: 3px;
+  height: 14px;
+  border: 0;
+  background: var(--ink);
+  border-radius: var(--radius-none);
 }

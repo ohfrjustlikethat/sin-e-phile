@@ -397,3 +397,99 @@ at the end of Phase 8.
 Two items outstanding for the author, neither blocking: **P8** (Tier 0 embedding
 measurement on constrained hardware, before Phase 21) and the **TMDB enquiry** still
 drafted and unsent at `docs/correspondence/tmdb-ai-clause.md`.
+
+---
+
+## Session 5 — 2026-08-31 — Phase 2: design system, built from the chosen mockup
+
+**Phase 2 complete.** All five exit criteria met with evidence. Took Take B with
+Take A's 74vh hero (ADR-0024), built tokens and every component from it, then
+measured the claims instead of asserting them.
+
+### Built
+
+Tokens (`src/styles/tokens.css`) with warm non-linear greys, three separated ink
+levels all clearing AA, and the `--oxblood` / `--oxblood-text` split so an accent
+that fails as small text cannot be used as small text. Fonts bundled locally, no
+network request. 15 primitives, 6 media primitives, a virtualised `Rail`, the
+command palette, and a dev-only `#design` gallery rendering every one of them in
+every state.
+
+`docs/specs/design-system.md` documents all of it. `docs/learning/phase-02-notes.md`
+carries the five self-check questions — which do **not** fire yet; ADR-0016 moved the
+gate to tier boundaries, so Phases 1–8 are asked together at the end of Phase 8.
+
+### The measured numbers
+
+```
+rail       14/500 mounted · median 16.7ms · p95 16.7ms · worst 16.8ms · 0 dropped
+keyboard   rail is 1 tab stop; End reaches card 499 of 500
+focus      45 stops, 18 distinct, 0 without a ring
+motion     38 non-opacity transitions normally → 0 under reduce
+contrast   29 enforced pairs pass WCAG AA (3 decorative recorded, not enforced)
+```
+
+### Four silent bugs, none visible on screen
+
+This is the story of the phase. Not one produced an error message, and the app
+looked fine throughout.
+
+1. **Virtualisation was doing nothing.** A grid item defaults to `min-width: auto`
+   and will not shrink below its content, so the 97,060px track expanded its `1fr`
+   column to 97,060px. The `ResizeObserver` then reported a viewport that wide and
+   all 500 cards mounted. The virtualisation code was correct and ran happily.
+2. **The rail rendered at zero height** — absolutely-positioned children contribute
+   none. Replaced absolute positioning with a leading spacer in normal flow, which
+   removes the class of bug rather than patching it.
+3. **487 of 500 cards were unreachable by keyboard.** Virtualisation breaks Tab
+   silently: only the mounted window exists in the DOM, so Tab walked ~13 cards and
+   left the rail. More overscan only moves the wall. Fixed with a roving tabindex —
+   the rail is one Tab stop, arrows move through all 500, scrolling each card into
+   existence before focusing it.
+4. **`prefers-reduced-motion` was adding motion.** `transition-duration` on `*`
+   without pinning `transition-property` makes *every* property animate, because the
+   property defaults to `all`.
+
+Also fixed on the way: the app crashed in any plain browser because
+`@tauri-apps/api` reads `window.__TAURI_INTERNALS__.metadata` at render — the title
+bar now degrades instead of taking the whole app down, which is what let the gallery
+be rendered and audited at all. PosterCard printed the title twice in its
+artwork-free state. Card spine numbers had no legibility scrim over bright frames.
+The gallery had never been shown with real artwork; 24 real public-domain stills now
+live in `public/stills/`.
+
+### New harness — `tools/uiaudit`
+
+The exit criteria include "60fps with 500 cards", "keyboard-navigable with visible
+focus at every step", and "respects `prefers-reduced-motion`". None can be signed off
+from a screenshot, and §10.8 does not accept "looks good".
+
+So: ~300 lines driving the real gallery in headless Chrome over the DevTools
+Protocol, with **zero dependencies** (Node 24 has a built-in WebSocket client).
+Wired into CI alongside the contrast audit.
+
+**Both audits were verified to fail before being trusted.** Reverting `min-w-0` →
+`rail is not scrollable`, exit 1. Removing `transition-property: opacity` → `180
+non-opacity transitions survive`, exit 1. A check never seen to fail is not evidence.
+
+Building the harness cost about an hour to a self-inflicted problem worth recording:
+Chrome's profile was written inside the project, Vite watches the project tree, and
+Chrome keeps `Cookies` locked — the watcher hit `EBUSY` and Vite exited after serving
+one request. The symptom was a blank page with no error, because the harness was
+discarding the dev server's stderr and only listening for `Runtime.exceptionThrown`.
+A module that fails to *fetch* never throws. It now logs both.
+
+### Blockers
+
+None.
+
+### What the next session should do first
+
+Verify CI is green on `phase/02-design-system`. Two new jobs run there — **Contrast
+audit** and **UI audit** — and the UI audit needs Chrome on the runner, so check that
+step specifically rather than trusting a green tick. Then merge, confirm green on
+`main`, tag `phase-02`, and start Phase 3.
+
+Still outstanding for the author, neither blocking: **P8** (Tier 0 embedding
+measurement before Phase 21) and the **TMDB enquiry** drafted at
+`docs/correspondence/tmdb-ai-clause.md`.
