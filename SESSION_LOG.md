@@ -493,3 +493,18 @@ step specifically rather than trusting a green tick. Then merge, confirm green o
 Still outstanding for the author, neither blocking: **P8** (Tier 0 embedding
 measurement before Phase 21) and the **TMDB enquiry** drafted at
 `docs/correspondence/tmdb-ai-clause.md`.
+
+### State correction — Phase 2 record
+
+`phases[2]` still read `not_started` with no evidence after Phase 2 was merged and
+tagged: the completed record had been written to `current_phase` only, never copied
+back into the `phases` array the way Phase 1's was. The repository was right and the
+state file was wrong, so the record was synced from `current_phase` and given
+`completion_commit: 3c2077f` (the merge). 20 of 154 exit criteria now carry evidence.
+
+Also noted, not a defect: there is no `docs/phases/phase-NN-*.md` for Phases 1–3.
+Only `phase-00-bootstrap.md` exists. Per-phase documents stopped being written under
+the lean profile (ADR-0016) — the phase specification lives in `SPEC.md` §15 and the
+working record in `PROJECT_STATE.json`. A `next_action` written last session pointed
+at `docs/phases/phase-03-*.md`, which does not exist; the phase was read from
+`SPEC.md` §15 instead.
