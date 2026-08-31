@@ -508,3 +508,98 @@ the lean profile (ADR-0016) — the phase specification lives in `SPEC.md` §15 
 working record in `PROJECT_STATE.json`. A `next_action` written last session pointed
 at `docs/phases/phase-03-*.md`, which does not exist; the phase was read from
 `SPEC.md` §15 instead.
+
+---
+
+## Session 6 — 2026-09-01 — Phase 3: the data layer, plus four rulings
+
+Phase 3 code-complete, all five exit criteria evidenced. Also carried out four
+instructions from the author before starting.
+
+### The four rulings
+
+**① Persistence location.** `crates/persistence` with `src-tauri/src/persistence/`
+as re-exports, as proposed — ADR-0022 already decided it and `SPEC.md`'s own Phase 3
+wording ("no raw SQL outside `persistence/`") permits it; CLAUDE.md's paraphrase was
+the narrow one. Made structural rather than remembered: the guard now fails on `sqlx`
+or a SQL literal anywhere under `src-tauri/`, and on any statement in the re-export
+module that is not a re-export.
+
+**② CLAUDE.md resynced against SPEC.md 1.4.0** (not 1.2.0 — three amendment rounds
+had landed). Eleven disagreements, listed in the commit. The worst were the session
+ritual pointing at `docs/phases/phase-NN-*.md` files the lean profile stopped
+creating, and the understanding gate still described as firing every phase when A2
+moved it to tier boundaries. The amendment procedure now ends with "resync this file
+in the same commit".
+
+**③ The sync bug is structural now.** Advancing `current_phase` requires every phase
+behind it to be a closed record: status `complete`, a `completion_commit`, and
+evidence on every criterion. `skipped` is legal for Tier C/D but needs a reason.
+Verified to fire before being trusted.
+
+**④ Standing instruction recorded**: nothing blocks development, including the
+author's learning. No mid-session teaching pauses; concepts go in the learning note.
+Written into CLAUDE.md as a fourth protocol.
+
+### The schema
+
+Four reversible migrations, 19 tables. The two decisions worth remembering are in
+ADR-0025 (one `media_items` table with all eight kinds from day one, because SQLite
+cannot alter a `CHECK` constraint) and in `0003_series.up.sql` (episode numbering is
+stored per source and resolved by lookup, because the conversions are not arithmetic
+and Phase 12's false-confident budget is 1%).
+
+### Measured
+
+```
+by_id           p50 0.032ms  p95 0.050ms  p99 0.098ms
+by_exact_title  p50 0.081ms  p95 0.128ms  p99 0.179ms
+by_external_id  p50 0.056ms  p95 0.091ms  p99 0.120ms
+bulk insert     43.7s (11,440 rows/sec) · database 145.4 MB · 500,000 rows
+```
+
+Budget is 100 ms per indexed lookup. Worst p99 is 558× inside it.
+
+### Five silent bugs
+
+None of them produced a wrong answer in ordinary use; all five were found by
+something that measures or checks rather than by running the app.
+
+1. **`idx_titles_text` was full-scanning.** SQLite only uses an index whose collation
+   matches the comparison's. 26.679 ms → 0.081 ms, 330×. **It passed the exit
+   criterion either way** — the benchmark is the only reason it was found, and it
+   would have surfaced in Phase 5 against a catalogue ten times larger.
+2. **`PRIMARY KEY (…, COALESCE(character, ''))`** — expressions are legal in an
+   index, illegal in a primary key.
+3. **`MIN(CASE e.source …)` in a correlated subquery** reads the outer row; SQLite
+   rejects it as "misuse of aggregate".
+4. **`open_in` probed writability before creating the directory**, so every fresh
+   portable install would have reported "not writable" for a directory that was
+   merely absent. Found by the E4 portability test.
+5. **The architecture guard rejected the file it protects.** Line-based, so a
+   rustfmt-wrapped `pub use foo::{…}` failed on three of its four lines. Now
+   statement-based, with that shape as a permanent vector. Selftest is 48 checks.
+
+`--tree` had passed on the re-export module because the file was untracked; `--staged`
+caught it at commit time, which is exactly the division of labour the guard documents.
+
+### Blockers
+
+None. **One decision the author owes**, and it should be made before Phase 4:
+
+**P9 — compile-time-checked SQL.** The data layer uses runtime-checked
+`sqlx::query()`, not the `query!` macros. `SPEC.md` §2's tech table gives compile-time
+checking as the *reason* sqlx was chosen ("valuable for a learner"), so this is a real
+deviation and it is being surfaced rather than quietly kept. Honest costs both ways
+are in `known_debt` and `docs/DECISIONS_PENDING.md`. It matters now because Phase 4
+writes far more SQL than Phase 3 did, and converting after that costs more.
+
+### What the next session should do first
+
+Verify CI green on `phase/03-data-layer`, merge, tag `phase-03`, then set
+`phases[3].completion_commit` to the merge SHA and advance `current_phase` to 4.
+**Get the P9 ruling before starting Phase 4 work.**
+
+Still outstanding for the author, neither blocking: **P8** (Tier 0 embedding
+measurement before Phase 21) and the **TMDB enquiry** at
+`docs/correspondence/tmdb-ai-clause.md`.

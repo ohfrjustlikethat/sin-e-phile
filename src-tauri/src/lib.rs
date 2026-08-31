@@ -5,6 +5,7 @@
 
 pub mod commands;
 pub mod logging;
+pub mod persistence;
 pub mod state;
 pub mod tiers;
 

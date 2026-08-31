@@ -441,6 +441,29 @@ def tracked_files() -> list[str]:
     return [p for p in result.stdout.splitlines() if p]
 
 
+def tree_sources():
+    """(path, text) for every tracked Rust file — what the architecture check reads."""
+    for rel in tracked_files():
+        if not rel.endswith(".rs"):
+            continue
+        try:
+            yield rel, (REPO_ROOT / rel).read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError, FileNotFoundError):
+            continue
+
+
+def staged_sources():
+    """Same, but the staged blob — so the hook sees what is about to be committed."""
+    names = git("diff", "--cached", "--name-only", "--diff-filter=ACMR")
+    for rel in (n.strip() for n in names.splitlines() if n.strip()):
+        if not rel.endswith(".rs"):
+            continue
+        try:
+            yield rel, git("show", f":{rel}")
+        except SystemExit:
+            continue
+
+
 def scan_tree(salt, deny, allow) -> list[Finding]:
     findings = []
     for rel in tracked_files():
@@ -499,6 +522,86 @@ def scan_history(salt, deny, allow) -> list[Finding]:
     return findings
 
 
+
+# -----------------------------------------------------------------------------
+# The architecture check (ADR-0022)
+# -----------------------------------------------------------------------------
+#
+# `cargo test` cannot run inside `src-tauri` on Windows: every test binary dies at
+# load with STATUS_ENTRYPOINT_NOT_FOUND. So logic that ought to be tested must not
+# live there. The data layer is the largest instance of this — SPEC.md Phase 3
+# requires integration tests for migrations forward and backward, which is
+# impossible if the SQL lives in the Tauri crate.
+#
+# The author's ruling (2026-09-01): "make it enforceable rather than remembered".
+# So this is a check, not a convention. It runs with --tree and --staged, which
+# means pre-commit and CI both enforce it.
+
+SQL_STATEMENT_RE = re.compile(
+    r'"\s*(SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM|CREATE\s+(TABLE|INDEX|VIEW|TRIGGER)'
+    r'|ALTER\s+TABLE|DROP\s+(TABLE|INDEX|VIEW)|PRAGMA|BEGIN\s+TRANSACTION)',
+    re.IGNORECASE,
+)
+SQLX_RE = re.compile(r"sqlx")
+
+# A re-export module may contain only these statements. Checked per STATEMENT, not
+# per line: a rustfmt-wrapped `pub use foo::{A, B, C};` spans four lines, three of
+# which look like nothing in particular. The line-based first version rejected every
+# multi-line re-export in the file it was written to protect.
+REEXPORT_OK_RE = re.compile(
+    r"^(pub\s+use|use|pub\s+mod|mod|pub\s+type|pub\s+crate::|#!?\[)", re.S
+)
+
+
+def rust_statements(text: str):
+    """Yield (line_number, statement) with comments stripped.
+
+    Deliberately simple: this is a structural check on a module that is allowed to
+    contain almost nothing, not a Rust parser.
+    """
+    out, buf, start_line = [], [], 1
+    for n, raw in enumerate(text.splitlines(), 1):
+        line = raw.split("//")[0].rstrip()
+        if not line.strip():
+            continue
+        if not buf:
+            start_line = n
+        buf.append(line.strip())
+        if line.rstrip().endswith(";") or line.strip() in ("}", "};"):
+            out.append((start_line, " ".join(buf)))
+            buf = []
+    if buf:
+        out.append((start_line, " ".join(buf)))
+    return out
+
+
+def check_architecture(paths_and_text) -> list[str]:
+    """No SQL under src-tauri/, and src-tauri/src/persistence/ holds re-exports only."""
+    errors: list[str] = []
+    for path, text in paths_and_text:
+        rel = path.replace("\\", "/")
+        if not rel.startswith("src-tauri/") or not rel.endswith(".rs"):
+            continue
+
+        in_persistence = rel.startswith("src-tauri/src/persistence/")
+
+        for n, line in enumerate(text.splitlines(), 1):
+            if SQLX_RE.search(line) or SQL_STATEMENT_RE.search(line):
+                errors.append(
+                    f"{rel}:{n}: SQL or sqlx under src-tauri/. Raw SQL lives in "
+                    f"crates/persistence/ (ADR-0022); src-tauri re-exports it."
+                )
+
+        if in_persistence:
+            for n, statement in rust_statements(text):
+                if not REEXPORT_OK_RE.match(statement):
+                    errors.append(
+                        f"{rel}:{n}: src-tauri/src/persistence/ contains re-exports "
+                        f"and nothing else. This is logic: {statement[:60]}"
+                    )
+    return errors
+
+
 def die(message: str) -> None:
     print(f"guard: {message}", file=sys.stderr)
     raise SystemExit(2)
@@ -519,12 +622,28 @@ def main() -> int:
 
     salt, deny, allow = load_salt(), load_denylist(), load_allowlist()
 
+    arch: list[str] = []
     if args.staged:
         findings, what = scan_staged(salt, deny, allow), "staged content"
+        arch = check_architecture(staged_sources())
     elif args.tree:
         findings, what = scan_tree(salt, deny, allow), "working tree"
+        arch = check_architecture(tree_sources())
     else:
         findings, what = scan_history(salt, deny, allow), "full history"
+
+    if arch:
+        print("", file=sys.stderr)
+        print(f"guard: {len(arch)} architecture violation(s) in {what} — ADR-0022",
+              file=sys.stderr)
+        print("", file=sys.stderr)
+        for error in arch:
+            print(f"  {error}", file=sys.stderr)
+        print("", file=sys.stderr)
+        print("cargo test cannot run inside src-tauri, so logic that must be tested "
+              "cannot live there.", file=sys.stderr)
+        print("", file=sys.stderr)
+        return 1
 
     if not findings:
         print(f"guard: clean — {what} contains no content-source violations "

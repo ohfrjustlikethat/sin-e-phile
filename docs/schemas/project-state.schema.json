@@ -23,8 +23,10 @@
         "in_progress",
         "blocked",
         "awaiting_review",
-        "complete"
-      ]
+        "complete",
+        "skipped"
+      ],
+      "description": "A phase behind current_phase must be 'complete' or 'skipped'; 'skipped' requires a skip_reason. Enforced by validate_state.py's progression check, not by this schema, because the rule is relational."
     },
     "commitSha": {
       "type": [
@@ -285,6 +287,13 @@
             "items": {
               "$ref": "#/$defs/exitCriterion"
             }
+          },
+          "skip_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why a phase was deliberately not built. Required when status is 'skipped'."
           }
         },
         "allOf": [

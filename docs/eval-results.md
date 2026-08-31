@@ -287,3 +287,34 @@ only measured thing in the repository so far:
 | Posture guard self-test | 31/31 pass (12 must-fire, 17 must-not-fire, 2 structural) | 2026-08-31 | `66fd304` | `python tools/guard/guard.py --selftest` |
 | Guard false positives on tree | 0 (from 118 at first run) | 2026-08-31 | `66fd304` | `python tools/guard/guard.py --tree` |
 | Exit criteria met with evidence | 6 of 8 | 2026-08-31 | `8d86175` | `python tools/state/validate_state.py --check` |
+
+## Phase 3 — data layer
+
+`cargo test -p sinephile-persistence --release --test benchmark -- --ignored --nocapture`
+
+Fixture: 500,000 synthetic media items, deterministic (LCG seeded `0x5EED5EED`), so
+a rerun measures the same database. Release build. 1,000 sampled lookups each.
+
+| Metric | Value | Date | Commit | Command |
+|---|---|---|---|---|
+| `by_id` p50 / p95 / p99 | 0.032 / 0.050 / 0.098 ms | 2026-09-01 | `e4eb020` | as above |
+| `by_exact_title` p50 / p95 / p99 | 0.081 / 0.128 / 0.179 ms | 2026-09-01 | `e4eb020` | as above |
+| `by_external_id` p50 / p95 / p99 | 0.056 / 0.091 / 0.120 ms | 2026-09-01 | `e4eb020` | as above |
+| Bulk insert, 500k rows | 43.7 s (11,440 rows/sec) | 2026-09-01 | `e4eb020` | as above |
+| Database size at 500k items | 145.4 MB | 2026-09-01 | `e4eb020` | as above |
+| Migration tests | 17 pass | 2026-09-01 | `e4eb020` | `cargo test -p sinephile-persistence` |
+
+**Budget: 100 ms per indexed lookup** (Phase 3 E3, amendment 15 — the budget is the
+lookup alone; bulk insertion has none). Worst p99 is 0.179 ms, **558× inside it**.
+
+**One index was silently doing nothing, and the benchmark is what found it.**
+`by_exact_title` first measured **26.679 ms p50** — 400× slower than the other two
+lookups, because SQLite will only use an index whose collation matches the
+comparison's, and `WHERE title = ? COLLATE NOCASE` against a `BINARY` index falls
+back to a full scan. Adding `COLLATE NOCASE` to the index took it to 0.081 ms, a
+**330× improvement**.
+
+Both numbers pass the Phase 3 criterion, which is the point worth recording: the
+criterion would have been met with the scan in place, and the failure would have
+surfaced in Phase 5, whose 80 ms p95 search budget sits on top of this lookup against
+a catalogue an order of magnitude larger than this fixture.

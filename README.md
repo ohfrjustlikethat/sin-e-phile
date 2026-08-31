@@ -4,8 +4,8 @@
 local film library behind one semantic search engine and a discovery-first
 recommender.**
 
-> **Status: Phase 2 of 28 — the shell runs and the design system is built.** There
-> is no product UI yet. This README describes what is being built and is updated at
+> **Status: Phase 3 of 28 — the shell, the design system, and the data layer.**
+> There is no product UI yet. This README describes what is being built and is updated at
 > the end of every phase that changes what the app can do. It is never allowed to
 > over-claim; the [feature list](#what-actually-works-today) below says exactly what
 > exists.
@@ -233,6 +233,11 @@ Honestly:
 - ✅ A design system built from a chosen mockup: tokens, 21 components, a
   virtualised rail that holds 60fps with 500 cards and is keyboard-complete, and
   two audits in CI that enforce all of it
+- ✅ The database everything else sits on: 19 tables across four reversible
+  migrations, generic over media kind so reading and comics need no migration later.
+  Indexed lookup over 500,000 rows measured at 0.179 ms p99 against a 100 ms budget —
+  and the benchmark caught an index that was silently full-scanning at 26.7 ms
+  while still passing the criterion
 - ⬜ Everything else described above this section
 
 ---

@@ -29,6 +29,7 @@ GUARD_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(GUARD_DIR))
 
 from guard import (  # noqa: E402
+    check_architecture,
     FULLY_EXEMPT,
     GUARD_DIR,
     STRUCTURAL_EXEMPT,
@@ -122,7 +123,59 @@ def run_selftest() -> int:
         print(f"    FAIL  unaudited domain(s) in vectors.py: {sorted(stray)}")
         failures.append(f"unaudited domains in vectors.py: {sorted(stray)}")
 
-    total = len(SHOULD_FIRE) + len(SHOULD_PASS) + 2
+    # ADR-0022: no SQL under src-tauri/, and src-tauri/src/persistence/ holds
+    # re-exports only. Vectors rather than trust: this check is what keeps the
+    # data layer testable, and a silently-broken regex would not be noticed until
+    # someone tried to test a migration.
+    print("")
+    print("  architecture check (ADR-0022)")
+    ARCH_SHOULD_FIRE = [
+        ("sqlx under src-tauri", "src-tauri/src/db.rs",
+         "let row = sqlx::query(\"x\").fetch_one(&pool).await?;"),
+        ("raw SELECT under src-tauri", "src-tauri/src/state.rs",
+         'const Q: &str = "SELECT id FROM media_items";'),
+        ("raw CREATE TABLE under src-tauri", "src-tauri/src/x.rs",
+         'let m = "CREATE TABLE media_items (id INTEGER)";'),
+        ("logic in the re-export module", "src-tauri/src/persistence/mod.rs",
+         "pub fn find(id: i64) -> Option<Media> { None }"),
+    ]
+    ARCH_SHOULD_PASS = [
+        ("re-export line", "src-tauri/src/persistence/mod.rs",
+         "pub use sinephile_persistence::{Db, MediaRepository};"),
+        # rustfmt wraps a long re-export across four lines, three of which look
+        # like nothing in particular. The line-based first version of this check
+        # rejected every multi-line re-export in the very file it protects.
+        ("rustfmt-wrapped re-export", "src-tauri/src/persistence/mod.rs",
+         "pub use sinephile_persistence::model::{" 
+         + "\n    EpisodeNumbering, IdSource, MediaItem, MediaKind,"
+         + "\n};"),
+        ("doc comment in the re-export module", "src-tauri/src/persistence/mod.rs",
+         "//! Re-exports of crates/persistence (ADR-0022)."),
+        ("attribute in the re-export module", "src-tauri/src/persistence/mod.rs",
+         "#[allow(unused_imports)]"),
+        ("SQL in a crate is fine", "crates/persistence/src/lib.rs",
+         'sqlx::query("SELECT 1").execute(&pool).await?;'),
+        ("SQL in a migration is fine", "crates/persistence/migrations/001.sql",
+         "CREATE TABLE media_items (id INTEGER PRIMARY KEY);"),
+        ("the word sqlx in prose", "src-tauri/src/lib.rs",
+         "// The data layer uses SQL, but lives in crates/persistence."),
+    ]
+    arch_failures = 0
+    for label, path, line in ARCH_SHOULD_FIRE:
+        if not check_architecture([(path, line)]):
+            print(f"    FAIL  {label} — expected a violation, got none")
+            failures.append(f"architecture check missed: {label}")
+            arch_failures += 1
+    for label, path, line in ARCH_SHOULD_PASS:
+        found = check_architecture([(path, line)])
+        if found:
+            print(f"    FAIL  {label} — false positive: {found[0]}")
+            failures.append(f"architecture false positive: {label}")
+            arch_failures += 1
+    if not arch_failures:
+        print(f"    PASS  {len(ARCH_SHOULD_FIRE)} fire, {len(ARCH_SHOULD_PASS)} stay quiet")
+
+    total = len(SHOULD_FIRE) + len(SHOULD_PASS) + 2 + len(ARCH_SHOULD_FIRE) + len(ARCH_SHOULD_PASS)
     if failures:
         print(f"\nguard selftest: {len(failures)} FAILURE(S) of {total} checks\n", file=sys.stderr)
         for failure in failures:

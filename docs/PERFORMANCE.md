@@ -32,7 +32,23 @@ separately.
 | Artefact | Budget | Actual |
 |---|---|---|
 | Embedding artefact | ~77 MB per 200k titles (ADR-0014) | — |
-| Catalogue database | < 4 GB (R4 trigger) | — |
+| Catalogue database | < 4 GB (R4 trigger) | 145.4 MB at 500k synthetic items (Phase 3) |
+
+## Phase 3 — data layer
+
+Measured on the dev machine (Tier 2), release build, 500,000 synthetic media items.
+Full table and method in `docs/eval-results.md`.
+
+| Operation | Budget | p50 | p99 |
+|---|---|---|---|
+| `by_id` | 100 ms (E3) | 0.032 ms | 0.098 ms |
+| `by_exact_title` | 100 ms (E3) | 0.081 ms | 0.179 ms |
+| `by_external_id` | 100 ms (E3) | 0.056 ms | 0.120 ms |
+| Bulk insert 500k rows | none (amendment 15) | 43.7 s | — |
+
+`by_exact_title` was 26.679 ms until the index was given `COLLATE NOCASE` to match
+the query's comparison — SQLite silently full-scans when the collations differ. It
+passed the criterion either way; it would not have survived Phase 5.
 
 ## Rules
 

@@ -1,0 +1,38 @@
+[package]
+name = "sinephile-persistence"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "SQLite data layer: schema, migrations, and repositories (SPEC.md Phase 3)."
+
+# Deliberately does NOT depend on tauri.
+#
+# SPEC.md Phase 3 requires integration tests for migrations forward AND backward,
+# and a test binary that links tauri cannot launch on Windows at all — it dies at
+# load with STATUS_ENTRYPOINT_NOT_FOUND before a single test runs (ADR-0022). The
+# data layer is the largest body of testable logic in the project, so it lives
+# here and `src-tauri/src/persistence/` re-exports it. `tools/guard` fails the
+# build if SQL appears anywhere under `src-tauri/`.
+
+[dependencies]
+# Pinned exactly (standing rule 15). sqlx is chosen for compile-time checked
+# queries — SPEC.md's tech table calls that out as the reason, and it is worth
+# more to a learner than the flexibility of a runtime-checked driver.
+sqlx = { version = "=0.8.6", default-features = false, features = [
+    "runtime-tokio",
+    "sqlite",
+    "macros",
+    "migrate",
+    "time",
+    "json",
+] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+time = { version = "0.3", features = ["formatting", "parsing", "macros", "serde"] }
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tempfile = "3"

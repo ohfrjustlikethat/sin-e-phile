@@ -158,6 +158,70 @@ def load() -> tuple[dict, dict]:
             json.loads(SCHEMA.read_text(encoding="utf-8")))
 
 
+
+def check_phase_progression(state: dict) -> list[str]:
+    """Every phase before the current one must be a CLOSED record.
+
+    SPEC.md §10.8 says a criterion is met only with an artefact. The schema enforces
+    that per-criterion, but it could not see a whole phase left half-written: the
+    Phase 2 record sat at `not_started` with no evidence for a day after Phase 2 was
+    merged and tagged, because the finished record had been written to
+    `current_phase` and never copied back into `phases`. Nothing complained.
+
+    That is exactly the failure this file exists to prevent, and it gets worse the
+    later it happens — at Phase 19 nobody is reading Phase 2's record closely enough
+    to notice it is empty. So: advancing `current_phase` closes every phase behind it.
+
+    A phase deliberately not built (Tier C and D are optional — Appendix E) may be
+    `skipped` instead, but must say why.
+    """
+    errors: list[str] = []
+    current = state["current_phase"]["number"]
+
+    for phase in state["phases"]:
+        n = phase["number"]
+        if n >= current:
+            continue
+
+        status = phase.get("status")
+        if status == "skipped":
+            if not (phase.get("skip_reason") or "").strip():
+                errors.append(
+                    f"phases[{n}] is skipped but gives no skip_reason. "
+                    f"A phase not built must record why."
+                )
+            continue
+
+        if status != "complete":
+            errors.append(
+                f"phases[{n}] has status '{status}' but current_phase is {current}. "
+                f"A phase behind the current one must be 'complete' (or 'skipped' "
+                f"with a reason)."
+            )
+        if not (phase.get("completion_commit") or "").strip():
+            errors.append(
+                f"phases[{n}] is behind current_phase {current} but has no "
+                f"completion_commit. Record the merge commit that closed it."
+            )
+        for criterion in phase["exit_criteria"]:
+            if not criterion["met"]:
+                errors.append(
+                    f"phases[{n}].{criterion['id']} is not met, but phase {n} is "
+                    f"behind current_phase {current}. Either evidence it, or say in "
+                    f"SESSION_LOG.md why the phase closed without it."
+                )
+            elif not (criterion.get("evidence") or "").strip():
+                errors.append(
+                    f"phases[{n}].{criterion['id']} is met with no evidence (§10.8)."
+                )
+
+    # The current phase must actually exist in the table it indexes into.
+    if not any(p["number"] == current for p in state["phases"]):
+        errors.append(f"current_phase is {current}, which is not in the phases table.")
+
+    return errors
+
+
 def do_check() -> int:
     state, schema = load()
     validator = Validator(schema)
@@ -176,6 +240,21 @@ def do_check() -> int:
         print("\nSPEC.md §10.8: a criterion marked met MUST carry an artefact. If evidence\n"
               "cannot be produced, the criterion is not met — say so and say what is\n"
               "blocking it.\n", file=sys.stderr)
+        return 1
+
+    progression = check_phase_progression(state)
+    if progression:
+        print("", file=sys.stderr)
+        print(f"validate_state: {len(progression)} phase-progression violation(s) "
+              f"in PROJECT_STATE.json", file=sys.stderr)
+        print("", file=sys.stderr)
+        for error in progression:
+            print(f"  {error}", file=sys.stderr)
+        print("", file=sys.stderr)
+        print("Advancing current_phase closes every phase behind it: status "
+              "'complete', a completion_commit, and evidence on every criterion.",
+              file=sys.stderr)
+        print("", file=sys.stderr)
         return 1
 
     phases = state["phases"]

@@ -10,43 +10,45 @@
 
 ## Where we are right now
 
-**Phase 2 — Design System and Visual Language** (`complete`, branch `phase/02-design-system`)
+**Phase 3 — Data Layer and Portable Storage** (`awaiting_review`, branch `phase/03-data-layer`)
 
 5 of 5 exit criteria met with evidence.
 
-> Phase 2 builds the visual language BEFORE any product UI. Two constraints carry over from Phase 1: ADR-0020 removed the gradient scrim under player chrome, so the design system must produce a solid opaque panel; and ADR-0013 requires every artwork-bearing surface to have a designed artwork-free state, so PosterCard needs a typographic fallback rather than a grey rectangle.
+> The schema everything else depends on, designed once. Two constraints carry over: ADR-0022 puts all SQL in crates/persistence with src-tauri/src/persistence/ as re-exports only (guard-enforced), and SPEC.md 6.2 requires anime's absolute-vs-seasonal numbering and title variants designed NOW rather than patched in Phase 12. media_kind carries all eight values from the start so Phases 24-25 need no migration.
 
-### Subtasks — 10/10 complete
+### Subtasks — 12/12 complete
 
-- [x] **2.0** THREE static HTML mockups of Home, film detail, and player-with-chrome, as three interpretations within the SPEC.md 9.0 brief, with REAL artwork and metadata. Author chooses before any token or component code. · `aebbd7f`
-- [x] **2.1** All SPEC.md 9 tokens as CSS custom properties consumed by the Tailwind theme; fonts bundled locally, no network font requests · `aebbd7f`
-- [x] **2.2** Component gallery route /design, dev-only, rendering every primitive in every state · `aebbd7f`
-- [x] **2.3** Primitives: Button, IconButton, Input, Select, Toggle, Slider, Tabs, Tooltip, Popover, Dialog, Toast, Skeleton, Spinner, Badge, ProgressBar, Rating · `aebbd7f`
-- [x] **2.4** Media primitives: PosterCard (with the ADR-0013 typographic artwork-free state), EpisodeCard, ChannelCard, Rail, HeroBanner, EmptyState · `aebbd7f`
-- [x] **2.5** Rail: virtualised, momentum scroll, edge-bleed, keyboard-navigable, 60fps with 500 cards · `aebbd7f`
-- [x] **2.6** Focus management with visible rings and correct tab order; full keyboard navigation; Ctrl+K command palette shell · `aebbd7f`
-- [x] **2.7** prefers-reduced-motion support throughout (the global rule exists from Phase 1; verify per component) · `aebbd7f`
-- [x] **2.8** Contrast audit script failing CI if any text token pair drops below WCAG AA; --ink-faint on --surface is the one to check · `aebbd7f`
-- [x] **2.9** docs/specs/design-system.md documenting every token and component with usage rules · `aebbd7f`
+- [x] **3.1** crates/persistence: sqlx + SQLite with WAL, pinned versions, committed .sqlx/ offline metadata so CI compiles without a live database; src-tauri/src/persistence/ re-exports only (guard-enforced, ADR-0022) · `593fcc8`
+- [x] **3.2** Path resolution: portable ./data/ next to the executable by default, %APPDATA% installed-mode as an opt-in; override and detection · `593fcc8`
+- [x] **3.3** Migration system: forward and backward migrations, with backup-on-migrate · `593fcc8`
+- [x] **3.4** Schema - identity: media_items with the eight-value media_kind discriminator, external_ids, titles (romaji/native/english variants) · `593fcc8`
+- [x] **3.5** Schema - people and taxonomy: people, credits, genres, keywords · `593fcc8`
+- [x] **3.6** Schema - series: series, seasons, episodes with BOTH seasonal and absolute numbering, plus the reconciliation table (SPEC.md 6.2 - designed now, not patched in Phase 12) · `593fcc8`
+- [x] **3.7** Schema - user and config: profiles, watch_events, playback_positions, watchlist_items, collections, local_files, local_file_matches, sources_config, settings · `593fcc8`
+- [x] **3.8** Repository-pattern access layer over the whole schema · `593fcc8`
+- [x] **3.9** Export/import of a whole profile as a portable archive · `593fcc8`
+- [x] **3.10** Migration round-trip integration tests: forward and backward against a populated database (E1) · `593fcc8`
+- [x] **3.11** 500,000 synthetic media items; indexed lookup under 100 ms, insertion timed separately (amendment 15); numbers into docs/PERFORMANCE.md and docs/eval-results.md · `593fcc8`
+- [x] **3.12** ER diagram in docs/ARCHITECTURE.md (E2), and an ADR recording why the schema is generic over media kind (E5) · `593fcc8`
 
 ### Exit criteria
 
-- [x] **E1** Every primitive renders correctly in the gallery, in all states.
-      - *Evidence:* Rendered headless at 1500px across all four gallery tabs with 0 page errors; screenshots in tools/uiaudit/out/. Every primitive shown in loading, disabled, error and empty states; PosterCard shown in both ADR-0013 states side by side.
-- [x] **E2** The entire gallery is navigable by keyboard alone with visible focus at every step.
-      - *Evidence:* node tools/uiaudit/run.mjs: 45 Tab stops walked, 0 without a visible focus ring, 0 off-screen. Rail exposes exactly 1 tab stop; ArrowRight/End reach card 499 of 500 (roving tabindex).
-- [x] **E3** Contrast audit passes.
-      - *Evidence:* python tools/contrast/audit.py -> "29 enforced pairs pass WCAG AA (3 decorative recorded, not enforced)"; runs in CI.
-- [x] **E4** A rail of 500 poster cards scrolls at 60 fps with no dropped frames.
-      - *Evidence:* node tools/uiaudit/run.mjs -> 200 sampled frames flicking 500 cards: median 16.7ms, p95 16.7ms, worst 16.8ms, 0 frames over 33.3ms, 14/500 cards mounted. Harness verified to fail on a reintroduced regression.
-- [x] **E5** `docs/specs/design-system.md` documents every token and component with usage rules.
-      - *Evidence:* docs/specs/design-system.md - tokens, layout invariants, all 21 components, Rail virtualisation + keyboard contract, motion, measured numbers, and rules for extending it.
+- [x] **E1** All migrations run forward and backward cleanly against a populated database.
+      - *Evidence:* crates/persistence/tests/migrations.rs - 9 tests. `migrations_roll_back_against_a_populated_database` populates a FILE database across all four migrations then rolls back one at a time to 0 and asserts no tables survive; `the_ladder_can_be_climbed_twice` re-applies afterwards, which is what catches a down script that drops a table but forgets its indexes. Command: cargo test -p sinephile-persistence.
+- [x] **E2** Schema documented with an entity-relationship diagram in `docs/ARCHITECTURE.md`.
+      - *Evidence:* docs/ARCHITECTURE.md - mermaid ER diagram covering all 19 tables plus episode_numbering, with the four design decisions and the load-bearing PRAGMA configuration.
+- [x] **E3** A database populated with 500,000 synthetic media items answers indexed lookups in under 100 ms. (The 100 ms budget is the lookup alone; bulk insertion of the 500,000 rows has no time budget and is measured and recorded separately in `docs/PERFORMANCE.md`.)
+      - *Evidence:* cargo test -p sinephile-persistence --release --test benchmark -- --ignored --nocapture, 500,000 synthetic rows: by_id p99 0.098ms, by_exact_title p99 0.179ms, by_external_id p99 0.120ms against a 100ms budget. Bulk insert 43.7s (11,440 rows/sec), database 145.4 MB, timed separately per amendment 15. Recorded in docs/eval-results.md and docs/PERFORMANCE.md. The benchmark found idx_titles_text silently full-scanning (26.679ms -> 0.081ms p50, 330x) because its collation did not match the query's.
+- [x] **E4** Copying the app folder to another location and launching it preserves all data.
+      - *Evidence:* crates/persistence/tests/portability.rs - 5 tests. `a_copied_data_folder_keeps_everything` writes a populated installation, checkpoints the WAL, copies the whole data folder to another path with a directory-tree copy, opens it there and asserts catalogue, watch history, resume position and settings all survive; `nothing_in_the_database_records_where_it_lives` introspects the schema and fails if any new path-shaped column appears. Found a real bug: open_in probed writability before creating the directory, which failed on every fresh portable install.
+- [x] **E5** An ADR records why the schema is generic over media kind.
+      - *Evidence:* docs/adr/0025-generic-media-schema.md, verified by tests/migrations.rs::all_eight_media_kinds_are_accepted.
 
 ---
 
 ## What's next
 
-Phase 2 is DONE: merged to main, tagged phase-02, CI green on main (run 33397473458 on the branch, and the main run after the merge - all 5 jobs pass, including the two new audit steps). Start Phase 3: read docs/phases/phase-03-*.md, then SPEC.md 15's Phase 3 entry, and plan before implementing. The understanding gate does NOT fire here - ADR-0016 moved it to tier boundaries, so the five questions in docs/learning/phase-02-notes.md accumulate and are asked together with Phases 1-8 at the end of Phase 8.
+Phase 3 is complete with all five exit criteria evidenced. Verify CI green on phase/03-data-layer, merge, tag phase-03. THEN: the author owes a ruling on P9 (sqlx compile-time query! macros vs runtime-checked queries) BEFORE Phase 4 starts, because Phase 4's ingestion pipeline writes far more SQL than Phase 3 did and converting later costs more.
 
 ---
 
@@ -65,7 +67,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 0 | Bootstrap and Project Infrastructure | A | nothing | 1 | 8/8 |
 | [x] | 1 | Application Shell and Capability Tiers | A | 0 | 1–2 | 7/7 |
 | [x] | 2 | Design System and Visual Language | A | 1 | 1–2 | 5/5 |
-| [ ] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 0/5 |
+| [?] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 5/5 |
 | [ ] | 4 | Metadata Backbone | A | 3 | 2–3 | 0/7 |
 | [ ] | 5 | Semantic Search Engine | A | 4 | 2 | 0/5 |
 | [ ] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 0/6 |
@@ -107,6 +109,7 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D8** (raised in Phase 1) tiers.rs treats any non-software DXGI adapter as having hardware decode, and uses >= 2 GB dedicated VRAM as a proxy for 'discrete GPU or strong iGPU'. Both are coarse. Whether a SPECIFIC codec decodes in hardware is only knowable at play time from mpv's hwdec-current, so Phase 8 should feed that back and Phase 21 should revisit the VRAM threshold against real Tier 0/1 hardware.
 - **D9** (raised in Phase 2) Rail's roving tabindex sets tabIndex imperatively on the first focusable descendant of each mounted item rather than threading it through the render prop. Correct today because `render` returns caller-owned markup, but it silently does nothing if a card's first focusable element is not its main control. Revisit in Phase 9, when real screens use Rail with more complex cards.
 - **D10** (raised in Phase 2) The UI audit (tools/uiaudit) drives the design gallery, not real product screens - those do not exist until Phase 9. Its budgets prove the Rail component holds 60fps, not that any real screen does. Revisit in Phase 9: point the audit at the Home screen too.
+- **D11** (raised in Phase 3) The data layer uses runtime-checked sqlx::query() rather than the compile-time-checked query! macros. SPEC.md's tech table gives compile-time checking as the REASON sqlx was chosen ('valuable for a learner'), so this is a deviation the author should rule on. Cost of converting: query! needs literal SQL, so archive.rs's dynamically-built preference query cannot use it at all; SQLite nullability inference is weak, so most columns need `as "col!"` annotations; and it adds sqlx-cli plus a `cargo sqlx prepare` step after every schema change. Benefit: SQL typos fail the build instead of a test. Raised at the end of Phase 3, not decided.
 
 ---
 
@@ -116,3 +119,4 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **P5** — decide by Phase 12 Where the Phase 12 review-queue confidence threshold sits, given >95% top-1 and <1% false-confident pull against each other. Measure, do not guess. See docs/DECISIONS_PENDING.md.
 - **P6** — decide by Phase 27 Windows Sandbox pass on a genuinely bare machine. The E1 CI job proves a clean checkout builds, but windows-latest ships Rust, Node and MSVC preinstalled, so it does not prove SETUP.md is complete from nothing.
 - **P8** — decide by Phase 21 Spike C measured query-embedding latency on the Tier 2 dev machine only. ADR-0015 also asked for a constrained VM approximating Tier 0. Unpadded headroom is ~18x so this does not block Phase 5, but the padded worst case with a 3-4x Tier 0 penalty lands at 24-33 ms, close to the 30 ms trigger. Measure before Phase 21 signs off the 80 ms search budget.
+- **P9** — decide by Phase 4 Convert the data layer to sqlx's compile-time-checked query! macros, or accept runtime-checked queries? SPEC.md 2 names compile-time checking as the REASON sqlx was chosen. Phase 3 shipped runtime-checked; see known_debt for the cost on both sides. See docs/DECISIONS_PENDING.md.

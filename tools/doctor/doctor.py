@@ -47,12 +47,21 @@ class Result:
         self.name, self.ok, self.detail, self.fix, self.required = name, ok, detail, fix, required
 
 
-def run(*cmd: str, timeout: int = 20) -> tuple[int, str]:
+# A tool that exists is not the same as a tool that is slow to start, and doctor
+# must not report the second as the first. `npm --version` on a cold CI runner took
+# longer than the old 20s ceiling, and doctor said "found but failed to run" — which
+# reads as a broken install and sent a real diagnosis down the wrong path.
+TIMED_OUT = -1
+
+
+def run(*cmd: str, timeout: int = 60) -> tuple[int, str]:
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
                               encoding="utf-8", errors="replace")
         return proc.returncode, (proc.stdout + proc.stderr).strip()
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+    except subprocess.TimeoutExpired:
+        return TIMED_OUT, ""
+    except (FileNotFoundError, OSError):
         return 127, ""
 
 
@@ -114,8 +123,18 @@ def check_command(name: str, exe: str, version_args: tuple[str, ...], fix: str,
         code, out = run("cmd", "/c", path, *version_args)
     else:
         code, out = run(exe, *version_args)
+    if code == TIMED_OUT:
+        return Result(
+            name, False,
+            f"found at {path} but did not respond within 60s",
+            "It is installed. Something is making it very slow to start — antivirus "
+            "scanning a cold node_modules, or a network drive. Re-run doctor; if it "
+            "persists, run the command by hand to see what it is waiting on.",
+            required,
+        )
     if code != 0:
-        return Result(name, False, f"found at {path} but failed to run", fix, required)
+        return Result(name, False, f"found at {path} but failed to run (exit {code})",
+                      fix, required)
     match = re.search(pattern, out)
     version = match.group(1) if match else out.splitlines()[0][:40]
     return Result(name, True, f"{version}  {DIM}{path}{RESET}", "", required)

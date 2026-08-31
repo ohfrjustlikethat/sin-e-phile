@@ -288,6 +288,31 @@ real gallery in headless Chrome and measures frame times, focus rings, keyboard
 reach and `prefers-reduced-motion`. It and the contrast audit run on every push, and
 both were verified to fail on a reintroduced regression before being trusted.
 
+### The database ✅ `Phase 3`
+
+One SQLite file in `data/`, next to the executable, so the whole app is a folder you
+can copy to a USB stick and keep using.
+
+The design decision worth knowing is that **a film, a TV episode, an anime season and
+a manga chapter are all the same kind of thing** — one `media_items` table with a
+`kind` column. It means search, the watchlist, viewing history and the recommender
+all point at one type instead of four. It also means adding manga in Phase 24 needs
+no database migration, because all eight kinds were allowed from the first day.
+
+The other one is episode numbering. A long-running anime genuinely has no single
+correct episode number: one source says season 3 episode 7, another says episode 59,
+a third restarts at 1 every cour. Those do not convert into one another by
+arithmetic, because the cours are uneven and the sources disagree about whether recap
+episodes count. So the database records **what each source said**, and identifying a
+file is a lookup rather than a calculation. Phase 12 has to be right about this more
+than 99% of the time.
+
+Your viewing history can be exported to a file and carried to another machine. It
+refers to films by their public IMDb-style ids, never by internal row numbers —
+those are assigned in the order things were ingested, so the same film is a different
+number on every installation, and an export keyed on them would restore a history
+pointing at the wrong films while looking perfectly fine.
+
 ---
 
 ## Where to look in the code
@@ -304,3 +329,5 @@ both were verified to fail on a reintroduced regression before being trusted.
 | How the design system fits together | `docs/specs/design-system.md` + `src/styles/tokens.css` |
 | Why the visual direction is what it is | `docs/adr/0023`, `0024` + `docs/design/mockups/` |
 | What a screenshot cannot check | `tools/uiaudit/run.mjs` |
+| The schema, and why it is shaped that way | `crates/persistence/migrations/` + `docs/adr/0025` |
+| Why anime episode numbering is hard | `crates/persistence/migrations/0003_series.up.sql` |
