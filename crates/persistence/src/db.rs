@@ -137,6 +137,15 @@ impl Db {
         Ok(())
     }
 
+    /// The highest migration this binary carries.
+    ///
+    /// Tests assert against this rather than a hard-coded number: migration 0005
+    /// broke three tests that said `Some(4)`, which is a maintenance tax on every
+    /// future migration for no benefit.
+    pub fn latest_schema_version() -> i64 {
+        MIGRATOR.iter().map(|m| m.version).max().unwrap_or(0)
+    }
+
     /// The highest applied migration version, or `None` on a fresh database.
     pub async fn schema_version(&self) -> Result<Option<i64>, DbError> {
         let row: Option<(i64,)> =

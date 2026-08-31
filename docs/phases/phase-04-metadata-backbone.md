@@ -25,7 +25,7 @@ A local catalogue of hundreds of thousands of titles that works offline, enriche
 
 ## Subtasks
 
-- [ ] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts
+- [x] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts
 - [ ] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres
 - [ ] **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device)
 - [ ] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering
@@ -52,4 +52,4 @@ ETL pipelines; why offline-first beats API-first here; rate limiting and backoff
 <!-- subtask log: appended during the phase -->
 
 ## Work log
-
+- **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a kill

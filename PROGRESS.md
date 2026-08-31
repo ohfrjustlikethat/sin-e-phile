@@ -16,9 +16,9 @@
 
 > The catalogue. Three constraints carry in: ADR-0013 and ADR-0027 mean the app must be complete and good-looking with NO TMDB key and no key ever ships; ADR-0026 means SQL is runtime-checked, so every new repository method needs a line in crates/persistence/tests/repository_surface.rs; and R4 (ingestion larger or slower than expected) is this phase's named risk — measure before committing to a shape, and scope by a popularity threshold rather than ingesting everything.
 
-### Subtasks — 0/12 complete
+### Subtasks — 1/12 complete
 
-- [ ] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts
+- [x] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts
 - [ ] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres
 - [ ] **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device)
 - [ ] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering
@@ -45,7 +45,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.1: build the resumable job runner in tools/ingest/ with checkpointing, so a killed ingestion resumes rather than restarts (exit criterion E2). Read docs/phases/phase-04-metadata-backbone.md first; R4 in docs/RISKS.md is this phase's named risk.
+Phase 4 subtask 4.2: IMDb dataset download, verification and normalisation into media_items/titles/people/credits/genres, built as steps on the runner in tools/ingest/src/job.rs. Read docs/phases/phase-04-metadata-backbone.md; R4 says measure the size and time before committing to a shape, and scope by a popularity threshold rather than ingesting everything.
 
 ---
 

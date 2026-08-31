@@ -393,7 +393,10 @@ async fn db_surface() {
     );
 
     // schema_version
-    assert_eq!(db.schema_version().await.expect("schema_version"), Some(4));
+    assert_eq!(
+        db.schema_version().await.expect("schema_version"),
+        Some(Db::latest_schema_version())
+    );
 
     // backup_to
     let backup = dir.path().join("backups/b.db");
@@ -408,6 +411,7 @@ async fn db_surface() {
         .is_none());
 
     // migrate_down_to
-    db.migrate_down_to(3).await.expect("migrate_down_to");
-    assert_eq!(db.schema_version().await.expect("version"), Some(3));
+    let one_back = Db::latest_schema_version() - 1;
+    db.migrate_down_to(one_back).await.expect("migrate_down_to");
+    assert_eq!(db.schema_version().await.expect("version"), Some(one_back));
 }

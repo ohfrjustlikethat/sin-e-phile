@@ -113,7 +113,11 @@ async fn populate(db: &Db) -> i64 {
 async fn migrations_run_forward_on_a_fresh_database() {
     let db = Db::in_memory().await.expect("open");
     let version = db.schema_version().await.expect("version");
-    assert_eq!(version, Some(4), "all four migrations applied");
+    assert_eq!(
+        version,
+        Some(Db::latest_schema_version()),
+        "every migration this binary carries was applied"
+    );
 }
 
 #[tokio::test]
@@ -188,10 +192,13 @@ async fn migrations_roll_back_against_a_populated_database() {
         .expect("open");
 
     populate(&db).await;
-    assert_eq!(db.schema_version().await.expect("version"), Some(4));
+    assert_eq!(
+        db.schema_version().await.expect("version"),
+        Some(Db::latest_schema_version())
+    );
 
     // All the way down, one migration at a time, with data present at every step.
-    for target in [3, 2, 1, 0] {
+    for target in (0..Db::latest_schema_version()).rev() {
         db.migrate_down_to(target)
             .await
             .unwrap_or_else(|e| panic!("rollback to {target} failed: {e}"));
@@ -225,7 +232,10 @@ async fn the_ladder_can_be_climbed_twice() {
 
     // Re-opening runs the migrations forward again from nothing.
     let db = Db::open(&path).await.expect("reopen");
-    assert_eq!(db.schema_version().await.expect("version"), Some(4));
+    assert_eq!(
+        db.schema_version().await.expect("version"),
+        Some(Db::latest_schema_version())
+    );
 
     // And the schema is usable, not merely present.
     let media = MediaRepository::new(&db);
