@@ -603,3 +603,96 @@ Verify CI green on `phase/03-data-layer`, merge, tag `phase-03`, then set
 Still outstanding for the author, neither blocking: **P8** (Tier 0 embedding
 measurement before Phase 21) and the **TMDB enquiry** at
 `docs/correspondence/tmdb-ai-clause.md`.
+
+---
+
+## Session 7 — 2026-09-01 — two rulings, the navigation system, and Phase 4 begins
+
+### Rulings
+
+**P9 closed — runtime-checked SQL, spec amended to 1.5.0** (ADR-0026). The author's
+reasoning: if most columns need `as "col!"` nullability annotations then
+"compile-time checked" is really "compile-time asserted by me", which is weaker than
+it sounds; add the `cargo sqlx prepare` ritual across 24 more phases and dynamic SQL
+being impossible anyway, and the macros lose. §2's rationale now says what is true —
+single-file portability, WAL, a mature async driver.
+
+Compensating control: `tests/repository_surface.rs` exercises **every** repository
+method against a freshly migrated database. Standing requirement in CLAUDE.md.
+Verified honestly: typo'd `primary_title` → `primary_titel` and **`cargo build`
+reported zero errors** — the demonstration that the compile-time guarantee is
+genuinely gone — while the test failed with `no such column`.
+
+**P2 closed — no TMDB key ever ships** (ADR-0027). Per-profile, in settings, under
+the user's own acceptance, removable. Every dependent surface degrades to the §9.4
+typographic state, which Phase 2 already built. The enquiry is not sent and no longer
+tracked; kept and marked closed, because the analysis is the useful part.
+
+### The navigation system (SPEC 1.6.0, ADR-0028)
+
+Phase docs reinstated as **generated** working files; six commands as skills;
+`docs/COMMANDS.md`; `tools/statecheck` in CI and pre-push; the decision protocol as a
+fifth CLAUDE.md protocol; the session reading list cut to two files.
+
+Verified in the direction that matters: a deliberately vague `next_action` was
+**refused by the pre-push hook**.
+
+### Phase 4 opened, subtask 4.1 complete
+
+Migration 0005 puts `ingest_jobs` and `ingest_steps` in the app database (author's
+ruling — two files is what would break the copy-the-folder promise). The runner is
+built on one idea: **a checkpoint commits in the same transaction as the work it
+describes**. Moving it onto a separate connection broke 8 of 10 tests and deadlocked
+a ninth, which is the demonstration that the property is load-bearing.
+
+### Six bugs, and what each one cost
+
+1. **`Job::begin` only adopted `running` jobs** — but a crashed job is marked
+   `failed`, which is precisely the one to resume. Every crash silently started over:
+   70 rows where 50 were expected.
+2. **`run_step` upserted a step to `running` before reading its status**, so a
+   completed step was marked running by the very query about to ask whether it had
+   completed.
+3. **Three tests hard-coded schema version 4** and broke on migration 0005. Now
+   derived from `Db::latest_schema_version()`.
+4. **`statecheck` did not validate the state file's own schema** — a subtask marked
+   complete with a null commit reached CI. Pre-push is meant to be the stricter gate.
+5. **`statecheck` rewrote the file it was checking.** `read_text`/`write_text`
+   translate newlines, so its restore converted `PROGRESS.md` from LF to CRLF on
+   every run — and it compared normalised text, so it was blind to its own damage.
+   CI saw a 118-line diff on a file whose content had not changed.
+6. **Then the fix over-corrected**: comparing bytes is right for the restore and
+   wrong for the comparison, because CI checks out with `autocrlf`. Compare
+   normalised, restore exact.
+
+(5) and (6) are the useful pair. A check that modifies what it checks is worse than
+no check; a check that cries wolf gets deleted. Both were mine, one session apart.
+
+### Also
+
+The **statecheck rule was deliberately weakened** after it fired on real work: a
+trailing comment fix in a migration was refused although the work was recorded one
+commit earlier. It is now a window — if any of the last five commits changed code,
+one of them must have touched `PROJECT_STATE.json`. A rule that demands a meaningless
+edit is a rule that earns `--no-verify`.
+
+`--force` regenerating `phase-00` destroyed a hand-written retrospective. Restored
+from git; the generator now refuses to overwrite any document it did not produce.
+
+The phase-doc generator found its own bug on first real use: Phase 4's Risks section
+came out empty because R4 names Phase 4 as owner while the Phase 4 entry never
+mentions R4. Lookup is bidirectional now.
+
+### Blockers
+
+None. No decisions waiting that block Phase 4.
+
+### What the next session should do first
+
+`/next`. Subtask 4.2: IMDb dataset download, verification and normalisation, built as
+steps on the runner. **R4 is this phase's named risk** — measure size and time before
+committing to a shape, and scope by a popularity threshold rather than ingesting
+everything.
+
+Still outstanding for the author, non-blocking: **P8** (Tier 0 embedding measurement
+before Phase 21).
