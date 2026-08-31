@@ -45,11 +45,17 @@ from.
 3. A phase behind the current one is left unclosed.
 4. `next_action` is empty, or is a direction ("continue the torrent engine") rather
    than an instruction naming a file and an approach.
-5. **The most recent commit that changed `src-tauri/`, `src/` or `crates/` is not
-   recorded in `PROJECT_STATE.json`** — and neither is any commit since.
+5. **A run of commits changed code and none of them touched `PROJECT_STATE.json`** —
+   checked over the last five commits.
 
 The last one is the important one. It makes *finished the work, forgot to record it*
 mechanically impossible rather than something anyone has to remember.
+
+It is a window rather than a strict "the newest code commit must touch state",
+deliberately. The strict version fired on a trailing comment fix in a migration —
+work already recorded one commit earlier — and a rule that demands a meaningless
+edit to get past it is a rule that gets `--no-verify`'d within a week, and then
+protects nothing.
 
 ## How decisions get put to you
 

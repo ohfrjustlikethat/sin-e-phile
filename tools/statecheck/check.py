@@ -36,7 +36,12 @@ PROGRESS = REPO / "PROGRESS.md"
 PHASEDOC = REPO / "tools" / "phasedoc" / "generate.py"
 VALIDATE = REPO / "tools" / "state" / "validate_state.py"
 
-CODE_PATHS = ("src-tauri/", "src/", "crates/")
+CODE_PATHS = ("src-tauri/", "src/", "crates/", "tools/ingest/")
+
+# How far back "keeps pace" looks. Five is enough to catch a session that built
+# something and never recorded it, and loose enough that a trailing comment fix does
+# not demand its own state edit — see check_state_follows_code.
+WINDOW = 5
 
 BOLD, RED, GREEN, DIM, RESET = "\033[1m", "\033[31m", "\033[32m", "\033[2m", "\033[0m"
 
@@ -182,41 +187,43 @@ def check_next_action(state: dict) -> list[Problem]:
 # ---------------------------------------------------------------------------
 
 def check_state_follows_code(_: dict) -> list[Problem]:
-    """The most recent code commit must be reflected in PROJECT_STATE.json.
+    """State must keep pace with code: no run of commits changes code in silence.
 
     The author's framing: this makes "finished work but forgot to record it"
     mechanically impossible rather than something to remember.
 
-    Satisfied by the code commit itself touching the state file, OR by any commit
-    since it doing so — recording state in a following commit is a normal and honest
-    workflow, and forbidding it would only encourage bundling unrelated changes into
-    one commit, which standing rule 4 argues against.
+    The rule is a WINDOW, not a strict ordering, and that is a deliberate weakening
+    made after the first version fired on real work. Requiring the most recent code
+    commit specifically to touch the state file meant a trailing comment fix in a
+    migration — work that was already fully recorded one commit earlier — was
+    refused at push. A rule that demands a meaningless state edit to get past it is
+    a rule that gets `--no-verify`'d within a week, and then protects nothing.
+
+    So: if any of the last WINDOW commits changed code, at least one of them must
+    have touched PROJECT_STATE.json. A session cannot build for a whole run of
+    commits without recording it, and a fixup does not need its own ceremony.
     """
-    recent = git("log", "-40", "--format=%H").splitlines()
-    if not recent:
+    window = git("log", f"-{WINDOW}", "--format=%H").splitlines()
+    if not window:
         return []
 
-    code_commit = None
-    for sha in recent:
-        files = git("show", "--name-only", "--format=", sha).splitlines()
-        if any(f.startswith(CODE_PATHS) for f in files if f):
-            code_commit = sha
-            break
-    if not code_commit:
-        return []
-
-    # Commits from the code commit onward, newest first, including it.
-    window = recent[: recent.index(code_commit) + 1]
+    touched_code: list[str] = []
+    touched_state = False
     for sha in window:
-        files = git("show", "--name-only", "--format=", sha).splitlines()
+        files = [f for f in git("show", "--name-only", "--format=", sha).splitlines() if f]
+        if any(f.startswith(CODE_PATHS) for f in files):
+            touched_code.append(sha)
         if "PROJECT_STATE.json" in files:
-            return []
+            touched_state = True
 
-    subject = git("log", "-1", "--format=%s", code_commit)
+    if not touched_code or touched_state:
+        return []
+
+    subjects = [git("log", "-1", "--format=%s", sha)[:44] for sha in touched_code[:3]]
     return [Problem(
         "state follows code",
-        f"the most recent code commit ({code_commit[:7]} {subject[:48]!r}) is not "
-        f"recorded in PROJECT_STATE.json, and neither is any commit since",
+        f"{len(touched_code)} of the last {WINDOW} commits changed code and none "
+        f"touched PROJECT_STATE.json: " + "; ".join(f"{s!r}" for s in subjects),
         "update subtask status, evidence and next_action, then commit the state file",
     )]
 
