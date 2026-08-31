@@ -62,6 +62,52 @@ Tier 2 and are labelled as such.
 
 ---
 
+## Phase 1 — Application shell
+
+Release build, dev machine (**Tier 2**: 32 GB, 24 cores, RTX 5070 Ti, hardware
+decode present). Tier 0 figures are the governing ones (§2.3) and are outstanding
+until Phase 21 measures on constrained hardware — these are the Tier 2 targets from
+the Phase 1 exit criteria.
+
+| Measurement | Value | Target | Command |
+|---|---|---|---|
+| **Cold start to interactive** | **515 / 660 ms** | < 2 s (Tier 2), < 4 s (Tier 0) | `cold_start_ms` in `data/logs/`, measured process start → frontend painted |
+| **Idle RAM** | **42.2 MB** | < 200 MB (Tier 2), < 250 MB (Tier 0) | `WorkingSet64` after the window is shown |
+| Release binary | **10.1 MB** | — | `target/release/sin-e-phile.exe` |
+| Frontend bundle | 257 KB JS (79 KB gzip), 18 KB CSS | — | `npm run build` |
+
+**Cold start is measured to *interactive*, not to window creation.** The window is
+created hidden and revealed only when the frontend reports it has painted, gated on
+a double `requestAnimationFrame`. Timing to `MainWindowHandle` instead gave 267 ms —
+a flattering number for a window with nothing in it. The honest figure is ~2× that
+and still well inside budget.
+
+### Tier detection (§8)
+
+Correct on the dev machine: `Capable`, 32189 MB, 24 physical cores,
+`NVIDIA GeForce RTX 5070 Ti Laptop GPU`, hardware decode present. Probed via DXGI
+rather than WMI, which is slow enough to be visible in a 4 s cold-start budget.
+
+### Exit criteria evidenced
+
+| Criterion | Evidence |
+|---|---|
+| **IPC types are generated, not hand-written; changing a Rust command signature breaks the TypeScript build** | Verified by doing it. Baseline `npm run build` clean → added a `profile_id: u32` argument to `has_capability` in Rust → rebuilt → `src/lib/ipc.ts` regenerated with `unexpectedNewArg` → `npm run build` failed with `error TS2554: Expected 2 arguments, but got 1` at `SettingsScreen.tsx(145,64)`. Reverted; clean again. |
+| **A deliberately-triggered panic writes a crash log** | `SINEPHILE_PANIC_TEST=1` → `data/crashes/crash-1788162818.txt` with version, location (`logging.rs:65:9`), message and full backtrace. Also caught a *real* panic earlier (a Specta BigInt export error), which is stronger evidence than the contrived one. |
+| Graceful error screen | `src/app/ErrorBoundary.test.tsx` — 2 tests, asserts the message and that it names where the crash report went. |
+| Tier detection correct | See above; 8 unit tests in `crates/tiers` cover the §8 table at its boundaries. |
+
+### Test and lint status
+
+| Check | Result |
+|---|---|
+| `cargo test --workspace` | **8 passed**, 0 failed |
+| `cargo clippy --workspace --all-targets -- -D warnings` | clean |
+| `cargo fmt --all --check` | clean |
+| `npm test` | **9 passed** (3 files) |
+| `npm run lint` | clean |
+| `npm run build` | clean |
+
 ## Phase 1 — Spike C (ONNX Runtime, risk R3)
 
 **R3 does not fire. PASS, with large headroom.** `ort` 2.0.0-rc.13, ONNX Runtime,

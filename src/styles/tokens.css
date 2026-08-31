@@ -1,0 +1,72 @@
+/* Design tokens — SPEC.md §9.1, "Charcoal & Oxblood".
+ *
+ * Phase 2 builds the design system properly. These are the starting tokens, held
+ * as CSS custom properties so theming stays honest and Tailwind consumes them
+ * rather than duplicating them.
+ *
+ * COLOUR RULES (§9.1), which the Phase 2 contrast audit will enforce:
+ *   - Oxblood is for INTENT — play, focus, progress, active nav. Never decorative,
+ *     never a large fill.
+ *   - Posters and stills are the colour in this app. The chrome recedes.
+ *   - --danger and --oxblood must never appear adjacent.
+ *   - Every text/background pair must pass WCAG AA. --ink-faint on --surface is
+ *     the one to watch.
+ */
+
+:root {
+  /* Ground */
+  --void: #0c0c0e;
+  --base: #131316;
+  --surface: #1a1a1e;
+  --raised: #232328;
+  --overlay: #2c2c32;
+  --scrim: rgba(12, 12, 14, 0.82);
+
+  /* Line */
+  --line-subtle: #26262c;
+  --line: #35353e;
+  --line-strong: #4a4a55;
+
+  /* Type — warm cream, never pure white */
+  --ink: #f2efe9;
+  --ink-muted: #a8a49c;
+  --ink-faint: #6e6a64;
+
+  /* Accent — oxblood */
+  --oxblood: #8c2f39;
+  --oxblood-hover: #a03642;
+  --oxblood-bright: #c04a56;
+  --oxblood-deep: #551d24;
+  --oxblood-wash: rgba(140, 47, 57, 0.14);
+  --oxblood-glow: rgba(192, 74, 86, 0.3);
+
+  /* Semantic — deliberately distinct from oxblood */
+  --success: #4e7a5c;
+  --warning: #b8873f;
+  --danger: #d9503f;
+  --info: #5a7a8c;
+
+  /* Motion — §9.3 */
+  --ease-standard: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-standard: 180ms;
+  --dur-fast: 120ms;
+
+  /* Layout — §9.4 */
+  --rail-collapsed: 72px;
+  --rail-expanded: 240px;
+  --content-max: 1680px;
+}
+
+/* §9.3: prefers-reduced-motion disables scale and parallax and keeps opacity
+   fades at 100ms. Enforced globally rather than per-component so it cannot be
+   forgotten. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 100ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -137,4 +137,8 @@ SHOULD_PASS: list[tuple[str, str]] = [
     ("Apache-2.0 licence body", "    http://www.apache.org/licenses/LICENSE-2.0"),
     ("TOML table header", "[profile.dev]"),
     ("nested TOML table header", "[tool.poetry.group.dev.dependencies]"),
+    # Lockfiles are committed (R8) and are full of registry and funding URLs.
+    ("npm lockfile resolved URL", '"resolved": "https://registry.npmjs.org/react/-/react-19.2.8.tgz"'),
+    ("funding URL in package metadata", '"url": "https://opencollective.com/eslint"'),
+    ("the app's own bundle identifier", '"identifier": "dev.sinephile.app",'),
 ]

@@ -1,0 +1,15 @@
+# Workspace root.
+#
+# `src-tauri` is the application; `crates/` holds self-contained, independently
+# testable pieces (SPEC.md §7). The split is not only about reuse: a test binary
+# that links Tauri cannot launch on Windows without a manifest `cargo test` does
+# not provide, so pure logic must live outside the Tauri crate to be testable at
+# all (ADR-0022).
+[workspace]
+resolver = "2"
+members = ["src-tauri", "crates/tiers"]
+
+[workspace.package]
+edition = "2021"
+license = "GPL-3.0-only"
+rust-version = "1.82"

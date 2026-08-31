@@ -235,9 +235,19 @@ The three things worth carrying forward:
 
 ### What we built
 
-- Spike A: libmpv in Tauri v2. Child-HWND embedding, still-frame pause overlay,
-  region-cutout playback chrome. Throwaway code in `spikes/`.
-- *(Spikes B and C, then the shell, tiers and IPC — pending.)*
+- **Three de-risking spikes, all passed.** libmpv embeds in Tauri and
+  hardware-decodes; librqbit already provides most of the Phase 7 scheduler;
+  `ort` embeds a query in 1.63 ms p95 against a 30 ms trigger. Throwaway code in
+  `spikes/`.
+- **The application shell.** Tauri v2 + React 19 + TypeScript strict + Vite +
+  Tailwind 4, custom title bar, five-destination nav rail that remembers its
+  collapsed state, honest phase-badged placeholders.
+- **A generated IPC boundary.** `tauri-specta` derives `src/lib/ipc.ts` from the
+  Rust command signatures on every debug run, so the two sides cannot drift.
+- **`crates/tiers`** — §8 hardware detection and capability gating, with the
+  Settings screen that shows what the machine enables in plain language, and what
+  happens instead where it does not.
+- **Logging and a crash handler** writing to portable `data/` next to the exe.
 
 ### Why this approach
 
@@ -246,6 +256,13 @@ The three things worth carrying forward:
   measured; over HTML5-plus-remux because that trades away "plays everything".
 - `SPEC.md` §9.3 amended by ADR-0020 rather than carrying a requirement the platform
   cannot meet.
+- **Testable logic moved out of `src-tauri` (ADR-0022).** Not a preference — a test
+  binary that links Tauri cannot launch on Windows at all, and the targeted fix is
+  nightly-only. Rejected: nightly Rust, manifest-via-rustflags (breaks every
+  dependency), and UI-only testing (§12.1 requires unit tests).
+- **Cold start measured to *interactive*, not to window creation.** The flattering
+  number was 267 ms; the honest one is ~515–660 ms. The window is created hidden and
+  revealed when the frontend reports it has painted.
 
 ### New concepts
 
@@ -259,6 +276,16 @@ The three things worth carrying forward:
 | `RealChildWindowFromPoint` vs `WindowFromPoint` | `scratchpad/test1_probe.ps1` |
 | Tauri `with_webview` → `ICoreWebView2Controller2` | `spikes/spike-a-tauri/src/main.rs` (setup) |
 | Windows DPI awareness and coordinate spaces | harness; see the note on `ClientToScreen` |
+| Zustand store with selective `persist` | `src/lib/store.ts:26` |
+| TanStack Query defaults for a local backend | `src/main.tsx:12` |
+| React error boundary (class component, `getDerivedStateFromError`) | `src/app/ErrorBoundary.tsx:14` |
+| `tauri-specta` generated bindings | `src-tauri/src/lib.rs:26` (`ipc_builder`) |
+| Specta forbids `u64`/`usize` across IPC (JS numbers are f64) | `crates/tiers/src/lib.rs:101` |
+| `OnceLock` for process-start timing | `src-tauri/src/lib.rs` (`PROCESS_START`) |
+| Tauri capability permissions (allowlist per window) | `src-tauri/capabilities/default.json` |
+| Cargo workspace + why `test = false` on the Tauri crate | `src-tauri/Cargo.toml:22`, ADR-0022 |
+| DXGI adapter enumeration for GPU detection | `crates/tiers/src/lib.rs` (`probe_gpu`) |
+| Tailwind v4 CSS-first theme (`@theme inline`) | `src/styles/global.css:6` |
 
 ### Five self-check questions
 

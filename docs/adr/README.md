@@ -37,6 +37,7 @@ never be empty: if nothing was genuinely rejected, there was no decision.
 | [0019](0019-movielens-matrix-computed-on-device.md) | Compute the MovieLens item-item matrix on the user's machine | Accepted | 2026-08-31 |
 | [0020](0020-solid-player-chrome-region-cutouts.md) | Solid player chrome, cut out of the video window | Accepted | 2026-08-31 |
 | [0021](0021-player-composition-architecture.md) | Player composition: still-frame on pause, region cutouts during playback | Accepted | 2026-08-31 |
+| [0022](0022-testable-logic-outside-the-tauri-crate.md) | Testable logic lives outside the Tauri crate | Accepted | 2026-08-31 |
 
 **0002–0008 record decisions that were already locked in `SPEC.md` §5 before this
 repository existed.** They were written in session 0b, after 0009–0015, which is why
