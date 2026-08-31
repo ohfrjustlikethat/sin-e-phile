@@ -37,6 +37,12 @@ CREATE TABLE ingest_steps (
     -- the step needs to say "carry on from here". Deliberately untyped: the runner
     -- must not need to understand any particular dataset's idea of progress, or it
     -- would need changing for every new source.
+    --
+    -- MUST NOT contain an absolute path. §2.4 promises the app folder can be copied
+    -- to another machine and keep working; a cursor holding a machine-specific path
+    -- would break that silently on the resumed run rather than loudly at the copy.
+    -- Store an offset or an id — if a step needs a file, it resolves the path itself
+    -- from the data directory.
     cursor      TEXT,
 
     -- For progress reporting only. `items_total` is NULL until the step knows, which
