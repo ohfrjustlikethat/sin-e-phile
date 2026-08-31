@@ -259,6 +259,35 @@ The reason for all this machinery: this project runs for months across many sess
 with long gaps. Whether the state file can be trusted is the difference between
 resuming and re-deriving.
 
+### The design system ✅ `Phase 2`
+
+Every colour, size and duration is a CSS custom property in `src/styles/tokens.css`.
+Tailwind's own default palette is deliberately **not** re-exported, so writing
+`bg-slate-800` does not resolve — the wrong colour fails rather than merely being
+discouraged.
+
+`src/design-system/` holds 21 components, each shown in every state — including
+loading, disabled, error and empty — in a dev-only gallery at `#design`. A component
+that only looks right in its happy state is not finished.
+
+The most interesting piece is `Rail`, the horizontally-scrolling row. It virtualises:
+with 500 cards it mounts about 14, which is what keeps it at 60fps. Virtualisation
+has two consequences that are not obvious and that both failed silently here:
+
+- The scroll track is enormous (97,060px for 500 cards), so any ancestor that
+  refuses to shrink below its content will expand to match it. That happened, the
+  component measured its own viewport as 97,060px wide, and it mounted all 500
+  cards while appearing to work perfectly.
+- Only the mounted cards exist in the DOM, so plain Tab navigation reaches about
+  thirteen of them and then leaves. The other 487 were unreachable by keyboard.
+  The rail is therefore **one** tab stop with arrow-key navigation, which scrolls
+  each card into existence just before focusing it.
+
+Neither was visible on screen, which is why `tools/uiaudit` exists: it drives the
+real gallery in headless Chrome and measures frame times, focus rings, keyboard
+reach and `prefers-reduced-motion`. It and the contrast audit run on every push, and
+both were verified to fail on a reintroduced regression before being trusted.
+
 ---
 
 ## Where to look in the code
@@ -272,3 +301,6 @@ resuming and re-deriving.
 | Why any technology was chosen | `docs/adr/0002`–`0008` |
 | What could go wrong, and the pre-decided response | `docs/RISKS.md` |
 | What is deliberately undecided | `docs/DECISIONS_PENDING.md` |
+| How the design system fits together | `docs/specs/design-system.md` + `src/styles/tokens.css` |
+| Why the visual direction is what it is | `docs/adr/0023`, `0024` + `docs/design/mockups/` |
+| What a screenshot cannot check | `tools/uiaudit/run.mjs` |

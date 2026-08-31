@@ -4,10 +4,11 @@
 local film library behind one semantic search engine and a discovery-first
 recommender.**
 
-> **Status: Phase 0 of 28 — infrastructure.** There is no application to run yet.
-> This README describes what is being built and will be updated at the end of every
-> phase that changes what the app can do. It is never allowed to over-claim; the
-> [feature list](#what-actually-works-today) below says exactly what exists.
+> **Status: Phase 2 of 28 — the shell runs and the design system is built.** There
+> is no product UI yet. This README describes what is being built and is updated at
+> the end of every phase that changes what the app can do. It is never allowed to
+> over-claim; the [feature list](#what-actually-works-today) below says exactly what
+> exists.
 >
 > Follow along in [`PROGRESS.md`](PROGRESS.md).
 
@@ -110,7 +111,8 @@ Every recommendation carries a truthful, human-readable reason.
 
 ## Measured, not asserted
 
-Four evaluation harnesses run in CI and track quality over time. **A quality
+Two audits run in CI today, and four evaluation harnesses arrive with the phases
+that need them. All of them track quality over time. **A quality
 regression blocks a merge exactly as a failing test does** — including in an earlier
 phase's metric, which is the kind of rot that otherwise goes unnoticed.
 
@@ -124,6 +126,19 @@ phase's metric, which is the kind of rot that otherwise goes unnoticed.
 The false-confident rate matters more than the accuracy number. Being wrong while
 confident is the worst failure mode a file matcher has, and it is measured
 separately for that reason.
+
+Running already, on every push:
+
+| Audit | Checks | Current |
+|---|---|---|
+| `npm run audit:contrast` | every token pair against WCAG AA | 29 enforced pairs pass |
+| `npm run audit:ui` | 60fps rail · focus rings · keyboard reach · reduced motion | worst frame 16.8ms, 0 dropped |
+
+Both were verified to **fail** on a deliberately reintroduced regression before being
+trusted. A check that has never been seen to fail is not evidence of anything, and
+the UI audit found four bugs on the day it was written that no screenshot showed —
+including virtualisation that had silently stopped working, and 487 of 500 cards
+being unreachable by keyboard.
 
 ---
 
@@ -200,15 +215,25 @@ off means the pause overlay shows the full cast list, beautifully.
 
 ## What actually works today
 
-**Phase 0 — infrastructure only. There is no application yet.** Honestly:
+**Phases 0–2 — the shell and the design system. There is no product UI yet.**
+Honestly:
 
 - ✅ Posture guard, secret scanner, and prerequisite doctor — all three verified by
   deliberately planted failures
-- ✅ CI on `windows-latest`; git hooks; GPL-3.0; specification amended to 1.1.0 with
-  15 ADRs
+- ✅ CI on `windows-latest`; git hooks; GPL-3.0; specification at 1.4.0 with 24 ADRs recorded
 - ✅ Machine-readable project state for all 28 phases, generated from the spec and
   schema-validated so a criterion cannot be marked done without evidence
-- ⬜ Everything described above this section
+- ✅ A Tauri window that opens, with a custom title bar and hardware tier detection.
+  Cold start measured to the first painted frame — 515ms and 660ms across two
+  release runs — not to the point where the window handle exists, which would
+  have been a flattering and dishonest 267ms
+- ✅ All three Phase 1 spikes de-risked: libmpv drives from Rust, librqbit streams,
+  and the ONNX embedding model runs locally. The compositing problem that would
+  have surfaced in Phase 8 was found and solved in Phase 1
+- ✅ A design system built from a chosen mockup: tokens, 21 components, a
+  virtualised rail that holds 60fps with 500 cards and is keyboard-complete, and
+  two audits in CI that enforce all of it
+- ⬜ Everything else described above this section
 
 ---
 

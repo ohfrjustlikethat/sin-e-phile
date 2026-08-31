@@ -46,7 +46,7 @@
 
 ## What's next
 
-Phase 2 is code-complete with all five exit criteria evidenced. Verify CI is green on phase/02-design-system (the workflow now runs two new jobs: "Contrast audit (WCAG AA)" and "UI audit" - the UI audit needs Chrome on the runner, so check that step specifically). Then merge to main, confirm green, tag phase-02. Next is Phase 3; read docs/phases/phase-03-*.md first. The understanding gate does NOT fire here - ADR-0016 moved it to tier boundaries, so the five questions in docs/learning/phase-02-notes.md accumulate and are asked with Phases 1-8 at the end of Phase 8.
+Phase 2 is DONE: merged to main, tagged phase-02, CI green on main (run 33397473458 on the branch, and the main run after the merge - all 5 jobs pass, including the two new audit steps). Start Phase 3: read docs/phases/phase-03-*.md, then SPEC.md 15's Phase 3 entry, and plan before implementing. The understanding gate does NOT fire here - ADR-0016 moved it to tier boundaries, so the five questions in docs/learning/phase-02-notes.md accumulate and are asked together with Phases 1-8 at the end of Phase 8.
 
 ---
 
