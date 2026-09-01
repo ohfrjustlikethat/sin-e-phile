@@ -13,6 +13,10 @@ description = "Live metadata API clients: shared rate limiting, backoff, and cac
 
 [dependencies]
 tokio = { version = "1", features = ["sync", "time", "macros"] }
+sinephile-persistence = { path = "../persistence" }
+sqlx = { version = "=0.8.6", default-features = false, features = [
+    "runtime-tokio", "sqlite", "macros",
+] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
@@ -20,3 +24,4 @@ tracing = "0.1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["sync", "time", "macros", "rt-multi-thread", "test-util"] }
+tempfile = "3"

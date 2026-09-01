@@ -11,7 +11,9 @@
 pub mod backoff;
 pub mod cache;
 pub mod limiter;
+pub mod store;
 
 pub use backoff::{classify, Backoff, Retryable};
 pub use cache::{cache_key, freshness, serveable, Freshness, Resource};
 pub use limiter::{Limit, RateLimiter};
+pub use store::{CacheStore, Cached, StoreError};

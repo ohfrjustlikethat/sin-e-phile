@@ -46,7 +46,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.6, continued: wire crates/metadata-api's cache policy to the http_cache table (migration 0008) behind a small store type, then write the AniList client - it needs no key and unblocks 4.4. The rate limiter, backoff and TTL policy are done with 25 tests; E4's 1,000-request stress test passes. See crates/metadata-api/src/cache.rs.
+Phase 4 subtask 4.6: write the AniList GraphQL client in crates/metadata-api - it needs no key (ADR-0027) and unblocks 4.4's anime catalogue and 4.13's airing schedules. Behind an injectable Transport trait so it is testable with no network. The rate limiter, backoff, TTL policy and cache store are done with 36 tests; E4's 1,000-request stress test passes.
 
 ---
 
