@@ -1,7 +1,7 @@
 {
   "spec_version": "1.7.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-09-01T20:18:45Z",
+  "last_updated": "2026-09-01T20:23:57Z",
   "sessions_completed": 5,
   "current_phase": {
     "number": 4,
@@ -39,8 +39,8 @@
       {
         "id": "4.5",
         "text": "External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules",
-        "status": "in_progress",
-        "commit": "ac4bbdf"
+        "status": "complete",
+        "commit": "f67d939"
       },
       {
         "id": "4.6",
@@ -717,8 +717,8 @@
         {
           "id": "4.5",
           "text": "External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules",
-          "status": "in_progress",
-          "commit": "ac4bbdf"
+          "status": "complete",
+          "commit": "f67d939"
         },
         {
           "id": "4.6",
@@ -1786,7 +1786,7 @@
       ]
     }
   ],
-  "next_action": "Phase 4 subtask 4.6, continued: add the persistent response cache to crates/metadata-api (migration 0007, an http_cache table so the SPEC.md 2.4 one-folder promise holds) with per-resource TTLs and stale-serving when offline, then the AniList client - it needs no key and unblocks 4.4. The shared rate limiter and backoff policy are done and E4's 1,000-request stress test passes. See crates/metadata-api/src/limiter.rs.",
+  "next_action": "Phase 4: write migration 0007 changing idx_titles_unique from (media_item_id, variant, language, region) to (media_item_id, variant, title), delete the existing duplicates, and re-run `ingest akas` (860s). That recovers ~270 MB of the ~986 MB R4 headroom for no loss of information - see docs/eval-results.md. Do this BEFORE reconsidering the >=10 vote threshold.",
   "blockers": [],
   "decisions_pending": [
     {
@@ -2015,6 +2015,11 @@
       "id": "D14",
       "phase_raised": 4,
       "text": "EXPECTATION TO MANAGE, not a defect: the author asked whether the bittorrent client will rival qBittorrent for seamless downloads. SPEC.md Phase 7's stated goal is 'torrents that stream, not torrents that download'. For STREAMING a purpose-built deadline scheduler should beat qBittorrent, which is not optimised for sequential playback. For BULK DOWNLOAD THROUGHPUT, matching a decade of tuned peer selection and disk I/O is a much harder bar and is not a stated goal - R2 already rates librqbit's streaming control as a live risk. Phase 7 should measure against qBittorrent on both axes and report honestly rather than let the comparison stay implicit."
+    },
+    {
+      "id": "D15",
+      "phase_raised": 4,
+      "text": "titles holds 2,250,937 redundant rows (27%): idx_titles_unique is (media_item_id, variant, language, region), so the same text under en/US, en/GB, en/CA and a null region is four distinct keys. Seven Samurai has six identical english rows. Deduplicating on (item, variant, text) recovers about 270 MB and costs nothing, because it removes duplicate rows rather than information. Needs migration 0007 changing the index, plus an 860s akas reload. Worth doing BEFORE any decision to tighten the vote threshold, which would cost 370,000 films their cast lists for a comparable saving."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

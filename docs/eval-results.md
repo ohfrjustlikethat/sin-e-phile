@@ -528,3 +528,59 @@ with `title.akas`, AniList, MovieLens and the embedding build still to run.
 
 **Both of R4's triggers are in play.** Neither is breached; neither is comfortably
 clear.
+
+### Alternative titles loaded — every R4 component is now measured
+
+`./target/release/ingest akas`, 2026-09-01, commit `f67d939`.
+
+| Metric | Value |
+|---|---|
+| Title rows | 8,435,215 |
+| **Database** | **3,110 MB** (+683 MB) |
+| **Load time** | **860 s** |
+
+Variant distribution: primary 2,701,195 · english 2,671,786 · alternative 1,697,466 ·
+original 909,292 · **native 380,185** · **romaji 75,291**. The script heuristic
+produces plausible counts, and no title rows are orphaned or attached to a non-core
+item beyond its primary.
+
+### R4, every component measured
+
+| Component | Projected | **Measured** | Projection error |
+|---|---|---|---|
+| titles (index tier) | 450 MB | **1,153 MB** | 2.6x under |
+| people + credits (core) | 1,921 MB | **1,069 MB** | 1.8x over |
+| alternative titles (core) | 812 MB | **683 MB** | 1.2x over |
+| | | **3,110 MB total** | |
+
+**3,110 MB of the 4,096 MB trigger — 76%.** Ingestion time so far is roughly 65
+minutes of the two-hour budget.
+
+Still to fit: the embedding artefact (~330 MB at ADR-0014's rate for 854,752 core
+titles), AniList, and MovieLens. Estimating those at ~600 MB puts the final figure
+near **3.7 GB, or 91% of the trigger** — under it, with no margin.
+
+The projections were wrong in all three cases and in both directions. They are
+retained above only to show that.
+
+### A defect the variant distribution exposed
+
+`Seven Samurai` has **six identical `english` rows**, differing only by region.
+`idx_titles_unique` is `(media_item_id, variant, language, region)`, so the same
+text under `en/US`, `en/GB`, `en/CA` and a null region are four distinct keys and
+all were inserted.
+
+| Uniqueness | Rows | Redundant |
+|---|---|---|
+| as stored | 8,435,215 | — |
+| distinct (item, variant, text) | 6,184,278 | **2,250,937 (27%)** |
+| distinct (item, text) | 4,370,081 | 4,065,134 (48%) |
+
+At roughly 120 bytes per row, deduplicating on **(item, variant, text)** recovers
+about **270 MB** — and costs nothing, because it removes duplicate rows rather than
+information. A genuinely different regional title is still a different row.
+
+**This matters more than the vote threshold.** Deduplication buys ~270 MB for no loss
+at all; tightening the core to `>= 50` buys perhaps 750 MB but takes the cast list
+away from roughly 370,000 films. The cheap fix should be taken before the expensive
+one is considered.

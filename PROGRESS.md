@@ -16,13 +16,13 @@
 
 > The catalogue. Three constraints carry in: ADR-0013 and ADR-0027 mean the app must be complete and good-looking with NO TMDB key and no key ever ships; ADR-0026 means SQL is runtime-checked, so every new repository method needs a line in crates/persistence/tests/repository_surface.rs; and R4 (ingestion larger or slower than expected) is this phase's named risk — measure before committing to a shape, and scope by a popularity threshold rather than ingesting everything.
 
-### Subtasks — 2/13 complete
+### Subtasks — 3/13 complete
 
 - [x] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts · `4a78d64`
 - [x] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres · `048180a`
 - [ ] **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device)
 - [ ] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering
-- [~] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules · `ac4bbdf`
+- [x] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules · `f67d939`
 - [~] **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline
 - [ ] **4.7** Per-profile TMDB key from settings, never shipped (ADR-0027); every TMDB-dependent surface degrades to the typographic state
 - [ ] **4.8** Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding, blurhash placeholders
@@ -46,7 +46,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.6, continued: add the persistent response cache to crates/metadata-api (migration 0007, an http_cache table so the SPEC.md 2.4 one-folder promise holds) with per-resource TTLs and stale-serving when offline, then the AniList client - it needs no key and unblocks 4.4. The shared rate limiter and backoff policy are done and E4's 1,000-request stress test passes. See crates/metadata-api/src/limiter.rs.
+Phase 4: write migration 0007 changing idx_titles_unique from (media_item_id, variant, language, region) to (media_item_id, variant, title), delete the existing duplicates, and re-run `ingest akas` (860s). That recovers ~270 MB of the ~986 MB R4 headroom for no loss of information - see docs/eval-results.md. Do this BEFORE reconsidering the >=10 vote threshold.
 
 ---
 
@@ -111,6 +111,7 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D12** (raised in Phase 4) A title released AFTER the last ingestion run is not in the catalogue at all: the IMDb datasets are a snapshot and IMDb refreshes daily. With a TMDB key, subtask 4.6's live clients can fill the gap on demand; with no key - which ADR-0027 makes the default - nothing currently covers it. Surfaced by the author asking whether new releases would be available. Owner: subtask 4.9's first-run flow.
 - **D13** (raised in Phase 4) WEEKLY TV EPISODE FRESHNESS has no owner. The author asked whether a newly-aired episode would be available seamlessly, the way a streaming app manages it. Finding a SOURCE is Phases 6/7/9 and needs nothing special - a new episode resolves like any other title. KNOWING THE EPISODE EXISTS is the gap: title.episode is a snapshot, IMDb refreshes daily and we do not. For anime, AniList publishes airing schedules through a public API with no key, so subtask 4.4 can solve it properly. For general TV it needs either the user's TMDB key or a periodic re-fetch of title.episode (one of the smaller files). Neither is currently specified. Owner: propose a mechanism before Phase 11, which is where next-episode handling lands.
 - **D14** (raised in Phase 4) EXPECTATION TO MANAGE, not a defect: the author asked whether the bittorrent client will rival qBittorrent for seamless downloads. SPEC.md Phase 7's stated goal is 'torrents that stream, not torrents that download'. For STREAMING a purpose-built deadline scheduler should beat qBittorrent, which is not optimised for sequential playback. For BULK DOWNLOAD THROUGHPUT, matching a decade of tuned peer selection and disk I/O is a much harder bar and is not a stated goal - R2 already rates librqbit's streaming control as a live risk. Phase 7 should measure against qBittorrent on both axes and report honestly rather than let the comparison stay implicit.
+- **D15** (raised in Phase 4) titles holds 2,250,937 redundant rows (27%): idx_titles_unique is (media_item_id, variant, language, region), so the same text under en/US, en/GB, en/CA and a null region is four distinct keys. Seven Samurai has six identical english rows. Deduplicating on (item, variant, text) recovers about 270 MB and costs nothing, because it removes duplicate rows rather than information. Needs migration 0007 changing the index, plus an 860s akas reload. Worth doing BEFORE any decision to tighten the vote threshold, which would cost 370,000 films their cast lists for a comparable saving.
 
 ---
 
