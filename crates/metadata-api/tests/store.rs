@@ -1,6 +1,6 @@
 //! The cache store against a migrated database (ADR-0026's standing requirement).
 
-use sinephile_metadata_api::{CacheStore, Freshness, Resource};
+use sinephile_metadata_api::{CacheStore, Freshness, Resource, Store};
 use sinephile_persistence::Db;
 
 /// Backdate an entry, so freshness can be tested without waiting.
@@ -16,19 +16,12 @@ async fn age_entry(db: &Db, url: &str, seconds: i64) {
 }
 
 const URL: &str = "https://example.test/film/1";
+const BODY: &str = r#"{"title":"Ran"}"#;
 
 async fn stored() -> Db {
     let db = Db::in_memory().await.expect("open");
     CacheStore::new(&db)
-        .put(
-            URL,
-            "tmdb",
-            Resource::Detail,
-            200,
-            r#"{"title":"Ran"}"#,
-            None,
-            None,
-        )
+        .put(Store::ok(URL, "tmdb", Resource::Detail, BODY))
         .await
         .expect("put");
     db
@@ -44,7 +37,7 @@ async fn a_fresh_entry_is_served() {
         .expect("present");
 
     assert_eq!(hit.freshness, Freshness::Fresh);
-    assert_eq!(hit.body, r#"{"title":"Ran"}"#);
+    assert_eq!(hit.body, BODY);
     assert_eq!(hit.status, 200);
 }
 
@@ -88,17 +81,9 @@ async fn an_entry_past_max_age_is_not_served_even_offline() {
 #[tokio::test]
 async fn include_stale_returns_an_entry_for_its_validators() {
     // A conditional refresh needs the ETag of an entry it will not serve.
-    let db = stored().await;
+    let db = Db::in_memory().await.expect("open");
     CacheStore::new(&db)
-        .put(
-            URL,
-            "tmdb",
-            Resource::Detail,
-            200,
-            "body",
-            Some("W/\"abc\""),
-            None,
-        )
+        .put(Store::ok(URL, "tmdb", Resource::Detail, BODY).with_etag(Some("W/\"abc\"")))
         .await
         .expect("put with etag");
     age_entry(&db, URL, 60 * 60 * 24 * 40).await;
@@ -144,17 +129,14 @@ async fn touch_refreshes_the_clock_without_rewriting_the_body() {
         .expect("get")
         .expect("fresh again");
     assert_eq!(entry.freshness, Freshness::Fresh);
-    assert_eq!(
-        entry.body, r#"{"title":"Ran"}"#,
-        "the body was not rewritten"
-    );
+    assert_eq!(entry.body, BODY, "the body was not rewritten");
 }
 
 #[tokio::test]
 async fn a_second_put_replaces_rather_than_duplicating() {
     let db = stored().await;
     CacheStore::new(&db)
-        .put(URL, "tmdb", Resource::Detail, 200, "updated", None, None)
+        .put(Store::ok(URL, "tmdb", Resource::Detail, "updated"))
         .await
         .expect("put again");
 
@@ -174,7 +156,7 @@ async fn an_api_key_never_reaches_the_table() {
     let db = Db::in_memory().await.expect("open");
     let with_key = "https://example.test/film/1?api_key=SECRET&language=en";
     CacheStore::new(&db)
-        .put(with_key, "tmdb", Resource::Detail, 200, "body", None, None)
+        .put(Store::ok(with_key, "tmdb", Resource::Detail, "body"))
         .await
         .expect("put");
 
@@ -188,7 +170,7 @@ async fn an_api_key_never_reaches_the_table() {
     );
     assert_eq!(stored_url, "https://example.test/film/1?language=en");
 
-    // And a lookup with the key still finds it, because both sides are stripped.
+    // And a lookup WITH the key still finds it, because both sides are stripped.
     assert!(CacheStore::new(&db)
         .get(with_key, Resource::Detail, false, false)
         .await
@@ -204,31 +186,25 @@ async fn purge_removes_only_what_is_past_max_age() {
     let store = CacheStore::new(&db);
 
     store
-        .put(
+        .put(Store::ok(
             "https://example.test/a",
             "tmdb",
             Resource::Detail,
-            200,
             "a",
-            None,
-            None,
-        )
+        ))
         .await
         .expect("a");
     store
-        .put(
+        .put(Store::ok(
             "https://example.test/b",
             "tmdb",
             Resource::Detail,
-            200,
             "b",
-            None,
-            None,
-        )
+        ))
         .await
         .expect("b");
 
-    // 'a' is stale but useful; 'b' is beyond max_age.
+    // 'a' is stale but still useful; 'b' is beyond max_age.
     age_entry(&db, "https://example.test/a", 60 * 60 * 24 * 60).await;
     age_entry(&db, "https://example.test/b", 60 * 60 * 24 * 400).await;
 
@@ -248,7 +224,7 @@ async fn a_schedule_expires_far_sooner_than_a_detail() {
     let store = CacheStore::new(&db);
     let url = "https://example.test/schedule";
     store
-        .put(url, "anilist", Resource::Schedule, 200, "{}", None, None)
+        .put(Store::ok(url, "anilist", Resource::Schedule, "{}"))
         .await
         .expect("put");
 
@@ -290,4 +266,32 @@ async fn a_clock_that_went_backwards_does_not_make_an_entry_fresh_forever() {
         Freshness::Fresh,
         "a negative age clamps to zero rather than overflowing into nonsense"
     );
+}
+
+#[tokio::test]
+async fn a_non_200_response_is_cacheable_too() {
+    // A cached 404 is a 404 not re-requested a hundred times. The backoff policy
+    // already says it is not worth retrying; the cache is what makes that stick
+    // across restarts.
+    let db = Db::in_memory().await.expect("open");
+    let missing = "https://example.test/film/999";
+    CacheStore::new(&db)
+        .put(Store {
+            url: missing,
+            source: "tmdb",
+            resource: Resource::Detail,
+            status: 404,
+            body: "",
+            etag: None,
+            last_modified: None,
+        })
+        .await
+        .expect("put");
+
+    let entry = CacheStore::new(&db)
+        .get(missing, Resource::Detail, false, false)
+        .await
+        .expect("get")
+        .expect("present");
+    assert_eq!(entry.status, 404);
 }

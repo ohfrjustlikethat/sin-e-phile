@@ -46,7 +46,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.6: write the AniList GraphQL client in crates/metadata-api - it needs no key (ADR-0027) and unblocks 4.4's anime catalogue and 4.13's airing schedules. Behind an injectable Transport trait so it is testable with no network. The rate limiter, backoff, TTL policy and cache store are done with 36 tests; E4's 1,000-request stress test passes.
+Phase 4 subtask 4.6: write the AniList GraphQL client in crates/metadata-api behind an injectable Transport trait so it is testable with no network. AniList needs no key (ADR-0027) and unblocks 4.4's anime catalogue and 4.13's airing schedules. The rate limiter, backoff, TTL policy and cache store are done - 37 tests, and E4's 1,000-request stress test passes.
 
 ---
 

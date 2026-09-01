@@ -16,6 +16,50 @@ pub enum StoreError {
     Sqlx(#[from] sqlx::Error),
 }
 
+/// `(body, status, etag, last_modified, age_seconds)` as `http_cache` stores it.
+type CacheRow = (String, i64, Option<String>, Option<String>, f64);
+
+/// A response to store.
+///
+/// A struct rather than eight positional arguments: `put(url, source, resource,
+/// status, body, etag, last_modified)` is a line where two `Option<&str>` sit
+/// adjacent and swapping them compiles fine and is wrong forever.
+#[derive(Debug, Clone)]
+pub struct Store<'a> {
+    pub url: &'a str,
+    pub source: &'a str,
+    pub resource: Resource,
+    pub status: u16,
+    pub body: &'a str,
+    pub etag: Option<&'a str>,
+    pub last_modified: Option<&'a str>,
+}
+
+impl<'a> Store<'a> {
+    /// The common case: a 200 with no validators.
+    pub fn ok(url: &'a str, source: &'a str, resource: Resource, body: &'a str) -> Self {
+        Self {
+            url,
+            source,
+            resource,
+            status: 200,
+            body,
+            etag: None,
+            last_modified: None,
+        }
+    }
+
+    pub fn with_etag(mut self, etag: Option<&'a str>) -> Self {
+        self.etag = etag;
+        self
+    }
+
+    pub fn with_last_modified(mut self, last_modified: Option<&'a str>) -> Self {
+        self.last_modified = last_modified;
+        self
+    }
+}
+
 /// A cached response, and how stale it is.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Cached {
@@ -64,7 +108,7 @@ impl<'a> CacheStore<'a> {
 
         // Age computed in SQL: julianday() differences are exact, and parsing the
         // stored timestamp in Rust would mean agreeing on a format with SQLite.
-        let row: Option<(String, i64, Option<String>, Option<String>, f64)> = sqlx::query_as(
+        let row: Option<CacheRow> = sqlx::query_as(
             "SELECT body, status, etag, last_modified,
                     (julianday('now') - julianday(fetched_at)) * 86400.0
              FROM http_cache WHERE url = ?",
@@ -99,18 +143,9 @@ impl<'a> CacheStore<'a> {
     }
 
     /// Store a response. Replaces any existing entry for the same key.
-    pub async fn put(
-        &self,
-        url: &str,
-        source: &str,
-        resource: Resource,
-        status: u16,
-        body: &str,
-        etag: Option<&str>,
-        last_modified: Option<&str>,
-    ) -> Result<(), StoreError> {
-        let key = cache::cache_key(url);
-        let ttl_seconds = resource.ttl().as_secs() as i64;
+    pub async fn put(&self, entry: Store<'_>) -> Result<(), StoreError> {
+        let key = cache::cache_key(entry.url);
+        let ttl_seconds = entry.resource.ttl().as_secs() as i64;
 
         sqlx::query(
             "INSERT INTO http_cache
@@ -127,12 +162,12 @@ impl<'a> CacheStore<'a> {
                  expires_at = excluded.expires_at",
         )
         .bind(&key)
-        .bind(source)
-        .bind(resource.as_str())
-        .bind(body)
-        .bind(i64::from(status))
-        .bind(etag)
-        .bind(last_modified)
+        .bind(entry.source)
+        .bind(entry.resource.as_str())
+        .bind(entry.body)
+        .bind(i64::from(entry.status))
+        .bind(entry.etag)
+        .bind(entry.last_modified)
         .bind(ttl_seconds)
         .execute(self.db.pool())
         .await?;
