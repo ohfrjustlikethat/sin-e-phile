@@ -1,7 +1,7 @@
 {
   "spec_version": "1.7.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-09-01T20:23:57Z",
+  "last_updated": "2026-09-01T20:28:42Z",
   "sessions_completed": 5,
   "current_phase": {
     "number": 4,
@@ -1786,7 +1786,7 @@
       ]
     }
   ],
-  "next_action": "Phase 4: write migration 0007 changing idx_titles_unique from (media_item_id, variant, language, region) to (media_item_id, variant, title), delete the existing duplicates, and re-run `ingest akas` (860s). That recovers ~270 MB of the ~986 MB R4 headroom for no loss of information - see docs/eval-results.md. Do this BEFORE reconsidering the >=10 vote threshold.",
+  "next_action": "Phase 4 subtask 4.6, continued: wire crates/metadata-api's cache policy to the http_cache table (migration 0008) behind a small store type, then write the AniList client - it needs no key and unblocks 4.4. The rate limiter, backoff and TTL policy are done with 25 tests; E4's 1,000-request stress test passes. See crates/metadata-api/src/cache.rs.",
   "blockers": [],
   "decisions_pending": [
     {
@@ -2019,7 +2019,7 @@
     {
       "id": "D15",
       "phase_raised": 4,
-      "text": "titles holds 2,250,937 redundant rows (27%): idx_titles_unique is (media_item_id, variant, language, region), so the same text under en/US, en/GB, en/CA and a null region is four distinct keys. Seven Samurai has six identical english rows. Deduplicating on (item, variant, text) recovers about 270 MB and costs nothing, because it removes duplicate rows rather than information. Needs migration 0007 changing the index, plus an 860s akas reload. Worth doing BEFORE any decision to tighten the vote threshold, which would cost 370,000 films their cast lists for a comparable saving."
+      "text": "RESOLVED by migration 0007 on data-quality grounds, not the stated ones. The 2,250,937 redundant title rows are gone and a search no longer matches the same film six times. The 270 MB saving I predicted did not happen: the new unique index carries the title TEXT where the old one carried two short codes, so the index grew by more than the table shrank. Net -23 MB. See docs/eval-results.md."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

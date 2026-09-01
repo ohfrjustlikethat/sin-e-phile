@@ -584,3 +584,48 @@ information. A genuinely different regional title is still a different row.
 at all; tightening the core to `>= 50` buys perhaps 750 MB but takes the cast list
 away from roughly 370,000 films. The cheap fix should be taken before the expensive
 one is considered.
+
+### The deduplication worked, and saved nothing. Third projection error.
+
+Migration 0007, applied to the real 3,110 MB catalogue in **32 seconds**.
+
+| | Before | After |
+|---|---|---|
+| `titles` rows | 8,435,215 | **6,184,278** |
+| Database | 3,110 MB | **3,133 MB** |
+
+The row count fell by exactly the 2,250,937 predicted. **The file grew by 23 MB.**
+
+**Why.** The old index was `(media_item_id, variant, language, region)` — two short
+codes. The new one is `(media_item_id, variant, title)`, and an index carries the
+values it is keyed on, so it now stores **the full title text of every row**. The
+table got smaller and the index got wider by more than the table saved. `freelist_count`
+is 0, so there is nothing for `VACUUM` to reclaim either.
+
+I estimated 270 MB of savings. The actual result was **-23 MB**. That is the third
+storage estimate in this phase to be wrong:
+
+| Estimate | Predicted | Actual |
+|---|---|---|
+| titles | 450 MB | 1,153 MB |
+| credits | 1,921 MB | 1,069 MB |
+| akas | 812 MB | 683 MB |
+| dedupe saving | +270 MB | **-23 MB** |
+
+**The pattern is the finding.** Every one of these was an arithmetic argument about
+storage that sounded reasonable and was wrong — twice high, twice low. Storage in
+SQLite depends on page packing, index width and B-tree fill factor, none of which a
+back-of-envelope multiplier models. **The rule from here: report measurements, and do
+not present storage arithmetic as a prediction at all.**
+
+**Was the migration still worth applying?** On data quality, yes and it stays: a
+search for "Seven Samurai" no longer matches the same film six times, and 2.25 million
+rows carrying no information are gone. On disk, it is break-even. It was sold on the
+disk saving, and that part did not happen.
+
+### R4, after deduplication
+
+**3,133 MB of the 4,096 MB trigger.** Unchanged in substance: roughly 960 MB of
+headroom for the embedding artefact, AniList and MovieLens — and no reliable way to
+predict what those will cost, which is precisely why they will be measured as they
+land rather than estimated now.

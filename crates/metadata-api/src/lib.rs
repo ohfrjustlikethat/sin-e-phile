@@ -9,7 +9,9 @@
 //! rate-limited is to return "no enrichment", never to fail the operation that asked.
 
 pub mod backoff;
+pub mod cache;
 pub mod limiter;
 
 pub use backoff::{classify, Backoff, Retryable};
+pub use cache::{cache_key, freshness, serveable, Freshness, Resource};
 pub use limiter::{Limit, RateLimiter};

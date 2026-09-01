@@ -245,3 +245,79 @@ async fn the_language_and_region_survive() {
             .expect("query");
     assert_eq!(row, (Some("fr".into()), Some("FR".into())));
 }
+
+#[tokio::test]
+async fn the_same_text_is_stored_once_per_variant_whatever_the_region() {
+    // Migration 0007. The old index was (item, variant, language, region), so
+    // "Seven Samurai" under en/US, en/GB and a null region was three distinct keys
+    // and all three were stored — 27% of the real catalogue's title rows carried no
+    // information. A genuinely DIFFERENT regional title is different text and is
+    // still its own row.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let n = null();
+    let akas = write_gz(
+        dir.path(),
+        "a.tsv.gz",
+        &tsv(&[
+            &[
+                "titleId",
+                "ordering",
+                "title",
+                "region",
+                "language",
+                "types",
+                "attributes",
+                "isOriginalTitle",
+            ],
+            &["tt0000001", "1", "Seven Samurai", "US", "en", &n, &n, "0"],
+            &["tt0000001", "2", "Seven Samurai", "GB", "en", &n, &n, "0"],
+            &["tt0000001", "3", "Seven Samurai", "CA", "en", &n, &n, "0"],
+            &["tt0000001", "4", "Seven Samurai", &n, "en", &n, &n, "0"],
+            // A genuinely different UK title must survive as its own row.
+            &[
+                "tt0000001",
+                "5",
+                "The Magnificent Seven",
+                "GB",
+                "en",
+                &n,
+                &n,
+                "0",
+            ],
+        ]),
+    );
+
+    let db = Db::in_memory().await.expect("open");
+    let mut job = Job::begin(&db, "imdb").await.expect("job");
+    let basics_path = write_gz(dir.path(), "b.tsv.gz", &basics());
+    let ratings_path = write_gz(dir.path(), "r.tsv.gz", &ratings());
+    load::load_titles(
+        &mut job,
+        basics_path,
+        Arc::new(load::load_votes(&ratings_path).expect("votes")),
+        Arc::new(load::load_average_ratings(&ratings_path).expect("averages")),
+        CatalogueScope::DEFAULT,
+    )
+    .await
+    .expect("titles");
+
+    let core = Arc::new(credits::core_title_ids(&db).await.expect("core"));
+    let mut job = Job::begin(&db, "imdb-akas").await.expect("job");
+    akas::load_akas(&mut job, akas, core).await.expect("akas");
+
+    let english: Vec<String> = sqlx::query_scalar(
+        "SELECT t.title FROM titles t
+         JOIN external_ids e ON e.media_item_id = t.media_item_id
+         WHERE e.external_id = 'tt0000001' AND t.variant = 'english'
+         ORDER BY t.title",
+    )
+    .fetch_all(db.pool())
+    .await
+    .expect("query");
+
+    assert_eq!(
+        english,
+        vec!["Seven Samurai", "The Magnificent Seven"],
+        "four identical rows collapse to one; a different title survives"
+    );
+}
