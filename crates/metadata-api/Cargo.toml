@@ -1,0 +1,22 @@
+[package]
+name = "sinephile-metadata-api"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "Live metadata API clients: shared rate limiting, backoff, and caching (SPEC.md Phase 4)."
+
+# Not in tools/ingest, because these clients are used at RUNTIME for live enrichment
+# as well as during ingestion. Not in src-tauri, because a test binary that links
+# tauri cannot launch on Windows (ADR-0022) and E4 — "rate limits are never exceeded
+# under a stress test of 1,000 rapid lookups" — is a test.
+
+[dependencies]
+tokio = { version = "1", features = ["sync", "time", "macros"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["sync", "time", "macros", "rt-multi-thread", "test-util"] }

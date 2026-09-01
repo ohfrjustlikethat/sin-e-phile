@@ -1,7 +1,7 @@
 {
   "spec_version": "1.7.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-09-01T20:08:06Z",
+  "last_updated": "2026-09-01T20:18:45Z",
   "sessions_completed": 5,
   "current_phase": {
     "number": 4,
@@ -45,7 +45,7 @@
       {
         "id": "4.6",
         "text": "Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline",
-        "status": "not_started",
+        "status": "in_progress",
         "commit": null
       },
       {
@@ -81,7 +81,7 @@
       {
         "id": "4.12",
         "text": "Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits",
-        "status": "not_started",
+        "status": "in_progress",
         "commit": null
       },
       {
@@ -723,7 +723,7 @@
         {
           "id": "4.6",
           "text": "Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline",
-          "status": "not_started",
+          "status": "in_progress",
           "commit": null
         },
         {
@@ -759,7 +759,7 @@
         {
           "id": "4.12",
           "text": "Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits",
-          "status": "not_started",
+          "status": "in_progress",
           "commit": null
         },
         {
@@ -1786,7 +1786,7 @@
       ]
     }
   ],
-  "next_action": "Phase 4: write the title.akas loader in tools/ingest/src/ (romaji/native/english variants for core titles, SPEC.md 6.2) and MEASURE it. That is the last unmeasured component of R4, and the >=10 core threshold should be decided once, on measured data for all of them - see docs/eval-results.md. Both R4 triggers are now in play: 2,427 MB of 4 GB and ~45 min of 2 hours used, with akas, AniList, MovieLens and the embedding build still to run.",
+  "next_action": "Phase 4 subtask 4.6, continued: add the persistent response cache to crates/metadata-api (migration 0007, an http_cache table so the SPEC.md 2.4 one-folder promise holds) with per-resource TTLs and stale-serving when offline, then the AniList client - it needs no key and unblocks 4.4. The shared rate limiter and backoff policy are done and E4's 1,000-request stress test passes. See crates/metadata-api/src/limiter.rs.",
   "blockers": [],
   "decisions_pending": [
     {
