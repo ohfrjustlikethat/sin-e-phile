@@ -1,7 +1,7 @@
 {
   "spec_version": "1.7.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-08-31T22:12:00Z",
+  "last_updated": "2026-09-01T20:08:06Z",
   "sessions_completed": 5,
   "current_phase": {
     "number": 4,
@@ -40,7 +40,7 @@
         "id": "4.5",
         "text": "External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules",
         "status": "in_progress",
-        "commit": null
+        "commit": "ac4bbdf"
       },
       {
         "id": "4.6",
@@ -718,7 +718,7 @@
           "id": "4.5",
           "text": "External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules",
           "status": "in_progress",
-          "commit": null
+          "commit": "ac4bbdf"
         },
         {
           "id": "4.6",

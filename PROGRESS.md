@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 1.7.0** · 5 session(s) completed · last updated 2026-08-31
+**Spec version 1.7.0** · 5 session(s) completed · last updated 2026-09-01
 
 ---
 
@@ -22,7 +22,7 @@
 - [x] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres · `048180a`
 - [ ] **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device)
 - [ ] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering
-- [~] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules
+- [~] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules · `ac4bbdf`
 - [ ] **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline
 - [ ] **4.7** Per-profile TMDB key from settings, never shipped (ADR-0027); every TMDB-dependent surface degrades to the typographic state
 - [ ] **4.8** Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding, blurhash placeholders

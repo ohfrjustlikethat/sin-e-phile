@@ -20,6 +20,8 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            re-run it after an interruption and it carries on.
   ingest credits           load cast and crew for core-tier titles. Needs
                            `ingest imdb` to have run first.
+  ingest akas              load alternative titles (romaji/native/english) for
+                           core-tier titles. Needs `ingest imdb` first.
   ingest status            show every job and its steps
   ingest reset <name>      discard a job's progress so the next run starts clean
 
@@ -72,6 +74,7 @@ async fn main() -> Result<(), JobError> {
         }
         "imdb" => imdb(&db, &dir.join("datasets")).await,
         "credits" => credits(&db, &dir.join("datasets")).await,
+        "akas" => akas(&db, &dir.join("datasets")).await,
         "status" => status(&db).await,
         "reset" => match args.get(1) {
             Some(name) => {
@@ -227,6 +230,61 @@ async fn credits(db: &Db, datasets: &Path) -> Result<(), JobError> {
     let after = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
     println!();
     println!("  {people} people, {credits} credits");
+    println!(
+        "  database {:.0} MB (+{:.0} MB) · {:.0}s",
+        after as f64 / 1_048_576.0,
+        (after.saturating_sub(before)) as f64 / 1_048_576.0,
+        started.elapsed().as_secs_f64()
+    );
+    println!();
+    Ok(())
+}
+
+/// Alternative titles for core-tier titles — the last unmeasured R4 component.
+async fn akas(db: &Db, datasets: &Path) -> Result<(), JobError> {
+    use std::sync::Arc;
+    use std::time::Instant;
+
+    let started = Instant::now();
+    let before = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
+
+    let dataset = &sinephile_ingest::imdb::TITLE_AKAS;
+    let path = datasets.join(dataset.filename);
+    let result = sinephile_ingest::Downloader::new()
+        .fetch(&dataset.url(), &path, |_| {})
+        .await?;
+    tracing::info!(
+        "{}: {:.1} MB{}",
+        dataset.name,
+        result.bytes as f64 / 1_048_576.0,
+        if result.fetched {
+            ""
+        } else {
+            " (already had it)"
+        }
+    );
+    sinephile_ingest::download::verify_gzip(&path)?;
+
+    let core = Arc::new(sinephile_ingest::credits::core_title_ids(db).await?);
+    if core.is_empty() {
+        eprintln!("ingest: no core titles — run `ingest imdb` first");
+        std::process::exit(2);
+    }
+    tracing::info!("{} core titles", core.len());
+
+    let mut job = Job::begin(db, "imdb-akas").await?;
+    if job.is_resuming().await? {
+        tracing::info!("resuming a previous run");
+    }
+    sinephile_ingest::akas::load_akas(&mut job, path, core).await?;
+    job.finish().await?;
+
+    let titles: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM titles")
+        .fetch_one(db.pool())
+        .await?;
+    let after = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
+    println!();
+    println!("  {titles} title rows");
     println!(
         "  database {:.0} MB (+{:.0} MB) · {:.0}s",
         after as f64 / 1_048_576.0,

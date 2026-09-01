@@ -7,6 +7,7 @@
 //! The resumability lives in [`job`], and is built on one rule: a checkpoint commits
 //! in the same transaction as the work it describes.
 
+pub mod akas;
 pub mod credits;
 pub mod download;
 pub mod imdb;
