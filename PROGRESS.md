@@ -46,7 +46,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.4: ingest the AniList anime catalogue using crates/metadata-api's AniList client, promoting matched titles to anime_film/anime_series and writing romaji/native/english titles as asserted facts over the script heuristic akas produced. Then 4.13's airing schedules, which the same client already returns. Shared infrastructure is done: limiter, backoff, TTL policy, cache store, transport trait, AniList client, reqwest transport - 70 tests, E4 passes.
+Phase 4 subtask 4.4: ingest the AniList anime catalogue. Use the client in crates/metadata-api/src/anilist.rs to promote matched titles to anime_film/anime_series and write romaji/native/english titles as asserted facts over the script heuristic in tools/ingest/src/akas.rs. Then 4.13's airing schedules, which the same client already returns via Media::next_airing. Approach in docs/specs/catalogue-freshness.md. Shared infrastructure is done - 70 tests, and E4's 1,000-request stress test passes.
 
 ---
 
