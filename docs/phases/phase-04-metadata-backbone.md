@@ -30,13 +30,13 @@ A local catalogue of hundreds of thousands of titles that works offline, enriche
 - [ ] **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device)
 - [ ] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering
 - [x] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules
-- [ ] **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline
+- [x] **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline
 - [ ] **4.7** Per-profile TMDB key from settings, never shipped (ADR-0027); every TMDB-dependent surface degrades to the typographic state
 - [ ] **4.8** Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding, blurhash placeholders
 - [ ] **4.9** First-run flow: usable during the background build, searching what is ingested so far
 - [ ] **4.10** The embedding artefact producer (ADR-0014): deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date; published as a GitHub Release asset
 - [ ] **4.11** Hand-checked 50-title anime ID-mapping fixture including long-running shonen, split-cour seasons, and films tied to series
-- [ ] **4.12** Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits
+- [x] **4.12** Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits
 - [ ] **4.13** Incremental catalogue refresh (ADR-0030): re-fetch title.basics/ratings/episode and insert only the tail past the highest id already stored, reusing TsvReader::seek_past. Plus AniList airing schedules, which need no key. See docs/specs/catalogue-freshness.md.
 
 ## Risks named by this phase
@@ -56,3 +56,5 @@ ETL pipelines; why offline-first beats API-first here; rate limiting and backoff
 - **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a kill
 - **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, · `048180a`
 - **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules · `f67d939`
+- **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, pe · `38d75d7`
+- **4.12** Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits · `38d75d7`

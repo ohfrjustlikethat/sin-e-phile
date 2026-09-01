@@ -345,3 +345,194 @@ async fn no_api_key_is_sent_because_anilist_does_not_need_one() {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// The cache path
+// ---------------------------------------------------------------------------
+
+use sinephile_metadata_api::{CacheStore, Resource};
+use sinephile_persistence::Db;
+
+#[tokio::test]
+async fn a_second_lookup_is_served_from_cache_without_touching_the_network() {
+    let db = Db::in_memory().await.expect("open");
+    let store = CacheStore::new(&db);
+    let transport = FakeTransport::new();
+    transport.push(Response::new(200, media_json(5114, "a", "b", "c", "TV")));
+
+    let client = AniList::new(&transport).await.with_cache(&store);
+    let first = client.media(5114).await.expect("first").expect("found");
+    let second = client.media(5114).await.expect("second").expect("found");
+
+    assert_eq!(first, second);
+    assert_eq!(
+        transport.request_count(),
+        1,
+        "the second lookup went to the network"
+    );
+}
+
+#[tokio::test]
+async fn each_operation_gets_its_own_cache_entry() {
+    // Every AniList request is a POST to the same URL. Keyed on the URL alone, the
+    // second lookup would return the first one's answer.
+    let db = Db::in_memory().await.expect("open");
+    let store = CacheStore::new(&db);
+    let transport = FakeTransport::new();
+    transport.push(Response::new(
+        200,
+        media_json(199, "spirited", "away", "x", "MOVIE"),
+    ));
+    transport.push(Response::new(
+        200,
+        media_json(5114, "fma", "brotherhood", "y", "TV"),
+    ));
+
+    let client = AniList::new(&transport).await.with_cache(&store);
+    let first = client.media(5114).await.expect("q").expect("found");
+    let second = client.media(199).await.expect("q").expect("found");
+
+    assert_eq!(first.id, 5114);
+    assert_eq!(
+        second.id, 199,
+        "the second lookup returned the first one's answer"
+    );
+    assert_eq!(store.len().await.expect("len"), 2);
+}
+
+#[tokio::test]
+async fn a_search_and_a_lookup_do_not_collide() {
+    let db = Db::in_memory().await.expect("open");
+    let store = CacheStore::new(&db);
+    let transport = FakeTransport::new();
+    transport.push(Response::new(
+        200,
+        media_json(2, "searched", "b", "c", "TV"),
+    ));
+    transport.push(Response::new(
+        200,
+        media_json(1, "looked up", "b", "c", "TV"),
+    ));
+
+    let client = AniList::new(&transport).await.with_cache(&store);
+    client.media(1).await.expect("lookup");
+    client.search("something").await.expect("search");
+
+    assert_eq!(store.len().await.expect("len"), 2);
+}
+
+#[tokio::test]
+async fn a_stale_entry_is_served_when_the_service_is_unreachable() {
+    // "Graceful offline behaviour": a month-old cast list beats an error.
+    use sinephile_metadata_api::TransportError;
+
+    let db = Db::in_memory().await.expect("open");
+    let store = CacheStore::new(&db);
+    let transport = FakeTransport::new();
+    transport.push(Response::new(
+        200,
+        media_json(5114, "cached", "b", "c", "TV"),
+    ));
+
+    let client = AniList::new(&transport).await.with_cache(&store);
+    client.media(5114).await.expect("prime the cache");
+
+    // Age it past its TTL, then make every attempt fail.
+    sqlx::query("UPDATE http_cache SET fetched_at = datetime('now', '-60 days')")
+        .execute(db.pool())
+        .await
+        .expect("age");
+    for _ in 0..10 {
+        transport.push_error(TransportError::Network("unreachable".into()));
+    }
+
+    let media = client
+        .media(5114)
+        .await
+        .expect("falls back rather than failing")
+        .expect("served from cache");
+    assert_eq!(media.title.romaji.as_deref(), Some("cached"));
+}
+
+#[tokio::test]
+async fn without_a_cached_entry_an_unreachable_service_is_an_error() {
+    // Degrading is right; pretending nothing went wrong is not.
+    use sinephile_metadata_api::TransportError;
+
+    let db = Db::in_memory().await.expect("open");
+    let store = CacheStore::new(&db);
+    let transport = FakeTransport::new();
+    for _ in 0..10 {
+        transport.push_error(TransportError::Network("unreachable".into()));
+    }
+
+    let result = AniList::new(&transport)
+        .await
+        .with_cache(&store)
+        .media(5114)
+        .await;
+    assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn a_cached_miss_is_still_a_miss_rather_than_a_refetch() {
+    // A cached 404 is a 404 not re-requested a hundred times.
+    let db = Db::in_memory().await.expect("open");
+    let store = CacheStore::new(&db);
+    let transport = FakeTransport::new();
+    transport.push(Response::new(
+        404,
+        r#"{"errors":[{"message":"Not Found."}]}"#,
+    ));
+
+    let client = AniList::new(&transport).await.with_cache(&store);
+    assert!(client.media(999).await.expect("first").is_none());
+    assert!(client.media(999).await.expect("second").is_none());
+    assert_eq!(transport.request_count(), 1, "the miss was re-requested");
+}
+
+#[tokio::test]
+async fn the_cache_key_is_readable_in_the_table() {
+    // The cache is a table in the user's own database. Being able to see what is in
+    // it, by eye, is worth more than the bytes a digest would save.
+    let db = Db::in_memory().await.expect("open");
+    let store = CacheStore::new(&db);
+    let transport = FakeTransport::new();
+    transport.push(Response::new(200, media_json(5114, "a", "b", "c", "TV")));
+
+    AniList::new(&transport)
+        .await
+        .with_cache(&store)
+        .media(5114)
+        .await
+        .expect("query");
+
+    let url: String = sqlx::query_scalar("SELECT url FROM http_cache")
+        .fetch_one(db.pool())
+        .await
+        .expect("query");
+    assert_eq!(url, "https://graphql.anilist.co#Media(id:5114)");
+}
+
+#[tokio::test]
+async fn a_search_is_cached_under_the_shorter_search_ttl() {
+    // Search results go stale quickly; a film's details do not. One global TTL would
+    // be wrong for both.
+    let db = Db::in_memory().await.expect("open");
+    let store = CacheStore::new(&db);
+    let transport = FakeTransport::new();
+    transport.push(Response::new(200, media_json(1, "a", "b", "c", "TV")));
+
+    AniList::new(&transport)
+        .await
+        .with_cache(&store)
+        .search("ran")
+        .await
+        .expect("query");
+
+    let resource: String = sqlx::query_scalar("SELECT resource FROM http_cache")
+        .fetch_one(db.pool())
+        .await
+        .expect("query");
+    assert_eq!(resource, Resource::Search.as_str());
+}

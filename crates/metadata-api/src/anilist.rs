@@ -13,9 +13,14 @@
 //!
 //! # It is GraphQL, which changes one thing
 //!
-//! Every request is a `POST` to the same URL with a different body, so the URL is
-//! useless as a cache key. The key is the URL plus a hash of the query and its
-//! variables — otherwise every AniList response would overwrite the last one.
+//! Every request is a `POST` to the same URL with a different body, so **the URL is
+//! useless as a cache key** — every AniList response would overwrite the last one.
+//! The key is the endpoint plus a readable description of the operation, so
+//! `https://graphql.anilist.co#Media(id:5114)`.
+//!
+//! Readable rather than a hash on purpose: the cache is a table in the user's own
+//! database, and being able to see what is in it — by eye, in a query — is worth
+//! more than the few bytes a digest would save.
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -24,7 +29,9 @@ use std::time::Duration;
 use serde::Deserialize;
 
 use crate::backoff::{self, Backoff};
+use crate::cache::Resource;
 use crate::limiter::{Limit, RateLimiter};
+use crate::store::{CacheStore, Store};
 use crate::transport::{Request, Transport, TransportError};
 
 /// `anilist.co` is on `tools/guard/allowlist.txt` as a metadata source (ADR-0010).
@@ -126,6 +133,8 @@ const MEDIA_FIELDS: &str = "
 
 pub struct AniList<'a> {
     transport: &'a dyn Transport,
+    /// Optional, so the client is usable in a test or a context with no database.
+    cache: Option<&'a CacheStore<'a>>,
     limiter: RateLimiter,
     backoff: Backoff,
 }
@@ -136,9 +145,19 @@ impl<'a> AniList<'a> {
         limiter.configure(HOST, default_limit()).await;
         Self {
             transport,
+            cache: None,
             limiter,
             backoff: Backoff::default(),
         }
+    }
+
+    /// Read and write through a cache.
+    ///
+    /// Without one the client still works and simply talks to the network every
+    /// time — which is right for a test, and wrong for the application.
+    pub fn with_cache(mut self, cache: &'a CacheStore<'a>) -> Self {
+        self.cache = Some(cache);
+        self
     }
 
     /// Share a limiter with the other clients. The limit is per host, so this only
@@ -148,6 +167,7 @@ impl<'a> AniList<'a> {
         limiter.configure(HOST, default_limit()).await;
         Self {
             transport,
+            cache: None,
             limiter,
             backoff: Backoff::default(),
         }
@@ -157,15 +177,26 @@ impl<'a> AniList<'a> {
     pub async fn media(&self, id: i64) -> Result<Option<Media>, AniListError> {
         let query =
             format!("query ($id: Int) {{ Media(id: $id, type: ANIME) {{ {MEDIA_FIELDS} }} }}");
-        self.media_query(&query, &format!(r#"{{"id":{id}}}"#)).await
+        self.media_query(
+            &key(&format!("Media(id:{id})")),
+            Resource::Detail,
+            &query,
+            &format!(r#"{{"id":{id}}}"#),
+        )
+        .await
     }
 
     /// One title by MyAnimeList id — the cross-mapping AniList gives away free.
     pub async fn media_by_mal(&self, mal_id: i64) -> Result<Option<Media>, AniListError> {
         let query =
             format!("query ($id: Int) {{ Media(idMal: $id, type: ANIME) {{ {MEDIA_FIELDS} }} }}");
-        self.media_query(&query, &format!(r#"{{"id":{mal_id}}}"#))
-            .await
+        self.media_query(
+            &key(&format!("Media(idMal:{mal_id})")),
+            Resource::Detail,
+            &query,
+            &format!(r#"{{"id":{mal_id}}}"#),
+        )
+        .await
     }
 
     /// Search by title. AniList matches romaji, english and native, which is the
@@ -174,45 +205,75 @@ impl<'a> AniList<'a> {
         let query =
             format!("query ($q: String) {{ Media(search: $q, type: ANIME) {{ {MEDIA_FIELDS} }} }}");
         let variables = serde_json::json!({ "q": title }).to_string();
-        self.media_query(&query, &variables).await
+        self.media_query(
+            &key(&format!("Media(search:{title})")),
+            Resource::Search,
+            &query,
+            &variables,
+        )
+        .await
     }
 
+    /// The cached-then-network path, with the cache as the fallback when the
+    /// network fails.
+    ///
+    /// The order is the point. A fresh entry short-circuits before the rate limiter
+    /// is even touched. A failure falls back to a stale entry rather than
+    /// propagating, because "graceful offline behaviour" means a month-old cast list
+    /// beats an error — and the failure is still logged, so it is degraded rather
+    /// than hidden.
     async fn media_query(
         &self,
+        cache_key: &str,
+        resource: Resource,
         query: &str,
         variables: &str,
     ) -> Result<Option<Media>, AniListError> {
+        if let Some(cache) = self.cache {
+            if let Ok(Some(hit)) = cache.get(cache_key, resource, false, false).await {
+                return parse_media(hit.status, &hit.body);
+            }
+        }
+
         let body = format!(
             r#"{{"query":{},"variables":{variables}}}"#,
             json_string(query)
         );
-        let response = self.execute(&body).await?;
 
-        // AniList reports "not found" as a GraphQL error with a 404 status, not an
-        // empty data field. Treating that as an error would make every miss look
-        // like a failure, and a catalogue full of anime we do not have is normal.
-        if response.status == 404 {
-            return Ok(None);
-        }
-
-        let parsed: GraphQlResponse<MediaData> = serde_json::from_str(&response.body)
-            .map_err(|e| AniListError::Shape(format!("{e}: {}", truncate(&response.body))))?;
-
-        if let Some(errors) = parsed.errors {
-            let message = errors
-                .iter()
-                .map(|e| e.message.as_str())
-                .collect::<Vec<_>>()
-                .join("; ");
-            // A GraphQL "not found" arrives here as an error too, depending on the
-            // query shape. It is a miss, not a fault.
-            if message.to_ascii_lowercase().contains("not found") {
-                return Ok(None);
+        let response = match self.execute(&body).await {
+            Ok(response) => response,
+            Err(error) => {
+                // Serve a stale entry rather than failing. `offline: true` is the
+                // right argument here even if the machine has a network — from this
+                // caller's point of view the service is unreachable, which is the
+                // condition the stale window exists for.
+                if let Some(cache) = self.cache {
+                    if let Ok(Some(stale)) = cache.get(cache_key, resource, true, false).await {
+                        tracing::warn!("anilist unreachable ({error}); serving a stale entry");
+                        return parse_media(stale.status, &stale.body);
+                    }
+                }
+                return Err(error);
             }
-            return Err(AniListError::Api(message));
+        };
+
+        if let Some(cache) = self.cache {
+            let entry = Store {
+                url: cache_key,
+                source: "anilist",
+                resource,
+                status: response.status,
+                body: &response.body,
+                etag: response.etag(),
+                last_modified: response.last_modified(),
+            };
+            // A cache write that fails must not fail the request that succeeded.
+            if let Err(error) = cache.put(entry).await {
+                tracing::warn!("anilist response not cached: {error}");
+            }
         }
 
-        Ok(parsed.data.and_then(|d| d.media))
+        parse_media(response.status, &response.body)
     }
 
     /// POST the body, rate-limited, with retries.
@@ -272,6 +333,46 @@ impl<'a> AniList<'a> {
         let sample = jitter_sample(attempt);
         tokio::time::sleep(self.backoff.jittered(attempt + 1, sample)).await;
     }
+}
+
+/// Parse a response body, from the network or the cache, identically.
+///
+/// Shared on purpose: a cached body that parsed differently from a live one would be
+/// a bug that only appeared on the second run.
+fn parse_media(status: u16, body: &str) -> Result<Option<Media>, AniListError> {
+    // AniList reports "not found" as a 404 rather than an empty data field. Treating
+    // that as an error would make every miss look like a failure, and a catalogue
+    // full of anime we do not have is normal.
+    if status == 404 {
+        return Ok(None);
+    }
+
+    let parsed: GraphQlResponse<MediaData> = serde_json::from_str(body)
+        .map_err(|e| AniListError::Shape(format!("{e}: {}", truncate(body))))?;
+
+    if let Some(errors) = parsed.errors {
+        let message = errors
+            .iter()
+            .map(|e| e.message.as_str())
+            .collect::<Vec<_>>()
+            .join("; ");
+        // A GraphQL "not found" arrives here too, depending on the query shape. It
+        // is a miss, not a fault.
+        if message.to_ascii_lowercase().contains("not found") {
+            return Ok(None);
+        }
+        return Err(AniListError::Api(message));
+    }
+
+    Ok(parsed.data.and_then(|d| d.media))
+}
+
+/// The cache key for one operation.
+///
+/// Every AniList request is a POST to the same URL, so the operation has to be part
+/// of the key or each response overwrites the last.
+fn key(operation: &str) -> String {
+    format!("{ENDPOINT}#{operation}")
 }
 
 /// A deterministic pseudo-sample in `[0, 1)`.

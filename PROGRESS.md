@@ -16,20 +16,20 @@
 
 > The catalogue. Three constraints carry in: ADR-0013 and ADR-0027 mean the app must be complete and good-looking with NO TMDB key and no key ever ships; ADR-0026 means SQL is runtime-checked, so every new repository method needs a line in crates/persistence/tests/repository_surface.rs; and R4 (ingestion larger or slower than expected) is this phase's named risk — measure before committing to a shape, and scope by a popularity threshold rather than ingesting everything.
 
-### Subtasks — 3/13 complete
+### Subtasks — 5/13 complete
 
 - [x] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts · `4a78d64`
 - [x] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres · `048180a`
 - [ ] **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device)
 - [ ] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering
 - [x] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules · `f67d939`
-- [~] **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline
+- [x] **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline · `38d75d7`
 - [ ] **4.7** Per-profile TMDB key from settings, never shipped (ADR-0027); every TMDB-dependent surface degrades to the typographic state
 - [ ] **4.8** Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding, blurhash placeholders
 - [ ] **4.9** First-run flow: usable during the background build, searching what is ingested so far
 - [ ] **4.10** The embedding artefact producer (ADR-0014): deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date; published as a GitHub Release asset
 - [ ] **4.11** Hand-checked 50-title anime ID-mapping fixture including long-running shonen, split-cour seasons, and films tied to series
-- [~] **4.12** Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits
+- [x] **4.12** Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits · `38d75d7`
 - [ ] **4.13** Incremental catalogue refresh (ADR-0030): re-fetch title.basics/ratings/episode and insert only the tail past the highest id already stored, reusing TsvReader::seek_past. Plus AniList airing schedules, which need no key. See docs/specs/catalogue-freshness.md.
 
 ### Exit criteria
@@ -46,7 +46,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.6: wire the AniList client to the CacheStore. Its POSTs all go to one URL, so the cache key must be the endpoint plus a hash of query+variables - see the module docs in crates/metadata-api/src/anilist.rs, which state the problem but do not yet solve it. Then a reqwest Transport impl so something other than the fake can run. 62 tests in the crate; E4 passes.
+Phase 4 subtask 4.4: ingest the AniList anime catalogue using crates/metadata-api's AniList client, promoting matched titles to anime_film/anime_series and writing romaji/native/english titles as asserted facts over the script heuristic akas produced. Then 4.13's airing schedules, which the same client already returns. Shared infrastructure is done: limiter, backoff, TTL policy, cache store, transport trait, AniList client, reqwest transport - 70 tests, E4 passes.
 
 ---
 
@@ -112,7 +112,6 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D13** (raised in Phase 4) WEEKLY TV EPISODE FRESHNESS has no owner. The author asked whether a newly-aired episode would be available seamlessly, the way a streaming app manages it. Finding a SOURCE is Phases 6/7/9 and needs nothing special - a new episode resolves like any other title. KNOWING THE EPISODE EXISTS is the gap: title.episode is a snapshot, IMDb refreshes daily and we do not. For anime, AniList publishes airing schedules through a public API with no key, so subtask 4.4 can solve it properly. For general TV it needs either the user's TMDB key or a periodic re-fetch of title.episode (one of the smaller files). Neither is currently specified. Owner: propose a mechanism before Phase 11, which is where next-episode handling lands.
 - **D14** (raised in Phase 4) EXPECTATION TO MANAGE, not a defect: the author asked whether the bittorrent client will rival qBittorrent for seamless downloads. SPEC.md Phase 7's stated goal is 'torrents that stream, not torrents that download'. For STREAMING a purpose-built deadline scheduler should beat qBittorrent, which is not optimised for sequential playback. For BULK DOWNLOAD THROUGHPUT, matching a decade of tuned peer selection and disk I/O is a much harder bar and is not a stated goal - R2 already rates librqbit's streaming control as a live risk. Phase 7 should measure against qBittorrent on both axes and report honestly rather than let the comparison stay implicit.
 - **D15** (raised in Phase 4) RESOLVED by migration 0007 on data-quality grounds, not the stated ones. The 2,250,937 redundant title rows are gone and a search no longer matches the same film six times. The 270 MB saving I predicted did not happen: the new unique index carries the title TEXT where the old one carried two short codes, so the index grew by more than the table shrank. Net -23 MB. See docs/eval-results.md.
-- **D16** (raised in Phase 4) The AniList client does not yet use the cache store. Its requests are POSTs to one URL, so the URL is useless as a cache key - the key must be the endpoint plus a hash of the query and variables, or every AniList response overwrites the last. The client and the store both exist and are tested; wiring them is a small piece of work that was deliberately not rushed at the end of a long session. Owner: subtask 4.6 before 4.4 uses the client in anger.
 
 ---
 
