@@ -8,12 +8,16 @@
 //! ships. So the correct behaviour when a service is unavailable, unconfigured, or
 //! rate-limited is to return "no enrichment", never to fail the operation that asked.
 
+pub mod anilist;
 pub mod backoff;
 pub mod cache;
 pub mod limiter;
 pub mod store;
+pub mod transport;
 
+pub use anilist::{AniList, AniListError, Media, Titles};
 pub use backoff::{classify, Backoff, Retryable};
 pub use cache::{cache_key, freshness, serveable, Freshness, Resource};
 pub use limiter::{Limit, RateLimiter};
 pub use store::{CacheStore, Cached, Store, StoreError};
+pub use transport::{FakeTransport, Request, Response, Transport, TransportError};

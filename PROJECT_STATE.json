@@ -1,7 +1,7 @@
 {
   "spec_version": "1.7.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-09-01T21:06:06Z",
+  "last_updated": "2026-09-01T21:30:12Z",
   "sessions_completed": 5,
   "current_phase": {
     "number": 4,
@@ -1786,7 +1786,7 @@
       ]
     }
   ],
-  "next_action": "Phase 4 subtask 4.6: write the AniList GraphQL client in crates/metadata-api behind an injectable Transport trait so it is testable with no network. AniList needs no key (ADR-0027) and unblocks 4.4's anime catalogue and 4.13's airing schedules. The rate limiter, backoff, TTL policy and cache store are done - 37 tests, and E4's 1,000-request stress test passes.",
+  "next_action": "Phase 4 subtask 4.6: wire the AniList client to the CacheStore. Its POSTs all go to one URL, so the cache key must be the endpoint plus a hash of query+variables - see the module docs in crates/metadata-api/src/anilist.rs, which state the problem but do not yet solve it. Then a reqwest Transport impl so something other than the fake can run. 62 tests in the crate; E4 passes.",
   "blockers": [],
   "decisions_pending": [
     {
@@ -2020,6 +2020,11 @@
       "id": "D15",
       "phase_raised": 4,
       "text": "RESOLVED by migration 0007 on data-quality grounds, not the stated ones. The 2,250,937 redundant title rows are gone and a search no longer matches the same film six times. The 270 MB saving I predicted did not happen: the new unique index carries the title TEXT where the old one carried two short codes, so the index grew by more than the table shrank. Net -23 MB. See docs/eval-results.md."
+    },
+    {
+      "id": "D16",
+      "phase_raised": 4,
+      "text": "The AniList client does not yet use the cache store. Its requests are POSTs to one URL, so the URL is useless as a cache key - the key must be the endpoint plus a hash of the query and variables, or every AniList response overwrites the last. The client and the store both exist and are tested; wiring them is a small piece of work that was deliberately not rushed at the end of a long session. Owner: subtask 4.6 before 4.4 uses the client in anger."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."
