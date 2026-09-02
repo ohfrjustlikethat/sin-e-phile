@@ -103,13 +103,13 @@ pub async fn candidates(
 
     let placeholders = vec!["?"; forms.len()].join(", ");
     let sql = format!(
-        "SELECT DISTINCT t.media_item_id, t.title, m.release_year
+        "SELECT DISTINCT t.media_item_id, t.title, m.release_year, m.kind
          FROM titles t
          JOIN media_items m ON m.id = t.media_item_id
          WHERE t.normalised IN ({placeholders})"
     );
 
-    let mut query = sqlx::query_as::<_, (i64, String, Option<i64>)>(&sql);
+    let mut query = sqlx::query_as::<_, (i64, String, Option<i64>, String)>(&sql);
     for form in forms {
         query = query.bind(form);
     }
@@ -118,10 +118,13 @@ pub async fn candidates(
         .fetch_all(db.pool())
         .await?
         .into_iter()
-        .map(|(media_item_id, title, year)| crate::matching::Candidate {
-            media_item_id,
-            title,
-            year,
-        })
+        .map(
+            |(media_item_id, title, year, kind)| crate::matching::Candidate {
+                media_item_id,
+                title,
+                year,
+                kind,
+            },
+        )
         .collect())
 }

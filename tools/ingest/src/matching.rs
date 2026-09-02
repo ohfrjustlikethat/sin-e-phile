@@ -61,6 +61,9 @@ pub struct Candidate {
     pub media_item_id: i64,
     pub title: String,
     pub year: Option<i64>,
+    /// The catalogue's `media_items.kind`. Used only to break a tie, never to make
+    /// one — see [`match_title`].
+    pub kind: String,
 }
 
 /// Broadcast years disagree by one more often than they agree exactly: a series
@@ -213,10 +216,30 @@ pub fn title_forms<'a>(
 }
 
 /// Find the catalogue entry an AniList title refers to.
+/// Does a catalogue kind agree with the shape AniList says this is?
+///
+/// Both the anime and non-anime kinds count, because a re-run matches against titles
+/// a previous run already promoted.
+fn kind_agrees(catalogue: &str, want: &str) -> bool {
+    match want {
+        "film" | "anime_film" => matches!(catalogue, "film" | "anime_film"),
+        "series" | "anime_series" => matches!(catalogue, "series" | "anime_series"),
+        _ => true,
+    }
+}
+
+/// Find the catalogue entry an AniList title refers to.
+///
+/// `want_kind` is what AniList's `format` says this is — `"film"` or `"series"`. It
+/// is a TIE-BREAKER and nothing more: it can choose between candidates already equally
+/// good on title and year, and it can never create a match or reject one on its own.
+/// "Naruto" is one series and two unrelated films with no year between them; without
+/// the shape that is three coin flips, and with it there is one answer.
 pub fn match_title(
     index: &TitleIndex,
     forms: &[&str],
     anilist_year: Option<i64>,
+    want_kind: Option<&str>,
 ) -> Result<Match, NoMatch> {
     let mut year_conflict: Option<NoMatch> = None;
     let mut saw_a_title = false;
@@ -237,7 +260,18 @@ pub fn match_title(
                 .filter(|c| years_agree(c.year, anilist_year))
                 .collect();
 
-            match viable.len() {
+            // COLLAPSE BY ITEM FIRST. A catalogue entry carries one title row per
+            // spelling — "Death Note", "DEATH NOTE", "Death note" — and all of them
+            // normalise to the same key, so each comes back as its own candidate.
+            // Counting rows made one unambiguous series look like five rivals, and
+            // refused Death Note, One Piece, Naruto and Attack on Titan: the four most
+            // recognisable titles in the sample, every one of them ambiguous against
+            // itself. Measured over 250 entries, this alone was 97 refusals.
+            let mut ids: Vec<i64> = viable.iter().map(|c| c.media_item_id).collect();
+            ids.sort_unstable();
+            ids.dedup();
+
+            match ids.len() {
                 0 => {
                     // Remember the first conflict, but keep trying other forms — a
                     // different form may match a different entry cleanly.
@@ -248,22 +282,54 @@ pub fn match_title(
                         }
                     }
                 }
-                1 => {
-                    let kind = if anilist_year.is_none() || viable[0].year.is_none() {
-                        MatchKind::ExactTitleYearUnknown
-                    } else {
-                        kind
-                    };
-                    return Ok(Match {
-                        media_item_id: viable[0].media_item_id,
-                        kind,
-                        matched_on: (*form).to_string(),
+                1 => return Ok(settle(&viable, ids[0], kind, form, anilist_year)),
+                _ => {
+                    // Several genuinely different catalogue entries share this title.
+                    // Narrow by STRENGTH OF EVIDENCE, in stages, and settle only if a
+                    // stage leaves exactly one. Each stage may discard a candidate
+                    // that is worse-evidenced than another; none may invent a match or
+                    // reject the last one standing.
+                    let mut pool: Vec<&Candidate> = viable.clone();
+
+                    // Stage 1: a year that is KNOWN AND AGREES corroborates the match.
+                    // A catalogue entry with no year at all merely fails to contradict
+                    // it, and `years_agree` is permissive about exactly that. Treating
+                    // the two as equal let a year-less stub veto a match the dated
+                    // entry had earned: Death Note, Sword Art Online and Steins;Gate
+                    // were all refused this way despite an exact year match sitting in
+                    // the candidate set.
+                    if anilist_year.is_some() {
+                        let dated: Vec<&Candidate> =
+                            pool.iter().copied().filter(|c| c.year.is_some()).collect();
+                        if !dated.is_empty() {
+                            pool = dated;
+                        }
+                    }
+
+                    // Stage 2: AniList states whether this is a film or a series.
+                    if let Some(want) = want_kind {
+                        let agreeing: Vec<&Candidate> = pool
+                            .iter()
+                            .copied()
+                            .filter(|c| kind_agrees(&c.kind, want))
+                            .collect();
+                        if !agreeing.is_empty() {
+                            pool = agreeing;
+                        }
+                    }
+
+                    let mut remaining: Vec<i64> = pool.iter().map(|c| c.media_item_id).collect();
+                    remaining.sort_unstable();
+                    remaining.dedup();
+
+                    if remaining.len() == 1 {
+                        return Ok(settle(&pool, remaining[0], kind, form, anilist_year));
+                    }
+
+                    // Picking one now would be a coin flip recorded as a fact.
+                    return Err(NoMatch::Ambiguous {
+                        candidates: remaining.len(),
                     });
-                }
-                n => {
-                    // Two catalogue entries with the same title and a compatible
-                    // year. Picking one would be a coin flip recorded as a fact.
-                    return Err(NoMatch::Ambiguous { candidates: n });
                 }
             }
         }
@@ -272,6 +338,34 @@ pub fn match_title(
     match (year_conflict, saw_a_title) {
         (Some(conflict), _) => Err(conflict),
         (None, _) => Err(NoMatch::NotInCatalogue),
+    }
+}
+
+/// Build the `Match` for a settled candidate.
+///
+/// A match made where either side has no year is recorded as `ExactTitleYearUnknown`
+/// rather than as the stronger kind it was reached by, because that is what actually
+/// happened — the year did not corroborate it, it merely failed to contradict it.
+fn settle(
+    viable: &[&Candidate],
+    media_item_id: i64,
+    kind: MatchKind,
+    form: &str,
+    anilist_year: Option<i64>,
+) -> Match {
+    let chosen = viable
+        .iter()
+        .find(|c| c.media_item_id == media_item_id)
+        .expect("the id came from viable");
+    let kind = if anilist_year.is_none() || chosen.year.is_none() {
+        MatchKind::ExactTitleYearUnknown
+    } else {
+        kind
+    };
+    Match {
+        media_item_id,
+        kind,
+        matched_on: form.to_string(),
     }
 }
 
@@ -289,12 +383,60 @@ mod tests {
     use super::*;
 
     fn index(rows: &[(i64, &str, Option<i64>)]) -> TitleIndex {
+        let kinded_rows: Vec<(i64, &str, Option<i64>, &str)> = rows
+            .iter()
+            .map(|(a, b, c)| (*a, *b, *c, "series"))
+            .collect();
+        kinded(&kinded_rows)
+    }
+
+    #[test]
+    fn a_corroborating_year_beats_a_candidate_with_no_year_at_all() {
+        // `years_agree` is permissive about a missing year, which is right — it is not
+        // evidence AGAINST a match. But it is not evidence for one either, and letting
+        // a year-less stub tie with an exact year match refused Death Note, Sword Art
+        // Online and Steins;Gate outright.
+        let index = kinded(&[
+            (1, "Death Note", Some(2006), "series"),
+            (2, "Death Note", None, "series"),
+        ]);
+        let found = match_title(&index, &["Death Note"], Some(2006), Some("series"))
+            .expect("the dated entry is better evidenced");
+        assert_eq!(found.media_item_id, 1);
+    }
+
+    #[test]
+    fn two_candidates_that_both_agree_on_year_stay_ambiguous() {
+        // Narrowing by evidence must never become ranking. Nothing separates these.
+        let index = kinded(&[
+            (1, "Monster", Some(2004), "series"),
+            (2, "Monster", Some(2004), "series"),
+        ]);
+        assert_eq!(
+            match_title(&index, &["Monster"], Some(2004), Some("series")),
+            Err(NoMatch::Ambiguous { candidates: 2 })
+        );
+    }
+
+    #[test]
+    fn a_year_less_candidate_still_matches_when_it_is_the_only_one() {
+        // The narrowing may discard a worse-evidenced rival; it may never discard the
+        // last candidate standing.
+        let index = kinded(&[(1, "An Old Series", None, "series")]);
+        let found = match_title(&index, &["An Old Series"], Some(1975), Some("series"))
+            .expect("still a match");
+        assert_eq!(found.media_item_id, 1);
+        assert_eq!(found.kind, MatchKind::ExactTitleYearUnknown);
+    }
+
+    fn kinded(rows: &[(i64, &str, Option<i64>, &str)]) -> TitleIndex {
         let mut index = TitleIndex::new();
-        for (id, title, year) in rows {
+        for (id, title, year, kind) in rows {
             index.insert(Candidate {
                 media_item_id: *id,
                 title: (*title).to_string(),
                 year: *year,
+                kind: (*kind).to_string(),
             });
         }
         index
@@ -347,7 +489,7 @@ mod tests {
     #[test]
     fn an_exact_title_and_year_matches() {
         let index = index(&[(1, "Cowboy Bebop", Some(1998))]);
-        let found = match_title(&index, &["Cowboy Bebop"], Some(1998)).expect("match");
+        let found = match_title(&index, &["Cowboy Bebop"], Some(1998), None).expect("match");
         assert_eq!(found.media_item_id, 1);
         assert_eq!(found.kind, MatchKind::ExactTitleAndYear);
     }
@@ -357,7 +499,7 @@ mod tests {
         // A series airing from October runs into the next year and the two datasets
         // pick different ends.
         let index = index(&[(1, "A Series", Some(2019))]);
-        assert!(match_title(&index, &["A Series"], Some(2020)).is_ok());
+        assert!(match_title(&index, &["A Series"], Some(2020), None).is_ok());
     }
 
     #[test]
@@ -365,7 +507,7 @@ mod tests {
         // Usually a different entry in the same franchise.
         let index = index(&[(1, "Fullmetal Alchemist", Some(2003))]);
         let error =
-            match_title(&index, &["Fullmetal Alchemist"], Some(2009)).expect_err("no match");
+            match_title(&index, &["Fullmetal Alchemist"], Some(2009), None).expect_err("no match");
         assert_eq!(
             error,
             NoMatch::YearConflict {
@@ -379,7 +521,7 @@ mod tests {
     fn two_equally_good_candidates_are_refused_rather_than_guessed() {
         // THE RULE. A coin flip recorded as a fact is worse than no match at all.
         let index = index(&[(1, "Gamera", Some(1995)), (2, "Gamera", Some(1995))]);
-        let error = match_title(&index, &["Gamera"], Some(1995)).expect_err("refused");
+        let error = match_title(&index, &["Gamera"], Some(1995), None).expect_err("refused");
         assert_eq!(error, NoMatch::Ambiguous { candidates: 2 });
     }
 
@@ -387,11 +529,11 @@ mod tests {
     fn a_missing_year_on_either_side_is_not_evidence_against() {
         // Requiring one would drop most pre-2000 entries.
         let no_year = index(&[(1, "An Old Series", None)]);
-        let found = match_title(&no_year, &["An Old Series"], Some(1975)).expect("match");
+        let found = match_title(&no_year, &["An Old Series"], Some(1975), None).expect("match");
         assert_eq!(found.kind, MatchKind::ExactTitleYearUnknown);
 
         let no_anilist_year = index(&[(2, "Another", Some(1975))]);
-        let found = match_title(&no_anilist_year, &["Another"], None).expect("match");
+        let found = match_title(&no_anilist_year, &["Another"], None, None).expect("match");
         assert_eq!(found.kind, MatchKind::ExactTitleYearUnknown);
     }
 
@@ -403,7 +545,7 @@ mod tests {
             Some("Spirited Away"),
             None,
         );
-        let found = match_title(&index, &forms, Some(2001)).expect("match");
+        let found = match_title(&index, &forms, Some(2001), None).expect("match");
         assert_eq!(found.matched_on, "Spirited Away");
     }
 
@@ -416,7 +558,7 @@ mod tests {
             Some("Your Name."),
             Some("君の名は。"),
         );
-        let found = match_title(&index, &forms, Some(2016)).expect("match");
+        let found = match_title(&index, &forms, Some(2016), None).expect("match");
         assert_eq!(found.matched_on, "君の名は。");
     }
 
@@ -424,8 +566,13 @@ mod tests {
     fn a_season_entry_finds_the_base_series() {
         // AniList's "Season 2" against IMDb's one series entry.
         let index = index(&[(1, "Kaguya-sama: Love is War", Some(2019))]);
-        let found =
-            match_title(&index, &["Kaguya-sama: Love is War Season 2"], Some(2020)).expect("match");
+        let found = match_title(
+            &index,
+            &["Kaguya-sama: Love is War Season 2"],
+            Some(2020),
+            None,
+        )
+        .expect("match");
         assert_eq!(found.media_item_id, 1);
         assert_eq!(found.kind, MatchKind::SeasonAware);
     }
@@ -435,7 +582,7 @@ mod tests {
         // They need different fixes, and E5 measures both.
         let index = index(&[(1, "Something Else", Some(2000))]);
         assert_eq!(
-            match_title(&index, &["Not Here At All"], Some(2000)).expect_err("no match"),
+            match_title(&index, &["Not Here At All"], Some(2000), None).expect_err("no match"),
             NoMatch::NotInCatalogue
         );
     }
@@ -452,6 +599,7 @@ mod tests {
         index.insert(Candidate {
             media_item_id: 1,
             title: "!!!".to_string(),
+            kind: "series".to_string(),
             year: None,
         });
         assert!(
@@ -472,7 +620,7 @@ mod tests {
             Some("Fullmetal Alchemist: Brotherhood"),
             None,
         );
-        let found = match_title(&index, &forms, Some(2009)).expect("match");
+        let found = match_title(&index, &forms, Some(2009), None).expect("match");
         assert_eq!(
             found.media_item_id, 2,
             "it did not stop at the first conflict"

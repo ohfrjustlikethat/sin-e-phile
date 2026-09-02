@@ -3611,6 +3611,7 @@ dependencies = [
  "flate2",
  "futures-util",
  "reqwest 0.12.24",
+ "sinephile-metadata-api",
  "sinephile-persistence",
  "sqlx",
  "tempfile",

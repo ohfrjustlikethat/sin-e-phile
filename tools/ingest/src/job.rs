@@ -222,13 +222,18 @@ impl<'a> Job<'a> {
 
     /// True if this job adopted a previous unfinished run.
     pub async fn is_resuming(&self) -> Result<bool, JobError> {
-        let done: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM ingest_steps WHERE job_id = ? AND status = 'complete'",
+        // A COMPLETED STEP IS NOT THE ONLY EVIDENCE OF PROGRESS, and it is not even
+        // the common one. A crash lands mid-step, leaving a cursor and a count on a
+        // step that never completed — exactly the case a caller most wants to be told
+        // about. Counting only `complete` reported "fresh run" on every real resume.
+        let progressed: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM ingest_steps
+             WHERE job_id = ? AND (status = 'complete' OR cursor IS NOT NULL OR items_done > 0)",
         )
         .bind(self.id)
         .fetch_one(self.db.pool())
         .await?;
-        Ok(done > 0)
+        Ok(progressed > 0)
     }
 
     /// Run one step to completion, batch by batch, resuming from its last checkpoint.

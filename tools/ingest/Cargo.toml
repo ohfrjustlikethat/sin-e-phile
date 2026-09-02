@@ -20,6 +20,9 @@ path = "src/main.rs"
 
 [dependencies]
 sinephile-persistence = { path = "../../crates/persistence" }
+# AniList lives here rather than in this crate: rate limiting, backoff and cache
+# freshness are HTTP concerns, and the app needs them at runtime too (Phase 11).
+sinephile-metadata-api = { path = "../../crates/metadata-api" }
 sqlx = { version = "=0.8.6", default-features = false, features = [
     "runtime-tokio", "sqlite", "macros",
 ] }

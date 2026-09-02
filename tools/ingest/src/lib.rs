@@ -8,6 +8,7 @@
 //! in the same transaction as the work it describes.
 
 pub mod akas;
+pub mod anime;
 pub mod credits;
 pub mod download;
 pub mod imdb;

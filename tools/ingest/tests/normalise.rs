@@ -80,7 +80,7 @@ async fn the_candidates_feed_straight_into_the_matcher() {
         index.insert(candidate);
     }
 
-    let found = match_title(&index, &forms, Some(2009)).expect("match");
+    let found = match_title(&index, &forms, Some(2009), None).expect("match");
     assert_eq!(found.matched_on, "Fullmetal Alchemist: Brotherhood");
 }
 

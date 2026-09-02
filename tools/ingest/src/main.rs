@@ -24,6 +24,11 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            core-tier titles. Needs `ingest imdb` first.
   ingest normalise         backfill titles.normalised, which anime matching and
                            Phase 5's exact-title search both need
+  ingest anime [--pages N] match the AniList catalogue onto ours and promote what
+                           matches to anime_film/anime_series. Needs `ingest
+                           normalise` first. --pages bounds the run; pages come
+                           most-popular-first, so a bounded run is the useful
+                           part of the catalogue rather than an arbitrary slice.
   ingest status            show every job and its steps
   ingest reset <name>      discard a job's progress so the next run starts clean
 
@@ -78,6 +83,14 @@ async fn main() -> Result<(), JobError> {
         "credits" => credits(&db, &dir.join("datasets")).await,
         "akas" => akas(&db, &dir.join("datasets")).await,
         "normalise" => normalise(&db).await,
+        "anime" => {
+            let pages = args
+                .iter()
+                .position(|a| a == "--pages")
+                .and_then(|i| args.get(i + 1))
+                .and_then(|n| n.parse::<i64>().ok());
+            anime(&db, pages).await
+        }
         "status" => status(&db).await,
         "reset" => match args.get(1) {
             Some(name) => {
@@ -294,6 +307,76 @@ async fn akas(db: &Db, datasets: &Path) -> Result<(), JobError> {
         (after.saturating_sub(before)) as f64 / 1_048_576.0,
         started.elapsed().as_secs_f64()
     );
+    println!();
+    Ok(())
+}
+
+/// Match the AniList catalogue onto ours (subtask 4.4).
+async fn anime(db: &Db, max_pages: Option<i64>) -> Result<(), JobError> {
+    use std::sync::Arc;
+    use std::time::Instant;
+
+    let unnormalised = sinephile_ingest::normalise::remaining(db).await?;
+    if unnormalised > 0 {
+        // Failing loudly beats matching against a catalogue that is only partly
+        // searchable: a NULL normalised form is invisible to the matcher, so the run
+        // would "succeed" with a silently depressed match rate.
+        eprintln!(
+            "ingest: {unnormalised} titles have no normalised form. Run `ingest normalise` first."
+        );
+        std::process::exit(2);
+    }
+
+    let started = Instant::now();
+    let transport: Arc<dyn sinephile_metadata_api::Transport> =
+        Arc::new(sinephile_metadata_api::HttpTransport::new());
+    let client = Arc::new(sinephile_metadata_api::AniList::owned(transport).await);
+
+    let mut job = Job::begin(db, "anilist").await?;
+    if job.is_resuming().await? {
+        tracing::info!("resuming a previous run");
+    }
+    let report = sinephile_ingest::anime::ingest(&mut job, client, max_pages).await?;
+    job.finish().await?;
+
+    println!();
+    println!("  {} AniList entries seen", report.seen);
+    println!(
+        "  {} matched ({:.1}%)",
+        report.matched,
+        report.match_rate() * 100.0
+    );
+    println!("      {} exact title and year", report.exact_title_and_year);
+    println!(
+        "      {} title only, year unknown",
+        report.exact_title_year_unknown
+    );
+    println!("      {} season-aware", report.season_aware);
+    println!(
+        "  {} already claimed by an earlier entry",
+        report.already_claimed
+    );
+    println!("  {} not in catalogue", report.not_in_catalogue);
+    println!("  {} ambiguous (refused)", report.ambiguous);
+    println!("  {} year conflict", report.year_conflict);
+    println!("  {:.0}s", started.elapsed().as_secs_f64());
+
+    // The sample is the deliverable for exit criterion E5, which hand-checks fifty.
+    // Printing it is what makes that check possible without writing a second tool.
+    println!(
+        "
+  a sample of what did NOT match:"
+    );
+    for (title, why) in report.unmatched_samples.iter().take(25) {
+        println!("    {title:<48}  {why}");
+    }
+    println!(
+        "
+  a sample of what DID match:"
+    );
+    for (title, form, id) in report.matched_samples.iter().take(25) {
+        println!("    {title:<48}  on {form:?} -> item {id}");
+    }
     println!();
     Ok(())
 }

@@ -667,3 +667,51 @@ storage estimates that were wrong in both directions.
 **Headroom is now thin enough that the `>= 10` core threshold is a live question
 again.** It should be settled once the remaining three components are measured, which
 is the same discipline that has been applied throughout: no fifth prediction.
+
+### Tuning the AniList matcher (subtask 4.4)
+
+`./target/release/ingest anime --pages 5` — the same 250 most-popular AniList entries
+against the full catalogue, re-run after each change. Pages come most-popular-first,
+so this sample is deliberately the hardest one: long-running franchises with many
+IMDb entries sharing a title.
+
+| | v1 | + collapse by item | + evidence narrowing |
+|---|---|---|---|
+| **Matched** | 101 (40.4%) | 171 (68.4%) | **184 (73.6%)** |
+| Ambiguous (refused) | **97** | 23 | **9** |
+| Already claimed | 11 | 16 | 17 |
+| Not in catalogue | 27 | 27 | 27 |
+| Year conflict | 14 | 13 | 13 |
+
+**v1 refused Death Note, One Piece, Naruto and Attack on Titan** — the four most
+recognisable titles in the sample. Every one of them was ambiguous *against itself*.
+The catalogue stores one `titles` row per spelling, so `Death Note`, `DEATH NOTE` and
+`Death note` all normalise to the same key and came back as three rival candidates for
+one item. The matcher counted rows where it should have counted items. That single bug
+was 97 of the 250 outcomes, and it was invisible in unit tests because a fixture never
+has three spellings of one title.
+
+Two narrowing rules then took ambiguity from 23 to 9. Both use evidence already held
+rather than preference, and neither can create a match or reject the last candidate
+standing:
+
+1. **A known, agreeing year beats no year at all.** `years_agree` is permissive about a
+   missing year — correctly, since absence is not evidence *against* a match. But it is
+   not evidence *for* one either, and treating the two as equal let a year-less
+   catalogue stub veto a match an exactly-dated entry had earned. This is what refused
+   Death Note (a 2006 series sitting beside an undated one), Sword Art Online and
+   Steins;Gate.
+2. **AniList states whether an entry is a film or a series.** `Naruto` is one series and
+   two unrelated undated films; the format setting resolves it. It is applied only when
+   several candidates are already tied, and only when it leaves exactly one.
+
+**What is still refused is refused correctly.** The remaining 9 are cases where two
+catalogue entries of the same kind share a title and a compatible year — nothing
+distinguishes them, so nothing may choose. Ranking by vote count would resolve most of
+them and would be wrong: popularity is evidence about a title, not about its identity.
+
+`already_claimed` counts an AniList entry that resolved to the right catalogue item but
+found it already mapped by an earlier one — nearly always a later season, since AniList
+lists seasons separately and IMDb lists one series dated by its first year. Counting
+those as matches gives (184 + 17) / 250 = **80.4% resolved**; the headline 73.6% is the
+pessimistic reading, and E5 reads the counts rather than either rate.

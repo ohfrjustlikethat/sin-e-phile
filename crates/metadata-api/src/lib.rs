@@ -16,7 +16,7 @@ pub mod reqwest_transport;
 pub mod store;
 pub mod transport;
 
-pub use anilist::{AniList, AniListError, Media, Titles};
+pub use anilist::{AniList, AniListError, Media, Page, Titles};
 pub use backoff::{classify, Backoff, Retryable};
 pub use cache::{cache_key, freshness, serveable, Freshness, Resource};
 pub use limiter::{Limit, RateLimiter};

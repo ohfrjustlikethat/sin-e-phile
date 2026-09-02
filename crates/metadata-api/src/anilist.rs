@@ -131,8 +131,29 @@ const MEDIA_FIELDS: &str = "
     nextAiringEpisode { airingAt timeUntilAiring episode }
 ";
 
+/// How the client holds its transport.
+///
+/// Borrowed is right for a test, which builds a `FakeTransport` on the stack and
+/// wants it back afterwards to assert on what was requested. Owned is right for
+/// anything that must outlive its caller's stack frame — a background ingestion step,
+/// and from Phase 11 a client living in Tauri's managed state, neither of which can
+/// hold a borrow of anything.
+enum TransportRef<'a> {
+    Borrowed(&'a dyn Transport),
+    Owned(std::sync::Arc<dyn Transport>),
+}
+
+impl TransportRef<'_> {
+    fn get(&self) -> &dyn Transport {
+        match self {
+            TransportRef::Borrowed(t) => *t,
+            TransportRef::Owned(t) => t.as_ref(),
+        }
+    }
+}
+
 pub struct AniList<'a> {
-    transport: &'a dyn Transport,
+    transport: TransportRef<'a>,
     /// Optional, so the client is usable in a test or a context with no database.
     cache: Option<&'a CacheStore<'a>>,
     limiter: RateLimiter,
@@ -144,7 +165,23 @@ impl<'a> AniList<'a> {
         let limiter = RateLimiter::new();
         limiter.configure(HOST, default_limit()).await;
         Self {
-            transport,
+            transport: TransportRef::Borrowed(transport),
+            cache: None,
+            limiter,
+            backoff: Backoff::default(),
+        }
+    }
+
+    /// A client that owns its transport, and so borrows nothing.
+    ///
+    /// `AniList<'static>` can be put in an `Arc` and shared with a spawned task or a
+    /// long-running job step. The borrowing constructor cannot, and the error when it
+    /// is tried is an unhelpful lifetime one rather than an obvious missing feature.
+    pub async fn owned(transport: std::sync::Arc<dyn Transport>) -> AniList<'static> {
+        let limiter = RateLimiter::new();
+        limiter.configure(HOST, default_limit()).await;
+        AniList {
+            transport: TransportRef::Owned(transport),
             cache: None,
             limiter,
             backoff: Backoff::default(),
@@ -166,7 +203,7 @@ impl<'a> AniList<'a> {
     pub async fn with_limiter(transport: &'a dyn Transport, limiter: RateLimiter) -> Self {
         limiter.configure(HOST, default_limit()).await;
         Self {
-            transport,
+            transport: TransportRef::Borrowed(transport),
             cache: None,
             limiter,
             backoff: Backoff::default(),
@@ -222,6 +259,57 @@ impl<'a> AniList<'a> {
     /// propagating, because "graceful offline behaviour" means a month-old cast list
     /// beats an error — and the failure is still logged, so it is degraded rather
     /// than hidden.
+    /// One page of the anime catalogue, most popular first.
+    ///
+    /// Sorted by popularity rather than id so that an ingestion cut short still has
+    /// the titles anyone would search for. `per_page` is capped at AniList's maximum
+    /// of 50 — asking for more is silently truncated, which would look like the
+    /// catalogue ending early.
+    pub async fn page(&self, page: i64, per_page: i64) -> Result<Page, AniListError> {
+        let per_page = per_page.clamp(1, 50);
+        let query = format!(
+            "query ($page: Int, $perPage: Int) {{
+                 Page(page: $page, perPage: $perPage) {{
+                     pageInfo {{ hasNextPage }}
+                     media(type: ANIME, sort: POPULARITY_DESC) {{ {MEDIA_FIELDS} }}
+                 }}
+             }}"
+        );
+        let variables = format!(r#"{{"page":{page},"perPage":{per_page}}}"#);
+        let cache_key = key(&format!("Page({page},{per_page})"));
+
+        let body = format!(
+            r#"{{"query":{},"variables":{variables}}}"#,
+            json_string(&query)
+        );
+
+        // Catalogue pages are deliberately NOT cached. They are read once during
+        // ingestion, and caching twenty thousand titles' worth of pages would put a
+        // second copy of the anime catalogue in the user's database for no benefit.
+        let _ = &cache_key;
+        let response = self.execute(&body).await?;
+
+        let parsed: GraphQlResponse<PageData> = serde_json::from_str(&response.body)
+            .map_err(|e| AniListError::Shape(format!("{e}: {}", truncate(&response.body))))?;
+
+        if let Some(errors) = parsed.errors {
+            return Err(AniListError::Api(
+                errors
+                    .iter()
+                    .map(|e| e.message.as_str())
+                    .collect::<Vec<_>>()
+                    .join("; "),
+            ));
+        }
+
+        Ok(parsed.data.map(|d| d.page).unwrap_or(Page {
+            page_info: PageInfo {
+                has_next_page: false,
+            },
+            media: Vec::new(),
+        }))
+    }
+
     async fn media_query(
         &self,
         cache_key: &str,
@@ -284,7 +372,7 @@ impl<'a> AniList<'a> {
             self.limiter.acquire(HOST).await;
 
             let request = Request::post_json(ENDPOINT, body.to_string());
-            let outcome = self.transport.send(request).await;
+            let outcome = self.transport.get().send(request).await;
 
             let response = match outcome {
                 Ok(response) => response,
@@ -396,6 +484,26 @@ struct GraphQlResponse<T> {
 #[derive(Debug, Deserialize)]
 struct GraphQlError {
     message: String,
+}
+
+/// One page of results.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct Page {
+    #[serde(rename = "pageInfo")]
+    pub page_info: PageInfo,
+    pub media: Vec<Media>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct PageInfo {
+    #[serde(rename = "hasNextPage")]
+    pub has_next_page: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct PageData {
+    #[serde(rename = "Page")]
+    page: Page,
 }
 
 #[derive(Debug, Deserialize)]
