@@ -22,6 +22,8 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            `ingest imdb` to have run first.
   ingest akas              load alternative titles (romaji/native/english) for
                            core-tier titles. Needs `ingest imdb` first.
+  ingest normalise         backfill titles.normalised, which anime matching and
+                           Phase 5's exact-title search both need
   ingest status            show every job and its steps
   ingest reset <name>      discard a job's progress so the next run starts clean
 
@@ -75,6 +77,7 @@ async fn main() -> Result<(), JobError> {
         "imdb" => imdb(&db, &dir.join("datasets")).await,
         "credits" => credits(&db, &dir.join("datasets")).await,
         "akas" => akas(&db, &dir.join("datasets")).await,
+        "normalise" => normalise(&db).await,
         "status" => status(&db).await,
         "reset" => match args.get(1) {
             Some(name) => {
@@ -291,6 +294,32 @@ async fn akas(db: &Db, datasets: &Path) -> Result<(), JobError> {
         (after.saturating_sub(before)) as f64 / 1_048_576.0,
         started.elapsed().as_secs_f64()
     );
+    println!();
+    Ok(())
+}
+
+/// Backfill the normalised title form (migration 0009).
+async fn normalise(db: &Db) -> Result<(), JobError> {
+    use std::time::Instant;
+
+    let started = Instant::now();
+    let before = sinephile_ingest::normalise::remaining(db).await?;
+    tracing::info!("{before} titles need normalising");
+
+    let mut job = Job::begin(db, "titles-normalise").await?;
+    if job.is_resuming().await? {
+        tracing::info!("resuming a previous run");
+    }
+    sinephile_ingest::normalise::backfill(&mut job).await?;
+    job.finish().await?;
+
+    let after = sinephile_ingest::normalise::remaining(db).await?;
+    println!();
+    println!(
+        "  {} titles normalised, {after} still without a form",
+        before - after
+    );
+    println!("  {:.0}s", started.elapsed().as_secs_f64());
     println!();
     Ok(())
 }

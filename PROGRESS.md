@@ -46,7 +46,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.4, second half: page through AniList's catalogue and apply the matcher in tools/ingest/src/matching.rs - promote matched titles to anime_film/anime_series, write romaji/native/english as asserted facts over the script heuristic in tools/ingest/src/akas.rs, and store anilist/mal external ids. The matcher refuses ambiguous matches by design, so record the NotInCatalogue and Ambiguous counts: exit criterion E5 hand-checks 50 titles and those two numbers are what it measures.
+Phase 4 subtask 4.4, final part: page through AniList with the client in crates/metadata-api/src/anilist.rs, feed each entry's three title forms through tools/ingest/src/normalise.rs::candidates and tools/ingest/src/matching.rs::match_title, then promote matched rows to anime_film/anime_series, write romaji/native/english as asserted facts, and store anilist/mal external ids. Record the NotInCatalogue and Ambiguous counts - exit criterion E5 hand-checks 50 titles and those are the numbers it measures.
 
 ---
 
