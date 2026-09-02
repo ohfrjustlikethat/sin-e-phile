@@ -629,3 +629,41 @@ disk saving, and that part did not happen.
 headroom for the embedding artefact, AniList and MovieLens — and no reliable way to
 predict what those will cost, which is precisely why they will be measured as they
 land rather than estimated now.
+
+### Normalised titles backfilled (migration 0009)
+
+`./target/release/ingest normalise`, 2026-09-02, commit `3155e6b`.
+
+| Metric | Value |
+|---|---|
+| Titles normalised | **6,184,278** (all of them) |
+| Distinct normalised forms | 3,453,809 |
+| Empty forms (punctuation-only titles) | 126 |
+| **Time** | **197 s** |
+| **Database** | 3,133 MB → **3,399 MB** (+266 MB) |
+
+Spot-checked: `Fullmetal Alchemist: Brotherhood` → `fullmetal alchemist brotherhood`,
+and `8½` survives as `8½` because `½` is a numeric character rather than punctuation.
+
+**The ambiguity the matcher refuses is real and large.** 568 catalogue items share the
+normalised title `home`; 486 share `alone`; 330 share `broken`. Any matcher that
+resolved ties by picking the first would be wrong hundreds of times and would record
+each one as a fact. That is the case
+`two_equally_good_candidates_are_refused_rather_than_guessed` exists for, and it is
+not a hypothetical.
+
+The 126 empty forms are titles made entirely of punctuation. They can never match,
+which is correct — there is nothing to match on.
+
+### R4 after migration 0009
+
+**3,399 MB of the 4,096 MB trigger — 83%. Headroom is 697 MB.**
+
+Still to fit: the embedding artefact, AniList and MovieLens. ADR-0014 states ~77 MB
+per 200,000 titles, which for 854,752 core titles is around 330 MB — that is the
+ADR's own rate, not an estimate of mine, and this document has already recorded four
+storage estimates that were wrong in both directions.
+
+**Headroom is now thin enough that the `>= 10` core threshold is a live question
+again.** It should be settled once the remaining three components are measured, which
+is the same discipline that has been applied throughout: no fifth prediction.
