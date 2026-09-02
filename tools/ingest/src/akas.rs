@@ -66,22 +66,39 @@ pub fn variant(
     }
     let non_latin = is_non_latin(title);
 
-    match language {
+    match (language, region) {
         // A non-Latin-script language written in Latin characters: a transliteration.
-        Some(lang) if TRANSLITERATED.contains(&lang) => {
+        (Some(lang), _) if TRANSLITERATED.contains(&lang) => {
             if non_latin {
                 "native"
             } else {
                 "romaji"
             }
         }
-        Some("en") => "english",
-        _ => match region {
-            // IMDb frequently gives a region and no language.
-            Some("US") | Some("GB") | Some("CA") | Some("AU") => "english",
-            _ if non_latin => "native",
-            _ => "alternative",
-        },
+        (Some("en"), _) => "english",
+
+        // A KNOWN language that is neither English nor a transliterated one. The
+        // region says nothing here and must not be consulted: IMDb lists the Spanish
+        // title of Spirited Away with region US and the French one with region CA,
+        // and reading the region first labelled both of them `english`. A release
+        // region is where a title was used, not what language it is in.
+        (Some(_), _) => {
+            if non_latin {
+                "native"
+            } else {
+                "alternative"
+            }
+        }
+
+        // No language at all — now the region is the only evidence there is.
+        (None, Some("US" | "GB" | "CA" | "AU")) => "english",
+        (None, _) => {
+            if non_latin {
+                "native"
+            } else {
+                "alternative"
+            }
+        }
     }
 }
 
@@ -198,6 +215,28 @@ mod tests {
         assert_eq!(
             variant(true, Some("en"), Some("US"), "Seven Samurai"),
             "original"
+        );
+    }
+
+    #[test]
+    fn a_release_region_never_overrides_a_known_language() {
+        // Found in the real catalogue: IMDb lists the Spanish title of Spirited Away
+        // with region US and the French one with region CA. Consulting the region
+        // before checking the language labelled both of them `english`, so the film's
+        // "English title" was whichever regional title happened to load last.
+        assert_eq!(
+            variant(false, Some("es"), Some("US"), "El viaje de Chihiro"),
+            "alternative"
+        );
+        assert_eq!(
+            variant(false, Some("fr"), Some("CA"), "Le voyage de Chihiro"),
+            "alternative"
+        );
+        // The region is still the only evidence when there is no language at all.
+        assert_eq!(
+            variant(false, None, Some("US"), "Some Title"),
+            "english",
+            "region remains the fallback when the language is unknown"
         );
     }
 

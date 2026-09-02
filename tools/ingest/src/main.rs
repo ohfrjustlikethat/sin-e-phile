@@ -29,6 +29,8 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            normalise` first. --pages bounds the run; pages come
                            most-popular-first, so a bounded run is the useful
                            part of the catalogue rather than an arbitrary slice.
+  ingest repair-variants   recompute titles.variant for rows the region-over-
+                           language bug labelled english. Narrow and re-runnable.
   ingest status            show every job and its steps
   ingest reset <name>      discard a job's progress so the next run starts clean
 
@@ -91,6 +93,7 @@ async fn main() -> Result<(), JobError> {
                 .and_then(|n| n.parse::<i64>().ok());
             anime(&db, pages).await
         }
+        "repair-variants" => repair_variants(&db).await,
         "status" => status(&db).await,
         "reset" => match args.get(1) {
             Some(name) => {
@@ -377,6 +380,29 @@ async fn anime(db: &Db, max_pages: Option<i64>) -> Result<(), JobError> {
     for (title, form, id) in report.matched_samples.iter().take(25) {
         println!("    {title:<48}  on {form:?} -> item {id}");
     }
+    println!();
+    Ok(())
+}
+
+/// Recompute variants the region-over-language bug got wrong.
+async fn repair_variants(db: &Db) -> Result<(), JobError> {
+    use std::time::Instant;
+
+    let started = Instant::now();
+    let before = sinephile_ingest::repair::mislabelled_english(db).await?;
+    tracing::info!("{before} rows claim to be english while carrying another language");
+
+    let mut job = Job::begin(db, "repair-variants").await?;
+    sinephile_ingest::repair::english_variants(&mut job).await?;
+    job.finish().await?;
+
+    let after = sinephile_ingest::repair::mislabelled_english(db).await?;
+    println!();
+    println!(
+        "  {} rows repaired, {after} still mislabelled",
+        before - after
+    );
+    println!("  {:.0}s", started.elapsed().as_secs_f64());
     println!();
     Ok(())
 }

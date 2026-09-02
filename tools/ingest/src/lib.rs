@@ -17,6 +17,7 @@ pub mod load;
 pub mod matching;
 pub mod measure;
 pub mod normalise;
+pub mod repair;
 pub mod tsv;
 
 pub use download::{Downloaded, Downloader, Progress};

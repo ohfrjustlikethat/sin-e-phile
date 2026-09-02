@@ -261,22 +261,50 @@ impl<'a> AniList<'a> {
     /// than hidden.
     /// One page of the anime catalogue, most popular first.
     ///
-    /// Sorted by popularity rather than id so that an ingestion cut short still has
-    /// the titles anyone would search for. `per_page` is capped at AniList's maximum
-    /// of 50 — asking for more is silently truncated, which would look like the
-    /// catalogue ending early.
-    pub async fn page(&self, page: i64, per_page: i64) -> Result<Page, AniListError> {
+    /// # AniList stops paginating at 5,000 entries
+    ///
+    /// Past that depth every request is a `400` — "Page depth exceeds maximum allowed
+    /// for API requests (5000 entries)". So an unfiltered popularity sweep can reach
+    /// the top 5,000 anime and no further, however patiently it pages. `pageInfo.total`
+    /// does not warn you: it reports exactly `5000` for any query, including one whose
+    /// real total is far smaller, so it is a trap rather than a bound.
+    ///
+    /// `season_year` is how the whole catalogue is reachable. Each year holds well
+    /// under 5,000 entries, so a per-year sweep never approaches the cap. `None` gives
+    /// the unfiltered popularity ordering, which is still the right first pass.
+    ///
+    /// `per_page` is capped at AniList's maximum of 50 — asking for more is silently
+    /// truncated, which would look like the catalogue ending early.
+    pub async fn page(
+        &self,
+        page: i64,
+        per_page: i64,
+        season_year: Option<i64>,
+    ) -> Result<Page, AniListError> {
         let per_page = per_page.clamp(1, 50);
+        // The filter is added to the query text rather than always declared, because a
+        // declared-but-null `seasonYear` is not the same as an absent one: AniList
+        // treats the null as "no filter" on some fields and as "match nothing" on
+        // others, and depending on which would be a silent, untestable difference.
+        let (declare, filter) = match season_year {
+            Some(_) => (", $seasonYear: Int", ", seasonYear: $seasonYear"),
+            None => ("", ""),
+        };
         let query = format!(
-            "query ($page: Int, $perPage: Int) {{
+            "query ($page: Int, $perPage: Int{declare}) {{
                  Page(page: $page, perPage: $perPage) {{
                      pageInfo {{ hasNextPage }}
-                     media(type: ANIME, sort: POPULARITY_DESC) {{ {MEDIA_FIELDS} }}
+                     media(type: ANIME{filter}, sort: POPULARITY_DESC) {{ {MEDIA_FIELDS} }}
                  }}
              }}"
         );
-        let variables = format!(r#"{{"page":{page},"perPage":{per_page}}}"#);
-        let cache_key = key(&format!("Page({page},{per_page})"));
+        let variables = match season_year {
+            Some(year) => {
+                format!(r#"{{"page":{page},"perPage":{per_page},"seasonYear":{year}}}"#)
+            }
+            None => format!(r#"{{"page":{page},"perPage":{per_page}}}"#),
+        };
+        let cache_key = key(&format!("Page({page},{per_page},{season_year:?})"));
 
         let body = format!(
             r#"{{"query":{},"variables":{variables}}}"#,

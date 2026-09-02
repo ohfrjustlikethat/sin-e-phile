@@ -268,7 +268,7 @@ impl CatalogueScope {
 /// Read from the clock rather than baked in, so the two-year window keeps moving. A
 /// frozen constant would quietly stop rescuing new releases a year after shipping,
 /// and nothing would report it.
-fn current_year() -> i64 {
+pub fn current_year() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     let seconds = SystemTime::now()
         .duration_since(UNIX_EPOCH)

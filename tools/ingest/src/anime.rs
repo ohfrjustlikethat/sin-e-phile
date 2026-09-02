@@ -26,6 +26,7 @@ use std::sync::{Arc, Mutex};
 
 use sinephile_metadata_api::{AniList, Media};
 
+use crate::imdb::current_year;
 use crate::job::{Batch, Job, JobError, SqliteTx};
 use crate::matching::{
     match_title, normalise, split_season, title_forms, Candidate, MatchKind, NoMatch, TitleIndex,
@@ -151,37 +152,95 @@ fn display_name(media: &Media) -> String {
         .to_string()
 }
 
+/// The first year worth sweeping. AniList's earliest entries are from the 1900s, but
+/// anime as a broadcast catalogue starts in the 1960s; earlier years cost a request
+/// each and return nothing. Cheap enough to start well before the real beginning.
+const FIRST_SEASON_YEAR: i64 = 1940;
+
+/// Where a run is up to: a year and a page within that year.
+///
+/// Serialised into the step cursor as `year:page`. A page number alone was enough
+/// while the sweep was one flat list; it is not enough now, and a cursor that cannot
+/// express the position is a resume that silently restarts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Cursor {
+    year: i64,
+    page: i64,
+}
+
+impl Cursor {
+    fn parse(raw: Option<&str>) -> Self {
+        let start = Cursor {
+            year: FIRST_SEASON_YEAR,
+            page: 1,
+        };
+        let Some(raw) = raw else { return start };
+        // An unparseable cursor restarts the sweep rather than failing. Re-running is
+        // idempotent — every write is an upsert and the first claim on an item stands
+        // — so redoing work is safe where guessing at a position is not.
+        match raw.split_once(':') {
+            Some((year, page)) => match (year.parse(), page.parse()) {
+                (Ok(year), Ok(page)) => Cursor { year, page },
+                _ => start,
+            },
+            None => start,
+        }
+    }
+
+    fn encode(self) -> String {
+        format!("{}:{}", self.year, self.page)
+    }
+}
+
 /// Page the anime catalogue, match each entry, and write what matched.
 ///
-/// `max_pages` bounds a run — `None` means "until AniList says there is no next
-/// page". A bound is useful for the fixture run E5 checks, and for a first pass that
-/// only wants the popular core, which is why the query sorts by popularity.
-/// The client is taken by `Arc` rather than by reference because the step's closure
-/// outlives this stack frame as far as the type system can tell — see
-/// [`AniList::owned`].
+/// # Why this sweeps year by year
+///
+/// AniList refuses to paginate past 5,000 entries, so a flat popularity sweep reaches
+/// the top 5,000 anime and then returns `400` forever — which is exactly how the first
+/// full run ended. Partitioning by `seasonYear` keeps every individual sweep far below
+/// the cap, and years are walked ASCENDING so that when two AniList entries resolve to
+/// one catalogue item the earlier one claims it. For a series listed once by IMDb and
+/// per-season by AniList, the earlier entry is season one, which is the right answer
+/// and a better one than the popularity ordering gave.
+///
+/// Entries with no `seasonYear` at all are not reached by this sweep. They are reached
+/// by the unfiltered popularity pass (`last_year: None`), which is bounded by the same
+/// 5,000 cap — so an undated entry outside the 5,000 most popular is not ingested. It
+/// also could not be matched with any confidence, since the year is half the evidence.
+///
+/// `max_pages` bounds a run, for tests and for a quick first pass. The client is taken
+/// by `Arc` rather than by reference because the step's closure outlives this stack
+/// frame as far as the type system can tell — see [`AniList::owned`].
 pub async fn ingest(
     job: &mut Job<'_>,
     client: Arc<AniList<'static>>,
     max_pages: Option<i64>,
 ) -> Result<Report, JobError> {
+    let last_year = current_year() + 1;
     let report = Arc::new(Mutex::new(Report::default()));
     let sink = Arc::clone(&report);
+    let fetched = Arc::new(Mutex::new(0i64));
 
     job.run_step("anilist.catalogue", move |tx, cursor| {
         let sink = Arc::clone(&sink);
         let client = Arc::clone(&client);
+        let fetched = Arc::clone(&fetched);
         Box::pin(async move {
-            // The cursor is the last page COMPLETED, so a resume starts at the next
-            // one. AniList numbers pages from 1, so an absent cursor means page 1.
-            let last_done: i64 = cursor.as_deref().and_then(|c| c.parse().ok()).unwrap_or(0);
-            let page_number = last_done + 1;
-
-            if max_pages.is_some_and(|max| page_number > max) {
+            let at = Cursor::parse(cursor.as_deref());
+            if at.year > last_year {
                 return Ok(Batch::finished(0));
+            }
+            {
+                let mut fetched = fetched.lock().expect("page count lock");
+                if max_pages.is_some_and(|max| *fetched >= max) {
+                    return Ok(Batch::finished(0));
+                }
+                *fetched += 1;
             }
 
             let page = client
-                .page(page_number, PER_PAGE)
+                .page(at.page, PER_PAGE, Some(at.year))
                 .await
                 .map_err(|e| JobError::step("anilist.catalogue", e.to_string()))?;
 
@@ -196,11 +255,26 @@ pub async fn ingest(
                     .record(media, &outcome, claim);
             }
 
-            let items = page.media.len() as i64;
-            Ok(if page.page_info.has_next_page && !page.media.is_empty() {
-                Batch::more(page_number.to_string(), items)
+            // A year with nothing left moves to the next one. The sweep ends only when
+            // the years run out, never when a single year does — most years before the
+            // 1960s are empty, and stopping at the first empty one would stop at 1940.
+            let next = if page.page_info.has_next_page && !page.media.is_empty() {
+                Cursor {
+                    year: at.year,
+                    page: at.page + 1,
+                }
             } else {
+                Cursor {
+                    year: at.year + 1,
+                    page: 1,
+                }
+            };
+
+            let items = page.media.len() as i64;
+            Ok(if next.year > last_year {
                 Batch::finished(items)
+            } else {
+                Batch::more(next.encode(), items)
             })
         })
     })

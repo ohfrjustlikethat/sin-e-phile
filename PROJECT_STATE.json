@@ -1,7 +1,7 @@
 {
   "spec_version": "1.7.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-09-02T01:25:51Z",
+  "last_updated": "2026-09-02",
   "sessions_completed": 5,
   "current_phase": {
     "number": 4,
@@ -710,9 +710,9 @@
         },
         {
           "id": "4.4",
-          "text": "AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering",
+          "text": "AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering [catalogue, titles and ids DONE in 87f15f6; episode numbering remains]",
           "status": "in_progress",
-          "commit": null
+          "commit": "87f15f6"
         },
         {
           "id": "4.5",
@@ -1786,7 +1786,7 @@
       ]
     }
   ],
-  "next_action": "Phase 4 subtask 4.4, final part: page through AniList with the client in crates/metadata-api/src/anilist.rs, feed each entry's three title forms through tools/ingest/src/normalise.rs::candidates and tools/ingest/src/matching.rs::match_title, then promote matched rows to anime_film/anime_series, write romaji/native/english as asserted facts, and store anilist/mal external ids. Record the NotInCatalogue and Ambiguous counts - exit criterion E5 hand-checks 50 titles and those are the numbers it measures.",
+  "next_action": "Phase 4 subtask 4.4, remaining part: episode numbering. Add a step to tools/ingest/src/anime.rs that, for each media_item now carrying an anilist external id, fetches the entry's episode list and writes both the seasonal and the absolute number into the episode_numbering table added by migration crates/persistence/migrations/0003_series_episodes.up.sql. The catalogue half of 4.4 is done and committed as 87f15f6.",
   "blockers": [],
   "decisions_pending": [
     {
@@ -2025,6 +2025,21 @@
       "id": "D16",
       "phase_raised": 4,
       "text": "R4 headroom is 697 MB after migration 0009 (3,399 MB of 4,096 MB). The embedding artefact, AniList and MovieLens all still have to fit. The >=10 core vote threshold in tools/ingest/src/imdb.rs::CatalogueScope::DEFAULT is the lever if they do not - tightening to >=50 cuts the core from 854,752 titles to roughly 484,000, which reduces credits and akas proportionately. Decide ONCE, after those three are measured. Four storage predictions in this phase have been wrong in both directions; a fifth would be no better."
+    },
+    {
+      "id": "D17",
+      "phase_raised": 4,
+      "text": "titles.variant calls a title 'native' whenever its script is non-Latin, regardless of whether that language has anything to do with the work. 93,900 rows are marked native with a language other than Japanese - a Greek or Ukrainian release title of a Japanese film is an ALTERNATIVE title, not a native one. Fixing it properly needs media_items.original_language plumbed into tools/ingest/src/akas.rs::variant and a repair pass like tools/ingest/src/repair.rs::english_variants. Not urgent: nothing reads 'native' as 'the original title' yet, and Phase 5 searches every variant."
+    },
+    {
+      "id": "D18",
+      "phase_raised": 4,
+      "text": "AniList refuses to paginate past 5,000 entries, so the catalogue is swept per seasonYear. Entries with NO seasonYear are reachable only through the unfiltered popularity pass, which hits the same 5,000 cap - so an undated AniList entry outside the 5,000 most popular is never ingested. Acceptable because the matcher needs a year as half its evidence, but it is a real coverage gap and should be stated rather than discovered later."
+    },
+    {
+      "id": "D19",
+      "phase_raised": 4,
+      "text": "crates/metadata-api/src/anilist.rs::default_limit is hard-coded to AniList's documented 90 requests/minute, but the service has been enforcing something lower for a long time. The backoff absorbs the 429s correctly, so nothing fails - it just spends a request to rediscover the limit each time. AniList returns X-RateLimit-Limit and X-RateLimit-Remaining; reading those and reconfiguring the limiter would honour whatever the server actually allows."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."
