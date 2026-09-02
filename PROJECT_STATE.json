@@ -1,7 +1,7 @@
 {
   "spec_version": "1.7.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-09-01T21:38:34Z",
+  "last_updated": "2026-09-02T01:04:26Z",
   "sessions_completed": 5,
   "current_phase": {
     "number": 4,
@@ -33,7 +33,7 @@
       {
         "id": "4.4",
         "text": "AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering",
-        "status": "not_started",
+        "status": "in_progress",
         "commit": null
       },
       {
@@ -711,7 +711,7 @@
         {
           "id": "4.4",
           "text": "AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering",
-          "status": "not_started",
+          "status": "in_progress",
           "commit": null
         },
         {
@@ -1786,7 +1786,7 @@
       ]
     }
   ],
-  "next_action": "Phase 4 subtask 4.4: ingest the AniList anime catalogue. Use the client in crates/metadata-api/src/anilist.rs to promote matched titles to anime_film/anime_series and write romaji/native/english titles as asserted facts over the script heuristic in tools/ingest/src/akas.rs. Then 4.13's airing schedules, which the same client already returns via Media::next_airing. Approach in docs/specs/catalogue-freshness.md. Shared infrastructure is done - 70 tests, and E4's 1,000-request stress test passes.",
+  "next_action": "Phase 4 subtask 4.4, second half: page through AniList's catalogue and apply the matcher in tools/ingest/src/matching.rs - promote matched titles to anime_film/anime_series, write romaji/native/english as asserted facts over the script heuristic in tools/ingest/src/akas.rs, and store anilist/mal external ids. The matcher refuses ambiguous matches by design, so record the NotInCatalogue and Ambiguous counts: exit criterion E5 hand-checks 50 titles and those two numbers are what it measures.",
   "blockers": [],
   "decisions_pending": [
     {

@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 1.7.0** · 5 session(s) completed · last updated 2026-09-01
+**Spec version 1.7.0** · 5 session(s) completed · last updated 2026-09-02
 
 ---
 
@@ -21,7 +21,7 @@
 - [x] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts · `4a78d64`
 - [x] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres · `048180a`
 - [ ] **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device)
-- [ ] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering
+- [~] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering
 - [x] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules · `f67d939`
 - [x] **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline · `38d75d7`
 - [ ] **4.7** Per-profile TMDB key from settings, never shipped (ADR-0027); every TMDB-dependent surface degrades to the typographic state
@@ -46,7 +46,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.4: ingest the AniList anime catalogue. Use the client in crates/metadata-api/src/anilist.rs to promote matched titles to anime_film/anime_series and write romaji/native/english titles as asserted facts over the script heuristic in tools/ingest/src/akas.rs. Then 4.13's airing schedules, which the same client already returns via Media::next_airing. Approach in docs/specs/catalogue-freshness.md. Shared infrastructure is done - 70 tests, and E4's 1,000-request stress test passes.
+Phase 4 subtask 4.4, second half: page through AniList's catalogue and apply the matcher in tools/ingest/src/matching.rs - promote matched titles to anime_film/anime_series, write romaji/native/english as asserted facts over the script heuristic in tools/ingest/src/akas.rs, and store anilist/mal external ids. The matcher refuses ambiguous matches by design, so record the NotInCatalogue and Ambiguous counts: exit criterion E5 hand-checks 50 titles and those two numbers are what it measures.
 
 ---
 
