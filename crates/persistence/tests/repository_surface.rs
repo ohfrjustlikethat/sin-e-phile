@@ -21,7 +21,9 @@
 use sinephile_persistence::archive::Archiver;
 use sinephile_persistence::model::EpisodeNumbering;
 use sinephile_persistence::repositories::profiles::PlaybackPosition;
-use sinephile_persistence::repositories::{EpisodeRepository, MediaRepository, ProfileRepository};
+use sinephile_persistence::repositories::{
+    CredentialRepository, EpisodeRepository, MediaRepository, ProfileRepository, TmdbAccess,
+};
 use sinephile_persistence::{Db, IdSource, MediaKind, NewMediaItem, TitleVariant};
 
 /// Exercise every public method on `MediaRepository`.
@@ -390,6 +392,54 @@ async fn db_surface() {
             .await
             .expect("pool works"),
         1
+    );
+
+    // ── CredentialRepository ──────────────────────────────────────────────────
+    // ADR-0027: no key ever ships, so every one of these starts from Absent.
+    let profile = ProfileRepository::new(&db)
+        .create("Author", true)
+        .await
+        .expect("profile");
+    let creds = CredentialRepository::new(&db);
+
+    // tmdb_access — the default state of the application
+    assert_eq!(
+        creds.tmdb_access(profile).await.expect("tmdb_access"),
+        TmdbAccess::Absent
+    );
+
+    // profiles_with_a_key
+    assert_eq!(creds.profiles_with_a_key().await.expect("count"), 0);
+
+    // set_tmdb_key
+    creds
+        .set_tmdb_key(profile, "abcdef0123456789abcdef0123456789")
+        .await
+        .expect("set_tmdb_key");
+    assert!(creds
+        .tmdb_access(profile)
+        .await
+        .expect("tmdb_access")
+        .is_configured());
+
+    // set_tmdb_key — refuses what is not a key
+    assert!(creds.set_tmdb_key(profile, "nope").await.is_err());
+
+    // set / get, the non-secret path
+    creds.set(profile, "ui.theme", "dark").await.expect("set");
+    assert_eq!(
+        creds.get(profile, "ui.theme").await.expect("get"),
+        Some("dark".to_string())
+    );
+    // get — refuses to hand back a secret
+    assert!(creds.get(profile, "tmdb.api_key").await.is_err());
+
+    // clear_tmdb_key
+    let (removed, _discarded) = creds.clear_tmdb_key(profile).await.expect("clear_tmdb_key");
+    assert!(removed);
+    assert_eq!(
+        creds.tmdb_access(profile).await.expect("tmdb_access"),
+        TmdbAccess::Absent
     );
 
     // schema_version

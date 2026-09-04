@@ -728,8 +728,8 @@
         },
         {
           "id": "4.7",
-          "text": "Per-profile TMDB key from settings, never shipped (ADR-0027); every TMDB-dependent surface degrades to the typographic state",
-          "status": "not_started",
+          "text": "Per-profile TMDB key from settings, never shipped (ADR-0027), DPAPI-wrapped at rest; every TMDB-dependent surface degrades to the typographic state. Storage and the degradation contract are done; the settings UI is Phase 14.",
+          "status": "in_progress",
           "commit": null
         },
         {
@@ -1786,7 +1786,7 @@
       ]
     }
   ],
-  "next_action": "Phase 4 subtask 4.7: per-profile TMDB key. Add an encrypted-at-rest key per profile in the settings table, a settings UI to enter and remove it, and make every TMDB-dependent surface degrade to the SPEC.md 9.4 typographic treatment when absent (ADR-0013, ADR-0027). NO KEY EVER SHIPS. Subtask 4.13 is done and committed; 4.3 stays BLOCKED on B2, GroupLens' TLS certificate expired 2026-08-28.",
+  "next_action": "Phase 4 subtask 4.8: image handling. Lazy fetch, a disk cache under ./data/ with a size budget, WebP re-encoding and blurhash placeholders. Gate every fetch on CredentialRepository::tmdb_access returning Configured - TmdbAccess::Absent must produce the SPEC.md 9.4 typographic card, never a grey rectangle. Subtask 4.3 stays BLOCKED on B2 (GroupLens TLS certificate expired 2026-08-28).",
   "blockers": [
     {
       "id": "B2",
@@ -2072,6 +2072,11 @@
       "id": "D24",
       "phase_raised": 4,
       "text": "`ingest refresh` re-downloads title.basics (216 MB) every run because gzip cannot be seeked and IMDb publishes no changelog. Weekly is fine; daily would not be. If the cadence ever tightens, check whether IMDb serves conditional requests - the http_cache table from migration 0008 already stores ETag and Last-Modified, and crates/metadata-api handles revalidation, so a 304 would make this nearly free."
+    },
+    {
+      "id": "D25",
+      "phase_raised": 4,
+      "text": "The TMDB key is DPAPI-wrapped, so it is bound to the Windows user account and a copied ./data/ folder cannot decrypt it. That is deliberate (crates/persistence/src/secrets.rs) and degrades to TmdbAccess::Absent, but it means the PORTABLE promise of ADR-0008 has one documented exception: move the folder to another machine or account and the key must be re-entered. Everything else in the folder still works. Worth a line in the settings UI when Phase 14 builds it, so the user is told rather than surprised."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

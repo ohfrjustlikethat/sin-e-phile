@@ -47,7 +47,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.7: per-profile TMDB key. Add an encrypted-at-rest key per profile in the settings table, a settings UI to enter and remove it, and make every TMDB-dependent surface degrade to the SPEC.md 9.4 typographic treatment when absent (ADR-0013, ADR-0027). NO KEY EVER SHIPS. Subtask 4.13 is done and committed; 4.3 stays BLOCKED on B2, GroupLens' TLS certificate expired 2026-08-28.
+Phase 4 subtask 4.8: image handling. Lazy fetch, a disk cache under ./data/ with a size budget, WebP re-encoding and blurhash placeholders. Gate every fetch on CredentialRepository::tmdb_access returning Configured - TmdbAccess::Absent must produce the SPEC.md 9.4 typographic card, never a grey rectangle. Subtask 4.3 stays BLOCKED on B2 (GroupLens TLS certificate expired 2026-08-28).
 
 ---
 
@@ -122,6 +122,7 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D22** (raised in Phase 4) PHASE 12 INHERITS THIS. episode_numbering.absolute_number is NULL on all 539,817 episodes and no free source publishes one (ADR-0031). A filename reading 'Series - 59' cannot be resolved from the catalogue for anime, so Phase 12's matcher must route it to the review queue rather than assume a lookup succeeds - a correct outcome, not a wrong answer, so the <1% false-confident budget is unaffected. The fix, when Phase 12 wants it: stop collapsing AniList seasons onto one catalogue item, give each its own episode_numbering rows, and the absolute number becomes derivable from stored facts instead of computed from guesses. NEVER derive it by cumulating counts across seasons.
 - **D23** (raised in Phase 4) PROJECT_STATE.json holds exit criteria and subtasks TWICE - once in phases[] and once in current_phase - and tools/state/validate_state.py --check passes while the two disagree. Marking E5 met in phases[] left current_phase saying false, and only tools/statecheck caught it, via the phase document. The schema was meant to make this class of drift structural (author's ruling, 2026-09-01). It does not cover the `met`/`evidence`/`status` fields. Fix: add a schema rule, or a validate_state check, that current_phase mirrors its phases[] entry - the copies should not be editable independently at all.
 - **D24** (raised in Phase 4) `ingest refresh` re-downloads title.basics (216 MB) every run because gzip cannot be seeked and IMDb publishes no changelog. Weekly is fine; daily would not be. If the cadence ever tightens, check whether IMDb serves conditional requests - the http_cache table from migration 0008 already stores ETag and Last-Modified, and crates/metadata-api handles revalidation, so a 304 would make this nearly free.
+- **D25** (raised in Phase 4) The TMDB key is DPAPI-wrapped, so it is bound to the Windows user account and a copied ./data/ folder cannot decrypt it. That is deliberate (crates/persistence/src/secrets.rs) and degrades to TmdbAccess::Absent, but it means the PORTABLE promise of ADR-0008 has one documented exception: move the folder to another machine or account and the key must be re-entered. Everything else in the folder still works. Worth a line in the settings UI when Phase 14 builds it, so the user is told rather than surprised.
 
 ---
 

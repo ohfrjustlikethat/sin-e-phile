@@ -32,6 +32,7 @@ serde_json = "1"
 thiserror = "2"
 time = { version = "0.3", features = ["formatting", "parsing", "macros", "serde"] }
 tracing = "0.1"
+windows-sys = { version = "0.61.2", features = ["Win32_Security_Cryptography", "Win32_Foundation"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

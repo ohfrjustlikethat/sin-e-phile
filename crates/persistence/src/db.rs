@@ -19,6 +19,11 @@ pub enum DbError {
     Path(#[from] PathError),
     #[error("could not write the pre-migration backup to {0}: {1}")]
     Backup(PathBuf, #[source] std::io::Error),
+    /// The caller asked for something the repository refuses to store — a malformed
+    /// API key, a secret read through the wrong accessor. Distinct from `Sqlx` on
+    /// purpose: this is a message a user should see, not a database fault.
+    #[error("{0}")]
+    Invalid(String),
 }
 
 /// An open database.
