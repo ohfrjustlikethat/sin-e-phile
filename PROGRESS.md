@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 1.9.0** · 5 session(s) completed · last updated 2026-09-04
+**Spec version 1.9.0** · 5 session(s) completed · last updated 2026-09-05
 
 ---
 
@@ -47,7 +47,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.9: the first-run flow. The app must be usable DURING the background ingestion, searching whatever is ingested so far - so the ingest job needs a progress surface the frontend can poll, and search must run against a partial catalogue without claiming it is complete. tools/ingest already reports per-step progress via Job::progress; the missing half is exposing it. Subtask 4.3 stays BLOCKED on B2 (GroupLens TLS certificate expired 2026-08-28).
+Phase 4 is 12 of 13 with only 4.3 outstanding, and 4.3 is BLOCKED on B2 - files.grouplens.org served an expired TLS certificate on 2026-09-04. FIRST: re-run `ingest movielens` and see whether the certificate has been renewed; its code is complete and tested, so a successful download finishes the subtask. If it is still expired, run `/closephase` against the exit criteria instead and record 4.3 as carried forward - do not work around the certificate.
 
 ---
 

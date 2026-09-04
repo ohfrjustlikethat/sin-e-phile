@@ -4,11 +4,13 @@
 //! `persistence/`." Every statement in the application is in one of these
 //! modules, and `tools/guard` enforces that none appears under `src-tauri/`.
 
+pub mod catalogue;
 pub mod credentials;
 pub mod episodes;
 pub mod media;
 pub mod profiles;
 
+pub use catalogue::{CatalogueRepository, Readiness, StepProgress};
 pub use credentials::{CredentialRepository, TmdbAccess};
 pub use episodes::EpisodeRepository;
 pub use media::MediaRepository;

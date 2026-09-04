@@ -1,7 +1,7 @@
 {
   "spec_version": "1.9.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-09-04",
+  "last_updated": "2026-09-05",
   "sessions_completed": 5,
   "current_phase": {
     "number": 4,
@@ -740,8 +740,8 @@
         },
         {
           "id": "4.9",
-          "text": "First-run flow: usable during the background build, searching what is ingested so far",
-          "status": "not_started",
+          "text": "First-run flow: usable during the background build, searching what is ingested so far. CatalogueRepository::readiness is the backend surface (Empty/Building/Interrupted/Ready, each carrying the searchable count); the progress UI itself is Phase 14.",
+          "status": "in_progress",
           "commit": null
         },
         {
@@ -1786,7 +1786,7 @@
       ]
     }
   ],
-  "next_action": "Phase 4 subtask 4.9: the first-run flow. The app must be usable DURING the background ingestion, searching whatever is ingested so far - so the ingest job needs a progress surface the frontend can poll, and search must run against a partial catalogue without claiming it is complete. tools/ingest already reports per-step progress via Job::progress; the missing half is exposing it. Subtask 4.3 stays BLOCKED on B2 (GroupLens TLS certificate expired 2026-08-28).",
+  "next_action": "Phase 4 is 12 of 13 with only 4.3 outstanding, and 4.3 is BLOCKED on B2 - files.grouplens.org served an expired TLS certificate on 2026-09-04. FIRST: re-run `ingest movielens` and see whether the certificate has been renewed; its code is complete and tested, so a successful download finishes the subtask. If it is still expired, run `/closephase` against the exit criteria instead and record 4.3 as carried forward - do not work around the certificate.",
   "blockers": [
     {
       "id": "B2",

@@ -22,7 +22,8 @@ use sinephile_persistence::archive::Archiver;
 use sinephile_persistence::model::EpisodeNumbering;
 use sinephile_persistence::repositories::profiles::PlaybackPosition;
 use sinephile_persistence::repositories::{
-    CredentialRepository, EpisodeRepository, MediaRepository, ProfileRepository, TmdbAccess,
+    CatalogueRepository, CredentialRepository, EpisodeRepository, MediaRepository,
+    ProfileRepository, Readiness, TmdbAccess,
 };
 use sinephile_persistence::{Db, IdSource, MediaKind, NewMediaItem, TitleVariant};
 
@@ -441,6 +442,27 @@ async fn db_surface() {
         creds.tmdb_access(profile).await.expect("tmdb_access"),
         TmdbAccess::Absent
     );
+
+    // ── CatalogueRepository ───────────────────────────────────────────────────
+    let catalogue = CatalogueRepository::new(&db);
+
+    // searchable_titles — this database holds no media, so zero rather than an error
+    assert_eq!(
+        catalogue
+            .searchable_titles()
+            .await
+            .expect("searchable_titles"),
+        0
+    );
+
+    // readiness — nothing ingested and no job: a fresh install
+    assert_eq!(
+        catalogue.readiness().await.expect("readiness"),
+        Readiness::Empty
+    );
+
+    // steps — no job, so nothing to report rather than an error
+    assert!(catalogue.steps().await.expect("steps").is_empty());
 
     // schema_version
     assert_eq!(
