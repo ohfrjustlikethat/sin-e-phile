@@ -31,7 +31,7 @@ A local catalogue of hundreds of thousands of titles that works offline, enriche
 - [x] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, and seasonal episode numbering into episode_numbering. Absolute numbering is NULL by ADR-0031 - no free source publishes one.
 - [x] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules
 - [x] **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline
-- [ ] **4.7** Per-profile TMDB key from settings, never shipped (ADR-0027); every TMDB-dependent surface degrades to the typographic state
+- [ ] **4.7** Per-profile TMDB key from settings, never shipped (ADR-0027), DPAPI-wrapped at rest; every TMDB-dependent surface degrades to the typographic state. Storage and the degradation contract are done; the settings UI is Phase 14.
 - [ ] **4.8** Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding, blurhash placeholders
 - [ ] **4.9** First-run flow: usable during the background build, searching what is ingested so far
 - [ ] **4.10** The embedding artefact producer (ADR-0014): deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date; published as a GitHub Release asset
