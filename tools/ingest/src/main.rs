@@ -34,6 +34,11 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            holds and writes nothing. --min-votes N also loads
                            non-anime series with at least N votes; anime is
                            always loaded in full (SPEC.md 6.2).
+  ingest movielens [--set S] download MovieLens and join it onto the catalogue by
+                           IMDb id. S is ml-25m (default) or ml-latest-small.
+                           Ratings are NOT stored — they are an input to the
+                           on-device matrix (ADR-0019), and Phase 4's job is to
+                           measure what that will cost.
   ingest repair-variants   recompute titles.variant for rows the region-over-
                            language bug labelled english. Narrow and re-runnable.
   ingest status            show every job and its steps
@@ -111,6 +116,15 @@ async fn main() -> Result<(), JobError> {
                 min_votes,
             )
             .await
+        }
+        "movielens" => {
+            let set = args
+                .iter()
+                .position(|a| a == "--set")
+                .and_then(|i| args.get(i + 1))
+                .and_then(|s| sinephile_ingest::movielens::Release::parse(s))
+                .unwrap_or(sinephile_ingest::movielens::Release::Ml25m);
+            movielens(&db, &dir.join("datasets"), set).await
         }
         "repair-variants" => repair_variants(&db).await,
         "status" => status(&db).await,
@@ -525,6 +539,81 @@ async fn episodes(
             added as f64 / new_episodes as f64
         );
     }
+    println!();
+    Ok(())
+}
+
+/// MovieLens: join by IMDb id, and measure what the on-device matrix will cost.
+async fn movielens(
+    db: &Db,
+    datasets: &Path,
+    release: sinephile_ingest::movielens::Release,
+) -> Result<(), JobError> {
+    use sinephile_ingest::movielens as ml;
+    use std::sync::Arc;
+    use std::time::Instant;
+
+    let started = Instant::now();
+    let before = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
+
+    let path = datasets.join(release.filename());
+    let downloader = sinephile_ingest::Downloader::new();
+    let result = downloader.fetch(&release.url(), &path, |_| {}).await?;
+    tracing::info!(
+        "{}: {:.1} MB{}",
+        release.name(),
+        result.bytes as f64 / 1_048_576.0,
+        if result.fetched {
+            ""
+        } else {
+            " (already had it)"
+        }
+    );
+
+    let links = ml::links(&path)?;
+    tracing::info!("{} films in links.csv", links.len());
+    let catalogue = ml::catalogue_by_imdb(db).await?;
+
+    let mut measurement = ml::Measurement {
+        links: links.len() as i64,
+        ..Default::default()
+    };
+    let mut pairs: Vec<(i64, i64)> = Vec::new();
+    for link in &links {
+        match catalogue.get(&link.imdb_id) {
+            Some(media_item_id) => {
+                measurement.matched += 1;
+                pairs.push((*media_item_id, link.movielens_id));
+            }
+            None => measurement.unmatched += 1,
+        }
+    }
+
+    let mut job = Job::begin(db, "movielens").await?;
+    if job.is_resuming().await? {
+        tracing::info!("resuming a previous run");
+    }
+    ml::load(&mut job, Arc::new(pairs)).await?;
+    job.finish().await?;
+
+    // The number ADR-0019 requires Phase 4 to produce: streaming every rating is the
+    // floor on what the on-device item-item matrix costs on first run.
+    let (ratings, seconds) = ml::scan_ratings(&path)?;
+    measurement.ratings = ratings;
+    measurement.ratings_scan_seconds = seconds;
+    measurement.report(release);
+
+    let after = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
+    println!(
+        "  {} catalogue items carry a MovieLens id",
+        ml::mapped(db).await?
+    );
+    println!(
+        "  database {:.0} MB (+{:.0} MB) · {:.0}s total",
+        after as f64 / 1_048_576.0,
+        after.saturating_sub(before) as f64 / 1_048_576.0,
+        started.elapsed().as_secs_f64()
+    );
     println!();
     Ok(())
 }

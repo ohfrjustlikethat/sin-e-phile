@@ -41,6 +41,10 @@ futures-util = "=0.3.31"
 flate2 = "=1.1.4"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# MovieLens ships .zip and GroupLens publishes no gzip alternative. Pinned like every
+# other dependency (standing rule 15), and cut down to deflate-over-flate2 so it reuses
+# the decompressor already here rather than pulling in bzip2, zstd, lzma and AES.
+zip = { version = "=8.6.0", default-features = false, features = ["deflate-flate2"] }
 
 [dev-dependencies]
 tempfile = "3"

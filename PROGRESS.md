@@ -46,13 +46,13 @@
 
 ## What's next
 
-Phase 4 subtask 4.3: MovieLens ingestion. 4.4 is COMPLETE - AniList catalogue, titles, ids and seasonal episode numbering all loaded; absolute numbering is resolved as out of scope by ADR-0031 and SPEC.md is amended to 1.8.0. Download the MovieLens ml-latest dataset in tools/ingest/src/imdb.rs style, join its links.csv imdbId column onto external_ids, and load ratings for the collaborative-filtering signal Phase 16 needs. MEASURE ITS SIZE FIRST - R4 headroom is 461 MB.
+Phase 4 subtask 4.11: build the 50-title anime fixture that exit criterion E5 hand-checks. Pick from data/anilist-unmatched.tsv (7,409 rows, all title forms and a reason per row) plus the matched set in the database, deliberately including the tricky cases E5 names: long-running shonen, split-cour seasons, films tied to series. Write it to fixtures/anime/ with expected outcomes so it is committed evidence rather than a number in scrollback. Subtask 4.3 is BLOCKED on B2 (GroupLens TLS certificate expired 2026-08-28); its code is complete and tested, so just re-run `ingest movielens` once the certificate is renewed.
 
 ---
 
 ## Blockers
 
-None.
+- **B2** Subtask 4.3 cannot complete: files.grouplens.org serves an EXPIRED TLS certificate (subject files.grouplens.org, issuer InCommon ECC Server CA 2, notAfter 2026-08-28; today 2026-09-04). Plain HTTP redirects to HTTPS, so there is no path that does not hit it. NOT worked around: disabling certificate verification would ship a security downgrade to every user for a third party's expired cert, and an unallowlisted mirror has unverifiable provenance and would need an ADR. The parent grouplens.org has a VALID certificate, so this is one host and likely to be renewed. Everything that does not depend on the download is finished and tested against a synthetic archive - re-run `ingest movielens` when the certificate is renewed. No decision needed from the author.
 
 ---
 

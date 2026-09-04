@@ -18,6 +18,7 @@ pub mod job;
 pub mod load;
 pub mod matching;
 pub mod measure;
+pub mod movielens;
 pub mod normalise;
 pub mod repair;
 pub mod tsv;
