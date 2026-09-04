@@ -753,8 +753,8 @@
         {
           "id": "4.11",
           "text": "50-title anime fixture for E5: fixtures/anime/e5-hand-checked.tsv, 64 rows, checked by `ingest verify-anime` which exits non-zero on any mismatch",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "f19ddda"
         },
         {
           "id": "4.12",
