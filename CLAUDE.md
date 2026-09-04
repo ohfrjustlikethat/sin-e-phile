@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **1.8.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **1.9.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -239,6 +239,11 @@ Do not revisit without an ADR explaining what changed.
 **Explicit non-choices:** no Electron, no bundled qBittorrent, no cloud LLM in the
 critical path, no server component of any kind, no Docker, no cross-platform
 abstractions.
+
+**IMDb's dataset files sort as TEXT, not as numbers** (ADR-0032): `"tt10001008" <
+"tt1000101"`, and the last row of `title.basics` is `tt9916880`, which is not the
+largest id. Never assume a dataset's ordering — check it, in four lines, before
+building on it.
 
 **The catalogue refreshes in layers** (ADR-0030, `docs/specs/catalogue-freshness.md`).
 The IMDb datasets are a snapshot, so: incremental refresh past the highest id already

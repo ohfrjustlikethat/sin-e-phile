@@ -41,6 +41,10 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            measure what that will cost.
   ingest repair-variants   recompute titles.variant for rows the region-over-
                            language bug labelled english. Narrow and re-runnable.
+  ingest refresh           ADR-0030 layer 1: re-download title.basics and
+                           title.ratings, insert only titles newer than the
+                           highest id already held, and re-apply every rating.
+                           Weekly is ample.
   ingest verify-anime      check the catalogue against
                            fixtures/anime/e5-hand-checked.tsv — exit criterion
                            E5's evidence. Exits non-zero on any mismatch.
@@ -130,6 +134,7 @@ async fn main() -> Result<(), JobError> {
             movielens(&db, &dir.join("datasets"), set).await
         }
         "repair-variants" => repair_variants(&db).await,
+        "refresh" => refresh(&db, &dir.join("datasets")).await,
         "verify-anime" => verify_anime(&db).await,
         "status" => status(&db).await,
         "reset" => match args.get(1) {
@@ -196,6 +201,9 @@ async fn imdb(db: &Db, datasets: &Path) -> Result<(), JobError> {
         votes,
         averages,
         sinephile_ingest::imdb::CatalogueScope::DEFAULT,
+        // A first ingestion starts at the top of the file; `ingest refresh` is the
+        // same call with a watermark.
+        None,
     )
     .await?;
     job.finish().await?;
@@ -618,6 +626,72 @@ async fn movielens(
         after.saturating_sub(before) as f64 / 1_048_576.0,
         started.elapsed().as_secs_f64()
     );
+    println!();
+    Ok(())
+}
+
+/// ADR-0030 layer 1 — incremental bulk refresh.
+async fn refresh(db: &Db, datasets: &Path) -> Result<(), JobError> {
+    use std::sync::Arc;
+    use std::time::Instant;
+
+    let started = Instant::now();
+    let before = sinephile_ingest::refresh::title_count(db).await?;
+    let watermark = sinephile_ingest::refresh::watermark(db).await?;
+    match &watermark {
+        Some(w) => tracing::info!("{before} titles held; refreshing past {w}"),
+        None => tracing::info!("empty catalogue — this is a first ingestion"),
+    }
+
+    // Both files are re-fetched: gzip cannot be seeked and IMDb publishes no
+    // changelog, so the download is the unavoidable cost of layer 1.
+    let downloader = sinephile_ingest::Downloader::new();
+    for dataset in [
+        &sinephile_ingest::imdb::TITLE_RATINGS,
+        &sinephile_ingest::imdb::TITLE_BASICS,
+    ] {
+        let path = datasets.join(dataset.filename);
+        // Deleting first, because the downloader skips a file it already has — which
+        // is right for resumption and exactly wrong for a refresh.
+        let _ = std::fs::remove_file(&path);
+        let result = downloader.fetch(&dataset.url(), &path, |_| {}).await?;
+        tracing::info!(
+            "{}: {:.1} MB",
+            dataset.name,
+            result.bytes as f64 / 1_048_576.0
+        );
+        sinephile_ingest::download::verify_gzip(&path)?;
+    }
+
+    let ratings_path = datasets.join(sinephile_ingest::imdb::TITLE_RATINGS.filename);
+    let votes = Arc::new(sinephile_ingest::load::load_votes(&ratings_path)?);
+    let averages = Arc::new(sinephile_ingest::load::load_average_ratings(&ratings_path)?);
+
+    let mut job = Job::begin(db, "refresh").await?;
+    if job.is_resuming().await? {
+        tracing::info!("resuming a previous refresh");
+    }
+    sinephile_ingest::load::load_titles(
+        &mut job,
+        datasets.join(sinephile_ingest::imdb::TITLE_BASICS.filename),
+        Arc::clone(&votes),
+        Arc::clone(&averages),
+        sinephile_ingest::imdb::CatalogueScope::DEFAULT,
+        watermark,
+    )
+    .await?;
+    let rerated = sinephile_ingest::refresh::ratings(&mut job, votes, averages).await?;
+    job.finish().await?;
+
+    let after = sinephile_ingest::refresh::title_count(db).await?;
+    println!();
+    println!("  {} titles added", after - before);
+    println!("  {rerated} ratings re-applied");
+    println!("  {:.0}s", started.elapsed().as_secs_f64());
+    println!();
+    println!("  Not covered, deliberately: a REVISION to an existing title other than");
+    println!("  its rating — a corrected year, a changed runtime. Those stay stale");
+    println!("  until a full re-ingest (219 s). See docs/specs/catalogue-freshness.md.");
     println!();
     Ok(())
 }

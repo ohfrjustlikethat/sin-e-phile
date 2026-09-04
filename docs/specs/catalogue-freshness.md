@@ -30,16 +30,32 @@ know there is anything to look for.
 **What:** re-fetch `title.basics`, `title.ratings` and `title.episode`, and insert
 only what is new.
 
-**The trick that makes it cheap.** IMDb's files are **sorted by id**, and new titles
-receive higher ids. So a refresh is:
+**What makes it cheap — corrected by ADR-0032.** This document originally said IMDb's
+files are sorted by id so a refresh could `seek_past` our maximum and take the tail.
+**They are sorted as TEXT.** Measured over the real 12,761,311-row `title.basics`:
+
+```text
+sorted lexicographically: true
+sorted numerically      : false
+first numeric decrease at row 967,458:   tt10001008 -> tt1000101
+last id in the file:                     tt9916880   (not the largest)
+```
+
+`"tt10001008" < "tt1000101"` as text, so a newly issued `tt45000000` lands in the
+middle of the file. There is no position to seek to. Seeking past our maximum walked
+into rows already held and died on a UNIQUE violation the first time it ran.
+
+So the refresh **scans and filters by numeric id**:
 
 ```
-seek_past("tconst", highest_tconst_already_stored)
-… insert the tail …
+for each row: if numeric_id(tconst) <= highest_id_already_stored { skip }
+… insert the rest …
 ```
 
-That is the `TsvReader::seek_past` already built for resumption
-(`tools/ingest/src/tsv.rs`), used for a second purpose. No new machinery.
+The saving that mattered survives, because it was never the seek. The expensive half is
+inserting 2.7 million rows, and nothing already held is inserted or even parsed into
+one. `TsvReader::seek_past` remains in use for crash resumption, where a cursor IS a
+position in the file's own order and it is correct.
 
 **What it costs:** the download (216 MB for `title.basics`), because gzip cannot be
 seeked and IMDb publishes no changelog. It does **not** cost the database work of
@@ -51,6 +67,9 @@ full. Other field revisions are accepted as stale until a full re-ingest.
 
 **Cadence:** weekly is ample for bulk. `title.episode` is far smaller and can run
 daily.
+
+**Measured**, 2026-09-04, `ingest refresh`: 1,542 titles added, 1,086,185 ratings
+re-applied, **71 s** — against 219 s for a full re-ingest.
 
 ---
 

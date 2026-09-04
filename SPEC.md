@@ -1007,7 +1007,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 - [ ] **The catalogue is fully usable with no TMDB key** (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.
 - [ ] **The embedding artefact is produced and published** (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.
 
-**Catalogue freshness** (ADR-0030, `docs/specs/catalogue-freshness.md`). The datasets are a snapshot and IMDb republishes daily, so the catalogue is stale the moment it is built. **Incremental refresh**: IMDb's files are sorted by id and new titles get higher ids, so a refresh is `seek_past(highest id we have)` and insert the tail — the resumption machinery reused, costing the download rather than the 2.7-million-row insert. `title.episode` refreshes daily on its own. **AniList airing schedules**, which are public and need no key, give exact air times for anime.
+**Catalogue freshness** (ADR-0030, `docs/specs/catalogue-freshness.md`). The datasets are a snapshot and IMDb republishes daily, so the catalogue is stale the moment it is built. **Incremental refresh**: re-download, scan, and insert only titles whose numeric id is above the highest already held. **IMDb's files sort as TEXT, not as numbers** (ADR-0032) — `"tt10001008" < "tt1000101"` — so a newly issued id lands mid-file and there is no position to seek to. The saving is real regardless: the expensive half is the 2.7-million-row insert, not the read. Measured at **71 s** against 219 s for a full re-ingest. `title.episode` refreshes daily on its own. **AniList airing schedules**, which are public and need no key, give exact air times for anime.
 
 **Learning note.** ETL pipelines; why offline-first beats API-first here; rate limiting and backoff; caching strategy and TTL choice; the anime metadata problem specifically.
 
@@ -1559,6 +1559,14 @@ Face recognition, live TV, manga and comics, casting and watch-together. Fully i
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 1.9.0 — 2026-09-04 (how the files are actually sorted)
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A24 | §15 Phase 4 | **The incremental refresh cannot use `seek_past`, because IMDb's files are sorted lexicographically rather than numerically.** A21 and ADR-0030 both stated the premise "sorted by id and new titles get higher ids"; measured over the real 12,761,311-row file, numeric order first breaks at row 967,458 (`tt10001008` → `tt1000101`) and the last row is `tt9916880`, which is not the largest id. A newly issued `tt45000000` therefore lands mid-file, and seeking past our maximum walked into rows already held and died on a UNIQUE violation. The refresh now **filters by numeric id** instead. ADR-0030's decision and layers 2–4 stand unchanged; only layer 1's mechanism was wrong. Measured: 1,542 titles added, 1,086,185 ratings re-applied, **71 s**. | [0032](docs/adr/0032-imdb-ids-do-not-sort-numerically.md) |
+
+---
 
 ### spec_version 1.8.0 — 2026-09-04 (what the sources actually publish)
 

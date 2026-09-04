@@ -188,6 +188,7 @@ async fn loaded_db() -> (Db, Fx) {
         Arc::new(load::load_votes(&ratings_path).expect("votes")),
         Arc::new(load::load_average_ratings(&ratings_path).expect("averages")),
         CatalogueScope::DEFAULT,
+        None,
     )
     .await
     .expect("titles");

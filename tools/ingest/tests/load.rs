@@ -146,6 +146,7 @@ async fn run_load(db: &Db, fx: &Fixture) -> Result<(), JobError> {
         Arc::clone(&fx.votes),
         Arc::clone(&fx.averages),
         CatalogueScope::DEFAULT,
+        None,
     )
     .await?;
     Ok(())
@@ -322,6 +323,7 @@ async fn a_resumed_load_loses_no_title_and_duplicates_none() {
         Arc::clone(&votes),
         Arc::clone(&averages),
         CatalogueScope::DEFAULT,
+        None,
     )
     .await
     .expect("first load");
@@ -333,6 +335,7 @@ async fn a_resumed_load_loses_no_title_and_duplicates_none() {
         Arc::clone(&votes),
         Arc::clone(&averages),
         CatalogueScope::DEFAULT,
+        None,
     )
     .await
     .expect("second load");
@@ -374,6 +377,7 @@ async fn a_dataset_missing_a_column_is_rejected_by_name() {
         Arc::new(load::load_votes(&ratings_path).expect("votes")),
         Arc::new(HashMap::new()),
         CatalogueScope::DEFAULT,
+        None,
     )
     .await
     .expect_err("should be rejected")

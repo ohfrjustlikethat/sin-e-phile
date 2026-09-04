@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 1.8.0** · 5 session(s) completed · last updated 2026-09-04
+**Spec version 1.9.0** · 5 session(s) completed · last updated 2026-09-04
 
 ---
 
@@ -47,7 +47,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.13: incremental catalogue refresh (ADR-0030 layer 1). Add a step to tools/ingest/src/load.rs that resumes past the highest IMDb id already stored using TsvReader::seek_past, so a re-run costs a seek rather than a full re-read of 11M rows. Then 4.7 (per-profile TMDB key). Subtask 4.3 stays BLOCKED on B2 - GroupLens' TLS certificate expired 2026-08-28; re-run `ingest movielens` once it is renewed.
+Phase 4 subtask 4.7: per-profile TMDB key. Add an encrypted-at-rest key per profile in the settings table, a settings UI to enter and remove it, and make every TMDB-dependent surface degrade to the SPEC.md 9.4 typographic treatment when absent (ADR-0013, ADR-0027). NO KEY EVER SHIPS. Subtask 4.13 is done and committed; 4.3 stays BLOCKED on B2, GroupLens' TLS certificate expired 2026-08-28.
 
 ---
 
@@ -121,6 +121,7 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D21** (raised in Phase 4) Episodes are loaded for all anime plus non-anime series with >=5,000 votes: 539,817 episodes, 21,218 seasons. The threshold is one constant, passed as `ingest episodes --min-votes N`, and the loader skips what it already holds so widening is safe. Measured cost is 410 bytes per episode across three independent runs. Dropping to >=1,000 costs 344 MB and would leave 117 MB, which is less than ADR-0014's own rate for the embedding artefact - so this cannot widen until embeddings and MovieLens are measured.
 - **D22** (raised in Phase 4) PHASE 12 INHERITS THIS. episode_numbering.absolute_number is NULL on all 539,817 episodes and no free source publishes one (ADR-0031). A filename reading 'Series - 59' cannot be resolved from the catalogue for anime, so Phase 12's matcher must route it to the review queue rather than assume a lookup succeeds - a correct outcome, not a wrong answer, so the <1% false-confident budget is unaffected. The fix, when Phase 12 wants it: stop collapsing AniList seasons onto one catalogue item, give each its own episode_numbering rows, and the absolute number becomes derivable from stored facts instead of computed from guesses. NEVER derive it by cumulating counts across seasons.
 - **D23** (raised in Phase 4) PROJECT_STATE.json holds exit criteria and subtasks TWICE - once in phases[] and once in current_phase - and tools/state/validate_state.py --check passes while the two disagree. Marking E5 met in phases[] left current_phase saying false, and only tools/statecheck caught it, via the phase document. The schema was meant to make this class of drift structural (author's ruling, 2026-09-01). It does not cover the `met`/`evidence`/`status` fields. Fix: add a schema rule, or a validate_state check, that current_phase mirrors its phases[] entry - the copies should not be editable independently at all.
+- **D24** (raised in Phase 4) `ingest refresh` re-downloads title.basics (216 MB) every run because gzip cannot be seeked and IMDb publishes no changelog. Weekly is fine; daily would not be. If the cadence ever tightens, check whether IMDb serves conditional requests - the http_cache table from migration 0008 already stores ETag and Last-Modified, and crates/metadata-api handles revalidation, so a 304 would make this nearly free.
 
 ---
 

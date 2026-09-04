@@ -911,3 +911,39 @@ Measured over the full catalogue, before and after:
 
 `seen` landing on 14,737 for the third consecutive id-ordered run is the evidence that
 sweep is reproducible, which the popularity-ordered runs were not.
+
+### Incremental catalogue refresh (ADR-0030 layer 1, corrected by ADR-0032)
+
+`./target/release/ingest refresh`, 2026-09-04.
+
+| Metric | Value |
+|---|---|
+| Titles added | **1,542** |
+| Ratings re-applied | **1,086,185** |
+| **Time** | **71 s** |
+| Full re-ingest, for comparison | 219 s |
+
+**ADR-0030's stated mechanism does not work, and the file says so.** It specified
+`seek_past(highest id we have)` on the premise that IMDb's files are "sorted by id and
+new titles get higher ids". Measured over the real 12,761,311-row `title.basics`:
+
+```text
+sorted lexicographically: true
+sorted numerically      : false
+first numeric decrease at row 967,458:   tt10001008 -> tt1000101
+last id in the file:                     tt9916880   (not the largest)
+```
+
+`"tt10001008" < "tt1000101"` as text, so a newly issued `tt45000000` lands roughly half
+way through the file rather than at the end. Seeking past the catalogue's maximum
+(`tt44917931`) walked into the `tt5…`–`tt9…` rows already held and died on
+`UNIQUE constraint failed: external_ids.source, external_ids.external_id`.
+
+The refresh now filters by numeric id instead. **The saving ADR-0030 was after
+survives**, because it was never the seek: the expensive half is inserting 2.7 million
+rows, and nothing already held is inserted or even parsed into one. Three-fold on a
+weekly job.
+
+**Every fixture had used ids short enough for the two orderings to agree**, which is why
+seven passing tests said nothing about it. The regression test now uses the exact
+transition from row 967,458 of the real file.

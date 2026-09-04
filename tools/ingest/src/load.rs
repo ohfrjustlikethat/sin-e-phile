@@ -122,10 +122,17 @@ pub async fn load_titles(
     ratings: std::sync::Arc<HashMap<u32, i64>>,
     average_ratings: std::sync::Arc<HashMap<u32, i64>>,
     scope: CatalogueScope,
+    above_id: Option<u32>,
 ) -> Result<LoadStats, JobError> {
     let mut stats = LoadStats::default();
 
     job.run_step("title.basics", move |tx, cursor| {
+        // ADR-0030 layer 1, as corrected by ADR-0032. `above_id` skips every row whose
+        // NUMERIC id the catalogue already holds. It is not a seek: title.basics is
+        // sorted lexicographically, so a new tt45000000 sits in the middle of the file
+        // rather than at the end, and there is no position to jump to. The saving that
+        // matters survives — nothing already held is inserted, or even built into a row
+        // — and the read was never the expensive half.
         let basics = basics.clone();
         let ratings = std::sync::Arc::clone(&ratings);
         let average_ratings = std::sync::Arc::clone(&average_ratings);
@@ -143,7 +150,7 @@ pub async fn load_titles(
                 // `seek_past` stops ON the first unprocessed row rather than before
                 // it, so that row is taken from the buffer before reading onward.
                 // Dropping it here would silently lose one title per resume.
-                collect_current(&reader, ratings, average_ratings, scope)
+                collect_current(&reader, ratings, average_ratings, scope, above_id)
                     .into_iter()
                     .collect::<Vec<_>>()
             } else {
@@ -155,7 +162,9 @@ pub async fn load_titles(
                 if !reader.advance()? {
                     break;
                 }
-                if let Some(title) = collect_current(&reader, ratings, average_ratings, scope) {
+                if let Some(title) =
+                    collect_current(&reader, ratings, average_ratings, scope, above_id)
+                {
                     pending.push(title);
                 }
                 if let Some(row) = reader.current_row() {
@@ -187,13 +196,23 @@ fn collect_current(
     votes: &HashMap<u32, i64>,
     averages: &HashMap<u32, i64>,
     scope: CatalogueScope,
+    above_id: Option<u32>,
 ) -> Option<Title> {
     let row = reader.current_row()?;
     let tconst = row.get("tconst")?;
-    let title_type = row.get("titleType")?;
-    let kind = media_kind(title_type)?;
 
     let id = tconst_id(tconst);
+    // A refresh skips what the catalogue already holds. Checked before anything else
+    // is parsed, because on a real refresh this rejects 12.7 million of 12.8 million
+    // rows and every field read for them would be wasted.
+    if let (Some(above), Some(id)) = (above_id, id) {
+        if id <= above {
+            return None;
+        }
+    }
+
+    let title_type = row.get("titleType")?;
+    let kind = media_kind(title_type)?;
     let vote_count = id.and_then(|id| votes.get(&id)).copied();
     let adult = imdb::is_adult(row.get("isAdult"));
     let year = row.parse::<i64>("startYear");

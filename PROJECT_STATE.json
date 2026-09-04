@@ -1,5 +1,5 @@
 {
-  "spec_version": "1.8.0",
+  "spec_version": "1.9.0",
   "project": "sin-e-phile",
   "last_updated": "2026-09-04",
   "sessions_completed": 5,
@@ -765,7 +765,7 @@
         {
           "id": "4.13",
           "text": "Incremental catalogue refresh (ADR-0030): re-fetch title.basics/ratings/episode and insert only the tail past the highest id already stored, reusing TsvReader::seek_past. Plus AniList airing schedules, which need no key. See docs/specs/catalogue-freshness.md.",
-          "status": "not_started",
+          "status": "in_progress",
           "commit": null
         }
       ]
@@ -1786,7 +1786,7 @@
       ]
     }
   ],
-  "next_action": "Phase 4 subtask 4.13: incremental catalogue refresh (ADR-0030 layer 1). Add a step to tools/ingest/src/load.rs that resumes past the highest IMDb id already stored using TsvReader::seek_past, so a re-run costs a seek rather than a full re-read of 11M rows. Then 4.7 (per-profile TMDB key). Subtask 4.3 stays BLOCKED on B2 - GroupLens' TLS certificate expired 2026-08-28; re-run `ingest movielens` once it is renewed.",
+  "next_action": "Phase 4 subtask 4.7: per-profile TMDB key. Add an encrypted-at-rest key per profile in the settings table, a settings UI to enter and remove it, and make every TMDB-dependent surface degrade to the SPEC.md 9.4 typographic treatment when absent (ADR-0013, ADR-0027). NO KEY EVER SHIPS. Subtask 4.13 is done and committed; 4.3 stays BLOCKED on B2, GroupLens' TLS certificate expired 2026-08-28.",
   "blockers": [
     {
       "id": "B2",
@@ -2067,6 +2067,11 @@
       "id": "D23",
       "phase_raised": 4,
       "text": "PROJECT_STATE.json holds exit criteria and subtasks TWICE - once in phases[] and once in current_phase - and tools/state/validate_state.py --check passes while the two disagree. Marking E5 met in phases[] left current_phase saying false, and only tools/statecheck caught it, via the phase document. The schema was meant to make this class of drift structural (author's ruling, 2026-09-01). It does not cover the `met`/`evidence`/`status` fields. Fix: add a schema rule, or a validate_state check, that current_phase mirrors its phases[] entry - the copies should not be editable independently at all."
+    },
+    {
+      "id": "D24",
+      "phase_raised": 4,
+      "text": "`ingest refresh` re-downloads title.basics (216 MB) every run because gzip cannot be seeked and IMDb publishes no changelog. Weekly is fine; daily would not be. If the cadence ever tightens, check whether IMDb serves conditional requests - the http_cache table from migration 0008 already stores ETag and Last-Modified, and crates/metadata-api handles revalidation, so a 304 would make this nearly free."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

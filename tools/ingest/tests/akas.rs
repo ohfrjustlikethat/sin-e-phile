@@ -144,6 +144,7 @@ async fn loaded() -> (Db, Fx) {
         Arc::new(load::load_votes(&ratings_path).expect("votes")),
         Arc::new(load::load_average_ratings(&ratings_path).expect("averages")),
         CatalogueScope::DEFAULT,
+        None,
     )
     .await
     .expect("titles");
@@ -297,6 +298,7 @@ async fn the_same_text_is_stored_once_per_variant_whatever_the_region() {
         Arc::new(load::load_votes(&ratings_path).expect("votes")),
         Arc::new(load::load_average_ratings(&ratings_path).expect("averages")),
         CatalogueScope::DEFAULT,
+        None,
     )
     .await
     .expect("titles");
