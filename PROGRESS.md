@@ -46,7 +46,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.11: build the 50-title anime fixture that exit criterion E5 hand-checks. Pick from data/anilist-unmatched.tsv (7,409 rows, all title forms and a reason per row) plus the matched set in the database, deliberately including the tricky cases E5 names: long-running shonen, split-cour seasons, films tied to series. Write it to fixtures/anime/ with expected outcomes so it is committed evidence rather than a number in scrollback. Subtask 4.3 is BLOCKED on B2 (GroupLens TLS certificate expired 2026-08-28); its code is complete and tested, so just re-run `ingest movielens` once the certificate is renewed.
+Phase 4 subtask 4.13: incremental catalogue refresh (ADR-0030 layer 1). Add a step to tools/ingest/src/load.rs that resumes past the highest IMDb id already stored using TsvReader::seek_past, so a re-run costs a seek rather than a full re-read of 11M rows. Then 4.7 (per-profile TMDB key). Subtask 4.3 stays BLOCKED on B2 - GroupLens' TLS certificate expired 2026-08-28; re-run `ingest movielens` once it is renewed.
 
 ---
 
@@ -66,7 +66,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 1 | Application Shell and Capability Tiers | A | 0 | 1–2 | 7/7 |
 | [x] | 2 | Design System and Visual Language | A | 1 | 1–2 | 5/5 |
 | [x] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 5/5 |
-| [~] | 4 | Metadata Backbone | A | 3 | 2–3 | 0/7 |
+| [~] | 4 | Metadata Backbone | A | 3 | 2–3 | 1/7 |
 | [ ] | 5 | Semantic Search Engine | A | 4 | 2 | 0/5 |
 | [ ] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 0/6 |
 | [ ] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 0/8 |

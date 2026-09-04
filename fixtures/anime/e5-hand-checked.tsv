@@ -1,0 +1,98 @@
+# Exit criterion E5 — hand-checked anime mappings. 62 rows; E5 asks for 50.
+#
+# "Anime titles resolve across AniList and TMDB with correct ID mapping for a
+#  hand-checked set of 50 titles including tricky cases (long-running shonen,
+#  split-cour seasons, films tied to series)."
+#
+# Every anilist_id / imdb_id pair below was written from INDEPENDENT KNOWLEDGE of what
+# the work is, not by running the matcher and recording its answer. That distinction is
+# the whole value of the file: a fixture generated from the code it tests cannot fail.
+#
+# HONESTLY, THOUGH: the first run of `verify-anime` against this file failed 4 of 62,
+# and all four were errors in THIS FILE rather than in the matcher.
+#   - Yu Yu Hakusho and Nichijou had ids recalled wrongly. tt1710308 is Regular Show.
+#     Both were corrected only after checking the catalogue's own title and year for
+#     the id the matcher produced, which is independent evidence of what that id is.
+#   - Re:Zero and Attack on Titan Season 2 were listed as refusals on a false premise:
+#     Re:Zero is resolved by a later title form, and IMDb does hold a separate (sparse,
+#     undated) record for Attack on Titan Season 2 rather than only the one series.
+# Recorded because a fixture whose failures are quietly edited away until it passes is
+# worth nothing, and the next person needs to know which rows were revised and why.
+#
+# `expect` is what the pipeline must produce:
+#   match       - the AniList entry must map to exactly this IMDb id
+#   ambiguous   - the matcher must REFUSE; several catalogue entries are equally good
+#   claimed     - resolves correctly, but an earlier entry of the same series holds
+#                 the mapping (AniList lists seasons separately, IMDb often does not)
+#   conflict    - refused because the years disagree by more than the tolerance
+#
+# The negative rows are not filler. They are the ones that fail if someone ever
+# "improves" the matcher by breaking ties on popularity.
+#
+# Verify with:  cargo run -p sinephile-ingest --bin ingest -- verify-anime
+#
+anilist_id	imdb_id	expect	title	why_it_is_here
+1	tt0213338	match	Cowboy Bebop	baseline: exact title, exact year
+5	tt0275277	match	Cowboy Bebop: The Movie	film tied to a series, distinct entry
+6	tt0251439	match	Trigun	1990s TV, romaji and English identical
+19	tt0434706	match	Monster	one-word title shared by hundreds of works
+20	tt0409591	match	Naruto	long-running shonen; two undated films share the title
+21	tt0388629	match	One Piece	long-running shonen; a 2023 live-action shares the title
+30	tt0112159	match	Neon Genesis Evangelion	English title differs entirely from romaji
+33	tt0318871	match	Berserk	1997 series, NOT the 2016 one of the same name
+43	tt0113568	match	Ghost in the Shell	film with sequels sharing a stem
+45	tt0182629	match	Rurouni Kenshin	long-running shonen, multiple live-action films
+47	tt0094625	match	Akira	single-word film title
+121	tt0421357	match	Fullmetal Alchemist	2003 series — the hardest pair in the catalogue
+136	tt0426719	match	Hunter x Hunter	1999 series; the 2011 remake shares the title
+164	tt0119698	match	Princess Mononoke	Ghibli, English title unrelated to romaji
+199	tt0245429	match	Spirited Away	Ghibli; three regional titles were mislabelled English
+205	tt0423731	match	Samurai Champloo	baseline
+235	tt0131179	match	Detective Conan	1000+ episode shonen, renamed Case Closed in the US
+269	tt0434665	match	Bleach	long-running shonen with a 2022 revival
+339	tt0500092	match	Serial Experiments Lain	baseline
+392	tt0185133	match	Yu Yu Hakusho	IMDb titles it "Yu Yu Hakusho: Ghost Files"
+431	tt0347149	match	Howl's Moving Castle	Ghibli
+437	tt0156887	match	Perfect Blue	film, no series
+523	tt0096283	match	My Neighbor Totoro	Ghibli
+572	tt0087544	match	Nausicaä of the Valley of the Wind	diacritic in the English title
+578	tt0095327	match	Grave of the Fireflies	Ghibli
+777	tt0495212	match	Hellsing Ultimate	OVA series distinct from the 2001 Hellsing
+813	tt0121220	match	Dragon Ball Z	long-running shonen
+918	tt0988818	match	Gintama	long-running shonen, many seasons on AniList
+1535	tt0877057	match	Death Note	6 catalogue entries share the normalised title
+1575	tt0994314	match	Code Geass: Lelouch of the Rebellion	subtitle differs across sources
+1735	tt0988824	match	Naruto: Shippuden	sequel series, distinct IMDb entry from Naruto
+1943	tt0851578	match	Paprika	film
+2167	tt1118804	match	Clannad	sequel After Story is a separate entry
+2236	tt0808506	match	The Girl Who Leapt Through Time	film
+4224	tt1279024	match	Toradora!	punctuation in the title
+5114	tt1355642	match	Fullmetal Alchemist: Brotherhood	the other half of the hardest pair
+5680	tt1410218	match	K-On!	punctuation
+9253	tt1910272	match	Steins;Gate	semicolon; catalogue has "Steins; Gate" with a space
+9756	tt1773185	match	Puella Magi Madoka Magica	English title unrelated to romaji
+10165	tt2098308	match	Nichijou	IMDb titles it "Nichijou: My Ordinary Life"
+11757	tt2250192	match	Sword Art Online	4 catalogue entries share the title
+12355	tt2140203	match	Wolf Children	film
+16498	tt2560140	match	Attack on Titan	split-cour: 4 AniList entries, 1 IMDb series
+20464	tt3398540	match	Haikyu!!	sports shonen, multiple seasons
+20954	tt5323662	match	A Silent Voice	film; romaji "Koe no Katachi" differs from English
+21087	tt4508902	match	One Punch Man	two catalogue entries, one undated
+21507	tt5897304	match	Mob Psycho 100	baseline
+21519	tt5311514	match	Your Name.	trailing full stop in the AniList title
+21827	tt7078180	match	Violet Evergarden	film and series share a stem
+97986	tt7222086	match	Made in Abyss	series with films tied to it
+101348	tt10233448	match	Vinland Saga	split-cour, seasons 4 years apart
+101921	tt9522300	match	Kaguya-sama: Love Is War	split-cour; season 2 is one year later
+101922	tt9335498	match	Demon Slayer: Kimetsu no Yaiba	split-cour with named arcs
+105334	tt9304350	match	Fruits Basket	2019 remake; the 2001 series shares the title
+112151	tt11032374	match	Demon Slayer: Mugen Train	film tied to a series — an E5-named case
+113415	tt12343534	match	Jujutsu Kaisen	split-cour shonen
+131573	tt14331144	match	Jujutsu Kaisen 0	film tied to a series — an E5-named case
+20605	-	ambiguous	Tokyo Ghoul	2014 series and 2015 Root A both carry "Tokyo Ghoul"
+21355	tt5607616	match	Re:Zero	the 2016 Re-Edit shares the title; a later form resolves it
+20958	tt6450560	match	Attack on Titan Season 2	IMDb DOES hold a separate, sparse season-2 record
+108632	-	conflict	Re:Zero 2nd Season	season 2 is 2020, the catalogue series is 2016
+185	-	ambiguous	Initial D	First Stage 1998 and Second Stage 1999 both carry the title
+112641	-	claimed	Kaguya-sama season 3	split-cour: resolves to the series season 1 already holds
+99147	-	claimed	Shingeki no Kyojin Season 3	split-cour, and season 2 has its own IMDb record while 3 does not

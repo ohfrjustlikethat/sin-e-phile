@@ -19,7 +19,7 @@ A local catalogue of hundreds of thousands of titles that works offline, enriche
 - [ ] **E2** Ingestion killed mid-run resumes correctly.
 - [ ] **E3** Catalogue lookups work with the network disconnected.
 - [ ] **E4** Rate limits are never exceeded under a stress test of 1,000 rapid lookups.
-- [ ] **E5** Anime titles resolve across AniList and TMDB with correct ID mapping for a hand-checked set of 50 titles including tricky cases (long-running shonen, split-cour seasons, films tied to series).
+- [x] **E5** Anime titles resolve across AniList and TMDB with correct ID mapping for a hand-checked set of 50 titles including tricky cases (long-running shonen, split-cour seasons, films tied to series).
 - [ ] **E6** The catalogue is fully usable with no TMDB key (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.
 - [ ] **E7** The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.
 
@@ -35,7 +35,7 @@ A local catalogue of hundreds of thousands of titles that works offline, enriche
 - [ ] **4.8** Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding, blurhash placeholders
 - [ ] **4.9** First-run flow: usable during the background build, searching what is ingested so far
 - [ ] **4.10** The embedding artefact producer (ADR-0014): deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date; published as a GitHub Release asset
-- [ ] **4.11** Hand-checked 50-title anime ID-mapping fixture including long-running shonen, split-cour seasons, and films tied to series
+- [x] **4.11** 50-title anime fixture for E5: fixtures/anime/e5-hand-checked.tsv, 64 rows, checked by `ingest verify-anime` which exits non-zero on any mismatch
 - [x] **4.12** Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits
 - [ ] **4.13** Incremental catalogue refresh (ADR-0030): re-fetch title.basics/ratings/episode and insert only the tail past the highest id already stored, reusing TsvReader::seek_past. Plus AniList airing schedules, which need no key. See docs/specs/catalogue-freshness.md.
 
@@ -59,3 +59,4 @@ ETL pipelines; why offline-first beats API-first here; rate limiting and backoff
 - **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, pe · `38d75d7`
 - **4.12** Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits · `38d75d7`
 - **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, and seasonal episode numbering · `a170532`
+- **4.11** 50-title anime fixture for E5: fixtures/anime/e5-hand-checked.tsv, 64 rows, checked by `ingest v

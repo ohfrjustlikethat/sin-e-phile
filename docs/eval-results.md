@@ -866,3 +866,48 @@ natural key, so a second pass would happily insert every episode again — the s
 built from `external_ids` is the only thing preventing it, and
 `widening_the_scope_adds_episodes_without_duplicating_the_first_pass` was watched
 failing (4 rows instead of 2) with that skip removed before being trusted.
+
+### E5 — hand-checked anime mappings
+
+`./target/release/ingest verify-anime`, 2026-09-04, commit pending.
+Fixture: `fixtures/anime/e5-hand-checked.tsv`, **64 rows** where E5 asks for 50.
+
+| | |
+|---|---|
+| **Pass** | **64 / 64** |
+| Expected matches | 60 |
+| Expected refusals (ambiguous) | 2 |
+| Expected refusals (year conflict) | 1 |
+| Expected season claims | 2 |
+
+Coverage of the categories E5 names: long-running shonen (One Piece, Naruto, Bleach,
+Detective Conan, Dragon Ball Z, Gintama, Rurouni Kenshin), split-cour seasons (Attack on
+Titan, Jujutsu Kaisen, Demon Slayer, Vinland Saga, Kaguya-sama, Haikyu), and films tied
+to series (Mugen Train, Jujutsu Kaisen 0, Cowboy Bebop: The Movie, Made in Abyss).
+
+**The first run failed 4 of 62, and all four were errors in the fixture rather than in
+the matcher.** Two were IMDb ids I recalled wrongly — `tt1710308` is *Regular Show*, not
+*Nichijou*. Two were refusals asserted on a false premise: Re:Zero is resolved by a later
+title form, and IMDb does hold a separate (sparse, undated) record for *Attack on Titan
+Season 2* rather than only the one series. All four are recorded in the fixture header,
+because a fixture whose failures are quietly edited away until it passes is worth
+nothing.
+
+### A later title form can rescue an ambiguous earlier one
+
+Building the fixture surfaced a real bug. AniList's romaji for *Great Teacher Onizuka*
+is the three letters `GTO`, which several unrelated works share, so the matcher hit
+ambiguity and **returned immediately** — never trying the English form `GTO: Great
+Teacher Onizuka`, which exactly one catalogue entry has. The year-conflict path had
+always remembered-and-continued. The asymmetry was the bug.
+
+Measured over the full catalogue, before and after:
+
+| | before | after |
+|---|---|---|
+| Matched | 7,328 | **7,391** |
+| Ambiguous (refused) | 252 | **187** |
+| Seen | 14,737 | 14,737 |
+
+`seen` landing on 14,737 for the third consecutive id-ordered run is the evidence that
+sweep is reproducible, which the popularity-ordered runs were not.

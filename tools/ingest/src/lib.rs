@@ -22,6 +22,7 @@ pub mod movielens;
 pub mod normalise;
 pub mod repair;
 pub mod tsv;
+pub mod verify;
 
 pub use download::{Downloaded, Downloader, Progress};
 pub use job::{Batch, Job, JobError, StepOutcome, StepProgress, StepStatus};

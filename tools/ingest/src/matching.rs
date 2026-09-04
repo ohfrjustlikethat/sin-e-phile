@@ -242,6 +242,7 @@ pub fn match_title(
     want_kind: Option<&str>,
 ) -> Result<Match, NoMatch> {
     let mut year_conflict: Option<NoMatch> = None;
+    let mut ambiguity: Option<NoMatch> = None;
     let mut saw_a_title = false;
 
     for form in forms {
@@ -326,18 +327,34 @@ pub fn match_title(
                         return Ok(settle(&pool, remaining[0], kind, form, anilist_year));
                     }
 
-                    // Picking one now would be a coin flip recorded as a fact.
-                    return Err(NoMatch::Ambiguous {
-                        candidates: remaining.len(),
-                    });
+                    // Picking one now would be a coin flip recorded as a fact — but
+                    // that is a reason to try the OTHER title forms, not to give up.
+                    // AniList's romaji for Great Teacher Onizuka is the three letters
+                    // "GTO", which several unrelated things share; its English form is
+                    // "GTO: Great Teacher Onizuka", which exactly one catalogue entry
+                    // has. Returning on the first ambiguous form threw that away.
+                    //
+                    // The year-conflict branch above has always worked this way. The
+                    // asymmetry was the bug, not the rule.
+                    if ambiguity.is_none() {
+                        ambiguity = Some(NoMatch::Ambiguous {
+                            candidates: remaining.len(),
+                        });
+                    }
+                    continue;
                 }
             }
         }
     }
 
-    match (year_conflict, saw_a_title) {
-        (Some(conflict), _) => Err(conflict),
-        (None, _) => Err(NoMatch::NotInCatalogue),
+    // Ambiguity outranks a year conflict as an explanation: it means the title IS in
+    // the catalogue, more than once, which is a different problem to fix and a
+    // different thing for E5 to hand-check.
+    let _ = saw_a_title;
+    match (ambiguity, year_conflict) {
+        (Some(ambiguous), _) => Err(ambiguous),
+        (None, Some(conflict)) => Err(conflict),
+        (None, None) => Err(NoMatch::NotInCatalogue),
     }
 }
 
@@ -388,6 +405,46 @@ mod tests {
             .map(|(a, b, c)| (*a, *b, *c, "series"))
             .collect();
         kinded(&kinded_rows)
+    }
+
+    #[test]
+    fn a_later_form_can_rescue_an_ambiguous_earlier_one() {
+        // The real case: AniList's romaji for Great Teacher Onizuka is "GTO", three
+        // letters several unrelated things share. Its English form is "GTO: Great
+        // Teacher Onizuka", which exactly one catalogue entry has. Returning on the
+        // first ambiguous form threw the second away and refused a clean match.
+        let index = kinded(&[
+            (1, "GTO", Some(1999), "series"),
+            (2, "GTO", Some(1999), "series"),
+            (3, "GTO: Great Teacher Onizuka", Some(1999), "series"),
+        ]);
+        let found = match_title(
+            &index,
+            &["GTO", "GTO: Great Teacher Onizuka"],
+            Some(1999),
+            Some("series"),
+        )
+        .expect("the English form resolves it");
+        assert_eq!(found.media_item_id, 3);
+        assert_eq!(found.matched_on, "GTO: Great Teacher Onizuka");
+    }
+
+    #[test]
+    fn ambiguity_still_stands_when_no_form_resolves_it() {
+        // Trying every form must not become guessing at the end of them.
+        let index = kinded(&[
+            (1, "Tokyo Ghoul", Some(2014), "series"),
+            (2, "Tokyo Ghoul", Some(2015), "series"),
+        ]);
+        assert_eq!(
+            match_title(
+                &index,
+                &["Tokyo Ghoul", "東京喰種"],
+                Some(2014),
+                Some("series")
+            ),
+            Err(NoMatch::Ambiguous { candidates: 2 })
+        );
     }
 
     #[test]

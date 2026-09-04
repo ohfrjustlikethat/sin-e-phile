@@ -41,6 +41,9 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            measure what that will cost.
   ingest repair-variants   recompute titles.variant for rows the region-over-
                            language bug labelled english. Narrow and re-runnable.
+  ingest verify-anime      check the catalogue against
+                           fixtures/anime/e5-hand-checked.tsv — exit criterion
+                           E5's evidence. Exits non-zero on any mismatch.
   ingest status            show every job and its steps
   ingest reset <name>      discard a job's progress so the next run starts clean
 
@@ -127,6 +130,7 @@ async fn main() -> Result<(), JobError> {
             movielens(&db, &dir.join("datasets"), set).await
         }
         "repair-variants" => repair_variants(&db).await,
+        "verify-anime" => verify_anime(&db).await,
         "status" => status(&db).await,
         "reset" => match args.get(1) {
             Some(name) => {
@@ -615,6 +619,18 @@ async fn movielens(
         started.elapsed().as_secs_f64()
     );
     println!();
+    Ok(())
+}
+
+/// Check the catalogue against the E5 fixture.
+async fn verify_anime(db: &Db) -> Result<(), JobError> {
+    let path = Path::new("fixtures/anime/e5-hand-checked.tsv");
+    let rows = sinephile_ingest::verify::load(path)?;
+    let outcomes = sinephile_ingest::verify::run(db, &rows).await?;
+    if !sinephile_ingest::verify::report(&outcomes) {
+        // Non-zero, so this is usable as evidence in CI rather than only by eye.
+        std::process::exit(1);
+    }
     Ok(())
 }
 

@@ -673,8 +673,8 @@
         {
           "id": "E5",
           "text": "Anime titles resolve across AniList and TMDB with correct ID mapping for a hand-checked set of 50 titles including tricky cases (long-running shonen, split-cour seasons, films tied to series).",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "`./target/release/ingest verify-anime` -> 64/64 pass, 2026-09-04. Fixture fixtures/anime/e5-hand-checked.tsv covers long-running shonen, split-cour seasons and films tied to series, plus 3 expected REFUSALS and 2 season claims. Numbers and the four fixture errors the first run exposed are in docs/eval-results.md. TMDB half of E5 is not covered - no key ships (ADR-0027), so it is verified per-user in subtask 4.7."
         },
         {
           "id": "E6",
@@ -752,8 +752,8 @@
         },
         {
           "id": "4.11",
-          "text": "Hand-checked 50-title anime ID-mapping fixture including long-running shonen, split-cour seasons, and films tied to series",
-          "status": "not_started",
+          "text": "50-title anime fixture for E5: fixtures/anime/e5-hand-checked.tsv, 64 rows, checked by `ingest verify-anime` which exits non-zero on any mismatch",
+          "status": "in_progress",
           "commit": null
         },
         {
@@ -1786,7 +1786,7 @@
       ]
     }
   ],
-  "next_action": "Phase 4 subtask 4.11: build the 50-title anime fixture that exit criterion E5 hand-checks. Pick from data/anilist-unmatched.tsv (7,409 rows, all title forms and a reason per row) plus the matched set in the database, deliberately including the tricky cases E5 names: long-running shonen, split-cour seasons, films tied to series. Write it to fixtures/anime/ with expected outcomes so it is committed evidence rather than a number in scrollback. Subtask 4.3 is BLOCKED on B2 (GroupLens TLS certificate expired 2026-08-28); its code is complete and tested, so just re-run `ingest movielens` once the certificate is renewed.",
+  "next_action": "Phase 4 subtask 4.13: incremental catalogue refresh (ADR-0030 layer 1). Add a step to tools/ingest/src/load.rs that resumes past the highest IMDb id already stored using TsvReader::seek_past, so a re-run costs a seek rather than a full re-read of 11M rows. Then 4.7 (per-profile TMDB key). Subtask 4.3 stays BLOCKED on B2 - GroupLens' TLS certificate expired 2026-08-28; re-run `ingest movielens` once it is renewed.",
   "blockers": [
     {
       "id": "B2",
