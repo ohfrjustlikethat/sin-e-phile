@@ -109,17 +109,22 @@ async fn a_killed_run_resumes_and_repeats_nothing() {
 }
 
 #[tokio::test]
-async fn resuming_reports_that_it_is_resuming() {
+async fn a_crash_mid_step_reports_that_it_is_resuming() {
+    // THIS TEST USED TO ASSERT THE OPPOSITE, and the assertion was the bug written
+    // down. `is_resuming` counted only steps marked `complete`, so a run that died
+    // fifteen items into its only step reported a fresh start — on the most common
+    // resume there is. The old comment even said so out loud: "no step finished before
+    // the crash, so there is nothing to resume past". There is: a cursor at item 15.
     let db = Db::in_memory().await.expect("open");
     let _ = insert_films(&db, "imdb", "basics", 30, 10, Some(15)).await;
 
     let job = Job::begin(&db, "imdb").await.expect("adopt");
     assert!(
-        !job.is_resuming().await.expect("query"),
-        "no step finished before the crash, so there is nothing to resume past"
+        job.is_resuming().await.expect("query"),
+        "a cursor and fifteen committed items are exactly what resuming looks like"
     );
 
-    // Now finish it, then start a third run.
+    // A completed step is the other, rarer way to be resuming.
     insert_films(&db, "imdb", "basics", 30, 10, None)
         .await
         .expect("finish");
@@ -127,6 +132,17 @@ async fn resuming_reports_that_it_is_resuming() {
     assert!(
         job.is_resuming().await.expect("query"),
         "a completed step exists"
+    );
+}
+
+#[tokio::test]
+async fn a_genuinely_fresh_job_does_not_report_resuming() {
+    // The other half of the pair: widening `is_resuming` must not make it always true.
+    let db = Db::in_memory().await.expect("open");
+    let job = Job::begin(&db, "imdb").await.expect("begin");
+    assert!(
+        !job.is_resuming().await.expect("query"),
+        "nothing has run, so there is nothing to resume"
     );
 }
 

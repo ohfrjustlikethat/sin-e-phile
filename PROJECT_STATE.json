@@ -1,7 +1,7 @@
 {
   "spec_version": "1.7.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-09-02",
+  "last_updated": "2026-09-04",
   "sessions_completed": 5,
   "current_phase": {
     "number": 4,
@@ -1786,7 +1786,7 @@
       ]
     }
   ],
-  "next_action": "Phase 4 subtask 4.4, remaining part: episode numbering. Add a step to tools/ingest/src/anime.rs that, for each media_item now carrying an anilist external id, fetches the entry's episode list and writes both the seasonal and the absolute number into the episode_numbering table added by migration crates/persistence/migrations/0003_series_episodes.up.sql. The catalogue half of 4.4 is done and committed as 87f15f6.",
+  "next_action": "Phase 4 subtask 4.4, remaining part: episode numbering. Add a step to tools/ingest/src/anime.rs that, for each media_item carrying an anilist external id (7,383 of them now), fetches the entry's episode list and writes BOTH the seasonal and the absolute number into the episode_numbering table from crates/persistence/migrations/0003_series_episodes.up.sql. The catalogue half of 4.4 is done: 14,737 AniList entries swept, 7,328 matched, recorded in docs/eval-results.md.",
   "blockers": [],
   "decisions_pending": [
     {
@@ -2024,7 +2024,7 @@
     {
       "id": "D16",
       "phase_raised": 4,
-      "text": "R4 headroom is 697 MB after migration 0009 (3,399 MB of 4,096 MB). The embedding artefact, AniList and MovieLens all still have to fit. The >=10 core vote threshold in tools/ingest/src/imdb.rs::CatalogueScope::DEFAULT is the lever if they do not - tightening to >=50 cuts the core from 854,752 titles to roughly 484,000, which reduces credits and akas proportionately. Decide ONCE, after those three are measured. Four storage predictions in this phase have been wrong in both directions; a fifth would be no better."
+      "text": "R4 headroom is 670 MB after the AniList ingestion (3,426 MB of 4,096 MB). The embedding artefact, AniList and MovieLens all still have to fit. The >=10 core vote threshold in tools/ingest/src/imdb.rs::CatalogueScope::DEFAULT is the lever if they do not - tightening to >=50 cuts the core from 854,752 titles to roughly 484,000, which reduces credits and akas proportionately. Decide ONCE, after those three are measured. Four storage predictions in this phase have been wrong in both directions; a fifth would be no better."
     },
     {
       "id": "D17",
@@ -2040,6 +2040,11 @@
       "id": "D19",
       "phase_raised": 4,
       "text": "crates/metadata-api/src/anilist.rs::default_limit is hard-coded to AniList's documented 90 requests/minute, but the service has been enforcing something lower for a long time. The backoff absorbs the 429s correctly, so nothing fails - it just spends a request to rediscover the limit each time. AniList returns X-RateLimit-Limit and X-RateLimit-Remaining; reading those and reconfiguring the limiter would honour whatever the server actually allows."
+    },
+    {
+      "id": "D20",
+      "phase_raised": 4,
+      "text": "data/sinephile.db holds the UNION of three AniList sweeps - 7,383 items carry an anilist id where a single clean sweep produces 7,328. Every mapping was made by the same matcher under the same rules, so none is wrong, but the database is not byte-reproducible from one run. Clearing the anilist/mal rows in external_ids and reverting anime_* kinds before a final sweep would fix it; not worth 13 minutes until the catalogue is being frozen for Phase 27."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

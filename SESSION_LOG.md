@@ -757,6 +757,27 @@ the last candidate standing. Ranking the remaining nine by vote count would reso
 most of them and would be wrong: popularity is evidence about a title, not about its
 identity.
 
+### The full sweep, and one idea killed by measuring it
+
+**14,737 AniList entries, 7,328 matched (49.7%), 809 s.** 5,917 `anime_series` and
+1,466 `anime_film` now exist in a catalogue that could not previously distinguish anime
+from any other animation. `repair-variants` then corrected 41,193 rows in 39 s.
+
+**Long-vowel folding was proposed, measured and rejected.** `Obake no Q-tarou` is in the
+catalogue as `Q-Taro the Ghost`, findable under `obake no q taro`, so folding Japanese
+long vowels would recover it. It would recover 200 of 5,997 — 3.3% — while collapsing
+3,459,678 distinct titles to 3,432,608, manufacturing 27,070 collisions to do it. Bad by
+two orders of magnitude, and every collision lands in a matcher built to refuse
+ambiguity. The example was real and unrepresentative; the bucket is actually full of TV
+specials and promotional shorts IMDb never listed.
+
+**A sixth bug: offset pagination over a popularity ordering.** Three sweeps returned
+14,737 / 14,344 / 14,737. Ids do not reorder; popularity ranks do. Now `sort: ID`, which
+is also what makes ascending-year plus ascending-id mean the same thing — earlier first
+— so a series keeps season one's mapping. Season-aware matches consequently dropped to
+**zero**, which is the design working: season-stripping still fires, but its result now
+lands in `already_claimed` rather than creating a second mapping.
+
 ### What that says about testing
 
 Three of the five were invisible to unit tests and visible within minutes of running

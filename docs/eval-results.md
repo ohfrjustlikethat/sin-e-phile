@@ -747,15 +747,74 @@ are genuinely absent, and no normalisation reaches them.
 
 ### Offset pagination over a popularity ordering is lossy
 
-Two full sweeps, **no code change between them**, returned **14,737** and **14,344**
-entries — a 2.7% spread. Offset pagination is complete only while the ordering holds
-still, and popularity does not: an entry whose rank rises between page 4 being read and
-page 5 being requested moves onto page 4 and is never seen.
+Three full sweeps of the same catalogue:
 
-Ids do not move. The per-year sweep is now `sort: ID`, which makes it complete by
-construction rather than by luck, and which also settles the first-claim-wins rule —
-ascending year then ascending id both mean *earlier first*, so a series always keeps
-season one's mapping.
+| Run | Ordering within a year | Entries seen |
+|---|---|---|
+| 1 | `POPULARITY_DESC` | 14,737 |
+| 2 | `POPULARITY_DESC` | **14,344** |
+| 3 | `ID` | 14,737 |
+
+Run 2 lost 393 entries — 2.7% — with **no code change** between it and run 1. Offset
+pagination is complete only while the ordering holds still, and popularity does not: an
+entry whose rank rises between page 4 being read and page 5 being requested moves onto
+page 4 and is never seen.
+
+**What this does and does not establish.** It does not prove drift caused run 2's
+shortfall: a 10-second control sweep of one year showed no reordering under either sort,
+and proving the mechanism would take repeated long runs. What it does establish is that
+14,737 is the complete set, since two independent runs reached it and one fell short.
+The switch to `sort: ID` rests on the property rather than the measurement — an
+immutable key cannot reorder under a sweep, a popularity ranking can — and the id-ordered
+run reaching 14,737 is consistent with that.
+
+Ascending year and ascending id both mean *earlier first*, so the change also settles
+the first-claim-wins rule: a series keeps season one's mapping rather than whichever
+season was more popular on the day.
 
 The unfiltered pass keeps `POPULARITY_DESC`, because it is capped at 5,000 entries and
 there the question is *which* 5,000 rather than whether the sweep is complete.
+
+### The full AniList catalogue, ingested
+
+`./target/release/ingest anime`, 2026-09-04, commit `31aa603`. Id-ordered, year-swept.
+
+| Outcome | Count | Share |
+|---|---|---|
+| **Seen** | **14,737** | |
+| Matched | **7,328** | 49.7% |
+| — exact title and year | 7,224 | |
+| — title only, year unknown | 104 | |
+| — season-aware | **0** | |
+| Already claimed by an earlier entry | 409 | 2.8% |
+| Not in catalogue | 6,238 | 42.3% |
+| Year conflict | 510 | 3.5% |
+| Ambiguous (refused) | 252 | 1.7% |
+| **Time** | **809 s** | |
+
+Resulting catalogue state: **5,917 `anime_series` and 1,466 `anime_film`**, 7,383
+carrying an AniList id and 7,343 also a MAL id — the union of three sweeps; a single
+clean sweep produces 7,328. Confidence spread: 7,226 at 1.0, 157 at 0.8, none at 0.6.
+
+**Zero season-aware matches, and that is the design working rather than failing.**
+Season-stripping still fires constantly; under id ordering season one always claims the
+series first, so a later season now resolves into `already_claimed` instead of creating
+a second mapping. The machinery's output moved from the `matched` column to the
+`already_claimed` one, which is precisely where it belongs.
+
+**42.3% not in catalogue is dominated by things IMDb does not list**, not by matching
+failure — TV specials, OVAs, promotional shorts and collaboration films. See the
+long-vowel measurement above for why no normalisation reaches them. All 7,409 unmatched
+entries are written to `data/anilist-unmatched.tsv`, which is the list E5's 50
+hand-checked titles get chosen from.
+
+### Mislabelled title variants repaired
+
+`./target/release/ingest repair-variants`, 2026-09-04.
+
+**41,193 rows repaired, 0 still mislabelled, 39 s.** Spot-checked: *Spirited Away* now
+carries exactly one `english` title, and `El viaje de Chihiro` and `Le voyage de
+Chihiro` are `alternative` where they belong.
+
+Database after the anime ingestion and the repair: **3,426 MB** — up 27 MB from 3,399,
+which leaves **670 MB of R4 headroom**.
