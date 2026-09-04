@@ -87,8 +87,8 @@
       {
         "id": "4.13",
         "text": "Incremental catalogue refresh (ADR-0030): re-fetch title.basics/ratings/episode and insert only the tail past the highest id already stored, reusing TsvReader::seek_past. Plus AniList airing schedules, which need no key. See docs/specs/catalogue-freshness.md.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "47e7353"
       }
     ],
     "exit_criteria": [
@@ -765,8 +765,8 @@
         {
           "id": "4.13",
           "text": "Incremental catalogue refresh (ADR-0030): re-fetch title.basics/ratings/episode and insert only the tail past the highest id already stored, reusing TsvReader::seek_past. Plus AniList airing schedules, which need no key. See docs/specs/catalogue-freshness.md.",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "47e7353"
         }
       ]
     },

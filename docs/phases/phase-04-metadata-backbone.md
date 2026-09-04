@@ -37,7 +37,7 @@ A local catalogue of hundreds of thousands of titles that works offline, enriche
 - [ ] **4.10** The embedding artefact producer (ADR-0014): deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date; published as a GitHub Release asset
 - [x] **4.11** 50-title anime fixture for E5: fixtures/anime/e5-hand-checked.tsv, 64 rows, checked by `ingest verify-anime` which exits non-zero on any mismatch
 - [x] **4.12** Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits
-- [ ] **4.13** Incremental catalogue refresh (ADR-0030): re-fetch title.basics/ratings/episode and insert only the tail past the highest id already stored, reusing TsvReader::seek_past. Plus AniList airing schedules, which need no key. See docs/specs/catalogue-freshness.md.
+- [x] **4.13** Incremental catalogue refresh (ADR-0030): re-fetch title.basics/ratings/episode and insert only the tail past the highest id already stored, reusing TsvReader::seek_past. Plus AniList airing schedules, which need no key. See docs/specs/catalogue-freshness.md.
 
 ## Risks named by this phase
 
@@ -60,3 +60,4 @@ ETL pipelines; why offline-first beats API-first here; rate limiting and backoff
 - **4.12** Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits · `38d75d7`
 - **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, and seasonal episode numbering · `a170532`
 - **4.11** 50-title anime fixture for E5: fixtures/anime/e5-hand-checked.tsv, 64 rows, checked by `ingest v
+- **4.13** Incremental catalogue refresh (ADR-0030): re-fetch title.basics/ratings/episode and insert only  · `47e7353`
