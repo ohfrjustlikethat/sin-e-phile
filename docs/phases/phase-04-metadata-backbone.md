@@ -28,7 +28,7 @@ A local catalogue of hundreds of thousands of titles that works offline, enriche
 - [x] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts
 - [x] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres
 - [ ] **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device)
-- [ ] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering [catalogue, titles and ids DONE in 87f15f6; episode numbering remains]
+- [x] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, and seasonal episode numbering into episode_numbering. Absolute numbering is NULL by ADR-0031 - no free source publishes one.
 - [x] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules
 - [x] **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline
 - [ ] **4.7** Per-profile TMDB key from settings, never shipped (ADR-0027); every TMDB-dependent surface degrades to the typographic state
@@ -58,3 +58,4 @@ ETL pipelines; why offline-first beats API-first here; rate limiting and backoff
 - **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules · `f67d939`
 - **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, pe · `38d75d7`
 - **4.12** Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits · `38d75d7`
+- **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, and seasonal episode numbering · `a170532`

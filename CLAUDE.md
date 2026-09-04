@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **1.7.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **1.8.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -245,6 +245,14 @@ The IMDb datasets are a snapshot, so: incremental refresh past the highest id al
 stored, AniList airing schedules (no key), **search-triggered backfill** when a miss
 finds a source anyway, and full re-ingest. Backfill is the one that stops an
 out-of-date catalogue being a dead end.
+
+**No free source publishes an absolute episode number** (ADR-0031). AniList publishes
+per-entry numbering and an entry is one cour, so its numbers restart each season where
+IMDb's do. `absolute_number` is NULL by design, and **must never be derived by
+cumulating episode counts across seasons** — that arithmetic is wrong for exactly the
+long-running series the feature exists for, and a confidently wrong number is worse
+than a NULL. AniList also paginates only to 5,000 entries, so its catalogue is swept
+per `seasonYear`.
 
 **TMDB is optional, and no key ever ships** (ADR-0013, ADR-0027). The app is fully
 functional on the offline IMDb + MovieLens catalogue with no key. Each user supplies

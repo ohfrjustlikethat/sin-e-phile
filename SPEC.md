@@ -242,6 +242,8 @@ One canonical `MediaItem` type from Phase 3, generic enough to represent a film,
 
 Anime specifically requires: absolute vs seasonal episode numbering reconciliation, romaji/English/native title variants, and sub/dub track awareness. Design for this in Phase 3 rather than patching it in Phase 12.
 
+**On absolute numbering, specifically.** The schema stores both a seasonal and an absolute number per episode, and a per-source reconciliation table. **No free source publishes an absolute number** (ADR-0031): AniList publishes per-entry episode numbers, and an AniList entry is one cour, so its numbering restarts each season exactly where IMDb's does. Phase 4 therefore populates the seasonal numbering and leaves `absolute_number` NULL. It is filled in when a source that publishes one is added, or when Phase 12 makes each AniList season carry its own numbering rows — which turns the absolute number into something derivable from stored facts rather than computed from guesses. **It is never to be derived by cumulating episode counts across seasons**: cours split unevenly, recaps are numbered by some sources and not others, and specials interleave, so that arithmetic is wrong for exactly the long-running series the feature exists for. A confidently wrong number is worse than a NULL, because nothing downstream can tell it is wrong.
+
 ---
 
 ## 7. Repository Layout
@@ -864,7 +866,7 @@ All free. Phase 0 verifies current terms for each and records them in `docs/SETU
 | Service | Needed for | Cost | Notes |
 |---|---|---|---|
 | **TMDB** | Artwork, rich detail, cast headshots | **The user's own free key**, instant, non-commercial | Register at themoviedb.org → Settings → API. **Optional** — offered in onboarding as ~30 seconds of work, with a "later" that is not a dead end (ADR-0013). **No key ever ships with the application** (ADR-0027): each user supplies their own, per profile, in settings, under their own acceptance of TMDB's terms, and may remove it at any time. Every TMDB-dependent surface degrades to the §9.4 typographic treatment rather than breaking. |
-| **AniList** | Anime metadata, relations, absolute/seasonal numbering | Free, public GraphQL, no key | Required for anime. |
+| **AniList** | Anime metadata, relations, **per-entry** episode numbering and airing schedules | Free, public GraphQL, no key | Required for anime. **Publishes no absolute episode number** (ADR-0031) — an entry is one cour, so its numbering restarts each season. Paginates only to 5,000 entries, so the catalogue is swept per `seasonYear`. |
 | **Jikan** | MyAnimeList mirror, supplementary anime data | Free, no key, rate-limited | Optional fallback. |
 | **IMDb datasets** | Offline title/rating/crew index | Free download, no account | `datasets.imdbws.com`. Non-commercial use. |
 | **MovieLens** | Item-item collaborative filtering signal | Free download, no account | GroupLens; use the largest set the machine can ingest. |
@@ -1557,6 +1559,15 @@ Face recognition, live TV, manga and comics, casting and watch-together. Fully i
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 1.8.0 — 2026-09-04 (what the sources actually publish)
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A22 | §6.2, §11 | **No free source publishes an absolute episode number**, so Phase 4 loads the seasonal numbering and leaves `absolute_number` NULL. §11 claimed AniList provided "absolute/seasonal numbering"; it provides per-entry numbering, and an entry is one cour, so its numbers restart each season exactly where IMDb's do. §6.2 now states this and **forbids deriving the number by cumulating counts across seasons** — the arithmetic migration 0003 was written to prevent, wrong for precisely the long-running series the feature exists for. The columns and reconciliation table are unchanged: holding nothing for a number no source states is the schema working, not a gap in it. Recorded against Phase 12, where it bites. | [0031](docs/adr/0031-absolute-episode-numbering-is-not-published.md) |
+| A23 | §11 | **AniList paginates only to 5,000 entries** — every request past that depth is a `400`, and `pageInfo.total` reports exactly `5000` for any query rather than warning you. The catalogue is therefore swept per `seasonYear`, id-ordered. Found by a full run failing; recorded so the next source integration checks its own depth limit first. | — |
+
+---
 
 ### spec_version 1.7.0 — 2026-09-01 (downloads, freshness, safety)
 

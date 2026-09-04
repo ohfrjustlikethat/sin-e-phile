@@ -1,5 +1,5 @@
 {
-  "spec_version": "1.7.0",
+  "spec_version": "1.8.0",
   "project": "sin-e-phile",
   "last_updated": "2026-09-04",
   "sessions_completed": 5,
@@ -710,9 +710,9 @@
         },
         {
           "id": "4.4",
-          "text": "AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering [catalogue, titles and ids DONE in 87f15f6; episode numbering remains]",
-          "status": "in_progress",
-          "commit": "87f15f6"
+          "text": "AniList ingestion: anime catalogue, romaji/native/english titles, and seasonal episode numbering into episode_numbering. Absolute numbering is NULL by ADR-0031 - no free source publishes one.",
+          "status": "complete",
+          "commit": "a170532"
         },
         {
           "id": "4.5",
@@ -1786,15 +1786,8 @@
       ]
     }
   ],
-  "next_action": "Phase 4 subtask 4.4, last remaining part: ABSOLUTE episode numbering. Seasonal numbering is loaded (539,817 episodes, source 'imdb'). Absolute is still NULL everywhere and CANNOT simply be read from AniList - see blocker B1 / decision P10 in docs/DECISIONS_PENDING.md, which needs the author's answer before this is built. If working around it, do subtask 4.3 (MovieLens) instead, which is independent.",
-  "blockers": [
-    {
-      "id": "B1",
-      "raised": "2026-09-04",
-      "needs_user": true,
-      "description": "Absolute episode numbering: no source publishes one. SPEC.md 6.2 assumes AniList supplies absolute numbers; it does not - it publishes per-entry episode numbers, and an AniList entry is one cour, so its numbering restarts each season exactly where IMDb's does. An absolute number can only be DERIVED by ordering a series' AniList entries and cumulating counts, which is precisely the computation migration 0003 calls 'wrong often enough to matter, and wrong silently'. Options and a recommended default are in docs/DECISIONS_PENDING.md as P10."
-    }
-  ],
+  "next_action": "Phase 4 subtask 4.3: MovieLens ingestion. 4.4 is COMPLETE - AniList catalogue, titles, ids and seasonal episode numbering all loaded; absolute numbering is resolved as out of scope by ADR-0031 and SPEC.md is amended to 1.8.0. Download the MovieLens ml-latest dataset in tools/ingest/src/imdb.rs style, join its links.csv imdbId column onto external_ids, and load ratings for the collaborative-filtering signal Phase 16 needs. MEASURE ITS SIZE FIRST - R4 headroom is 461 MB.",
+  "blockers": [],
   "decisions_pending": [
     {
       "id": "P1",
@@ -2057,6 +2050,11 @@
       "id": "D21",
       "phase_raised": 4,
       "text": "Episodes are loaded for all anime plus non-anime series with >=5,000 votes: 539,817 episodes, 21,218 seasons. The threshold is one constant, passed as `ingest episodes --min-votes N`, and the loader skips what it already holds so widening is safe. Measured cost is 410 bytes per episode across three independent runs. Dropping to >=1,000 costs 344 MB and would leave 117 MB, which is less than ADR-0014's own rate for the embedding artefact - so this cannot widen until embeddings and MovieLens are measured."
+    },
+    {
+      "id": "D22",
+      "phase_raised": 4,
+      "text": "PHASE 12 INHERITS THIS. episode_numbering.absolute_number is NULL on all 539,817 episodes and no free source publishes one (ADR-0031). A filename reading 'Series - 59' cannot be resolved from the catalogue for anime, so Phase 12's matcher must route it to the review queue rather than assume a lookup succeeds - a correct outcome, not a wrong answer, so the <1% false-confident budget is unaffected. The fix, when Phase 12 wants it: stop collapsing AniList seasons onto one catalogue item, give each its own episode_numbering rows, and the absolute number becomes derivable from stored facts instead of computed from guesses. NEVER derive it by cumulating counts across seasons."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

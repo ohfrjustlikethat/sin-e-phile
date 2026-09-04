@@ -785,15 +785,34 @@ against six million real rows. Fixtures test the logic you thought of. The 250-t
 sample became the real harness, and re-running it after every change is what turned
 "the matcher seems better" into three numbers.
 
+### Episodes, and a spec assumption that was wrong
+
+**539,817 episodes and 21,218 seasons**, scope chosen from a measured cost rather than a
+guess: `title.episode` is 9,866,106 rows and 6.87M of them hang off core-tier series,
+which is 2.7 GB against 670 MB of headroom. Anime was loaded first purely to price it —
+405 bytes per episode — and widening twice more measured 402 and 410. Three numbers
+within 2%, and the first storage figure in this phase worth trusting. Scope settled at
+all anime plus non-anime series with >= 5,000 votes.
+
+**`SPEC.md` said AniList publishes absolute episode numbering. It does not.** An AniList
+entry is one cour, so its numbers restart each season exactly where IMDb's do; there is
+no absolute number to read anywhere free. Deriving one by cumulating counts is the
+arithmetic migration 0003 was written to prevent. Put to the author as P10 with four
+options; answered "your call", so the stated default was taken: leave it NULL, amend the
+spec to describe what is actually stored, and record the gap against Phase 12.
+
+`SPEC.md` is now **1.8.0** (A22, A23), ADR-0031 written, `CLAUDE.md` resynced in the
+same commit as the amendment requires.
+
 ### Blockers
 
-None.
+None. B1 was raised and cleared within the session.
 
 ### What the next session should do first
 
-Finish 4.4's remaining half — episode numbering into `episode_numbering` — then 4.11's
-50-title fixture, which is E5's actual evidence and which `data/anilist-unmatched.tsv`
-now exists to be chosen from.
+Subtask 4.3 — MovieLens — measuring its size first, because R4 headroom is 461 MB and
+the embedding artefact still has to fit. Then 4.11's 50-title fixture, which is E5's
+actual evidence and which `data/anilist-unmatched.tsv` now exists to be chosen from.
 
 Still outstanding for the author, non-blocking: **P8** (Tier 0 embedding measurement
 before Phase 21).

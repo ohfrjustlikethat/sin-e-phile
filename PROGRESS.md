@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 1.7.0** · 5 session(s) completed · last updated 2026-09-04
+**Spec version 1.8.0** · 5 session(s) completed · last updated 2026-09-04
 
 ---
 
@@ -46,13 +46,13 @@
 
 ## What's next
 
-Phase 4 subtask 4.4, last remaining part: ABSOLUTE episode numbering. Seasonal numbering is loaded (539,817 episodes, source 'imdb'). Absolute is still NULL everywhere and CANNOT simply be read from AniList - see blocker B1 / decision P10 in docs/DECISIONS_PENDING.md, which needs the author's answer before this is built. If working around it, do subtask 4.3 (MovieLens) instead, which is independent.
+Phase 4 subtask 4.3: MovieLens ingestion. 4.4 is COMPLETE - AniList catalogue, titles, ids and seasonal episode numbering all loaded; absolute numbering is resolved as out of scope by ADR-0031 and SPEC.md is amended to 1.8.0. Download the MovieLens ml-latest dataset in tools/ingest/src/imdb.rs style, join its links.csv imdbId column onto external_ids, and load ratings for the collaborative-filtering signal Phase 16 needs. MEASURE ITS SIZE FIRST - R4 headroom is 461 MB.
 
 ---
 
 ## Blockers
 
-- **B1** **(needs you)** Absolute episode numbering: no source publishes one. SPEC.md 6.2 assumes AniList supplies absolute numbers; it does not - it publishes per-entry episode numbers, and an AniList entry is one cour, so its numbering restarts each season exactly where IMDb's does. An absolute number can only be DERIVED by ordering a series' AniList entries and cumulating counts, which is precisely the computation migration 0003 calls 'wrong often enough to matter, and wrong silently'. Options and a recommended default are in docs/DECISIONS_PENDING.md as P10.
+None.
 
 ---
 
@@ -118,6 +118,7 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D19** (raised in Phase 4) crates/metadata-api/src/anilist.rs::default_limit is hard-coded to AniList's documented 90 requests/minute, but the service has been enforcing something lower for a long time. The backoff absorbs the 429s correctly, so nothing fails - it just spends a request to rediscover the limit each time. AniList returns X-RateLimit-Limit and X-RateLimit-Remaining; reading those and reconfiguring the limiter would honour whatever the server actually allows.
 - **D20** (raised in Phase 4) data/sinephile.db holds the UNION of three AniList sweeps - 7,383 items carry an anilist id where a single clean sweep produces 7,328. Every mapping was made by the same matcher under the same rules, so none is wrong, but the database is not byte-reproducible from one run. Clearing the anilist/mal rows in external_ids and reverting anime_* kinds before a final sweep would fix it; not worth 13 minutes until the catalogue is being frozen for Phase 27.
 - **D21** (raised in Phase 4) Episodes are loaded for all anime plus non-anime series with >=5,000 votes: 539,817 episodes, 21,218 seasons. The threshold is one constant, passed as `ingest episodes --min-votes N`, and the loader skips what it already holds so widening is safe. Measured cost is 410 bytes per episode across three independent runs. Dropping to >=1,000 costs 344 MB and would leave 117 MB, which is less than ADR-0014's own rate for the embedding artefact - so this cannot widen until embeddings and MovieLens are measured.
+- **D22** (raised in Phase 4) PHASE 12 INHERITS THIS. episode_numbering.absolute_number is NULL on all 539,817 episodes and no free source publishes one (ADR-0031). A filename reading 'Series - 59' cannot be resolved from the catalogue for anime, so Phase 12's matcher must route it to the review queue rather than assume a lookup succeeds - a correct outcome, not a wrong answer, so the <1% false-confident budget is unaffected. The fix, when Phase 12 wants it: stop collapsing AniList seasons onto one catalogue item, give each its own episode_numbering rows, and the absolute number becomes derivable from stored facts instead of computed from guesses. NEVER derive it by cumulating counts across seasons.
 
 ---
 

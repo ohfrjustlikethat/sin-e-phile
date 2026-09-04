@@ -156,7 +156,13 @@ The timing matters: converting is cheapest now and gets steadily more expensive.
 
 ## P10 — Absolute episode numbering, when no source publishes one {#p10}
 
-**Raised:** 2026-09-04, Phase 4 subtask 4.4. **Blocker B1.**
+> **RESOLVED 2026-09-04.** Author answered "your call", which by the §10 protocol takes
+> the stated default: **option 1**. `absolute_number` stays NULL, `SPEC.md` §6.2 and §11
+> are amended (spec_version 1.8.0, amendments A22-A23), and the gap is recorded against
+> Phase 12 as debt D22. See [ADR-0031](adr/0031-absolute-episode-numbering-is-not-published.md).
+> Blocker B1 cleared. Kept below because the reasoning is what Phase 12 will need.
+
+**Raised:** 2026-09-04, Phase 4 subtask 4.4. **Blocker B1 — cleared.**
 
 ### The decision, in one sentence
 
