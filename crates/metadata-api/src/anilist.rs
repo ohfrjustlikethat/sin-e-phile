@@ -290,11 +290,32 @@ impl<'a> AniList<'a> {
             Some(_) => (", $seasonYear: Int", ", seasonYear: $seasonYear"),
             None => ("", ""),
         };
+
+        // SORTED BY ID WHEN A YEAR IS GIVEN, and the difference is not cosmetic.
+        //
+        // Offset pagination is only complete while the ordering holds still. Popularity
+        // does not: an entry whose rank rises between page 4 being read and page 5
+        // being requested moves onto page 4 and is never seen at all. Two full
+        // popularity-ordered sweeps four minutes apart in wall-clock terms but
+        // seventeen minutes long returned 14,737 and 14,344 entries — a 2.7% spread
+        // with no code change between them.
+        //
+        // Ids are immutable, so an id-ordered sweep is complete by construction rather
+        // than by luck. Within a year the two orderings cover the same set; only the
+        // ORDER differs, and the order now means "the earlier entry", which is exactly
+        // what the caller's first-claim-wins rule wants.
+        //
+        // The unfiltered pass keeps popularity, because it is capped at 5,000 entries
+        // and there the question is which 5,000, not whether the sweep is complete.
+        let sort = match season_year {
+            Some(_) => "ID",
+            None => "POPULARITY_DESC",
+        };
         let query = format!(
             "query ($page: Int, $perPage: Int{declare}) {{
                  Page(page: $page, perPage: $perPage) {{
                      pageInfo {{ hasNextPage }}
-                     media(type: ANIME{filter}, sort: POPULARITY_DESC) {{ {MEDIA_FIELDS} }}
+                     media(type: ANIME{filter}, sort: {sort}) {{ {MEDIA_FIELDS} }}
                  }}
              }}"
         );

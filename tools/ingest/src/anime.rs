@@ -265,10 +265,16 @@ impl Cursor {
 /// AniList refuses to paginate past 5,000 entries, so a flat popularity sweep reaches
 /// the top 5,000 anime and then returns `400` forever — which is exactly how the first
 /// full run ended. Partitioning by `seasonYear` keeps every individual sweep far below
-/// the cap, and years are walked ASCENDING so that when two AniList entries resolve to
-/// one catalogue item the earlier one claims it. For a series listed once by IMDb and
-/// per-season by AniList, the earlier entry is season one, which is the right answer
-/// and a better one than the popularity ordering gave.
+/// the cap.
+///
+/// Years are walked ASCENDING and, within a year, entries come back id-ordered. Both
+/// halves of that mean the same thing — EARLIER FIRST — and together they settle the
+/// first-claim-wins rule completely: when two AniList entries resolve to one catalogue
+/// item, the one that keeps the mapping is the earlier of the two. For a series listed
+/// once by IMDb and per-season by AniList, that is season one.
+///
+/// Id order is also what makes the sweep complete rather than merely long; see
+/// [`AniList::page`] for why a popularity-ordered offset sweep silently loses entries.
 ///
 /// Entries with no `seasonYear` at all are not reached by this sweep. They are reached
 /// by the unfiltered popularity pass (`last_year: None`), which is bounded by the same

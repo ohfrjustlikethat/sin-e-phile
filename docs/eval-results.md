@@ -715,3 +715,47 @@ found it already mapped by an earlier one — nearly always a later season, sinc
 lists seasons separately and IMDb lists one series dated by its first year. Counting
 those as matches gives (184 + 17) / 250 = **80.4% resolved**; the headline 73.6% is the
 pessimistic reading, and E5 reads the counts rather than either rate.
+
+### Japanese long-vowel folding: measured, and rejected
+
+**The idea.** `Obake no Q-tarou` came back `not in catalogue`, and it is in the
+catalogue — as `Q-Taro the Ghost`, reachable under `obake no q taro`. Japanese long
+vowels romanise inconsistently (`ou` / `oo` / `ō` / `o`, `uu` / `ū` / `u`), so folding
+them before comparison would recover titles like that one.
+
+**The measurement.** `scratchpad/measure_vowels.py` over the real catalogue and the
+5,997 `not in catalogue` entries from the full sweep:
+
+| Metric | Value |
+|---|---|
+| Unmatched that folding would give a candidate | **200 of 5,997 — 3.3%** |
+| Distinct normalised titles | 3,459,678 |
+| Distinct titles **after** folding | 3,432,608 |
+| **Collisions folding creates** | **27,070** |
+
+**Rejected.** It would manufacture roughly 27,000 new ambiguities across the catalogue
+to recover 200 matches — a bad trade by two orders of magnitude, and every one of those
+ambiguities lands in a matcher whose entire design is that ambiguity must be refused.
+Folding is also unsafe in general: it does not know a title is Japanese, so `Book`
+becomes `Bok` and `Moon` becomes `Mon`.
+
+The one example that prompted the question was real and unrepresentative. The spread
+sample shows what the bucket actually contains: TV specials, OVAs, promotional shorts
+and collaboration films that IMDb does not list as separate titles at all —
+`Ore no Imouto ... Short Specials`, `Odekake Kozame Kurashiki-shi Collab Movie`. Those
+are genuinely absent, and no normalisation reaches them.
+
+### Offset pagination over a popularity ordering is lossy
+
+Two full sweeps, **no code change between them**, returned **14,737** and **14,344**
+entries — a 2.7% spread. Offset pagination is complete only while the ordering holds
+still, and popularity does not: an entry whose rank rises between page 4 being read and
+page 5 being requested moves onto page 4 and is never seen.
+
+Ids do not move. The per-year sweep is now `sort: ID`, which makes it complete by
+construction rather than by luck, and which also settles the first-claim-wins rule —
+ascending year then ascending id both mean *earlier first*, so a series always keeps
+season one's mapping.
+
+The unfiltered pass keeps `POPULARITY_DESC`, because it is capped at 5,000 entries and
+there the question is *which* 5,000 rather than whether the sweep is complete.

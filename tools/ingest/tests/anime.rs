@@ -590,6 +590,37 @@ async fn the_printed_sample_is_spread_not_truncated() {
 }
 
 #[tokio::test]
+async fn the_year_sweep_is_ordered_by_id_not_popularity() {
+    // Offset pagination is complete only while the ordering holds still, and popularity
+    // does not: an entry whose rank rises between page 4 being read and page 5 being
+    // requested moves onto page 4 and is never seen. Two popularity-ordered sweeps
+    // returned 14,737 and 14,344 entries with no code change between them. Ids do not
+    // move, so this is the difference between complete-by-construction and
+    // complete-if-nothing-changed — and it is one word in a query string.
+    let (_dir, db) = db().await;
+
+    let transport = FakeTransport::new();
+    transport.push(page(false, &[]));
+    let requests = Arc::clone(&transport.requests);
+
+    let anilist = Arc::new(AniList::owned(client(transport)).await);
+    let mut job = Job::begin(&db, "anilist").await.expect("begin");
+    anime::ingest(&mut job, anilist, Some(1), None)
+        .await
+        .expect("ingest");
+
+    let body = requests.lock().expect("lock")[0]
+        .body
+        .clone()
+        .expect("graphql body");
+    assert!(body.contains("sort: ID"), "got {body}");
+    assert!(
+        !body.contains("POPULARITY"),
+        "a year sweep must not be popularity-ordered: {body}"
+    );
+}
+
+#[tokio::test]
 async fn a_finished_year_advances_to_the_next_one() {
     // AniList refuses to paginate past 5,000 entries, so the sweep is partitioned by
     // seasonYear. A year that runs out must move to the next one — NOT end the sweep,

@@ -696,3 +696,83 @@ everything.
 
 Still outstanding for the author, non-blocking: **P8** (Tier 0 embedding measurement
 before Phase 21).
+
+---
+
+## Session 8 — 2026-09-04 — Phase 4: AniList ingestion, and five bugs only real data found
+
+**Phase 4, subtasks 4.4 (catalogue half) — 6 of 13 done.** Commits `87f15f6`,
+`f80ae81`, `fb034ba`.
+
+### What was built
+
+`ingest anime` — pages the AniList catalogue, runs every entry through the matcher,
+and promotes what matches to `anime_film`/`anime_series` with romaji, native and
+English titles written as asserted facts plus AniList and MAL external ids. This is
+the only place in the pipeline where a title becomes *anime* rather than merely
+animated, and it happens because AniList's `format` says so — IMDb cannot make that
+distinction at all.
+
+Also `ingest repair-variants`, and `crates/metadata-api`'s `AniList::owned`.
+
+### The five bugs
+
+**1. The matcher counted title rows, not items.** A catalogue entry carries one row
+per spelling, and `Death Note`, `DEATH NOTE` and `Death note` all normalise to the
+same key — so one unambiguous series arrived as five rivals. Death Note, One Piece,
+Naruto and Attack on Titan were every one of them refused as *ambiguous against
+themselves*: 97 of 250 outcomes. **No fixture could have caught this**, because a
+fixture never has three spellings of one title.
+
+**2. The upsert's `ON CONFLICT` target was copied from a stale comment.** Migration
+0001 documents `idx_titles_unique` as `(item, variant, language, region)`; migration
+0007 had since redefined it to `(item, variant, title)`. SQLite rejected it outright,
+which is the good case — an applied migration is history, not documentation.
+
+**3. `is_resuming` reported a fresh run on every real resume.** It counted only steps
+marked `complete`; a crash lands *mid*-step, leaving a cursor on a step that never
+completed. A predicate that is true in the rare case and false in the common one is
+worse than no predicate.
+
+**4. AniList refuses to paginate past 5,000 entries.** The first full run died there
+having reached the top 5,000 anime and no further. `pageInfo.total` reports exactly
+`5000` for *any* query including one whose real total is far smaller, so it is a trap
+rather than a bound. The sweep is now partitioned by `seasonYear`, verified against
+the live endpoint first — `id_greater` would have been the natural keyset cursor and
+does not exist.
+
+**5. 41,193 title rows were labelled English while being French or Spanish** — 5.5%
+of every `english` title. `akas::variant` read the release region before checking
+whether the language was already known, and IMDb files the Spanish *Spirited Away*
+under region US, the French under CA. A release region is where a title was used, not
+what language it is in.
+
+### Tuning, measured
+
+Same 250 most-popular entries, re-run after each change: **40.4% → 68.4% → 73.6%**
+matched; ambiguous **97 → 23 → 9**. The two narrowing rules that did the second half
+both use evidence already held rather than preference — a known agreeing year beats no
+year at all, and AniList states film-or-series. Neither can create a match or reject
+the last candidate standing. Ranking the remaining nine by vote count would resolve
+most of them and would be wrong: popularity is evidence about a title, not about its
+identity.
+
+### What that says about testing
+
+Three of the five were invisible to unit tests and visible within minutes of running
+against six million real rows. Fixtures test the logic you thought of. The 250-title
+sample became the real harness, and re-running it after every change is what turned
+"the matcher seems better" into three numbers.
+
+### Blockers
+
+None.
+
+### What the next session should do first
+
+Finish 4.4's remaining half — episode numbering into `episode_numbering` — then 4.11's
+50-title fixture, which is E5's actual evidence and which `data/anilist-unmatched.tsv`
+now exists to be chosen from.
+
+Still outstanding for the author, non-blocking: **P8** (Tier 0 embedding measurement
+before Phase 21).
