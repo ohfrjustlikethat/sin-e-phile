@@ -96,7 +96,7 @@ async fn a_matched_title_is_promoted_and_carries_both_ids() {
 
     let anilist = Arc::new(AniList::owned(client(transport)).await);
     let mut job = Job::begin(&db, "anilist").await.expect("begin");
-    let report = anime::ingest(&mut job, anilist, Some(1))
+    let report = anime::ingest(&mut job, anilist, Some(1), None)
         .await
         .expect("ingest");
     job.finish().await.expect("finish");
@@ -165,7 +165,7 @@ async fn a_film_becomes_anime_film_not_anime_series() {
 
     let anilist = Arc::new(AniList::owned(client(transport)).await);
     let mut job = Job::begin(&db, "anilist").await.expect("begin");
-    anime::ingest(&mut job, anilist, Some(1))
+    anime::ingest(&mut job, anilist, Some(1), None)
         .await
         .expect("ingest");
 
@@ -205,17 +205,13 @@ async fn two_equally_good_candidates_are_refused_rather_than_guessed() {
 
     let anilist = Arc::new(AniList::owned(client(transport)).await);
     let mut job = Job::begin(&db, "anilist").await.expect("begin");
-    let report = anime::ingest(&mut job, anilist, Some(1))
+    let report = anime::ingest(&mut job, anilist, Some(1), None)
         .await
         .expect("ingest");
 
     assert_eq!(report.matched, 0);
     assert_eq!(report.ambiguous, 1);
-    assert_eq!(
-        report.unmatched_samples.len(),
-        1,
-        "E5 hand-checks these by name"
-    );
+    assert_eq!(report.unmatched.len(), 1, "E5 hand-checks these by name");
 
     // Nothing was written. An ambiguous match that promoted one of the two would be
     // invisible afterwards.
@@ -263,7 +259,7 @@ async fn several_spellings_of_one_title_are_one_candidate_not_several() {
 
     let anilist = Arc::new(AniList::owned(client(transport)).await);
     let mut job = Job::begin(&db, "anilist").await.expect("begin");
-    let report = anime::ingest(&mut job, anilist, Some(1))
+    let report = anime::ingest(&mut job, anilist, Some(1), None)
         .await
         .expect("ingest");
 
@@ -299,7 +295,7 @@ async fn the_anilist_format_breaks_a_tie_it_cannot_create() {
 
     let anilist = Arc::new(AniList::owned(client(transport)).await);
     let mut job = Job::begin(&db, "anilist").await.expect("begin");
-    let report = anime::ingest(&mut job, anilist, Some(1))
+    let report = anime::ingest(&mut job, anilist, Some(1), None)
         .await
         .expect("ingest");
 
@@ -337,7 +333,7 @@ async fn the_format_cannot_break_a_tie_between_two_of_the_same_shape() {
 
     let anilist = Arc::new(AniList::owned(client(transport)).await);
     let mut job = Job::begin(&db, "anilist").await.expect("begin");
-    let report = anime::ingest(&mut job, anilist, Some(1))
+    let report = anime::ingest(&mut job, anilist, Some(1), None)
         .await
         .expect("ingest");
 
@@ -389,7 +385,7 @@ async fn a_second_season_does_not_overwrite_the_first() {
 
     let anilist = Arc::new(AniList::owned(client(transport)).await);
     let mut job = Job::begin(&db, "anilist").await.expect("begin");
-    let report = anime::ingest(&mut job, anilist, Some(2))
+    let report = anime::ingest(&mut job, anilist, Some(2), None)
         .await
         .expect("ingest");
 
@@ -445,7 +441,7 @@ async fn a_year_conflict_is_reported_separately_from_absence() {
 
     let anilist = Arc::new(AniList::owned(client(transport)).await);
     let mut job = Job::begin(&db, "anilist").await.expect("begin");
-    let report = anime::ingest(&mut job, anilist, Some(1))
+    let report = anime::ingest(&mut job, anilist, Some(1), None)
         .await
         .expect("ingest");
 
@@ -480,7 +476,7 @@ async fn an_interrupted_run_resumes_at_the_next_page() {
 
     let anilist = Arc::new(AniList::owned(client(transport)).await);
     let mut job = Job::begin(&db, "anilist").await.expect("begin");
-    let first = anime::ingest(&mut job, anilist, None).await;
+    let first = anime::ingest(&mut job, anilist, None, None).await;
     assert!(first.is_err(), "running out of pages mid-run is a failure");
 
     // Second run: the checkpoint says page 1 is done, so this must ask for page 2.
@@ -502,7 +498,7 @@ async fn an_interrupted_run_resumes_at_the_next_page() {
     let anilist = Arc::new(AniList::owned(client(transport)).await);
     let mut job = Job::begin(&db, "anilist").await.expect("resume");
     assert!(job.is_resuming().await.expect("resuming"));
-    let report = anime::ingest(&mut job, anilist, Some(1))
+    let report = anime::ingest(&mut job, anilist, Some(1), None)
         .await
         .expect("ingest");
 
@@ -515,6 +511,82 @@ async fn an_interrupted_run_resumes_at_the_next_page() {
         body.contains(r#""page":2"#),
         "resumed at page 2, got: {body}"
     );
+}
+
+#[tokio::test]
+async fn every_unmatched_entry_is_written_to_the_hand_check_file() {
+    // E5 hand-checks fifty titles. A count in a terminal that has since scrolled away
+    // is not something anyone can check, so the list is a file.
+    let (_dir, db) = db().await;
+    item(&db, "series", "Monster", Some(2004)).await;
+    item(&db, "series", "Monster", Some(2004)).await;
+
+    let out = _dir.path().join("unmatched.tsv");
+    let transport = FakeTransport::new();
+    transport.push(page(
+        false,
+        &[media(
+            19,
+            Some(19),
+            "Monster",
+            "Monster",
+            "モンスター",
+            "TV",
+            Some(2004),
+        )],
+    ));
+
+    let anilist = Arc::new(AniList::owned(client(transport)).await);
+    let mut job = Job::begin(&db, "anilist").await.expect("begin");
+    anime::ingest(&mut job, anilist, Some(1), Some(&out))
+        .await
+        .expect("ingest");
+
+    let written = std::fs::read_to_string(&out).expect("unmatched file");
+    let mut lines = written.lines();
+    assert_eq!(
+        lines.next().expect("header"),
+        "anilist_id\tromaji\tenglish\tnative\tyear\tformat\treason"
+    );
+    let row = lines.next().expect("one unmatched row");
+    let fields: Vec<&str> = row.split('\t').collect();
+    assert_eq!(fields[0], "19");
+    assert_eq!(fields[1], "Monster");
+    assert_eq!(
+        fields[3], "モンスター",
+        "the native form is what a human checks"
+    );
+    assert_eq!(fields[4], "2004");
+    assert!(fields[6].starts_with("ambiguous"), "got {:?}", fields[6]);
+    assert!(lines.next().is_none(), "one entry, one row");
+}
+
+#[tokio::test]
+async fn the_printed_sample_is_spread_not_truncated() {
+    // The sweep is year-ascending, so taking the first n unmatched entries samples the
+    // sweep order rather than the catalogue — every one of them from the 1950s.
+    let report = anime::Report {
+        unmatched: (0..100)
+            .map(|i| anime::Unmatched {
+                anilist_id: i,
+                romaji: format!("Title {i}"),
+                english: String::new(),
+                native: String::new(),
+                year: Some(1950 + i),
+                format: "TV".into(),
+                reason: "not in catalogue".into(),
+            })
+            .collect(),
+        ..Default::default()
+    };
+
+    let spread = report.unmatched_spread(5);
+    let ids: Vec<i64> = spread.iter().map(|u| u.anilist_id).collect();
+    assert_eq!(ids, vec![0, 20, 40, 60, 80]);
+
+    // Asking for more than there are returns everything, rather than panicking or
+    // repeating entries to pad the list.
+    assert_eq!(report.unmatched_spread(500).len(), 100);
 }
 
 #[tokio::test]
@@ -533,7 +605,7 @@ async fn a_finished_year_advances_to_the_next_one() {
 
     let anilist = Arc::new(AniList::owned(client(transport)).await);
     let mut job = Job::begin(&db, "anilist").await.expect("begin");
-    anime::ingest(&mut job, anilist, Some(2))
+    anime::ingest(&mut job, anilist, Some(2), None)
         .await
         .expect("ingest");
 
@@ -576,7 +648,7 @@ async fn max_pages_bounds_a_run() {
     let mut job = Job::begin(&db, "anilist").await.expect("begin");
     // hasNextPage is true, so only the bound stops this — and the transport has just
     // one response queued, so an unbounded run would error rather than pass.
-    let report = anime::ingest(&mut job, anilist, Some(1))
+    let report = anime::ingest(&mut job, anilist, Some(1), None)
         .await
         .expect("ingest");
 

@@ -330,6 +330,12 @@ async fn anime(db: &Db, max_pages: Option<i64>) -> Result<(), JobError> {
         std::process::exit(2);
     }
 
+    let unmatched = db
+        .path()
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .join("anilist-unmatched.tsv");
+
     let started = Instant::now();
     let transport: Arc<dyn sinephile_metadata_api::Transport> =
         Arc::new(sinephile_metadata_api::HttpTransport::new());
@@ -339,7 +345,8 @@ async fn anime(db: &Db, max_pages: Option<i64>) -> Result<(), JobError> {
     if job.is_resuming().await? {
         tracing::info!("resuming a previous run");
     }
-    let report = sinephile_ingest::anime::ingest(&mut job, client, max_pages).await?;
+    let report =
+        sinephile_ingest::anime::ingest(&mut job, client, max_pages, Some(&unmatched)).await?;
     job.finish().await?;
 
     println!();
@@ -364,15 +371,30 @@ async fn anime(db: &Db, max_pages: Option<i64>) -> Result<(), JobError> {
     println!("  {} year conflict", report.year_conflict);
     println!("  {:.0}s", started.elapsed().as_secs_f64());
 
-    // The sample is the deliverable for exit criterion E5, which hand-checks fifty.
-    // Printing it is what makes that check possible without writing a second tool.
+    // The unmatched list is the deliverable for exit criterion E5, which hand-checks
+    // fifty. The file is the real artefact; this is a legible summary of it.
+    //
+    // SPREAD, not the first twenty-five. The sweep is year-ascending, so the first
+    // unmatched entries are all obscure shorts from the 1950s — a sample of the sweep
+    // order rather than of the catalogue, and useless for the cases E5 actually names.
     println!(
         "
-  a sample of what did NOT match:"
+  what did NOT match, spread across the whole sweep:"
     );
-    for (title, why) in report.unmatched_samples.iter().take(25) {
-        println!("    {title:<48}  {why}");
+    for entry in report.unmatched_spread(25) {
+        let name = if entry.romaji.is_empty() {
+            &entry.english
+        } else {
+            &entry.romaji
+        };
+        println!("    {name:<48}  {}", entry.reason);
     }
+    println!(
+        "
+  all {} written to {}",
+        report.unmatched.len(),
+        unmatched.display()
+    );
     println!(
         "
   a sample of what DID match:"

@@ -22,6 +22,8 @@
 //! outside and writing inside, would put a page in memory with no checkpoint
 //! covering it, which is precisely the guarantee [`crate::job`] exists to provide.
 
+use std::io::Write;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use sinephile_metadata_api::{AniList, Media};
@@ -68,10 +70,51 @@ pub struct Report {
     pub exact_title_year_unknown: i64,
     pub season_aware: i64,
 
-    /// Titles by name, for the hand-check: `(anilist title, why)`.
-    pub unmatched_samples: Vec<(String, String)>,
+    /// Every entry that did not match, in full, for the hand-check.
+    ///
+    /// NOT a first-N sample. The sweep runs year-ascending, so the first two hundred
+    /// unmatched entries are all obscure shorts from 1955-1965 — and E5 asks
+    /// specifically for long-running shonen, split-cour seasons and films tied to
+    /// series, none of which can appear in a list like that. A first-N sample of an
+    /// ordered sweep is a sample of the order, not of the population.
+    pub unmatched: Vec<Unmatched>,
     /// `(anilist title, the form that matched, catalogue id)`.
     pub matched_samples: Vec<(String, String, i64)>,
+}
+
+/// One AniList entry that found no catalogue home, with everything needed to check it
+/// by hand or to measure why.
+#[derive(Debug, Clone)]
+pub struct Unmatched {
+    pub anilist_id: i64,
+    pub romaji: String,
+    pub english: String,
+    pub native: String,
+    pub year: Option<i64>,
+    pub format: String,
+    pub reason: String,
+}
+
+impl Unmatched {
+    fn tsv(&self) -> String {
+        let year = self.year.map(|y| y.to_string()).unwrap_or_default();
+        // Tabs and newlines inside a title would corrupt the file. Neither occurs in
+        // AniList's data today, and stripping them costs nothing against the chance
+        // that a single title silently shifts every column after it.
+        let clean = |s: &str| s.replace(['\t', '\n', '\r'], " ");
+        format!(
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            self.anilist_id,
+            clean(&self.romaji),
+            clean(&self.english),
+            clean(&self.native),
+            year,
+            clean(&self.format),
+            clean(&self.reason),
+        )
+    }
+
+    pub const HEADER: &'static str = "anilist_id\tromaji\tenglish\tnative\tyear\tformat\treason";
 }
 
 impl Report {
@@ -86,10 +129,8 @@ impl Report {
 
         if claim == Some(Claim::AlreadyClaimed) {
             self.already_claimed += 1;
-            if self.unmatched_samples.len() < SAMPLE_LIMIT {
-                self.unmatched_samples
-                    .push((name, "already claimed by an earlier entry".to_string()));
-            }
+            self.unmatched
+                .push(unmatched(media, "already claimed by an earlier entry"));
             return;
         }
 
@@ -121,11 +162,24 @@ impl Report {
                         format!("year conflict (catalogue {catalogue}, anilist {anilist})")
                     }
                 };
-                if self.unmatched_samples.len() < SAMPLE_LIMIT {
-                    self.unmatched_samples.push((name, why));
-                }
+                self.unmatched.push(unmatched(media, &why));
             }
         }
+    }
+
+    /// An evenly spread selection of the unmatched entries, for printing.
+    ///
+    /// Spread rather than truncated: the sweep is year-ascending, so the first `n`
+    /// unmatched entries are all from the 1950s and tell you nothing about the
+    /// catalogue as a whole.
+    pub fn unmatched_spread(&self, n: usize) -> Vec<&Unmatched> {
+        if self.unmatched.len() <= n || n == 0 {
+            return self.unmatched.iter().collect();
+        }
+        let step = self.unmatched.len() as f64 / n as f64;
+        (0..n)
+            .map(|i| &self.unmatched[(i as f64 * step) as usize])
+            .collect()
     }
 
     /// The share of AniList entries that found a catalogue home.
@@ -138,6 +192,18 @@ impl Report {
             return 0.0;
         }
         self.matched as f64 / self.seen as f64
+    }
+}
+
+fn unmatched(media: &Media, reason: &str) -> Unmatched {
+    Unmatched {
+        anilist_id: media.id,
+        romaji: media.title.romaji.clone().unwrap_or_default(),
+        english: media.title.english.clone().unwrap_or_default(),
+        native: media.title.native.clone().unwrap_or_default(),
+        year: media.season_year,
+        format: media.format.clone().unwrap_or_default(),
+        reason: reason.to_string(),
     }
 }
 
@@ -209,6 +275,10 @@ impl Cursor {
 /// 5,000 cap — so an undated entry outside the 5,000 most popular is not ingested. It
 /// also could not be matched with any confidence, since the year is half the evidence.
 ///
+/// `unmatched_to` is where every unmatched entry is appended as TSV. It is written
+/// PER PAGE rather than at the end, so an interrupted sweep keeps what it found — the
+/// same reason the checkpoint exists. E5's hand-check reads this file.
+///
 /// `max_pages` bounds a run, for tests and for a quick first pass. The client is taken
 /// by `Arc` rather than by reference because the step's closure outlives this stack
 /// frame as far as the type system can tell — see [`AniList::owned`].
@@ -216,16 +286,35 @@ pub async fn ingest(
     job: &mut Job<'_>,
     client: Arc<AniList<'static>>,
     max_pages: Option<i64>,
+    unmatched_to: Option<&Path>,
 ) -> Result<Report, JobError> {
     let last_year = current_year() + 1;
     let report = Arc::new(Mutex::new(Report::default()));
     let sink = Arc::clone(&report);
     let fetched = Arc::new(Mutex::new(0i64));
 
+    // Truncate and write the header once, here, rather than on first append: a run
+    // that matched everything should leave an empty file, not last run's file.
+    let log = match unmatched_to {
+        Some(path) => {
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| JobError::step("anilist.catalogue", e.to_string()))?;
+            }
+            let mut file = std::fs::File::create(path)
+                .map_err(|e| JobError::step("anilist.catalogue", e.to_string()))?;
+            writeln!(file, "{}", Unmatched::HEADER)
+                .map_err(|e| JobError::step("anilist.catalogue", e.to_string()))?;
+            Some(Arc::new(Mutex::new(file)))
+        }
+        None => None,
+    };
+
     job.run_step("anilist.catalogue", move |tx, cursor| {
         let sink = Arc::clone(&sink);
         let client = Arc::clone(&client);
         let fetched = Arc::clone(&fetched);
+        let log = log.clone();
         Box::pin(async move {
             let at = Cursor::parse(cursor.as_deref());
             if at.year > last_year {
@@ -244,15 +333,25 @@ pub async fn ingest(
                 .await
                 .map_err(|e| JobError::step("anilist.catalogue", e.to_string()))?;
 
+            let mut fresh = Vec::new();
             for media in &page.media {
                 let outcome = resolve(tx, media).await?;
                 let claim = match &outcome {
                     Ok(matched) => Some(write_match(tx, media, matched).await?),
                     Err(_) => None,
                 };
-                sink.lock()
-                    .expect("report lock")
-                    .record(media, &outcome, claim);
+                let mut report = sink.lock().expect("report lock");
+                let before = report.unmatched.len();
+                report.record(media, &outcome, claim);
+                fresh.extend_from_slice(&report.unmatched[before..]);
+            }
+
+            if let Some(log) = &log {
+                let mut file = log.lock().expect("unmatched log lock");
+                for entry in &fresh {
+                    writeln!(file, "{}", entry.tsv())
+                        .map_err(|e| JobError::step("anilist.catalogue", e.to_string()))?;
+                }
             }
 
             // A year with nothing left moves to the next one. The sweep ends only when
