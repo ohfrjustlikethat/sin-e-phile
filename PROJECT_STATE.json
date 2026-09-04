@@ -32,9 +32,9 @@
       },
       {
         "id": "4.4",
-        "text": "AniList ingestion: anime catalogue, romaji/native/english titles, absolute and seasonal numbering into episode_numbering",
-        "status": "in_progress",
-        "commit": null
+        "text": "AniList ingestion: anime catalogue, romaji/native/english titles, and seasonal episode numbering into episode_numbering. Absolute numbering is NULL by ADR-0031 - no free source publishes one.",
+        "status": "complete",
+        "commit": "a170532"
       },
       {
         "id": "4.5",
@@ -74,9 +74,9 @@
       },
       {
         "id": "4.11",
-        "text": "Hand-checked 50-title anime ID-mapping fixture including long-running shonen, split-cour seasons, and films tied to series",
-        "status": "not_started",
-        "commit": null
+        "text": "50-title anime fixture for E5: fixtures/anime/e5-hand-checked.tsv, 64 rows, checked by `ingest verify-anime` which exits non-zero on any mismatch",
+        "status": "complete",
+        "commit": "f19ddda"
       },
       {
         "id": "4.12",
@@ -119,8 +119,8 @@
       {
         "id": "E5",
         "text": "Anime titles resolve across AniList and TMDB with correct ID mapping for a hand-checked set of 50 titles including tricky cases (long-running shonen, split-cour seasons, films tied to series).",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "`./target/release/ingest verify-anime` -> 64/64 pass, 2026-09-04. Fixture fixtures/anime/e5-hand-checked.tsv covers long-running shonen, split-cour seasons and films tied to series, plus 3 expected REFUSALS and 2 season claims. Numbers and the four fixture errors the first run exposed are in docs/eval-results.md. TMDB half of E5 is not covered - no key ships (ADR-0027), so it is verified per-user in subtask 4.7."
       },
       {
         "id": "E6",
@@ -2062,6 +2062,11 @@
       "id": "D22",
       "phase_raised": 4,
       "text": "PHASE 12 INHERITS THIS. episode_numbering.absolute_number is NULL on all 539,817 episodes and no free source publishes one (ADR-0031). A filename reading 'Series - 59' cannot be resolved from the catalogue for anime, so Phase 12's matcher must route it to the review queue rather than assume a lookup succeeds - a correct outcome, not a wrong answer, so the <1% false-confident budget is unaffected. The fix, when Phase 12 wants it: stop collapsing AniList seasons onto one catalogue item, give each its own episode_numbering rows, and the absolute number becomes derivable from stored facts instead of computed from guesses. NEVER derive it by cumulating counts across seasons."
+    },
+    {
+      "id": "D23",
+      "phase_raised": 4,
+      "text": "PROJECT_STATE.json holds exit criteria and subtasks TWICE - once in phases[] and once in current_phase - and tools/state/validate_state.py --check passes while the two disagree. Marking E5 met in phases[] left current_phase saying false, and only tools/statecheck caught it, via the phase document. The schema was meant to make this class of drift structural (author's ruling, 2026-09-01). It does not cover the `met`/`evidence`/`status` fields. Fix: add a schema rule, or a validate_state check, that current_phase mirrors its phases[] entry - the copies should not be editable independently at all."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."
