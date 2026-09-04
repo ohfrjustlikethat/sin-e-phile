@@ -947,3 +947,46 @@ weekly job.
 **Every fixture had used ids short enough for the two orderings to agree**, which is why
 seven passing tests said nothing about it. The regression test now uses the exact
 transition from row 967,458 of the real file.
+
+### Artwork: WebP re-encoding measured on real photographs
+
+`cargo test -p sinephile-artwork --test real_images -- --nocapture`, 2026-09-04.
+Source: the 24 public-domain film stills in `dist/stills/` — *Battleship Potemkin*,
+*Detour*, *Beat the Devil*, *His Girl Friday*.
+
+| Metric | Value |
+|---|---|
+| JPEG in | 2,580 KB |
+| Lossy WebP out (q80) | **1,493 KB** |
+| **Saved overall** | **42.1%** |
+| Worst single image | 27.8% (*his-girl-friday-1.jpg*) |
+
+**Measured on photographs, not on gradients.** A synthetic test image compresses
+nothing like a film still, so a saving measured on one says nothing about the other —
+and this number is the entire justification for taking a C dependency (`webp`, wrapping
+libwebp) rather than using `image`'s pure-Rust encoder. `image` supports WebP decoding
+and **lossless** encoding only, and lossless WebP on a photograph is routinely *larger*
+than the JPEG it came from, which would have made the cache worse while appearing to
+satisfy the requirement.
+
+The test asserts a floor of 10% rather than the measured figure, so it fails if the
+dependency ever stops earning its place, without breaking every time libwebp changes a
+heuristic.
+
+### Blurhash
+
+Implemented in `crates/artwork/src/blurhash.rs` rather than taken as a dependency —
+about a hundred lines, and it is the interesting part of the subtask. 4×3 components,
+28 characters per image, computed from a 64px thumbnail rather than the full poster
+(the transform is O(pixels × components) and only the lowest frequencies survive
+anyway).
+
+Two bugs the tests caught, both of which would have shipped silently:
+
+- **Averaging in sRGB rather than linear light.** Half black and half white averages to
+  128 if the stored bytes are averaged directly and to ~188 done correctly. Every
+  placeholder in the app would have been visibly too dark. This is the classic bug in
+  reimplementations, and `the_average_is_computed_in_linear_light_not_in_srgb` is the
+  test for it.
+- **`&hash[2..6]` panics on a UTF-8 boundary.** These values come out of a database, so
+  one corrupt row would have taken the process down. Indexed as bytes now.

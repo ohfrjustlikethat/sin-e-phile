@@ -47,7 +47,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.8: image handling. Lazy fetch, a disk cache under ./data/ with a size budget, WebP re-encoding and blurhash placeholders. Gate every fetch on CredentialRepository::tmdb_access returning Configured - TmdbAccess::Absent must produce the SPEC.md 9.4 typographic card, never a grey rectangle. Subtask 4.3 stays BLOCKED on B2 (GroupLens TLS certificate expired 2026-08-28).
+Phase 4 subtask 4.9: the first-run flow. The app must be usable DURING the background ingestion, searching whatever is ingested so far - so the ingest job needs a progress surface the frontend can poll, and search must run against a partial catalogue without claiming it is complete. tools/ingest already reports per-step progress via Job::progress; the missing half is exposing it. Subtask 4.3 stays BLOCKED on B2 (GroupLens TLS certificate expired 2026-08-28).
 
 ---
 
