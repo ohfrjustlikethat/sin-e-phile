@@ -1786,8 +1786,15 @@
       ]
     }
   ],
-  "next_action": "Phase 4 subtask 4.4, remaining part: episode numbering. Add a step to tools/ingest/src/anime.rs that, for each media_item carrying an anilist external id (7,383 of them now), fetches the entry's episode list and writes BOTH the seasonal and the absolute number into the episode_numbering table from crates/persistence/migrations/0003_series_episodes.up.sql. The catalogue half of 4.4 is done: 14,737 AniList entries swept, 7,328 matched, recorded in docs/eval-results.md.",
-  "blockers": [],
+  "next_action": "Phase 4 subtask 4.4, last remaining part: ABSOLUTE episode numbering. Seasonal numbering is loaded (539,817 episodes, source 'imdb'). Absolute is still NULL everywhere and CANNOT simply be read from AniList - see blocker B1 / decision P10 in docs/DECISIONS_PENDING.md, which needs the author's answer before this is built. If working around it, do subtask 4.3 (MovieLens) instead, which is independent.",
+  "blockers": [
+    {
+      "id": "B1",
+      "raised": "2026-09-04",
+      "needs_user": true,
+      "description": "Absolute episode numbering: no source publishes one. SPEC.md 6.2 assumes AniList supplies absolute numbers; it does not - it publishes per-entry episode numbers, and an AniList entry is one cour, so its numbering restarts each season exactly where IMDb's does. An absolute number can only be DERIVED by ordering a series' AniList entries and cumulating counts, which is precisely the computation migration 0003 calls 'wrong often enough to matter, and wrong silently'. Options and a recommended default are in docs/DECISIONS_PENDING.md as P10."
+    }
+  ],
   "decisions_pending": [
     {
       "id": "P1",
@@ -2024,7 +2031,7 @@
     {
       "id": "D16",
       "phase_raised": 4,
-      "text": "R4 headroom is 670 MB after the AniList ingestion (3,426 MB of 4,096 MB). The embedding artefact, AniList and MovieLens all still have to fit. The >=10 core vote threshold in tools/ingest/src/imdb.rs::CatalogueScope::DEFAULT is the lever if they do not - tightening to >=50 cuts the core from 854,752 titles to roughly 484,000, which reduces credits and akas proportionately. Decide ONCE, after those three are measured. Four storage predictions in this phase have been wrong in both directions; a fifth would be no better."
+      "text": "R4 headroom is 461 MB after episodes (3,635 MB of 4,096 MB). The embedding artefact, AniList and MovieLens all still have to fit. The >=10 core vote threshold in tools/ingest/src/imdb.rs::CatalogueScope::DEFAULT is the lever if they do not - tightening to >=50 cuts the core from 854,752 titles to roughly 484,000, which reduces credits and akas proportionately. Decide ONCE, after those three are measured. Four storage predictions in this phase have been wrong in both directions; a fifth would be no better."
     },
     {
       "id": "D17",
@@ -2045,6 +2052,11 @@
       "id": "D20",
       "phase_raised": 4,
       "text": "data/sinephile.db holds the UNION of three AniList sweeps - 7,383 items carry an anilist id where a single clean sweep produces 7,328. Every mapping was made by the same matcher under the same rules, so none is wrong, but the database is not byte-reproducible from one run. Clearing the anilist/mal rows in external_ids and reverting anime_* kinds before a final sweep would fix it; not worth 13 minutes until the catalogue is being frozen for Phase 27."
+    },
+    {
+      "id": "D21",
+      "phase_raised": 4,
+      "text": "Episodes are loaded for all anime plus non-anime series with >=5,000 votes: 539,817 episodes, 21,218 seasons. The threshold is one constant, passed as `ingest episodes --min-votes N`, and the loader skips what it already holds so widening is safe. Measured cost is 410 bytes per episode across three independent runs. Dropping to >=1,000 costs 344 MB and would leave 117 MB, which is less than ADR-0014's own rate for the embedding artefact - so this cannot widen until embeddings and MovieLens are measured."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

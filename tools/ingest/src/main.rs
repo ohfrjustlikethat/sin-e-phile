@@ -29,6 +29,11 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            normalise` first. --pages bounds the run; pages come
                            most-popular-first, so a bounded run is the useful
                            part of the catalogue rather than an arbitrary slice.
+  ingest episodes          load episodes: media_items, episodes, seasons and
+                           episode_numbering. --measure reports what the dataset
+                           holds and writes nothing. --min-votes N also loads
+                           non-anime series with at least N votes; anime is
+                           always loaded in full (SPEC.md 6.2).
   ingest repair-variants   recompute titles.variant for rows the region-over-
                            language bug labelled english. Narrow and re-runnable.
   ingest status            show every job and its steps
@@ -92,6 +97,20 @@ async fn main() -> Result<(), JobError> {
                 .and_then(|i| args.get(i + 1))
                 .and_then(|n| n.parse::<i64>().ok());
             anime(&db, pages).await
+        }
+        "episodes" => {
+            let min_votes = args
+                .iter()
+                .position(|a| a == "--min-votes")
+                .and_then(|i| args.get(i + 1))
+                .and_then(|n| n.parse::<i64>().ok());
+            episodes(
+                &db,
+                &dir.join("datasets"),
+                args.iter().any(|a| a == "--measure"),
+                min_votes,
+            )
+            .await
         }
         "repair-variants" => repair_variants(&db).await,
         "status" => status(&db).await,
@@ -401,6 +420,110 @@ async fn anime(db: &Db, max_pages: Option<i64>) -> Result<(), JobError> {
     );
     for (title, form, id) in report.matched_samples.iter().take(25) {
         println!("    {title:<48}  on {form:?} -> item {id}");
+    }
+    println!();
+    Ok(())
+}
+
+/// Episodes: measure first, because title.episode is ~8.5M rows and R4 has 670 MB.
+async fn episodes(
+    db: &Db,
+    datasets: &Path,
+    measure_only: bool,
+    min_votes: Option<i64>,
+) -> Result<(), JobError> {
+    let downloader = sinephile_ingest::Downloader::new();
+    let dataset = &sinephile_ingest::imdb::TITLE_EPISODE;
+    let path = datasets.join(dataset.filename);
+    let result = downloader.fetch(&dataset.url(), &path, |_| {}).await?;
+    tracing::info!(
+        "{}: {:.1} MB{}",
+        dataset.name,
+        result.bytes as f64 / 1_048_576.0,
+        if result.fetched {
+            ""
+        } else {
+            " (already had it)"
+        }
+    );
+    sinephile_ingest::download::verify_gzip(&path)?;
+
+    if measure_only {
+        let measurement = sinephile_ingest::episodes::measure(db, datasets).await?;
+        measurement.report();
+        return Ok(());
+    }
+
+    use sinephile_ingest::episodes_load as ep;
+    use std::sync::Arc;
+    use std::time::Instant;
+
+    let started = Instant::now();
+    let before = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
+    let (episodes_before, _) = ep::count_episodes(db).await?;
+
+    let scope = ep::EpisodeScope {
+        all_anime: true,
+        min_votes: min_votes.unwrap_or(i64::MAX),
+    };
+    let series = ep::series(db).await?;
+    let skip = ep::already_loaded(db).await?;
+    tracing::info!(
+        "{} series in the catalogue, {} episodes already loaded",
+        series.len(),
+        skip.len()
+    );
+
+    let wanted = ep::collect(&path, &series, scope, &skip)?;
+    tracing::info!("{} episodes in scope", wanted.len());
+    if wanted.is_empty() {
+        println!(
+            "
+  nothing new in scope
+"
+        );
+        return Ok(());
+    }
+
+    let by_id: std::collections::HashMap<u32, ep::Wanted> =
+        wanted.iter().map(|w| (w.tconst, *w)).collect();
+    let wanted = Arc::new(wanted);
+
+    let mut job = Job::begin(db, "episodes").await?;
+    if job.is_resuming().await? {
+        tracing::info!("resuming a previous run");
+    }
+    ep::load_series_rows(&mut job, Arc::clone(&wanted)).await?;
+    ep::load_episodes(
+        &mut job,
+        datasets.join(sinephile_ingest::imdb::TITLE_BASICS.filename),
+        Arc::new(by_id),
+    )
+    .await?;
+    ep::load_seasons(&mut job).await?;
+    job.finish().await?;
+
+    let (episodes, seasons) = ep::count_episodes(db).await?;
+    let after = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
+    let added = after.saturating_sub(before);
+    println!();
+    println!("  {episodes} episodes, {seasons} seasons");
+    println!(
+        "  database {:.0} MB (+{:.0} MB) · {:.0}s",
+        after as f64 / 1_048_576.0,
+        added as f64 / 1_048_576.0,
+        started.elapsed().as_secs_f64()
+    );
+    // Per NEW episode, not per total. Dividing the delta by the whole table made an
+    // incremental run report 244 bytes against the 405 the same data cost when it was
+    // first loaded — a number that gets better every time you widen the scope, which
+    // is exactly the direction a cost estimate must never drift.
+    let new_episodes = episodes - episodes_before;
+    if new_episodes > 0 {
+        println!(
+            "  {new_episodes} new · {:.0} bytes per new episode, measured",
+            added as f64 / new_episodes as f64
+        );
     }
     println!();
     Ok(())

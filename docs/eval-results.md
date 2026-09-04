@@ -818,3 +818,51 @@ Chihiro` are `alternative` where they belong.
 
 Database after the anime ingestion and the repair: **3,426 MB** — up 27 MB from 3,399,
 which leaves **670 MB of R4 headroom**.
+
+### Episodes: the scope chosen from a measured cost
+
+`./target/release/ingest episodes --measure`, 2026-09-04. `title.episode` holds
+**9,866,106 rows**, of which 6,868,550 (69.6%) hang off a core-tier series. At the core
+tier's own 10-vote rule that is far more than R4 allows, so episodes needed their own,
+tighter threshold — and this is the curve it was chosen from.
+
+| parent series votes ≥ | episodes | series |
+|---|---|---|
+| 10 (the core tier's rule) | 6,759,802 | 111,134 |
+| 100 | 3,490,720 | 42,151 |
+| 1,000 | 1,265,318 | 12,787 |
+| 5,000 | 426,043 | 4,724 |
+| 10,000 | 216,121 | 2,832 |
+| 50,000 | 52,453 | 715 |
+
+**Cost per episode was measured, not predicted.** Anime was loaded first — 132,845
+episodes for **+51 MB, 405 bytes each**. Widening to 10,000 votes then added 203,754
+episodes at **402 bytes**, and to 5,000 votes another 203,218 at **410 bytes**. Three
+independent measurements inside 2% of each other, which is the first time in this phase
+a storage number has been trustworthy — because it was weighed rather than guessed.
+
+| Scope | Episodes | Cost at 410 B | Database | Headroom left |
+|---|---|---|---|---|
+| anime only | 132,845 | 51 MB | 3,477 MB | 619 MB |
+| + votes ≥ 10,000 | 336,599 | +78 MB | 3,555 MB | 541 MB |
+| **+ votes ≥ 5,000 (chosen)** | **539,817** | **+79 MB** | **3,635 MB** | **461 MB** |
+| + votes ≥ 1,000 | 1,378,000 | +344 MB | 3,979 MB | 117 MB |
+
+**≥ 5,000 is where it stops**, because the next step down costs 344 MB and ADR-0014's
+own rate puts the embedding artefact at roughly 330 MB. Widening past this point would
+buy episode lists for mid-tier series at the price of the search engine.
+
+Anime is exempt from the threshold entirely: `SPEC.md` §6.2 requires its numbering, and
+the whole anime catalogue is 132,880 episodes — small enough that a threshold would cost
+more in missing data than it saves in bytes.
+
+Result: **539,817 episodes and 21,218 seasons.** Spot-checked against reality —
+*Breaking Bad* 7/13/13/13/16, *Attack on Titan* 25/12/22/30, *Cowboy Bebop* a single
+26-episode season. 15,691 episodes (2.9%) carry no season or episode number because
+IMDb has none for them; they are stored as NULL rather than given an invented 0.
+
+**The scope can be widened later without corrupting anything.** `episodes` has no
+natural key, so a second pass would happily insert every episode again — the skip set
+built from `external_ids` is the only thing preventing it, and
+`widening_the_scope_adds_episodes_without_duplicating_the_first_pass` was watched
+failing (4 rows instead of 2) with that skip removed before being trusted.

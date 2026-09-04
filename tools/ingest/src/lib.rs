@@ -11,6 +11,8 @@ pub mod akas;
 pub mod anime;
 pub mod credits;
 pub mod download;
+pub mod episodes;
+pub mod episodes_load;
 pub mod imdb;
 pub mod job;
 pub mod load;

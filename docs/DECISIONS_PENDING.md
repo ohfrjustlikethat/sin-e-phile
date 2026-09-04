@@ -151,3 +151,73 @@ not, the spec should stop claiming it. What should *not* happen is the spec sayi
 thing and the code doing another, which is the situation today.
 
 The timing matters: converting is cheapest now and gets steadily more expensive.
+
+---
+
+## P10 — Absolute episode numbering, when no source publishes one {#p10}
+
+**Raised:** 2026-09-04, Phase 4 subtask 4.4. **Blocker B1.**
+
+### The decision, in one sentence
+
+`SPEC.md` §6.2 requires absolute-versus-seasonal episode reconciliation and assumes
+AniList supplies the absolute number — **it does not**, so we either derive it, source
+it elsewhere, or stop claiming to have it.
+
+### What is actually true
+
+Seasonal numbering is loaded and correct: 539,817 episodes from IMDb `title.episode`,
+with `episode_numbering.source = 'imdb'`. `absolute_number` is NULL on every row.
+
+AniList publishes an episode **count** and an airing schedule per *entry*, and an
+AniList entry is one cour. Its numbering therefore restarts at 1 each season, in
+exactly the same place IMDb's does. There is no absolute number to read.
+
+An absolute number can only be **derived** — order a series' AniList entries and
+cumulate their episode counts. That is precisely what migration 0003 warns against, in
+its own words: *"the conversions are not arithmetic, because cours split unevenly,
+recaps are numbered by some sources and not others, and specials interleave"*. The
+schema was built to store what each source said and reconcile by lookup, specifically
+so that nobody would compute this.
+
+There is a second problem. We map **one** AniList entry per catalogue series (first
+claim wins, by year then id), so seasons 2+ resolve to `already_claimed` and carry no
+AniList id at all — 409 of them. Even a derivation has nothing to iterate over.
+
+### The options
+
+1. **Leave `absolute_number` NULL, and amend §6.2** to say the schema *supports*
+   absolute numbering and that it is populated when a source that publishes one is
+   added. **Cost:** Phase 12's filename matcher meets `Series - 59` and cannot resolve
+   it from the catalogue; it must fall back to asking the user or to a fuzzy guess,
+   for anime specifically. That is a real gap in the feature the spec calls out.
+
+2. **Store per-season AniList numbering properly first** — stop collapsing seasons onto
+   one catalogue item, give each AniList entry its own `seasons` row and its own
+   `episode_numbering` rows. **Cost:** a redesign of the claim rule, roughly a session,
+   and it changes data already written. It also makes the absolute number *derivable*
+   rather than derived, which is the honest version of option 3.
+
+3. **Derive and store it now** — cumulate episode counts across ordered seasons.
+   **Cost:** one line of arithmetic that is silently wrong for every series with a
+   recap episode, a split cour, or an interleaved special — which is most long-running
+   anime, i.e. exactly the ones this feature exists for. Migration 0003 exists because
+   of this.
+
+4. **TVDB** publishes absolute numbering directly and is the only source that does.
+   **Cost:** an API key per user, a fifth external dependency, and §2.4's zero-cost
+   rule to check against their current terms.
+
+### Recommendation
+
+**(1) now, (2) when Phase 12 needs it.** The gap is real but it is Phase 12's gap, not
+Phase 4's, and option 2 is a redesign that should be driven by the code that needs it
+rather than guessed at eight phases early. Option 3 is the one to refuse outright: a
+number that is confidently wrong is worse than a NULL, and this schema was designed
+specifically to avoid it.
+
+### The default if you say "your call"
+
+**Option 1.** Leave `absolute_number` NULL, amend §6.2 to describe what is actually
+stored, and record the derivation problem against Phase 12 so it arrives with the
+context rather than rediscovering it.
