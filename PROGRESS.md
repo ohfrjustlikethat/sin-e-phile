@@ -51,7 +51,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.10, last piece: run the producer for real. The code is complete and tested with a fake embedder (tools/ingest/tests/embed.rs, 7 tests); what is missing is the model FILE. Download all-MiniLM-L6-v2 INT8 ONNX plus tokenizer.json from huggingface.co (already in the guard's INFRASTRUCTURE_DOMAINS) into models/, add an `ingest embed --model <path> --tokenizer <path>` command that calls sinephile_ingest::embed::produce with OnnxEmbedder, and run it over the 855,703 core titles. Expect ~313 MB and TIME IT - ADR-0019's two-hour trigger applies. That closes E7. Subtask 4.3 stays BLOCKED on B2.
+Phase 4: finish the embedding run if it is not already done - `ingest embed` is resumable, so re-running it continues from data/embeddings-all-MiniLM-L6-v2-int8.vectors.part. Record its size, time and sha256 in docs/eval-results.md and set E7's evidence, then run `python tools/phasedoc/generate.py --close 4`. It will STILL refuse while E1 is unmet, and E1 needs MovieLens, which is blocked on B2 - GroupLens' TLS certificate, last checked 2026-09-05, still expired since 2026-08-28. If it is still down, close Phase 4 with 4.3 and E1 carried forward EXPLICITLY rather than fudged.
 
 ---
 
