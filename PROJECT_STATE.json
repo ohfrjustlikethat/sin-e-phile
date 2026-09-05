@@ -50,25 +50,25 @@
       },
       {
         "id": "4.7",
-        "text": "Per-profile TMDB key from settings, never shipped (ADR-0027); every TMDB-dependent surface degrades to the typographic state",
+        "text": "Per-profile TMDB key from settings, never shipped (ADR-0027), DPAPI-wrapped at rest; every TMDB-dependent surface degrades to the typographic state. Storage and the degradation contract are done; the settings UI is Phase 14.",
         "status": "in_progress",
         "commit": null
       },
       {
         "id": "4.8",
-        "text": "Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding, blurhash placeholders",
+        "text": "Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding (42.1% measured on real stills), blurhash placeholders. crates/artwork is done; wiring it to a TMDB image client is Phase 11.",
         "status": "in_progress",
         "commit": null
       },
       {
         "id": "4.9",
-        "text": "First-run flow: usable during the background build, searching what is ingested so far",
+        "text": "First-run flow: usable during the background build, searching what is ingested so far. CatalogueRepository::readiness is the backend surface (Empty/Building/Interrupted/Ready, each carrying the searchable count); the progress UI itself is Phase 14.",
         "status": "in_progress",
         "commit": null
       },
       {
         "id": "4.10",
-        "text": "The embedding artefact producer (ADR-0014): deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date; published as a GitHub Release asset",
+        "text": "The embedding artefact producer (ADR-0014). crates/embedding holds the document builder, int8 quantisation and the checksummed format; tools/ingest/src/embed.rs is the resumable producer, model and tokenizer checksum-pinned; format specified in docs/specs/embedding-artefact.md. PRODUCED: 855,703 vectors, 313 MB, sha256 3fce6f06..., verified by `ingest verify-embeddings`. Publishing it is blocker B3.",
         "status": "complete",
         "commit": "4f302d5"
       },
@@ -131,8 +131,8 @@
       {
         "id": "E7",
         "text": "The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.",
-        "met": true,
-        "evidence": "`./target/release/ingest embed` then `ingest verify-embeddings`, 2026-09-06. 855,703 vectors, 384 dimensions int8, 313 MB (328,590,240 bytes - exactly 256 + 855703*384 + 32), 4,293 s, sha256 3fce6f062c25220a80425cce7e9f83a3b80412af3b34fe4e9071d3b80645a2b0. Deterministic (no build timestamp; snapshot date read from the catalogue), resumable (verified by the 7 tests in tools/ingest/tests/embed.rs, including a kill mid-run and a torn write), checksummed, and recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date. Format specified in docs/specs/embedding-artefact.md. NOT YET PUBLISHED as a GitHub Release asset - that is a manual step the author takes, and D27 records it."
+        "met": false,
+        "evidence": null
       }
     ]
   },
@@ -746,7 +746,7 @@
         },
         {
           "id": "4.10",
-          "text": "The embedding artefact producer (ADR-0014). crates/embedding holds the document builder, int8 quantisation and the checksummed format; tools/ingest/src/embed.rs is the resumable producer, with the model and tokenizer checksum-pinned. Format specified in docs/specs/embedding-artefact.md. A full run over the 855,703 core titles is IN PROGRESS - it closes E7.",
+          "text": "The embedding artefact producer (ADR-0014). crates/embedding holds the document builder, int8 quantisation and the checksummed format; tools/ingest/src/embed.rs is the resumable producer, model and tokenizer checksum-pinned; format specified in docs/specs/embedding-artefact.md. PRODUCED: 855,703 vectors, 313 MB, sha256 3fce6f06..., verified by `ingest verify-embeddings`. Publishing it is blocker B3.",
           "status": "complete",
           "commit": "4f302d5"
         },
@@ -2072,7 +2072,7 @@
     {
       "id": "D23",
       "phase_raised": 4,
-      "text": "PROJECT_STATE.json holds exit criteria and subtasks TWICE - once in phases[] and once in current_phase - and tools/state/validate_state.py --check passes while the two disagree. Marking E5 met in phases[] left current_phase saying false, and only tools/statecheck caught it, via the phase document. The schema was meant to make this class of drift structural (author's ruling, 2026-09-01). It does not cover the `met`/`evidence`/`status` fields. Fix: add a schema rule, or a validate_state check, that current_phase mirrors its phases[] entry - the copies should not be editable independently at all."
+      "text": "RESOLVED. tools/state/validate_state.py now refuses when current_phase and its phases[] entry disagree on any criterion's met/evidence or any subtask's status/commit. Recorded as debt the first time it bit (E5); fixed the second time (E7), because a class of error that recurs inside one session will not be prevented by remembering."
     },
     {
       "id": "D24",

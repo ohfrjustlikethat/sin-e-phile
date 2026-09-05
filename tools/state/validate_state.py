@@ -159,6 +159,54 @@ def load() -> tuple[dict, dict]:
 
 
 
+def check_current_phase_mirrors(state: dict) -> list[str]:
+    """`current_phase` and its `phases[]` entry must agree.
+
+    The state file holds the live checklists TWICE — once in `phases[]`, once in
+    `current_phase` — and nothing made them agree. In one session that let E5 be marked
+    met in `phases[]` while `current_phase` still said false, and then let the same
+    thing happen again to E7 an hour later. Both times only `tools/statecheck` caught
+    it, indirectly, through the phase document's checkbox, which is a long way from the
+    cause and says nothing useful about it.
+
+    Recorded as debt D23 the first time. Fixed here the second, because a class of
+    error that recurs within a session is not going to be prevented by remembering.
+    """
+    current = state.get("current_phase")
+    if not isinstance(current, dict):
+        return []
+    number = current.get("number")
+    entry = next(
+        (p for p in state.get("phases", []) if p.get("number") == number), None
+    )
+    if entry is None:
+        return [f"current_phase is phase {number}, which has no entry in phases[]"]
+
+    errors: list[str] = []
+
+    def compare(kind: str, key: str, fields: tuple[str, ...]) -> None:
+        mine = {item.get("id"): item for item in current.get(kind, [])}
+        theirs = {item.get("id"): item for item in entry.get(kind, [])}
+        for ident in sorted(set(mine) | set(theirs)):
+            a, b = mine.get(ident), theirs.get(ident)
+            if a is None or b is None:
+                errors.append(
+                    f"{kind} {ident} exists in "
+                    f"{'phases[]' if a is None else 'current_phase'} only"
+                )
+                continue
+            for field in fields:
+                if a.get(field) != b.get(field):
+                    errors.append(
+                        f"{kind} {ident}: current_phase.{field} is {a.get(field)!r} "
+                        f"but phases[{number}].{field} is {b.get(field)!r}"
+                    )
+
+    compare("exit_criteria", "id", ("met", "evidence"))
+    compare("subtasks", "id", ("status", "commit"))
+    return errors
+
+
 def check_phase_progression(state: dict) -> list[str]:
     """Every phase before the current one must be a CLOSED record.
 
@@ -240,6 +288,21 @@ def do_check() -> int:
         print("\nSPEC.md §10.8: a criterion marked met MUST carry an artefact. If evidence\n"
               "cannot be produced, the criterion is not met — say so and say what is\n"
               "blocking it.\n", file=sys.stderr)
+        return 1
+
+    mirrors = check_current_phase_mirrors(state)
+    if mirrors:
+        print("", file=sys.stderr)
+        print(f"validate_state: {len(mirrors)} disagreement(s) between current_phase "
+              f"and phases[] in PROJECT_STATE.json", file=sys.stderr)
+        print("", file=sys.stderr)
+        for error in mirrors:
+            print(f"  {error}", file=sys.stderr)
+        print("", file=sys.stderr)
+        print("The live checklists are stored twice and must agree. Update BOTH, or "
+              "the phase document and the state file will disagree about what is "
+              "done — which is how a criterion gets marked met in one place and not "
+              "the other (debt D23).", file=sys.stderr)
         return 1
 
     progression = check_phase_progression(state)
