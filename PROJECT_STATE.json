@@ -2077,6 +2077,11 @@
       "id": "D25",
       "phase_raised": 4,
       "text": "The TMDB key is DPAPI-wrapped, so it is bound to the Windows user account and a copied ./data/ folder cannot decrypt it. That is deliberate (crates/persistence/src/secrets.rs) and degrades to TmdbAccess::Absent, but it means the PORTABLE promise of ADR-0008 has one documented exception: move the folder to another machine or account and the key must be re-entered. Everything else in the folder still works. Worth a line in the settings UI when Phase 14 builds it, so the user is told rather than surprised."
+    },
+    {
+      "id": "D26",
+      "phase_raised": 4,
+      "text": "THE APPLICATION DOES NOT OPEN THE DATABASE YET. src-tauri's AppState holds the hardware profile and nothing else, so CatalogueRepository::readiness, CredentialRepository and the artwork cache are all reachable from tests and from tools/ingest but not from the running app. Phase 5 needs the database open for search and is the natural place to do it. WHEN IT DOES: re-measure cold start. Phase 1 recorded 515/660 ms to interactive against a 2 s Tier 2 budget, and opening a 3.6 GB SQLite file plus a migration version check is the first thing since then that could move it. Measuring after the change rather than before would make a regression invisible."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."
