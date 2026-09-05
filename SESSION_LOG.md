@@ -816,3 +816,78 @@ actual evidence and which `data/anilist-unmatched.tsv` now exists to be chosen f
 
 Still outstanding for the author, non-blocking: **P8** (Tier 0 embedding measurement
 before Phase 21).
+
+---
+
+## Session 9 — 2026-09-05 — Phase 4: episodes to embeddings, and one refusal
+
+**Phase 4, subtasks 4.7–4.13 — 11 of 13.** Five of seven exit criteria met with
+evidence. `/closephase` **refused**, correctly.
+
+### What was built
+
+`ingest episodes` (539,817 episodes, 21,218 seasons), `ingest refresh` (ADR-0030
+layer 1), `ingest movielens` (blocked), `ingest embed` (the artefact producer),
+`ingest verify-anime` (E5's checker), plus three new crates' worth of surface:
+`crates/artwork` (blurhash, WebP, a bounded cache), `crates/embedding` (document
+builder, quantisation, file format), and per-profile credentials and catalogue
+readiness in `crates/persistence`.
+
+### Every scope decision was measured
+
+Four size predictions earlier in this phase were wrong in both directions, so the
+practice changed: load a sample, weigh it, then decide.
+
+- **Episodes: 410 bytes each**, measured three times within 2%. `title.episode` is 9.87M
+  rows and 6.87M hang off core series — 2.7 GB against 670 MB of headroom — so the
+  scope is all anime plus non-anime series with ≥ 5,000 votes.
+- **WebP: 42.1% saved**, on real public-domain film stills rather than a synthetic
+  gradient. That number is the whole justification for taking a C dependency, since
+  `image`'s lossless encoder would have made the cache *worse* while appearing to
+  satisfy the requirement.
+- **The artefact: 313 MB**, arithmetic over a fixed layout. This finally closes the
+  `>= 10` core-threshold question open since migration 0009.
+
+### Three findings that changed a decision
+
+**ADR-0030's mechanism did not work.** Layer 1 specified `seek_past(highest id)` on the
+premise that IMDb's files are sorted by id. They are sorted as **text**: numeric order
+first breaks at row 967,458 (`tt10001008` → `tt1000101`) and the last row is
+`tt9916880`, which is not the largest. Seeking past our maximum walked into rows we
+already held and died on a UNIQUE violation. Now filters by numeric id; `SPEC.md` 1.9.0,
+ADR-0032.
+
+**No source publishes an absolute episode number.** §6.2 assumed AniList does; it
+publishes per-entry numbering, and an entry is one cour. Put to the author as P10;
+answered "your call", so the stated default was taken — leave it NULL, amend the spec,
+record the gap against Phase 12. `SPEC.md` 1.8.0, ADR-0031.
+
+**41,193 title rows called French and Spanish titles "English"**, because `akas::variant`
+read the release region before checking the language. Fixed, and repaired in place —
+`ingest akas` could not have done it, since its inserts would have added the corrected
+row and left the wrong one beside it.
+
+### Where I was wrong
+
+- **I reported the phase as "12 of 13 with only 4.3 outstanding".** It was 8 of 13, and
+  I had forgotten subtask 4.10 entirely. Corrected in the same turn it was noticed.
+- **The E5 fixture failed 4 of 62 on its first run and every failure was mine** —
+  including an IMDb id that turned out to be *Regular Show* rather than *Nichijou*.
+  Recorded in the fixture header rather than quietly edited away.
+- **A cache-eviction comment explained a Windows hazard while the code did the
+  opposite**, preferring `accessed()` — which Windows does not update — so
+  least-recently-used silently became least-recently-written.
+
+### Blockers
+
+**B2 — GroupLens' TLS certificate expired 2026-08-28** and was still expired when
+re-checked on 2026-09-05. Subtask 4.3 is blocked on it. **Not worked around**:
+disabling certificate verification would ship a security downgrade to every user
+because a university let a certificate lapse. The code is complete and tested against a
+synthetic archive; it needs only a working download.
+
+### What the next session should do first
+
+The embedding run finishes E7. Then `/closephase` again — it will still refuse if E1 is
+unmet, and E1 needs MovieLens. If GroupLens is still down, close Phase 4 with 4.3 and
+E1 carried forward explicitly rather than fudged.
