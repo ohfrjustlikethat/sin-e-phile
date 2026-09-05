@@ -373,6 +373,59 @@ impl<'a> Job<'a> {
     }
 
     /// Mark the job complete. Only call this when every step has run.
+    /// Record progress for a step whose work is NOT a database write.
+    ///
+    /// [`Self::run_step`] commits the checkpoint in the same transaction as the work it
+    /// describes, which is what makes a resumed job exactly correct. That guarantee is
+    /// unavailable when the work is a file — the embedding artefact is written to disk,
+    /// and no transaction spans a database and a file.
+    ///
+    /// So the weaker invariant is stated instead, and the caller must uphold it: **flush
+    /// the file before checkpointing.** Then the cursor can only ever lag what is
+    /// durably on disk, never lead it, and a resume redoes a little work rather than
+    /// skipping some. Leading would silently lose vectors from the middle of an
+    /// artefact, which nothing downstream could detect.
+    pub async fn checkpoint(
+        &self,
+        step: &str,
+        cursor: &str,
+        items_done: i64,
+    ) -> Result<(), JobError> {
+        sqlx::query(
+            "INSERT INTO ingest_steps (job_id, name, ordinal, status, cursor, items_done,
+                                       started_at, updated_at)
+             VALUES (?, ?, ?, 'running', ?, ?, datetime('now'), datetime('now'))
+             ON CONFLICT (job_id, name) DO UPDATE
+                 SET cursor = excluded.cursor,
+                     items_done = excluded.items_done,
+                     status = 'running',
+                     updated_at = datetime('now')",
+        )
+        .bind(self.id)
+        .bind(step)
+        .bind(self.ordinal + 1)
+        .bind(cursor)
+        .bind(items_done)
+        .execute(self.db.pool())
+        .await?;
+        Ok(())
+    }
+
+    /// Mark a step complete when its work was a file rather than a transaction.
+    pub async fn complete_step(&self, step: &str, items_done: i64) -> Result<(), JobError> {
+        sqlx::query(
+            "UPDATE ingest_steps SET status = 'complete', items_done = ?,
+                                     updated_at = datetime('now')
+              WHERE job_id = ? AND name = ?",
+        )
+        .bind(items_done)
+        .bind(self.id)
+        .bind(step)
+        .execute(self.db.pool())
+        .await?;
+        Ok(())
+    }
+
     pub async fn finish(&self) -> Result<(), JobError> {
         sqlx::query(
             "UPDATE ingest_jobs

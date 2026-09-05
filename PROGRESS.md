@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 1.9.0** · 5 session(s) completed · last updated 2026-09-05
+**Spec version 1.9.0** · 5 session(s) completed · last updated 2026-09-06
 
 ---
 
@@ -51,7 +51,7 @@
 
 ## What's next
 
-Phase 4 subtask 4.10, remaining half: the producer. crates/embedding is done and tested; what is missing is the ONNX model itself, which is gitignored and absent from this machine. Fetch all-MiniLM-L6-v2 INT8 plus its tokenizer.json (Spike C used them as CLI arguments, see spikes/spike-c-ort/src/main.rs), put them under models/, then add an `ingest embed` command that walks the 855,703 core titles through sinephile_embedding::build_document and writes the artefact resumably. Expect 313 MB and time it - ADR-0019's two-hour R4 trigger covers this too.
+Phase 4 subtask 4.10, last piece: run the producer for real. The code is complete and tested with a fake embedder (tools/ingest/tests/embed.rs, 7 tests); what is missing is the model FILE. Download all-MiniLM-L6-v2 INT8 ONNX plus tokenizer.json from huggingface.co (already in the guard's INFRASTRUCTURE_DOMAINS) into models/, add an `ingest embed --model <path> --tokenizer <path>` command that calls sinephile_ingest::embed::produce with OnnxEmbedder, and run it over the 855,703 core titles. Expect ~313 MB and TIME IT - ADR-0019's two-hour trigger applies. That closes E7. Subtask 4.3 stays BLOCKED on B2.
 
 ---
 
