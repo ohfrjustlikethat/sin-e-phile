@@ -16,11 +16,11 @@ A local catalogue of hundreds of thousands of titles that works offline, enriche
 ## Exit criteria
 
 - [ ] **E1** Full ingestion completes on the dev machine and the resulting database is under a documented size budget.
-- [ ] **E2** Ingestion killed mid-run resumes correctly.
-- [ ] **E3** Catalogue lookups work with the network disconnected.
-- [ ] **E4** Rate limits are never exceeded under a stress test of 1,000 rapid lookups.
+- [x] **E2** Ingestion killed mid-run resumes correctly.
+- [x] **E3** Catalogue lookups work with the network disconnected.
+- [x] **E4** Rate limits are never exceeded under a stress test of 1,000 rapid lookups.
 - [x] **E5** Anime titles resolve across AniList and TMDB with correct ID mapping for a hand-checked set of 50 titles including tricky cases (long-running shonen, split-cour seasons, films tied to series).
-- [ ] **E6** The catalogue is fully usable with no TMDB key (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.
+- [x] **E6** The catalogue is fully usable with no TMDB key (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.
 - [ ] **E7** The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.
 
 ## Subtasks

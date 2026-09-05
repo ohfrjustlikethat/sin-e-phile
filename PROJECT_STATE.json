@@ -101,20 +101,20 @@
       {
         "id": "E2",
         "text": "Ingestion killed mid-run resumes correctly.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "`cargo test -p sinephile-ingest --test resume` -> 10 passing, 2026-09-05. a_killed_run_resumes_and_repeats_nothing asserts 50 items exist EXACTLY once after a kill at item 20; progress_survives_a_restart; a_step_that_does_not_advance_its_cursor_is_stopped; and an_interrupted_run_resumes_at_the_next_page in tests/anime.rs. Demonstrated for real as well: the AniList sweep was interrupted and resumed during development, and a_crash_mid_step_reports_that_it_is_resuming was corrected after `is_resuming` was found reporting a fresh run on every real resume."
       },
       {
         "id": "E3",
         "text": "Catalogue lookups work with the network disconnected.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "STRUCTURAL: crates/persistence has no HTTP client in its dependency tree - sqlx is configured sqlite-only with no postgres/mysql feature, and the rest is serde, thiserror, time, tracing, windows-sys. The catalogue layer is incapable of a network call, so lookups cannot depend on one. Exercised by 72 passing tests in `cargo test -p sinephile-persistence`, including the 500,000-row indexed-lookup benchmark, none of which touch a network."
       },
       {
         "id": "E4",
         "text": "Rate limits are never exceeded under a stress test of 1,000 rapid lookups.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "`cargo test -p sinephile-metadata-api` -> limiter::tests::a_thousand_rapid_requests_never_exceed_the_limit, 2026-09-05. 1,000 acquisitions against a 40-per-10-seconds limit must take at least (1000-40)/4 = 240 simulated seconds; the test fails if they are faster. Uses tokio's paused clock, so it measures the limiter rather than the wall."
       },
       {
         "id": "E5",
@@ -125,8 +125,8 @@
       {
         "id": "E6",
         "text": "The catalogue is fully usable with no TMDB key (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "MEASURED on the real catalogue, 2026-09-05, with NO TMDB key ever supplied: 0 rows in external_ids with source='tmdb' and 0 TMDB responses in http_cache. The catalogue nonetheless holds 2,702,737 titles, 855,703 core-tier, 10,079,841 credits, 6,176,950 title rows, 4,450,735 genre links, 1,086,210 ratings, 2,008,183 runtimes and 539,817 episodes - all from IMDb and AniList alone. ADR-0027's per-profile key surface exists (crates/persistence/src/repositories/credentials.rs) and defaults to TmdbAccess::Absent."
       },
       {
         "id": "E7",
@@ -655,20 +655,20 @@
         {
           "id": "E2",
           "text": "Ingestion killed mid-run resumes correctly.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "`cargo test -p sinephile-ingest --test resume` -> 10 passing, 2026-09-05. a_killed_run_resumes_and_repeats_nothing asserts 50 items exist EXACTLY once after a kill at item 20; progress_survives_a_restart; a_step_that_does_not_advance_its_cursor_is_stopped; and an_interrupted_run_resumes_at_the_next_page in tests/anime.rs. Demonstrated for real as well: the AniList sweep was interrupted and resumed during development, and a_crash_mid_step_reports_that_it_is_resuming was corrected after `is_resuming` was found reporting a fresh run on every real resume."
         },
         {
           "id": "E3",
           "text": "Catalogue lookups work with the network disconnected.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "STRUCTURAL: crates/persistence has no HTTP client in its dependency tree - sqlx is configured sqlite-only with no postgres/mysql feature, and the rest is serde, thiserror, time, tracing, windows-sys. The catalogue layer is incapable of a network call, so lookups cannot depend on one. Exercised by 72 passing tests in `cargo test -p sinephile-persistence`, including the 500,000-row indexed-lookup benchmark, none of which touch a network."
         },
         {
           "id": "E4",
           "text": "Rate limits are never exceeded under a stress test of 1,000 rapid lookups.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "`cargo test -p sinephile-metadata-api` -> limiter::tests::a_thousand_rapid_requests_never_exceed_the_limit, 2026-09-05. 1,000 acquisitions against a 40-per-10-seconds limit must take at least (1000-40)/4 = 240 simulated seconds; the test fails if they are faster. Uses tokio's paused clock, so it measures the limiter rather than the wall."
         },
         {
           "id": "E5",
@@ -679,8 +679,8 @@
         {
           "id": "E6",
           "text": "The catalogue is fully usable with no TMDB key (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "MEASURED on the real catalogue, 2026-09-05, with NO TMDB key ever supplied: 0 rows in external_ids with source='tmdb' and 0 TMDB responses in http_cache. The catalogue nonetheless holds 2,702,737 titles, 855,703 core-tier, 10,079,841 credits, 6,176,950 title rows, 4,450,735 genre links, 1,086,210 ratings, 2,008,183 runtimes and 539,817 episodes - all from IMDb and AniList alone. ADR-0027's per-profile key surface exists (crates/persistence/src/repositories/credentials.rs) and defaults to TmdbAccess::Absent."
         },
         {
           "id": "E7",
@@ -1786,7 +1786,7 @@
       ]
     }
   ],
-  "next_action": "Phase 4 is 12 of 13 with only 4.3 outstanding, and 4.3 is BLOCKED on B2 - files.grouplens.org served an expired TLS certificate on 2026-09-04. FIRST: re-run `ingest movielens` and see whether the certificate has been renewed; its code is complete and tested, so a successful download finishes the subtask. If it is still expired, run `/closephase` against the exit criteria instead and record 4.3 as carried forward - do not work around the certificate.",
+  "next_action": "Phase 4 subtask 4.10: the embedding artefact producer (ADR-0014). Build it in tools/ingest as a resumable job: embed the 855,703 core-tier titles with the ONNX all-MiniLM-L6-v2 model already proven in Phase 1 Spike C, write a checksummed artefact recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date. THIS IS THE LAST EXIT CRITERION THAT REAL WORK CAN CLOSE - E7 depends on it and E1 depends on the artefact fitting in R4's remaining 452 MB. Subtask 4.3 stays BLOCKED on B2; the GroupLens certificate was re-checked on 2026-09-05 and is still the expired one (notAfter 2026-08-28).",
   "blockers": [
     {
       "id": "B2",

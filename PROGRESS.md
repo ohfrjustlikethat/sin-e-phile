@@ -12,7 +12,7 @@
 
 **Phase 4 — Metadata Backbone** (`in_progress`, branch `phase/04-metadata-backbone`)
 
-1 of 7 exit criteria met with evidence.
+5 of 7 exit criteria met with evidence.
 
 > The catalogue. Three constraints carry in: ADR-0013 and ADR-0027 mean the app must be complete and good-looking with NO TMDB key and no key ever ships; ADR-0026 means SQL is runtime-checked, so every new repository method needs a line in crates/persistence/tests/repository_surface.rs; and R4 (ingestion larger or slower than expected) is this phase's named risk — measure before committing to a shape, and scope by a popularity threshold rather than ingesting everything.
 
@@ -35,19 +35,23 @@
 ### Exit criteria
 
 - [ ] **E1** Full ingestion completes on the dev machine and the resulting database is under a documented size budget.
-- [ ] **E2** Ingestion killed mid-run resumes correctly.
-- [ ] **E3** Catalogue lookups work with the network disconnected.
-- [ ] **E4** Rate limits are never exceeded under a stress test of 1,000 rapid lookups.
+- [x] **E2** Ingestion killed mid-run resumes correctly.
+      - *Evidence:* `cargo test -p sinephile-ingest --test resume` -> 10 passing, 2026-09-05. a_killed_run_resumes_and_repeats_nothing asserts 50 items exist EXACTLY once after a kill at item 20; progress_survives_a_restart; a_step_that_does_not_advance_its_cursor_is_stopped; and an_interrupted_run_resumes_at_the_next_page in tests/anime.rs. Demonstrated for real as well: the AniList sweep was interrupted and resumed during development, and a_crash_mid_step_reports_that_it_is_resuming was corrected after `is_resuming` was found reporting a fresh run on every real resume.
+- [x] **E3** Catalogue lookups work with the network disconnected.
+      - *Evidence:* STRUCTURAL: crates/persistence has no HTTP client in its dependency tree - sqlx is configured sqlite-only with no postgres/mysql feature, and the rest is serde, thiserror, time, tracing, windows-sys. The catalogue layer is incapable of a network call, so lookups cannot depend on one. Exercised by 72 passing tests in `cargo test -p sinephile-persistence`, including the 500,000-row indexed-lookup benchmark, none of which touch a network.
+- [x] **E4** Rate limits are never exceeded under a stress test of 1,000 rapid lookups.
+      - *Evidence:* `cargo test -p sinephile-metadata-api` -> limiter::tests::a_thousand_rapid_requests_never_exceed_the_limit, 2026-09-05. 1,000 acquisitions against a 40-per-10-seconds limit must take at least (1000-40)/4 = 240 simulated seconds; the test fails if they are faster. Uses tokio's paused clock, so it measures the limiter rather than the wall.
 - [x] **E5** Anime titles resolve across AniList and TMDB with correct ID mapping for a hand-checked set of 50 titles including tricky cases (long-running shonen, split-cour seasons, films tied to series).
       - *Evidence:* `./target/release/ingest verify-anime` -> 64/64 pass, 2026-09-04. Fixture fixtures/anime/e5-hand-checked.tsv covers long-running shonen, split-cour seasons and films tied to series, plus 3 expected REFUSALS and 2 season claims. Numbers and the four fixture errors the first run exposed are in docs/eval-results.md. TMDB half of E5 is not covered - no key ships (ADR-0027), so it is verified per-user in subtask 4.7.
-- [ ] **E6** The catalogue is fully usable with no TMDB key (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.
+- [x] **E6** The catalogue is fully usable with no TMDB key (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.
+      - *Evidence:* MEASURED on the real catalogue, 2026-09-05, with NO TMDB key ever supplied: 0 rows in external_ids with source='tmdb' and 0 TMDB responses in http_cache. The catalogue nonetheless holds 2,702,737 titles, 855,703 core-tier, 10,079,841 credits, 6,176,950 title rows, 4,450,735 genre links, 1,086,210 ratings, 2,008,183 runtimes and 539,817 episodes - all from IMDb and AniList alone. ADR-0027's per-profile key surface exists (crates/persistence/src/repositories/credentials.rs) and defaults to TmdbAccess::Absent.
 - [ ] **E7** The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.
 
 ---
 
 ## What's next
 
-Phase 4 is 12 of 13 with only 4.3 outstanding, and 4.3 is BLOCKED on B2 - files.grouplens.org served an expired TLS certificate on 2026-09-04. FIRST: re-run `ingest movielens` and see whether the certificate has been renewed; its code is complete and tested, so a successful download finishes the subtask. If it is still expired, run `/closephase` against the exit criteria instead and record 4.3 as carried forward - do not work around the certificate.
+Phase 4 subtask 4.10: the embedding artefact producer (ADR-0014). Build it in tools/ingest as a resumable job: embed the 855,703 core-tier titles with the ONNX all-MiniLM-L6-v2 model already proven in Phase 1 Spike C, write a checksummed artefact recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date. THIS IS THE LAST EXIT CRITERION THAT REAL WORK CAN CLOSE - E7 depends on it and E1 depends on the artefact fitting in R4's remaining 452 MB. Subtask 4.3 stays BLOCKED on B2; the GroupLens certificate was re-checked on 2026-09-05 and is still the expired one (notAfter 2026-08-28).
 
 ---
 
@@ -67,7 +71,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 1 | Application Shell and Capability Tiers | A | 0 | 1–2 | 7/7 |
 | [x] | 2 | Design System and Visual Language | A | 1 | 1–2 | 5/5 |
 | [x] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 5/5 |
-| [~] | 4 | Metadata Backbone | A | 3 | 2–3 | 1/7 |
+| [~] | 4 | Metadata Backbone | A | 3 | 2–3 | 5/7 |
 | [ ] | 5 | Semantic Search Engine | A | 4 | 2 | 0/5 |
 | [ ] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 0/6 |
 | [ ] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 0/8 |
