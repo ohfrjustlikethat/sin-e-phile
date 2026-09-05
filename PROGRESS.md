@@ -51,7 +51,7 @@
 
 ## What's next
 
-Phase 5: the trigram index is built (196 MB, 2,702,737 titles) and typo tolerance works - 'seven samuria' finds Seven Samurai. TWO MEASURED PROBLEMS BLOCK E1, recorded as D30 and D31: the fuzzy path costs 256-390 ms against an 80 ms budget, and a weak keyword hit stops fuzzy running at all. Do 5.6 FIRST - build fixtures/search/ and the relevance harness - because both fixes need a threshold chosen from a corpus rather than guessed, and E2/E3 need the harness regardless.
+Phase 5 subtask 5.6: write fixtures/search/exact-titles.tsv and fixtures/search/semantic-queries.tsv, then a harness that reads them at tools/eval/src/search.rs (a new binary, as SPEC.md 15 Phase 5 names `cargo run -p eval -- search --report`). Do this BEFORE fixing D30 and D31: both need a BM25 score threshold and a fuzzy-tier cutoff chosen from a corpus rather than guessed, and E2 (exact-title top-1 = 100%) and E3 (nDCG@10 > 0.75) cannot be evidenced without the harness at all. The trigram index is built and typo tolerance works - see SearchRepository::fuzzy in crates/persistence/src/repositories/search.rs - but costs 256-390 ms against E1's 80 ms budget.
 
 ---
 
