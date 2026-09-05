@@ -746,8 +746,8 @@
         },
         {
           "id": "4.10",
-          "text": "The embedding artefact producer (ADR-0014): deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date; published as a GitHub Release asset",
-          "status": "not_started",
+          "text": "The embedding artefact producer (ADR-0014). crates/embedding holds the document builder, int8 quantisation and the checksummed file format, all tested. The PRODUCER still needs the ONNX model, which is gitignored and not on this machine.",
+          "status": "in_progress",
           "commit": null
         },
         {
@@ -1786,7 +1786,7 @@
       ]
     }
   ],
-  "next_action": "Phase 4 subtask 4.10: the embedding artefact producer (ADR-0014). Build it in tools/ingest as a resumable job: embed the 855,703 core-tier titles with the ONNX all-MiniLM-L6-v2 model already proven in Phase 1 Spike C, write a checksummed artefact recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date. THIS IS THE LAST EXIT CRITERION THAT REAL WORK CAN CLOSE - E7 depends on it and E1 depends on the artefact fitting in R4's remaining 452 MB. Subtask 4.3 stays BLOCKED on B2; the GroupLens certificate was re-checked on 2026-09-05 and is still the expired one (notAfter 2026-08-28).",
+  "next_action": "Phase 4 subtask 4.10, remaining half: the producer. crates/embedding is done and tested; what is missing is the ONNX model itself, which is gitignored and absent from this machine. Fetch all-MiniLM-L6-v2 INT8 plus its tokenizer.json (Spike C used them as CLI arguments, see spikes/spike-c-ort/src/main.rs), put them under models/, then add an `ingest embed` command that walks the 855,703 core titles through sinephile_embedding::build_document and writes the artefact resumably. Expect 313 MB and time it - ADR-0019's two-hour R4 trigger covers this too.",
   "blockers": [
     {
       "id": "B2",
@@ -2031,7 +2031,7 @@
     {
       "id": "D16",
       "phase_raised": 4,
-      "text": "R4 headroom is 461 MB after episodes (3,635 MB of 4,096 MB). The embedding artefact, AniList and MovieLens all still have to fit. The >=10 core vote threshold in tools/ingest/src/imdb.rs::CatalogueScope::DEFAULT is the lever if they do not - tightening to >=50 cuts the core from 854,752 titles to roughly 484,000, which reduces credits and akas proportionately. Decide ONCE, after those three are measured. Four storage predictions in this phase have been wrong in both directions; a fifth would be no better."
+      "text": "RESOLVED. The >= 10 core vote threshold survives. The embedding artefact is 313 MB for 855,703 core titles at 384 int8 dimensions - arithmetic over the fixed format in crates/embedding/src/artefact.rs, not a prediction - against 452 MB of R4 headroom, and it lives outside the database anyway. See docs/eval-results.md."
     },
     {
       "id": "D17",

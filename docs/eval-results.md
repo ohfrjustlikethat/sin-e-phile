@@ -990,3 +990,43 @@ Two bugs the tests caught, both of which would have shipped silently:
   test for it.
 - **`&hash[2..6]` panics on a UTF-8 boundary.** These values come out of a database, so
   one corrupt row would have taken the process down. Indexed as bytes now.
+
+### The embedding artefact: R4 answered by arithmetic on a measured format
+
+`cargo test -p sinephile-embedding`, 2026-09-05. 24 passing.
+
+ADR-0014 budgets INT8 at 384 dimensions, ~77 MB per 200,000 titles. The artefact format
+is now written down rather than estimated, so the size is a calculation over a real
+layout — a 256-byte header, one int8 per dimension per title, a 32-byte SHA-256:
+
+| | |
+|---|---|
+| Core-tier titles to embed | 855,703 |
+| Dimensions | 384 |
+| **Artefact size** | **313 MB** (`the_expected_size_can_be_shown_before_a_download`) |
+| R4 headroom before it | 452 MB (3,644 of 4,096 MB) |
+| **Headroom after** | **139 MB** |
+
+**It fits, and the `>= 10` core threshold survives.** That question has been open since
+migration 0009 and is now answerable: at 855,703 core titles the artefact costs 313 MB
+against 452 MB available. The number is arithmetic over a fixed format, not a
+prediction, which is why it can be trusted where the earlier storage estimates could
+not — and the artefact lives outside the database in any case, so R4's trigger is not
+what bounds it. It is recorded here because ADR-0014 says catalogue growth must not
+inflate it unnoticed.
+
+**Quantisation was checked for the thing that would make it useless**: int8 must not
+change the *order* of results. Over 384-dimension unit vectors, cosine similarity moves
+by less than 0.005, and a vector's similarity to its own round trip is above 0.9999.
+
+Two guards were broken deliberately to confirm they fail:
+
+- `-128` is never produced. Its negation does not fit in an i8, so a dot product that
+  negates a component overflows on exactly one value in 256 — a bug that surfaces once
+  in a million comparisons and never reproduces. Raising the clamp to 128 makes
+  `minus_128_is_never_produced` fail on the first seed.
+- A mismatched model identity is refused. Disabling the check makes
+  `a_mismatched_model_is_refused` fail. This is the more important of the two: a corrupt
+  download fails loudly, but a *mismatched* artefact fails silently — vectors from one
+  model compared against queries from another, with search simply getting worse and
+  nothing to point at.
