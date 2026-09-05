@@ -51,26 +51,26 @@
       {
         "id": "4.7",
         "text": "Per-profile TMDB key from settings, never shipped (ADR-0027); every TMDB-dependent surface degrades to the typographic state",
-        "status": "not_started",
+        "status": "in_progress",
         "commit": null
       },
       {
         "id": "4.8",
         "text": "Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding, blurhash placeholders",
-        "status": "not_started",
+        "status": "in_progress",
         "commit": null
       },
       {
         "id": "4.9",
         "text": "First-run flow: usable during the background build, searching what is ingested so far",
-        "status": "not_started",
+        "status": "in_progress",
         "commit": null
       },
       {
         "id": "4.10",
         "text": "The embedding artefact producer (ADR-0014): deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date; published as a GitHub Release asset",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "4f302d5"
       },
       {
         "id": "4.11",
@@ -131,8 +131,8 @@
       {
         "id": "E7",
         "text": "The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "`./target/release/ingest embed` then `ingest verify-embeddings`, 2026-09-06. 855,703 vectors, 384 dimensions int8, 313 MB (328,590,240 bytes - exactly 256 + 855703*384 + 32), 4,293 s, sha256 3fce6f062c25220a80425cce7e9f83a3b80412af3b34fe4e9071d3b80645a2b0. Deterministic (no build timestamp; snapshot date read from the catalogue), resumable (verified by the 7 tests in tools/ingest/tests/embed.rs, including a kill mid-run and a torn write), checksummed, and recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date. Format specified in docs/specs/embedding-artefact.md. NOT YET PUBLISHED as a GitHub Release asset - that is a manual step the author takes, and D27 records it."
       }
     ]
   },
@@ -685,8 +685,8 @@
         {
           "id": "E7",
           "text": "The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "`./target/release/ingest embed` then `ingest verify-embeddings`, 2026-09-06. 855,703 vectors, 384 dimensions int8, 313 MB (328,590,240 bytes - exactly 256 + 855703*384 + 32), 4,293 s, sha256 3fce6f062c25220a80425cce7e9f83a3b80412af3b34fe4e9071d3b80645a2b0. Deterministic (no build timestamp; snapshot date read from the catalogue), resumable (verified by the 7 tests in tools/ingest/tests/embed.rs, including a kill mid-run and a torn write), checksummed, and recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date. Format specified in docs/specs/embedding-artefact.md. NOT YET PUBLISHED as a GitHub Release asset - that is a manual step the author takes, and D27 records it."
         }
       ],
       "subtasks": [
@@ -747,8 +747,8 @@
         {
           "id": "4.10",
           "text": "The embedding artefact producer (ADR-0014). crates/embedding holds the document builder, int8 quantisation and the checksummed format; tools/ingest/src/embed.rs is the resumable producer, with the model and tokenizer checksum-pinned. Format specified in docs/specs/embedding-artefact.md. A full run over the 855,703 core titles is IN PROGRESS - it closes E7.",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "4f302d5"
         },
         {
           "id": "4.11",
@@ -1786,7 +1786,7 @@
       ]
     }
   ],
-  "next_action": "Phase 4: finish the embedding run if it is not already done - `ingest embed` is resumable, so re-running it continues from data/embeddings-all-MiniLM-L6-v2-int8.vectors.part. Record its size, time and sha256 in docs/eval-results.md and set E7's evidence, then run `python tools/phasedoc/generate.py --close 4`. It will STILL refuse while E1 is unmet, and E1 needs MovieLens, which is blocked on B2 - GroupLens' TLS certificate, last checked 2026-09-05, still expired since 2026-08-28. If it is still down, close Phase 4 with 4.3 and E1 carried forward EXPLICITLY rather than fudged.",
+  "next_action": "PHASE 4 CANNOT CLOSE and must not be forced. Six of seven exit criteria are met with evidence; E1 needs a full ingestion and MovieLens is blocked on B2 - GroupLens' TLS certificate, re-checked 2026-09-06, still the expired one (notAfter 2026-08-28, nine days). SPEC.md 10.11 forbids redefining a criterion that cannot be met, so the phase stays open. RECOMMENDED, and sanctioned by CLAUDE.md ('working out of order beats sitting stuck'): start Phase 5 (semantic search) on branch phase/05-search. It needs the catalogue and the embedding artefact, both of which exist; MovieLens feeds Phase 16's collaborative filtering, not search. Re-run `ingest movielens` whenever the certificate is renewed - the code is complete and tested - then close Phase 4.",
   "blockers": [
     {
       "id": "B2",
@@ -2082,6 +2082,11 @@
       "id": "D26",
       "phase_raised": 4,
       "text": "THE APPLICATION DOES NOT OPEN THE DATABASE YET. src-tauri's AppState holds the hardware profile and nothing else, so CatalogueRepository::readiness, CredentialRepository and the artwork cache are all reachable from tests and from tools/ingest but not from the running app. Phase 5 needs the database open for search and is the natural place to do it. WHEN IT DOES: re-measure cold start. Phase 1 recorded 515/660 ms to interactive against a 2 s Tier 2 budget, and opening a 3.6 GB SQLite file plus a migration version check is the first thing since then that could move it. Measuring after the change rather than before would make a regression invisible."
+    },
+    {
+      "id": "D27",
+      "phase_raised": 4,
+      "text": "The embedding artefact is PRODUCED but not PUBLISHED. ADR-0014 says it ships as a versioned GitHub Release asset with its checksum, downloaded on consent with the size shown. Producing it is automated; uploading a 313 MB file to a Release is a manual step the author takes, and the download-with-consent flow is Phase 5's, since nothing reads the artefact until search does. sha256 3fce6f062c25220a80425cce7e9f83a3b80412af3b34fe4e9071d3b80645a2b0."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

@@ -44,7 +44,7 @@ Tier 2 and are labelled as such.
 | *(Phase 1, Spike B)* Time to first usable bytes | escalate if > 20 s | — | — | — | — | spike harness |
 | *(Phase 1)* Cold start to interactive | < 4 s (T0) / < 2 s (T2) | — | — | — | — | — |
 | *(Phase 1)* Idle RAM | < 250 MB (T0) / < 200 MB (T2) | — | — | — | — | — |
-| *(Phase 3)* Indexed lookup, 500k rows | < 100 ms | — | — | — | — | — |
+| *(Phase 3)* Indexed lookup, 500k rows | < 100 ms | 2 | **0.141 ms** p95 (worst of three) | 2026-09-06 | `4f302d5` | `cargo test -p sinephile-persistence --test benchmark --release -- --ignored` |
 | *(Phase 5)* Keystroke → results p95 | < 80 ms *incl. embedding* | 0 | — | — | — | — |
 | *(Phase 7)* Play → first frame, healthy swarm | < 8 s | — | — | — | — | — |
 | *(Phase 8)* Play → first frame, local | < 500 ms | — | — | — | — | — |
@@ -1030,3 +1030,46 @@ Two guards were broken deliberately to confirm they fail:
   download fails loudly, but a *mismatched* artefact fails silently — vectors from one
   model compared against queries from another, with search simply getting worse and
   nothing to point at.
+
+### The embedding artefact, produced
+
+`./target/release/ingest embed`, 2026-09-06. Verified with `ingest verify-embeddings`.
+
+| | |
+|---|---|
+| Vectors | **855,703** |
+| Dimensions | 384, int8 |
+| **Size** | **313 MB** (328,590,240 bytes) |
+| **Time** | **4,293 s** (71.5 min) |
+| Rate | 199 vectors/second |
+| SHA-256 | `3fce6f062c25220a80425cce7e9f83a3b80412af3b34fe4e9071d3b80645a2b0` |
+| Model | `all-MiniLM-L6-v2-int8`, sha256 `afdb6f1a…`, 22,972,370 bytes |
+| Catalogue snapshot | 2026-09-04 |
+
+**The size is exactly what the format predicted**: `256 + 855,703 × 384 + 32 =
+328,590,240` bytes, to the byte. That was computed before the run from the layout in
+`crates/embedding/src/artefact.rs`, which is the difference between arithmetic and an
+estimate — and the reason it can be relied on for the next catalogue.
+
+**71.5 minutes is inside ADR-0019's two-hour trigger, and not by much.** This is a
+first-run cost on a Tier 2 machine (24 cores); ADR-0014 puts it on the author's machine
+precisely so it is not paid on Tier 0, where it would be far worse. The artefact is
+downloaded there instead.
+
+`verify-embeddings` checks what actually matters — not "is the file intact" but "would
+loading it produce meaningful results on this build": checksum, then model identity,
+then document-builder version, then that the **last** vector is present and non-empty.
+The last one is where an off-by-one in the layout shows up and nowhere else.
+
+### No regression in earlier phases
+
+Required before closing a phase (§10.12). Phase 3's indexed-lookup benchmark, re-run on
+2026-09-06 after the catalogue grew from a fixture to 2.7 million real titles:
+
+| Lookup | p50 | p95 | p99 | worst |
+|---|---|---|---|---|
+| by id | 0.031 ms | 0.067 ms | 0.121 ms | 0.722 ms |
+| by exact title | 0.074 ms | 0.141 ms | 0.257 ms | 0.404 ms |
+| by external id | 0.062 ms | 0.119 ms | 0.176 ms | 0.666 ms |
+
+Against a 100 ms budget. Three orders of magnitude of headroom, unchanged.

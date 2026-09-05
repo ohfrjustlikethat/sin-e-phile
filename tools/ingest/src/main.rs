@@ -48,6 +48,8 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
   ingest embed             produce the embedding artefact (ADR-0014) over the
                            core tier. Needs models/all-MiniLM-L6-v2-int8.onnx and
                            its tokenizer; both are checksum-pinned. Resumable.
+  ingest verify-embeddings verify the artefact: checksum, header, and whether it
+                           matches the model and document builder this build has
   ingest verify-anime      check the catalogue against
                            fixtures/anime/e5-hand-checked.tsv — exit criterion
                            E5's evidence. Exits non-zero on any mismatch.
@@ -139,6 +141,7 @@ async fn main() -> Result<(), JobError> {
         "repair-variants" => repair_variants(&db).await,
         "refresh" => refresh(&db, &dir.join("datasets")).await,
         "embed" => embed_artefact(&db, &dir).await,
+        "verify-embeddings" => verify_embeddings(&dir),
         "verify-anime" => verify_anime(&db).await,
         "status" => status(&db).await,
         "reset" => match args.get(1) {
@@ -766,6 +769,71 @@ async fn embed_artefact(db: &Db, dir: &Path) -> Result<(), JobError> {
     );
     println!("  sha256 {}", produced.checksum_hex());
     println!("  {}", artefact_path.display());
+    println!();
+    Ok(())
+}
+
+/// Verify the embedding artefact, as the application will at startup.
+///
+/// Reproduces the check that matters: not merely "is the file intact" but "would
+/// loading it produce meaningful results on this build". A mismatched artefact is
+/// intact and useless.
+fn verify_embeddings(dir: &Path) -> Result<(), JobError> {
+    use sinephile_embedding::{document, Artefact};
+    use sinephile_ingest::embed;
+
+    let path = dir.join("embeddings-all-MiniLM-L6-v2-int8.bin");
+    let mut file = std::fs::File::open(&path)
+        .map_err(|e| JobError::step("verify", format!("{}: {e}", path.display())))?;
+    let artefact =
+        Artefact::read(&mut file).map_err(|e| JobError::step("verify", e.to_string()))?;
+
+    println!();
+    println!("  {}", path.display());
+    println!("  model            {}", artefact.header.model);
+    println!("  dimension        {}", artefact.header.dimension);
+    println!("  quantisation     {:?}", artefact.header.quantisation);
+    println!(
+        "  document builder v{}",
+        artefact.header.document_builder_version
+    );
+    println!("  catalogue        {}", artefact.header.snapshot_date);
+    println!("  vectors          {}", artefact.header.count);
+    println!("  sha256           {}", artefact.checksum_hex());
+
+    match artefact
+        .header
+        .compatible_with(embed::MODEL_IDENTITY, document::VERSION)
+    {
+        Ok(()) => println!("  compatible       yes"),
+        Err(e) => {
+            println!("  compatible       NO — {e}");
+            std::process::exit(1);
+        }
+    }
+
+    // A vector nobody would notice being wrong: the last one. An off-by-one in the
+    // layout shows up here and nowhere else.
+    let last = artefact.header.count.saturating_sub(1);
+    match artefact.vector(last) {
+        Some(v) if v.len() == artefact.header.dimension as usize => {
+            let magnitude: f64 = v.iter().map(|c| (*c as f64).powi(2)).sum::<f64>().sqrt();
+            println!(
+                "  last vector      {} dimensions, magnitude {magnitude:.1}",
+                v.len()
+            );
+            // A vector of zeros would mean the model returned nothing and it was
+            // written anyway.
+            if magnitude < 1.0 {
+                println!("  WARNING: the last vector is all but empty");
+                std::process::exit(1);
+            }
+        }
+        _ => {
+            println!("  last vector      MISSING — the layout is wrong");
+            std::process::exit(1);
+        }
+    }
     println!();
     Ok(())
 }

@@ -12,11 +12,11 @@
 
 **Phase 4 — Metadata Backbone** (`in_progress`, branch `phase/04-metadata-backbone`)
 
-5 of 7 exit criteria met with evidence.
+6 of 7 exit criteria met with evidence.
 
 > The catalogue. Three constraints carry in: ADR-0013 and ADR-0027 mean the app must be complete and good-looking with NO TMDB key and no key ever ships; ADR-0026 means SQL is runtime-checked, so every new repository method needs a line in crates/persistence/tests/repository_surface.rs; and R4 (ingestion larger or slower than expected) is this phase's named risk — measure before committing to a shape, and scope by a popularity threshold rather than ingesting everything.
 
-### Subtasks — 8/13 complete
+### Subtasks — 9/13 complete
 
 - [x] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts · `4a78d64`
 - [x] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres · `048180a`
@@ -24,10 +24,10 @@
 - [x] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, and seasonal episode numbering into episode_numbering. Absolute numbering is NULL by ADR-0031 - no free source publishes one. · `a170532`
 - [x] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules · `f67d939`
 - [x] **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline · `38d75d7`
-- [ ] **4.7** Per-profile TMDB key from settings, never shipped (ADR-0027); every TMDB-dependent surface degrades to the typographic state
-- [ ] **4.8** Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding, blurhash placeholders
-- [ ] **4.9** First-run flow: usable during the background build, searching what is ingested so far
-- [ ] **4.10** The embedding artefact producer (ADR-0014): deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date; published as a GitHub Release asset
+- [~] **4.7** Per-profile TMDB key from settings, never shipped (ADR-0027); every TMDB-dependent surface degrades to the typographic state
+- [~] **4.8** Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding, blurhash placeholders
+- [~] **4.9** First-run flow: usable during the background build, searching what is ingested so far
+- [x] **4.10** The embedding artefact producer (ADR-0014): deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date; published as a GitHub Release asset · `4f302d5`
 - [x] **4.11** 50-title anime fixture for E5: fixtures/anime/e5-hand-checked.tsv, 64 rows, checked by `ingest verify-anime` which exits non-zero on any mismatch · `f19ddda`
 - [x] **4.12** Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits · `38d75d7`
 - [x] **4.13** Incremental catalogue refresh (ADR-0030): re-fetch title.basics/ratings/episode and insert only the tail past the highest id already stored, reusing TsvReader::seek_past. Plus AniList airing schedules, which need no key. See docs/specs/catalogue-freshness.md. · `47e7353`
@@ -45,13 +45,14 @@
       - *Evidence:* `./target/release/ingest verify-anime` -> 64/64 pass, 2026-09-04. Fixture fixtures/anime/e5-hand-checked.tsv covers long-running shonen, split-cour seasons and films tied to series, plus 3 expected REFUSALS and 2 season claims. Numbers and the four fixture errors the first run exposed are in docs/eval-results.md. TMDB half of E5 is not covered - no key ships (ADR-0027), so it is verified per-user in subtask 4.7.
 - [x] **E6** The catalogue is fully usable with no TMDB key (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.
       - *Evidence:* MEASURED on the real catalogue, 2026-09-05, with NO TMDB key ever supplied: 0 rows in external_ids with source='tmdb' and 0 TMDB responses in http_cache. The catalogue nonetheless holds 2,702,737 titles, 855,703 core-tier, 10,079,841 credits, 6,176,950 title rows, 4,450,735 genre links, 1,086,210 ratings, 2,008,183 runtimes and 539,817 episodes - all from IMDb and AniList alone. ADR-0027's per-profile key surface exists (crates/persistence/src/repositories/credentials.rs) and defaults to TmdbAccess::Absent.
-- [ ] **E7** The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.
+- [x] **E7** The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.
+      - *Evidence:* `./target/release/ingest embed` then `ingest verify-embeddings`, 2026-09-06. 855,703 vectors, 384 dimensions int8, 313 MB (328,590,240 bytes - exactly 256 + 855703*384 + 32), 4,293 s, sha256 3fce6f062c25220a80425cce7e9f83a3b80412af3b34fe4e9071d3b80645a2b0. Deterministic (no build timestamp; snapshot date read from the catalogue), resumable (verified by the 7 tests in tools/ingest/tests/embed.rs, including a kill mid-run and a torn write), checksummed, and recording model identity, quantisation, dimension, document-builder version and catalogue snapshot date. Format specified in docs/specs/embedding-artefact.md. NOT YET PUBLISHED as a GitHub Release asset - that is a manual step the author takes, and D27 records it.
 
 ---
 
 ## What's next
 
-Phase 4: finish the embedding run if it is not already done - `ingest embed` is resumable, so re-running it continues from data/embeddings-all-MiniLM-L6-v2-int8.vectors.part. Record its size, time and sha256 in docs/eval-results.md and set E7's evidence, then run `python tools/phasedoc/generate.py --close 4`. It will STILL refuse while E1 is unmet, and E1 needs MovieLens, which is blocked on B2 - GroupLens' TLS certificate, last checked 2026-09-05, still expired since 2026-08-28. If it is still down, close Phase 4 with 4.3 and E1 carried forward EXPLICITLY rather than fudged.
+PHASE 4 CANNOT CLOSE and must not be forced. Six of seven exit criteria are met with evidence; E1 needs a full ingestion and MovieLens is blocked on B2 - GroupLens' TLS certificate, re-checked 2026-09-06, still the expired one (notAfter 2026-08-28, nine days). SPEC.md 10.11 forbids redefining a criterion that cannot be met, so the phase stays open. RECOMMENDED, and sanctioned by CLAUDE.md ('working out of order beats sitting stuck'): start Phase 5 (semantic search) on branch phase/05-search. It needs the catalogue and the embedding artefact, both of which exist; MovieLens feeds Phase 16's collaborative filtering, not search. Re-run `ingest movielens` whenever the certificate is renewed - the code is complete and tested - then close Phase 4.
 
 ---
 
@@ -71,7 +72,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 1 | Application Shell and Capability Tiers | A | 0 | 1–2 | 7/7 |
 | [x] | 2 | Design System and Visual Language | A | 1 | 1–2 | 5/5 |
 | [x] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 5/5 |
-| [~] | 4 | Metadata Backbone | A | 3 | 2–3 | 5/7 |
+| [~] | 4 | Metadata Backbone | A | 3 | 2–3 | 6/7 |
 | [ ] | 5 | Semantic Search Engine | A | 4 | 2 | 0/5 |
 | [ ] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 0/6 |
 | [ ] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 0/8 |
@@ -128,6 +129,7 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D24** (raised in Phase 4) `ingest refresh` re-downloads title.basics (216 MB) every run because gzip cannot be seeked and IMDb publishes no changelog. Weekly is fine; daily would not be. If the cadence ever tightens, check whether IMDb serves conditional requests - the http_cache table from migration 0008 already stores ETag and Last-Modified, and crates/metadata-api handles revalidation, so a 304 would make this nearly free.
 - **D25** (raised in Phase 4) The TMDB key is DPAPI-wrapped, so it is bound to the Windows user account and a copied ./data/ folder cannot decrypt it. That is deliberate (crates/persistence/src/secrets.rs) and degrades to TmdbAccess::Absent, but it means the PORTABLE promise of ADR-0008 has one documented exception: move the folder to another machine or account and the key must be re-entered. Everything else in the folder still works. Worth a line in the settings UI when Phase 14 builds it, so the user is told rather than surprised.
 - **D26** (raised in Phase 4) THE APPLICATION DOES NOT OPEN THE DATABASE YET. src-tauri's AppState holds the hardware profile and nothing else, so CatalogueRepository::readiness, CredentialRepository and the artwork cache are all reachable from tests and from tools/ingest but not from the running app. Phase 5 needs the database open for search and is the natural place to do it. WHEN IT DOES: re-measure cold start. Phase 1 recorded 515/660 ms to interactive against a 2 s Tier 2 budget, and opening a 3.6 GB SQLite file plus a migration version check is the first thing since then that could move it. Measuring after the change rather than before would make a regression invisible.
+- **D27** (raised in Phase 4) The embedding artefact is PRODUCED but not PUBLISHED. ADR-0014 says it ships as a versioned GitHub Release asset with its checksum, downloaded on consent with the size shown. Producing it is automated; uploading a 313 MB file to a Release is a manual step the author takes, and the download-with-consent flow is Phase 5's, since nothing reads the artefact until search does. sha256 3fce6f062c25220a80425cce7e9f83a3b80412af3b34fe4e9071d3b80645a2b0.
 
 ---
 
