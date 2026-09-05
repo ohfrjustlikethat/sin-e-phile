@@ -51,7 +51,7 @@
 
 ## What's next
 
-Phase 4 is blocked on TWO author actions, both recorded as blockers B2 and B3, and cannot close until one of E1/E7 is unblocked. Author's instruction on 2026-09-06: start Phase 5 meanwhile. Create branch phase/05-search, read SPEC.md 15's Phase 5 entry, and run `python tools/phasedoc/generate.py --open 5`. Phase 5 needs the catalogue (2.7M titles) and the embedding artefact, both of which exist on disk.
+PHASE 5 IS BEING WORKED OUT OF ORDER, on branch phase/05-search, because Phase 4 cannot close: blockers B2 (GroupLens' expired certificate) and B3 (publishing the embedding artefact) both need the author. current_phase deliberately REMAINS 4 - advancing it would require Phase 4 to be complete or skipped, and it is neither. Phase 5's working document is docs/phases/phase-05-semantic-search-engine.md and its subtasks are in phases[5]. Start with 5.1: an FTS5 migration over titles, alternative titles, people and keywords. Verified on 2026-09-06 that the bundled SQLite 3.46.0 supports fts5, the trigram tokenizer, unicode61 diacritic folding and bm25().
 
 ---
 

@@ -809,6 +809,62 @@
           "met": false,
           "evidence": null
         }
+      ],
+      "subtasks": [
+        {
+          "id": "5.1",
+          "text": "FTS5 index over titles, alternative titles, people and keywords, with BM25 ranking. Migration; unicode61 with diacritic folding, plus a trigram index for typo tolerance. Verified available: SQLite 3.46.0 bundled with sqlx supports fts5, trigram, unicode61 and bm25().",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "5.2",
+          "text": "The exact-title short-circuit. E2 demands a 100% top-1 rate, so a literal title match must bypass ranking entirely rather than merely score highly. titles.normalised (migration 0009) already exists for this.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "5.3",
+          "text": "HNSW over the 855,703-vector artefact, persisted and memory-mapped. See DECISIONS_PENDING P11 for the library choice.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "5.4",
+          "text": "Reciprocal rank fusion of BM25 and vector results, with the exact-title short-circuit above both.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "5.5",
+          "text": "Query understanding: extract year ranges, languages, runtime bounds and 'directed by' as structured FILTERS rather than feeding them to the embedder.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "5.6",
+          "text": "fixtures/search/ corpus and the relevance eval harness: exact-title top-1 (E2) and nDCG@10 (E3).",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "5.7",
+          "text": "Open the database in the application (debt D26) and RE-MEASURE COLD START against Phase 1's 515/660 ms before and after.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "5.8",
+          "text": "Search UI: results as you type, grouped by kind, keyboard navigable, with a 'why this matched' hint. Must consult CatalogueRepository::readiness before saying 'no results'.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "5.9",
+          "text": "Tier 0 artefact download with consent and the size shown (ADR-0014, debt D27), and the FTS5-only degradation when it is absent.",
+          "status": "not_started",
+          "commit": null
+        }
       ]
     },
     {
@@ -1786,7 +1842,7 @@
       ]
     }
   ],
-  "next_action": "Phase 4 is blocked on TWO author actions, both recorded as blockers B2 and B3, and cannot close until one of E1/E7 is unblocked. Author's instruction on 2026-09-06: start Phase 5 meanwhile. Create branch phase/05-search, read SPEC.md 15's Phase 5 entry, and run `python tools/phasedoc/generate.py --open 5`. Phase 5 needs the catalogue (2.7M titles) and the embedding artefact, both of which exist on disk.",
+  "next_action": "PHASE 5 IS BEING WORKED OUT OF ORDER, on branch phase/05-search, because Phase 4 cannot close: blockers B2 (GroupLens' expired certificate) and B3 (publishing the embedding artefact) both need the author. current_phase deliberately REMAINS 4 - advancing it would require Phase 4 to be complete or skipped, and it is neither. Phase 5's working document is docs/phases/phase-05-semantic-search-engine.md and its subtasks are in phases[5]. Start with 5.1: an FTS5 migration over titles, alternative titles, people and keywords. Verified on 2026-09-06 that the bundled SQLite 3.46.0 supports fts5, the trigram tokenizer, unicode61 diacritic folding and bm25().",
   "blockers": [
     {
       "id": "B2",

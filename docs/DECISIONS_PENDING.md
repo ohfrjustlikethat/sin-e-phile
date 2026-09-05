@@ -227,3 +227,53 @@ specifically to avoid it.
 **Option 1.** Leave `absolute_number` NULL, amend §6.2 to describe what is actually
 stored, and record the derivation problem against Phase 12 so it arrives with the
 context rather than rediscovering it.
+
+---
+
+## P11 — Which HNSW implementation {#p11}
+
+**Raised:** 2026-09-06, Phase 5 subtask 5.3.
+
+### The decision, in one sentence
+
+`SPEC.md` §2 locks "HNSW, persisted" as the vector index and Phase 5 adds "memory-mapped";
+which library provides it, over 855,703 vectors of 384 int8 dimensions.
+
+### The options
+
+1. **`usearch`** — C++ bindings. **The only one that memory-maps a persisted index**,
+   which is what §15 Phase 5 actually asks for and what keeps Tier 0's idle RAM inside
+   the §2.3 250 MB budget: a 313 MB index loaded into memory does not fit there.
+   **Cost:** a third C/C++ dependency after ONNX Runtime and libwebp — all three already
+   need the MSVC toolchain, so it adds no new build requirement, but it is more foreign
+   code the author must be able to speak about.
+
+2. **`instant-distance`** — pure Rust, serde persistence. **Cost:** loads the whole
+   index into memory. At 313 MB of vectors plus graph overhead that breaks the Tier 0
+   RAM budget outright, which is the tier this artefact exists to serve (ADR-0015).
+
+3. **`hnsw_rs` / `fast-hnsw`** — pure Rust with file dump and load. **Cost:** same
+   memory question as (2) unless they mmap; needs checking rather than assuming, which
+   is a half-day before any code is written.
+
+4. **Write it.** HNSW is a skip-list of proximity graphs — explainable, and the
+   portfolio value is real. **Cost:** it is the one algorithm here where a subtle bug
+   produces *plausible but worse* results rather than a failure, and Phase 5's exit
+   criteria are measured numbers. Recall would need its own eval before the search eval
+   could be trusted.
+
+### Recommendation
+
+**(1) `usearch`**, because the memory-mapping requirement is not decoration: it is what
+lets Tier 0 hold a 313 MB index inside a 250 MB RAM budget, and options 2 and 3 do not
+obviously satisfy it. I would rather take a third C++ dependency than quietly miss a
+§2.3 budget.
+
+**(4) is the one I would enjoy most and would advise against**, for the same reason the
+AniList matcher refuses to guess: a wrong-but-plausible answer is the expensive kind.
+
+### The default if you say "your call"
+
+**Option 1**, with the recall measured against a brute-force baseline on the fixture
+corpus before any relevance number is reported — so that if the index is the reason a
+number is bad, that is visible rather than inferred.
