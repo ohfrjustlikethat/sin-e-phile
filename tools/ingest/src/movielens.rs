@@ -71,6 +71,44 @@ impl Release {
     }
 }
 
+/// The MD5 GroupLens publishes for `ml-25m.zip`.
+///
+/// **Read from `grouplens.org`, which has a VALID certificate, for a file served from
+/// `files.grouplens.org`, which does not** (expired 2026-08-28, still expired on
+/// 2026-09-06). That asymmetry is the whole point: the transport carrying the archive
+/// cannot currently be authenticated, but the checksum describing it can be. A file
+/// fetched by hand over the broken link and verified against this is as trustworthy as
+/// one fetched over a working one — and considerably more trustworthy than disabling
+/// certificate verification in the application, which would degrade every future
+/// download for every user because a university let a certificate lapse.
+pub const ML25M_MD5: &str = "544c4d86ea9f05e056d8075398539b34";
+
+/// Verify a manually-placed archive.
+///
+/// MD5 because that is what GroupLens publishes. It is not a security hash and is not
+/// used as one: the guarantee here is integrity against a truncated or corrupted
+/// download, and the authenticity comes from where the checksum was read, not from the
+/// algorithm.
+pub fn verify_md5(path: &Path, expected: &str) -> Result<(), JobError> {
+    use md5::{Digest, Md5};
+    let bytes = std::fs::read(path)
+        .map_err(|e| JobError::step("movielens", format!("{}: {e}", path.display())))?;
+    let actual: String = Md5::digest(&bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    if actual != expected {
+        return Err(JobError::step(
+            "movielens",
+            format!(
+                "{} has md5 {actual}, expected {expected} — the download is incomplete or                  is not the file GroupLens published",
+                path.display()
+            ),
+        ));
+    }
+    Ok(())
+}
+
 /// One row of `links.csv`.
 #[derive(Debug, Clone, Copy)]
 pub struct Link {

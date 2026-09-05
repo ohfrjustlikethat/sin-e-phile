@@ -52,13 +52,14 @@
 
 ## What's next
 
-PHASE 4 CANNOT CLOSE and must not be forced. Six of seven exit criteria are met with evidence; E1 needs a full ingestion and MovieLens is blocked on B2 - GroupLens' TLS certificate, re-checked 2026-09-06, still the expired one (notAfter 2026-08-28, nine days). SPEC.md 10.11 forbids redefining a criterion that cannot be met, so the phase stays open. RECOMMENDED, and sanctioned by CLAUDE.md ('working out of order beats sitting stuck'): start Phase 5 (semantic search) on branch phase/05-search. It needs the catalogue and the embedding artefact, both of which exist; MovieLens feeds Phase 16's collaborative filtering, not search. Re-run `ingest movielens` whenever the certificate is renewed - the code is complete and tested - then close Phase 4.
+Phase 4 is blocked on TWO author actions, both recorded as blockers B2 and B3, and cannot close until one of E1/E7 is unblocked. Author's instruction on 2026-09-06: start Phase 5 meanwhile. Create branch phase/05-search, read SPEC.md 15's Phase 5 entry, and run `python tools/phasedoc/generate.py --open 5`. Phase 5 needs the catalogue (2.7M titles) and the embedding artefact, both of which exist on disk.
 
 ---
 
 ## Blockers
 
-- **B2** Subtask 4.3 cannot complete: files.grouplens.org serves an EXPIRED TLS certificate (subject files.grouplens.org, issuer InCommon ECC Server CA 2, notAfter 2026-08-28; today 2026-09-04). Plain HTTP redirects to HTTPS, so there is no path that does not hit it. NOT worked around: disabling certificate verification would ship a security downgrade to every user for a third party's expired cert, and an unallowlisted mirror has unverifiable provenance and would need an ADR. The parent grouplens.org has a VALID certificate, so this is one host and likely to be renewed. Everything that does not depend on the download is finished and tested against a synthetic archive - re-run `ingest movielens` when the certificate is renewed. No decision needed from the author.
+- **B2** **(needs you)** E1 / subtask 4.3: files.grouplens.org has served an EXPIRED certificate since 2026-08-28 (re-checked 2026-09-06, nine days). NOT worked around - disabling certificate verification would ship a security downgrade to every user. THE AUTHOR CAN UNBLOCK THIS: download https://files.grouplens.org/datasets/movielens/ml-25m.zip by hand, accepting the browser's certificate warning, and drop it in data/datasets/. `ingest movielens` now verifies it against md5 544c4d86ea9f05e056d8075398539b34, which is published on grouplens.org - a host with a VALID certificate - so the file's integrity is checkable even though its transport was not authenticated. That risk judgement is the author's to make, not the application's to make for every user.
+- **B3** **(needs you)** E7 says the embedding artefact is 'produced AND PUBLISHED'. It is produced: 855,703 vectors, 313 MB, sha256 3fce6f062c25220a80425cce7e9f83a3b80412af3b34fe4e9071d3b80645a2b0, at data/embeddings-all-MiniLM-L6-v2-int8.bin, verified by `ingest verify-embeddings`. It is NOT published. ONLY THE AUTHOR CAN DO THAT: upload it as a GitHub Release asset on this repository with its sha256 alongside (ADR-0014). E7 is marked NOT MET until then - marking it met would be the overclaim SPEC.md 10.8 forbids, and I had marked it met before re-reading the criterion.
 
 ---
 
@@ -72,7 +73,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 1 | Application Shell and Capability Tiers | A | 0 | 1–2 | 7/7 |
 | [x] | 2 | Design System and Visual Language | A | 1 | 1–2 | 5/5 |
 | [x] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 5/5 |
-| [~] | 4 | Metadata Backbone | A | 3 | 2–3 | 6/7 |
+| [~] | 4 | Metadata Backbone | A | 3 | 2–3 | 5/7 |
 | [ ] | 5 | Semantic Search Engine | A | 4 | 2 | 0/5 |
 | [ ] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 0/6 |
 | [ ] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 0/8 |

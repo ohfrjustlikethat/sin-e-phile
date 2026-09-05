@@ -49,6 +49,7 @@ ort = { version = "2.0.0-rc.13", features = ["download-binaries"] }
 tokenizers = { version = "0.20", default-features = false, features = ["onig"] }
 sinephile-embedding = { version = "0.1.0", path = "../../crates/embedding" }
 sha2 = "0.10.9"
+md-5 = "0.10"
 
 [dev-dependencies]
 tempfile = "3"

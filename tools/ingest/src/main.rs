@@ -574,20 +574,31 @@ async fn movielens(
 
     let started = Instant::now();
     let before = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
+    let downloader = sinephile_ingest::Downloader::new();
 
     let path = datasets.join(release.filename());
-    let downloader = sinephile_ingest::Downloader::new();
-    let result = downloader.fetch(&release.url(), &path, |_| {}).await?;
-    tracing::info!(
-        "{}: {:.1} MB{}",
-        release.name(),
-        result.bytes as f64 / 1_048_576.0,
-        if result.fetched {
-            ""
-        } else {
-            " (already had it)"
+
+    // A manually-placed archive is verified and used as-is. files.grouplens.org has
+    // served an expired certificate since 2026-08-28, so the supported path while that
+    // lasts is: fetch ml-25m.zip by hand, and check it against the MD5 published on
+    // grouplens.org, which HAS a valid certificate. See movielens::ML25M_MD5.
+    if path.is_file() {
+        tracing::info!("{} is already here — verifying it", path.display());
+        if release == ml::Release::Ml25m {
+            ml::verify_md5(&path, ml::ML25M_MD5)?;
+            tracing::info!("md5 matches what GroupLens published");
         }
-    );
+    } else {
+        let result = downloader.fetch(&release.url(), &path, |_| {}).await?;
+        tracing::info!(
+            "{}: {:.1} MB",
+            release.name(),
+            result.bytes as f64 / 1_048_576.0
+        );
+        if release == ml::Release::Ml25m {
+            ml::verify_md5(&path, ml::ML25M_MD5)?;
+        }
+    }
 
     let links = ml::links(&path)?;
     tracing::info!("{} films in links.csv", links.len());

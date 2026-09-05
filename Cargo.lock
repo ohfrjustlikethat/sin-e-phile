@@ -4085,6 +4085,7 @@ version = "0.1.0"
 dependencies = [
  "flate2",
  "futures-util",
+ "md-5",
  "ort",
  "reqwest 0.12.24",
  "sha2",
