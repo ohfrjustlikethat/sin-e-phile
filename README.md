@@ -4,7 +4,9 @@
 local film library behind one semantic search engine and a discovery-first
 recommender.**
 
-> **Status: Phase 3 of 28 — the shell, the design system, and the data layer.**
+> **Status: Phase 4 of 28 — the shell, the design system, the data layer, and the
+> metadata backbone.** The catalogue is real: 2.7 million titles ingested offline from
+> public datasets, with no API key of any kind.
 > There is no product UI yet. This README describes what is being built and is updated at
 > the end of every phase that changes what the app can do. It is never allowed to
 > over-claim; the [feature list](#what-actually-works-today) below says exactly what
