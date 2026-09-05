@@ -46,6 +46,13 @@ async fn read_batch(db: &Db, after: i64, limit: i64) -> Result<Vec<Row>, JobErro
                   WHERE mg.media_item_id = m.id)
            FROM media_items m
           WHERE m.id > ? AND m.kind <> 'episode'
+            -- Skip what is already indexed, so a second run is a scan rather than a
+            -- rebuild. Job::begin starts a NEW job once the previous one completed, so
+            -- its steps are fresh and without this every item is re-indexed: idempotent,
+            -- and 150 seconds plus 49 MB of churn for no change (debt D28).
+            AND NOT EXISTS (
+                SELECT 1 FROM search_indexed s WHERE s.media_item_id = m.id
+            )
           ORDER BY m.id
           LIMIT ?",
     )
@@ -158,14 +165,21 @@ pub async fn build_trigram(job: &mut Job<'_>, db: &Db, core_only: bool) -> Resul
         let sink = std::sync::Arc::clone(&sink);
         Box::pin(async move {
             let after: i64 = cursor.as_deref().and_then(|c| c.parse().ok()).unwrap_or(0);
+            // `search_indexed.trigram` records what is already in the trigram index —
+            // a contentless FTS5 table cannot be asked (migration 0013). So widening
+            // from the core tier to the whole catalogue tops up rather than rebuilding.
             let sql = if core_only {
-                "SELECT id, primary_title FROM media_items
-                  WHERE id > ? AND kind <> 'episode' AND in_core = 1
-                  ORDER BY id LIMIT ?"
+                "SELECT m.id, m.primary_title FROM media_items m
+                  WHERE m.id > ? AND m.kind <> 'episode' AND m.in_core = 1
+                    AND NOT EXISTS (SELECT 1 FROM search_indexed s
+                                     WHERE s.media_item_id = m.id AND s.trigram = 1)
+                  ORDER BY m.id LIMIT ?"
             } else {
-                "SELECT id, primary_title FROM media_items
-                  WHERE id > ? AND kind <> 'episode'
-                  ORDER BY id LIMIT ?"
+                "SELECT m.id, m.primary_title FROM media_items m
+                  WHERE m.id > ? AND m.kind <> 'episode'
+                    AND NOT EXISTS (SELECT 1 FROM search_indexed s
+                                     WHERE s.media_item_id = m.id AND s.trigram = 1)
+                  ORDER BY m.id LIMIT ?"
             };
             let rows: Vec<(i64, String)> = sqlx::query_as(sql)
                 .bind(after)
@@ -201,6 +215,22 @@ pub async fn build_trigram(job: &mut Job<'_>, db: &Db, core_only: bool) -> Resul
                 }
                 insert
                     .execute(&mut **tx)
+                    .await
+                    .map_err(|e| JobError::step("search.trigram", e.to_string()))?;
+
+                // Mark them, in the same transaction as the insert — the checkpoint
+                // guarantee this runner exists to provide.
+                let values = vec!["(?, 1, 1)"; chunk.len()].join(", ");
+                let mark_sql = format!(
+                    "INSERT INTO search_indexed (media_item_id, generation, trigram)
+                     VALUES {values}
+                     ON CONFLICT (media_item_id) DO UPDATE SET trigram = 1"
+                );
+                let mut mark = sqlx::query(&mark_sql);
+                for (id, _) in chunk {
+                    mark = mark.bind(id);
+                }
+                mark.execute(&mut **tx)
                     .await
                     .map_err(|e| JobError::step("search.trigram", e.to_string()))?;
             }

@@ -1145,3 +1145,53 @@ Against E1's 80 ms p95 budget. **These are the short-circuit path, not the full 
 Spike C) and the vector half. But the Japanese title resolving to the English one, and a
 title containing FTS5 syntax returning rather than erroring, are both real behaviour on
 real data.
+
+### The trigram index, and what "trigram fuzzy matching" actually is
+
+`./target/release/ingest search-index --trigram`, 2026-09-06.
+
+| | |
+|---|---|
+| Titles | 2,702,737 |
+| Trigram index | **196 MB** (dbstat), +117 MB on disk |
+| Time | 56 s |
+| Database | **3,626 MB** — 470 MB of R4 headroom |
+
+Projected 192 MB from the core-tier measurement, actual 196. That projection held because
+it came from a complete measurement of 855,703 titles rather than from a sample.
+
+The D28 fix also worked: the main index reported **"0 items"** and took no time at all,
+where the previous run had re-indexed all 2.7 million.
+
+**SQLite's trigram tokenizer does substring search, not typo tolerance.** `SPEC.md` calls
+this deliverable "trigram fuzzy matching for typos" and the name invites the assumption.
+A phrase query against a trigram index asks *"does this document contain this
+substring"* — and `Solaris` does not contain `solariss`, so the first implementation
+returned nothing for every typo.
+
+Typo tolerance comes from the trigrams **individually**: `solariss` yields
+`sol ola lar ari ris iss`, `Solaris` contains five of those six, and OR-ing them lets
+BM25 rank by overlap. That is trigram similarity computed by the index rather than by us.
+
+### Live typo tolerance, and why E1 is not met yet
+
+| Query | Time | Top result |
+|---|---|---|
+| `solariss` | 256 ms | **Solaris** |
+| `seven samuria` | 390 ms | **Seven Samurai** |
+| `blade runer` | 354 ms | **Blade Runner** |
+| `tarkovski` | 0.4 ms | *Why Can't I Be Tarkovsky?* (keyword) |
+| `kurosowa` | 0.3 ms | *Margazhi Raagam* (keyword) |
+
+**The mechanism is right and the performance is not.** E1's budget is 80 ms p95 and the
+fuzzy path costs 256–390 ms — four to five times over. OR-ing ten trigrams across a
+2.7-million-row index touches a great deal of it.
+
+**And a weak keyword match blocks a good fuzzy one.** `kurosowa` returns *Margazhi
+Raagam* because the keyword tier found *something*, filled the result limit, and fuzzy
+never ran. The rule "fuzzy only fills what is left" is right in principle and wrong as
+implemented: it should be "fuzzy fills what is left once weak keyword hits are
+discounted", which needs a score threshold rather than a count.
+
+Both are recorded rather than papered over: E1 is a measured criterion and it is
+currently missed on this path.

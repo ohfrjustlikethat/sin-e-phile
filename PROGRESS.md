@@ -51,7 +51,7 @@
 
 ## What's next
 
-Phase 5 subtask 5.1 is done and measured. NEXT: build the FULL trigram index - `ingest search-index --trigram` - which now fits: R4 headroom is 610 MB after migration 0012 and a VACUUM, and the trigram index costs 71 bytes per title (61 MB for 855,703 core titles), so 2.7M is roughly 192 MB. Then wire fuzzy matching into SearchRepository::search as the third tier, below exact-title and keyword, marked MatchReason::Fuzzy. Then 5.3, the usearch HNSW index over the 313 MB artefact.
+Phase 5: the trigram index is built (196 MB, 2,702,737 titles) and typo tolerance works - 'seven samuria' finds Seven Samurai. TWO MEASURED PROBLEMS BLOCK E1, recorded as D30 and D31: the fuzzy path costs 256-390 ms against an 80 ms budget, and a weak keyword hit stops fuzzy running at all. Do 5.6 FIRST - build fixtures/search/ and the relevance harness - because both fixes need a threshold chosen from a corpus rather than guessed, and E2/E3 need the harness regardless.
 
 ---
 
@@ -132,6 +132,8 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D27** (raised in Phase 4) The embedding artefact is PRODUCED but not PUBLISHED. ADR-0014 says it ships as a versioned GitHub Release asset with its checksum, downloaded on consent with the size shown. Producing it is automated; uploading a 313 MB file to a Release is a manual step the author takes, and the download-with-consent flow is Phase 5's, since nothing reads the artefact until search does. sha256 3fce6f062c25220a80425cce7e9f83a3b80412af3b34fe4e9071d3b80645a2b0.
 - **D28** (raised in Phase 5) `ingest search-index` rebuilds from scratch on every run: Job::begin starts a NEW job when the previous one completed, so its steps are fresh and every one of 2.7M items is re-indexed. It is idempotent (delete-then-insert) so nothing corrupts, and it cost 49 MB of churn plus 150 s the one time it happened. The fix is to skip items already in search_indexed at the current generation - the column exists for exactly this and is unused.
 - **D29** (raised in Phase 5) VACUUM recovered ~354 MB of fragmentation from incremental ingestion (4,023 -> 3,486 MB, 46 s), on top of 183 MB from the dead index. Nine ingestion jobs writing and rewriting leave a tenth of the database as slack. Ingestion should VACUUM when it finishes, and the first-run flow should say so rather than leaving the user with a database a tenth larger than it needs to be.
+- **D30** (raised in Phase 5) THE FUZZY PATH MISSES E1's 80 ms BUDGET: 256-390 ms measured on the real 2.7M-row trigram index, because OR-ing ~10 trigrams touches a large part of it. Options, none yet measured: restrict the trigram index to the core tier (855,703, roughly 3x less work, and it already fits either way); require a minimum number of matching trigrams instead of a pure OR; or run fuzzy only when the keyword tier returns nothing strong. MEASURE BEFORE CHOOSING - the last three size questions in this project were all answered wrongly by intuition and correctly by measurement.
+- **D31** (raised in Phase 5) A WEAK KEYWORD HIT BLOCKS A GOOD FUZZY ONE. `kurosowa` returns 'Margazhi Raagam' because the keyword tier matched something irrelevant, filled the result limit and fuzzy never ran. SearchRepository::search should discount weak keyword hits by BM25 score before deciding whether to fall through, rather than counting them. Needs a threshold chosen from the fixture corpus in subtask 5.6, not guessed.
 
 ---
 

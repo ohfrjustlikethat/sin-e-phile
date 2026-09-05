@@ -196,6 +196,63 @@ impl<'a> SearchRepository<'a> {
             .collect())
     }
 
+    /// Typo-tolerant title matching, by trigram OVERLAP.
+    ///
+    /// # SQLite's trigram tokenizer does substring search, not typo tolerance
+    ///
+    /// It is easy to assume otherwise — "trigram" sounds like fuzzy matching, and
+    /// `SPEC.md` calls this deliverable "trigram fuzzy matching for typos". But a
+    /// phrase query against a trigram index asks *"does this document contain this
+    /// substring"*, and `Solaris` does not contain `solariss`. Searching for the typo
+    /// as a phrase returns nothing at all, which is what the first version did.
+    ///
+    /// Typo tolerance comes from the trigrams **individually**: `solariss` yields
+    /// `sol ola lar ari ris iss`, and `Solaris` contains five of those six. So the
+    /// query is the trigrams OR-ed together, and BM25 ranks by how many a document
+    /// shares — which is trigram-overlap similarity, computed by the index rather than
+    /// by us.
+    ///
+    /// **A last resort, and priced like one.** OR-ing six trigrams casts a wide net;
+    /// it is a way of finding candidates, not a ranking to trust. Running it before the
+    /// word index would bury exact word matches under near-misses.
+    ///
+    /// Below four characters it is refused: almost everything is within one trigram of
+    /// everything, and the results are noise wearing a confident expression.
+    pub async fn fuzzy(&self, query: &str, limit: i64) -> Result<Vec<Hit>, DbError> {
+        let cleaned = normalise_query(query);
+        if cleaned.chars().count() < 4 {
+            return Ok(Vec::new());
+        }
+
+        let Some(phrase) = trigram_query(&cleaned) else {
+            return Ok(Vec::new());
+        };
+        let rows: Vec<(i64, String, Option<i64>, String, f64)> = sqlx::query_as(
+            "SELECT m.id, m.primary_title, m.release_year, m.kind, bm25(search_trigram)
+               FROM search_trigram
+               JOIN media_items m ON m.id = search_trigram.rowid
+              WHERE search_trigram MATCH ?
+              ORDER BY bm25(search_trigram)
+              LIMIT ?",
+        )
+        .bind(&phrase)
+        .bind(limit)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|(media_item_id, title, year, kind, score)| Hit {
+                media_item_id,
+                title,
+                year,
+                kind,
+                score: Some(score),
+                why: MatchReason::Fuzzy,
+            })
+            .collect())
+    }
+
     /// Search: exact titles first, then keyword hits, de-duplicated.
     ///
     /// The order is the guarantee. An exact match is never displaced by a better-scoring
@@ -216,7 +273,24 @@ impl<'a> SearchRepository<'a> {
             seen.push(hit.media_item_id);
             hits.push(hit);
             if hits.len() as i64 >= limit {
-                break;
+                return Ok(hits);
+            }
+        }
+
+        // Fuzzy only fills what is left. A typo-tolerant match is worth showing when
+        // the word index found little; it is never worth showing INSTEAD of a word
+        // match, because "nearly spelled like this" is weaker evidence than "contains
+        // this word" and presenting them as equals makes good queries worse.
+        if (hits.len() as i64) < limit {
+            for hit in self.fuzzy(query, limit).await? {
+                if seen.contains(&hit.media_item_id) {
+                    continue;
+                }
+                seen.push(hit.media_item_id);
+                hits.push(hit);
+                if hits.len() as i64 >= limit {
+                    break;
+                }
             }
         }
         Ok(hits)
@@ -244,6 +318,34 @@ fn normalise_query(query: &str) -> String {
     out.trim_end().to_string()
 }
 
+/// The query's trigrams, OR-ed, so BM25 ranks by how many a title shares.
+///
+/// Character-based rather than byte-based: a Japanese title is three characters in
+/// nine bytes, and slicing by byte would both split a character and produce trigrams
+/// that match nothing.
+fn trigram_query(cleaned: &str) -> Option<String> {
+    let chars: Vec<char> = cleaned.chars().collect();
+    if chars.len() < 3 {
+        return None;
+    }
+    let mut grams: Vec<String> = Vec::new();
+    for window in chars.windows(3) {
+        let gram: String = window.iter().collect();
+        // A trigram of only spaces matches everything and ranks nothing.
+        if gram.trim().is_empty() {
+            continue;
+        }
+        let quoted = format!("\"{}\"", gram.replace('"', ""));
+        if !grams.contains(&quoted) {
+            grams.push(quoted);
+        }
+    }
+    if grams.is_empty() {
+        return None;
+    }
+    Some(grams.join(" OR "))
+}
+
 /// Turn user text into an FTS5 MATCH expression.
 ///
 /// **Every token is quoted.** FTS5's query language treats `"`, `*`, `:`, `-`, `^`,
@@ -269,6 +371,37 @@ fn fts_query(query: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_typo_shares_most_of_its_trigrams_with_the_real_title() {
+        // The whole mechanism, stated as a test: "solariss" and "solaris" differ by one
+        // character and share five trigrams out of six, which is what lets BM25 rank
+        // the real film above unrelated ones.
+        let typo = trigram_query("solariss").expect("trigrams");
+        let real = trigram_query("solaris").expect("trigrams");
+        let shared = real.split(" OR ").filter(|g| typo.contains(*g)).count();
+        assert_eq!(shared, 5, "typo {typo} vs real {real}");
+        assert!(
+            typo.contains("\"iss\""),
+            "the typo's own trigram is present too"
+        );
+    }
+
+    #[test]
+    fn trigrams_are_taken_by_character_not_by_byte() {
+        // A Japanese title is three characters in nine bytes; slicing by byte would
+        // split a character and produce trigrams that match nothing.
+        let grams = trigram_query("君の名は").expect("trigrams");
+        assert!(grams.contains("君の名"), "{grams}");
+        assert!(grams.contains("の名は"), "{grams}");
+    }
+
+    #[test]
+    fn a_query_too_short_to_have_a_trigram_yields_nothing() {
+        assert_eq!(trigram_query("ab"), None);
+        assert_eq!(trigram_query(""), None);
+        assert_eq!(trigram_query("   "), None);
+    }
 
     #[test]
     fn fts_syntax_in_a_title_is_treated_as_text() {

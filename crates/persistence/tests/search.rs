@@ -44,10 +44,12 @@ async fn film(
             .expect("normalise");
     }
 
-    SearchRepository::new(db)
+    let search = SearchRepository::new(db);
+    search
         .index_item(id, title, &alternatives.join(" "), people, keywords)
         .await
         .expect("index");
+    search.index_trigram(id, title).await.expect("trigram");
     id
 }
 
@@ -272,4 +274,67 @@ async fn nothing_indexed_is_distinguishable_from_nothing_matching() {
         .await
         .expect("search")
         .is_empty());
+}
+
+#[tokio::test]
+async fn a_typo_still_finds_the_film() {
+    // The whole point of carrying a second index: someone typing quickly.
+    let (_dir, db) = db().await;
+    let solaris = film(
+        &db,
+        "Solaris",
+        1972,
+        &[],
+        "Andrei Tarkovsky",
+        "science fiction",
+    )
+    .await;
+    let search = SearchRepository::new(&db);
+
+    let hits = search.search("solariss", 5).await.expect("search");
+    assert_eq!(hits[0].media_item_id, solaris, "got {hits:?}");
+    assert_eq!(hits[0].why, MatchReason::Fuzzy);
+}
+
+#[tokio::test]
+async fn a_word_match_is_never_displaced_by_a_near_miss() {
+    // Fuzzy fills what is left over; it does not compete. "Nearly spelled like this" is
+    // weaker evidence than "contains this word", and presenting them as equals makes
+    // good queries worse.
+    let (_dir, db) = db().await;
+    let exact_word = film(&db, "Stalker Chronicles", 1990, &[], "", "drama").await;
+    film(&db, "Stalkerr", 1991, &[], "", "drama").await;
+
+    let hits = SearchRepository::new(&db)
+        .search("Stalker", 5)
+        .await
+        .expect("search");
+    assert_eq!(hits[0].media_item_id, exact_word);
+    assert_eq!(hits[0].why, MatchReason::Keyword);
+}
+
+#[tokio::test]
+async fn a_very_short_query_is_refused_by_the_fuzzy_tier() {
+    // Below four characters almost everything is within one trigram of everything, and
+    // the results are noise wearing a confident expression.
+    let (_dir, db) = db().await;
+    film(&db, "Solaris", 1972, &[], "", "").await;
+    let search = SearchRepository::new(&db);
+
+    assert!(search.fuzzy("sol", 5).await.expect("fuzzy").is_empty());
+    assert!(search.fuzzy("a", 5).await.expect("fuzzy").is_empty());
+    assert!(!search.fuzzy("solar", 5).await.expect("fuzzy").is_empty());
+}
+
+#[tokio::test]
+async fn fuzzy_does_not_error_on_syntax_or_quotes() {
+    let (_dir, db) = db().await;
+    film(&db, "Face/Off", 1997, &[], "", "").await;
+    let search = SearchRepository::new(&db);
+    for query in ["face\"off", "face/off", "NOT face", "face*off"] {
+        assert!(
+            search.fuzzy(query, 5).await.is_ok(),
+            "query {query:?} errored"
+        );
+    }
 }
