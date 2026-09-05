@@ -65,3 +65,9 @@ data/
 
 # Downloaded IMDb datasets — hundreds of MB, re-fetchable, never committed.
 data/datasets/
+
+# ── Embedding artefacts ───────────────────────────────────────────────
+# The artefact is a build output published as a GitHub Release asset
+# (ADR-0014), never repository content. `models/` is already ignored above.
+*.vectors.part
+embeddings-*.bin

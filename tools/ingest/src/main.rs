@@ -45,6 +45,9 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            title.ratings, insert only titles newer than the
                            highest id already held, and re-apply every rating.
                            Weekly is ample.
+  ingest embed             produce the embedding artefact (ADR-0014) over the
+                           core tier. Needs models/all-MiniLM-L6-v2-int8.onnx and
+                           its tokenizer; both are checksum-pinned. Resumable.
   ingest verify-anime      check the catalogue against
                            fixtures/anime/e5-hand-checked.tsv — exit criterion
                            E5's evidence. Exits non-zero on any mismatch.
@@ -135,6 +138,7 @@ async fn main() -> Result<(), JobError> {
         }
         "repair-variants" => repair_variants(&db).await,
         "refresh" => refresh(&db, &dir.join("datasets")).await,
+        "embed" => embed_artefact(&db, &dir).await,
         "verify-anime" => verify_anime(&db).await,
         "status" => status(&db).await,
         "reset" => match args.get(1) {
@@ -692,6 +696,76 @@ async fn refresh(db: &Db, datasets: &Path) -> Result<(), JobError> {
     println!("  Not covered, deliberately: a REVISION to an existing title other than");
     println!("  its rating — a corrected year, a changed runtime. Those stay stale");
     println!("  until a full re-ingest (219 s). See docs/specs/catalogue-freshness.md.");
+    println!();
+    Ok(())
+}
+
+/// Produce the embedding artefact (ADR-0014, subtask 4.10).
+async fn embed_artefact(db: &Db, dir: &Path) -> Result<(), JobError> {
+    use sinephile_ingest::embed;
+    use std::time::Instant;
+
+    let models = Path::new("models");
+    let model = models.join("all-MiniLM-L6-v2-int8.onnx");
+    let tokenizer = models.join("all-MiniLM-L6-v2-tokenizer.json");
+    for (path, expected) in [
+        (&model, embed::MODEL_SHA256),
+        (&tokenizer, embed::TOKENIZER_SHA256),
+    ] {
+        if !path.is_file() {
+            eprintln!(
+                "ingest: {} is missing.
+  Download it from {}
+  (see embed::MODEL_URL / TOKENIZER_URL)",
+                path.display(),
+                embed::MODEL_URL
+            );
+            std::process::exit(2);
+        }
+        // A model that changed underneath would invalidate every vector while the
+        // artefact's own checksum stayed perfectly valid.
+        embed::verify_sha256(path, expected)?;
+    }
+
+    let started = Instant::now();
+    let count = embed::core_count(db).await?;
+    // The catalogue snapshot this artefact describes. An input, never today's date —
+    // ADR-0014 wants a rebuild to be byte-comparable.
+    // The catalogue's own latest change, asked of SQLite rather than computed from a
+    // file timestamp — the first version did day arithmetic on the database's mtime and
+    // produced 2026-09-21 for a file written on the 5th. This is both correct and the
+    // right semantic: the snapshot date is when the CATALOGUE last changed, not when the
+    // artefact happened to be built. An override exists so a rebuild can reproduce an
+    // older artefact exactly.
+    let snapshot: String = match std::env::var("SINEPHILE_SNAPSHOT_DATE") {
+        Ok(explicit) => explicit,
+        Err(_) => {
+            sqlx::query_scalar("SELECT COALESCE(MAX(date(updated_at)), 'unknown') FROM media_items")
+                .fetch_one(db.pool())
+                .await?
+        }
+    };
+
+    tracing::info!("embedding {count} core-tier titles, snapshot {snapshot}");
+    let mut embedder = embed::OnnxEmbedder::load(&model, &tokenizer, embed::MODEL_IDENTITY)?;
+
+    let artefact_path = dir.join("embeddings-all-MiniLM-L6-v2-int8.bin");
+    let mut job = Job::begin(db, "embed").await?;
+    if job.is_resuming().await? {
+        tracing::info!("resuming a previous run");
+    }
+    let produced = embed::produce(&mut job, db, &mut embedder, &artefact_path, &snapshot).await?;
+    job.finish().await?;
+
+    println!();
+    println!("  {} vectors", produced.count);
+    println!(
+        "  {:.0} MB · {:.0}s",
+        produced.bytes as f64 / 1_048_576.0,
+        started.elapsed().as_secs_f64()
+    );
+    println!("  sha256 {}", produced.checksum_hex());
+    println!("  {}", artefact_path.display());
     println!();
     Ok(())
 }

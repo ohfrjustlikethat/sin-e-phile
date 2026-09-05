@@ -294,6 +294,49 @@ async fn last_id_for(db: &Db, written: i64) -> Result<i64, JobError> {
     .unwrap_or(0))
 }
 
+/// The model this project embeds with, and its identity in the artefact.
+///
+/// The identity names the QUANTISATION as well as the model, because
+/// `all-MiniLM-L6-v2-int8` and `all-MiniLM-L6-v2-fp32` produce different vectors and
+/// must never be interchangeable — the artefact header compares this verbatim.
+pub const MODEL_IDENTITY: &str = "all-MiniLM-L6-v2-int8";
+
+/// Where the model came from, and what it must hash to.
+///
+/// Pinned after the first download rather than taken on trust: ADR-0014 requires a
+/// checksum on the artefact, and a model that silently changed underneath would
+/// invalidate every vector in it while the artefact's own checksum stayed valid.
+/// 22,972,370 bytes is the 21.9 MiB Phase 1 Spike C measured, which is how we know it
+/// is the same model the R3 latency number was taken with.
+pub const MODEL_URL: &str =
+    "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model_quantized.onnx";
+pub const MODEL_SHA256: &str = "afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1";
+pub const TOKENIZER_URL: &str =
+    "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/tokenizer.json";
+pub const TOKENIZER_SHA256: &str =
+    "da0e79933b9ed51798a3ae27893d3c5fa4a201126cef75586296df9b4d2c62a0";
+
+/// Verify a downloaded file against its pinned hash.
+pub fn verify_sha256(path: &Path, expected: &str) -> Result<(), JobError> {
+    use sha2::{Digest, Sha256};
+    let bytes = std::fs::read(path)
+        .map_err(|e| JobError::step("embed", format!("{}: {e}", path.display())))?;
+    let actual: String = Sha256::digest(&bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    if actual != expected {
+        return Err(JobError::step(
+            "embed",
+            format!(
+                "{} has sha256 {actual}, expected {expected} — refusing to embed with                  a model that is not the one pinned",
+                path.display()
+            ),
+        ));
+    }
+    Ok(())
+}
+
 /// The real embedder: ONNX Runtime plus a sentence-transformer.
 ///
 /// Reuses the inference path proven in Phase 1 Spike C — tokenize, run, mean-pool over
