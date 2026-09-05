@@ -51,7 +51,7 @@
 
 ## What's next
 
-PHASE 5 IS BEING WORKED OUT OF ORDER, on branch phase/05-search, because Phase 4 cannot close: blockers B2 (GroupLens' expired certificate) and B3 (publishing the embedding artefact) both need the author. current_phase deliberately REMAINS 4 - advancing it would require Phase 4 to be complete or skipped, and it is neither. Phase 5's working document is docs/phases/phase-05-semantic-search-engine.md and its subtasks are in phases[5]. Start with 5.1: an FTS5 migration over titles, alternative titles, people and keywords. Verified on 2026-09-06 that the bundled SQLite 3.46.0 supports fts5, the trigram tokenizer, unicode61 diacritic folding and bm25().
+Phase 5 subtask 5.1, remaining half: POPULATE the index over the real catalogue and MEASURE it. Migration 0011 and SearchRepository exist and are tested; nothing has written 2.7M rows into them yet. Add an `ingest search-index` command that walks media_items, assembles title / alternative_titles / people / keywords per item and calls SearchRepository::index_item, resumably. Populate the MAIN index first and record its size, THEN the trigram index separately and record its size - the trigram tokenizer indexes every 3-character window and is the single largest unknown in Phase 5, against 452 MB of R4 headroom. If it is too big, it can be narrowed to the core tier or dropped without touching the main index, which is why 0011 keeps them apart.
 
 ---
 

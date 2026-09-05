@@ -232,7 +232,13 @@ context rather than rediscovering it.
 
 ## P11 — Which HNSW implementation {#p11}
 
-**Raised:** 2026-09-06, Phase 5 subtask 5.3.
+> **RESOLVED 2026-09-06.** Author answered "your call", which takes the stated default:
+> **`usearch`**, with recall measured against a brute-force baseline before any
+> relevance number is reported. Confirmed by probe before committing to it: it builds on
+> this machine in 52 s, accepts `ScalarKind::I8`, and `Index::view()` memory-maps a saved
+> index rather than loading it — which is the property the whole decision rested on.
+
+**Raised:** 2026-09-06, Phase 5 subtask 5.3. **Resolved same day.**
 
 ### The decision, in one sentence
 

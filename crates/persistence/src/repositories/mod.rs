@@ -9,9 +9,11 @@ pub mod credentials;
 pub mod episodes;
 pub mod media;
 pub mod profiles;
+pub mod search;
 
 pub use catalogue::{CatalogueRepository, Readiness, StepProgress};
 pub use credentials::{CredentialRepository, TmdbAccess};
 pub use episodes::EpisodeRepository;
 pub use media::MediaRepository;
 pub use profiles::ProfileRepository;
+pub use search::{Hit, MatchReason, SearchRepository};

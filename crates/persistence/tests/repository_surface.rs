@@ -23,7 +23,7 @@ use sinephile_persistence::model::EpisodeNumbering;
 use sinephile_persistence::repositories::profiles::PlaybackPosition;
 use sinephile_persistence::repositories::{
     CatalogueRepository, CredentialRepository, EpisodeRepository, MediaRepository,
-    ProfileRepository, Readiness, TmdbAccess,
+    ProfileRepository, Readiness, SearchRepository, TmdbAccess,
 };
 use sinephile_persistence::{Db, IdSource, MediaKind, NewMediaItem, TitleVariant};
 
@@ -443,22 +443,61 @@ async fn db_surface() {
         TmdbAccess::Absent
     );
 
+    // ── SearchRepository ──────────────────────────────────────────────────────
+    let search = SearchRepository::new(&db);
+
+    // indexed_count — empty is zero, not an error
+    assert_eq!(search.indexed_count().await.expect("indexed_count"), 0);
+
+    // `search_indexed` has a foreign key onto media_items, so the row has to exist.
+    let probe = MediaRepository::new(&db)
+        .insert(&NewMediaItem::film("Probe Title", 1970))
+        .await
+        .expect("probe item");
+
+    // index_item, then again, to exercise the contentless delete-and-reinsert
+    search
+        .index_item(probe, "Probe Title", "Alt Probe", "A Person", "drama")
+        .await
+        .expect("index_item");
+    search
+        .index_item(probe, "Probe Title", "Alt Probe", "A Person", "drama")
+        .await
+        .expect("re-index");
+    assert_eq!(search.indexed_count().await.expect("indexed_count"), 1);
+
+    // index_trigram
+    search
+        .index_trigram(probe, "Probe Title")
+        .await
+        .expect("index_trigram");
+
+    // keyword / exact_title / search
+    assert_eq!(search.keyword("probe", 5).await.expect("keyword").len(), 1);
+    assert!(search
+        .exact_title("no such title", 5)
+        .await
+        .expect("exact")
+        .is_empty());
+    assert_eq!(search.search("probe", 5).await.expect("search").len(), 1);
+
     // ── CatalogueRepository ───────────────────────────────────────────────────
     let catalogue = CatalogueRepository::new(&db);
 
-    // searchable_titles — this database holds no media, so zero rather than an error
+    // searchable_titles — the probe item above is the only one here
     assert_eq!(
         catalogue
             .searchable_titles()
             .await
             .expect("searchable_titles"),
-        0
+        1
     );
 
-    // readiness — nothing ingested and no job: a fresh install
+    // readiness — titles present and no ingest job ever ran, which is what a prebuilt
+    // index looks like
     assert_eq!(
         catalogue.readiness().await.expect("readiness"),
-        Readiness::Empty
+        Readiness::Ready { titles: 1 }
     );
 
     // steps — no job, so nothing to report rather than an error
