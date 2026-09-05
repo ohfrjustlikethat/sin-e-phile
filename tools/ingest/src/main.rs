@@ -48,6 +48,9 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
   ingest embed             produce the embedding artefact (ADR-0014) over the
                            core tier. Needs models/all-MiniLM-L6-v2-int8.onnx and
                            its tokenizer; both are checksum-pinned. Resumable.
+  ingest search-index      build the FTS5 index (Phase 5). --trigram also builds
+                           the typo-tolerance index, --trigram-core restricts it
+                           to the core tier. Each index is measured separately.
   ingest verify-embeddings verify the artefact: checksum, header, and whether it
                            matches the model and document builder this build has
   ingest verify-anime      check the catalogue against
@@ -141,6 +144,11 @@ async fn main() -> Result<(), JobError> {
         "repair-variants" => repair_variants(&db).await,
         "refresh" => refresh(&db, &dir.join("datasets")).await,
         "embed" => embed_artefact(&db, &dir).await,
+        "search-index" => {
+            let trigram = args.iter().any(|a| a == "--trigram");
+            let trigram_core = args.iter().any(|a| a == "--trigram-core");
+            search_index(&db, trigram || trigram_core, trigram_core).await
+        }
         "verify-embeddings" => verify_embeddings(&dir),
         "verify-anime" => verify_anime(&db).await,
         "status" => status(&db).await,
@@ -780,6 +788,64 @@ async fn embed_artefact(db: &Db, dir: &Path) -> Result<(), JobError> {
     );
     println!("  sha256 {}", produced.checksum_hex());
     println!("  {}", artefact_path.display());
+    println!();
+    Ok(())
+}
+
+/// Build the FTS5 index, measuring each half separately.
+async fn search_index(db: &Db, trigram: bool, trigram_core: bool) -> Result<(), JobError> {
+    use sinephile_ingest::search_index as si;
+    use std::time::Instant;
+
+    let started = Instant::now();
+    let before = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
+
+    let mut job = Job::begin(db, "search-index").await?;
+    if job.is_resuming().await? {
+        tracing::info!("resuming a previous run");
+    }
+    let main = si::build_main(&mut job, db).await?;
+    let after_main = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
+
+    println!();
+    println!("  main index");
+    println!("    {main} items");
+    println!(
+        "    +{:.0} MB on disk, {:.0} MB reported by dbstat",
+        (after_main.saturating_sub(before)) as f64 / 1_048_576.0,
+        si::index_bytes(db, "search_index").await? as f64 / 1_048_576.0
+    );
+
+    if trigram {
+        // Built and measured SEPARATELY, because it is the half most likely to be cut.
+        let n = si::build_trigram(&mut job, db, trigram_core).await?;
+        let after_trigram = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
+        println!();
+        println!(
+            "  trigram index{}",
+            if trigram_core {
+                " (core tier only)"
+            } else {
+                ""
+            }
+        );
+        println!("    {n} titles");
+        println!(
+            "    +{:.0} MB on disk, {:.0} MB reported by dbstat",
+            (after_trigram.saturating_sub(after_main)) as f64 / 1_048_576.0,
+            si::index_bytes(db, "search_trigram").await? as f64 / 1_048_576.0
+        );
+    }
+    job.finish().await?;
+
+    let after = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
+    println!();
+    println!(
+        "  database {:.0} MB (+{:.0} MB) · {:.0}s",
+        after as f64 / 1_048_576.0,
+        (after.saturating_sub(before)) as f64 / 1_048_576.0,
+        started.elapsed().as_secs_f64()
+    );
     println!();
     Ok(())
 }

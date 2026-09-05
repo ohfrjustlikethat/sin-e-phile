@@ -1073,3 +1073,75 @@ Required before closing a phase (§10.12). Phase 3's indexed-lookup benchmark, r
 | by external id | 0.062 ms | 0.119 ms | 0.176 ms | 0.666 ms |
 
 Against a 100 ms budget. Three orders of magnitude of headroom, unchanged.
+
+## Phase 5 — Semantic search
+
+### The FTS5 index, and 537 MB that were not doing anything
+
+`./target/release/ingest search-index`, 2026-09-06.
+
+| | Items | dbstat | Time |
+|---|---|---|---|
+| Main index (word) | 2,702,737 | **266 MB** | 213 s |
+| Trigram index, core tier only | 855,703 | **61 MB** | — |
+
+At that point the database was **4,023 MB against R4's 4,096 MB trigger** — 73 MB of
+headroom, and a full-catalogue trigram index would have needed ~192 MB. The obvious move
+was to cut scope. Measuring first found something better.
+
+**`titles` is a 444 MB table carrying 882 MB of indexes.** Broken down with `dbstat`:
+
+| | |
+|---|---|
+| `idx_titles_unique` (media_item_id, variant, title) | 265 MB |
+| `idx_titles_text` (title COLLATE NOCASE) | 247 MB |
+| `idx_titles_normalised` (normalised) | 187 MB |
+| **`idx_titles_item`** (media_item_id, variant) | **183 MB** |
+
+**`idx_titles_item` is dead.** A B-tree on `(a, b, c)` serves every lookup a B-tree on
+`(a, b)` could, so SQLite never chooses it — confirmed against the real 6.2-million-row
+table:
+
+```
+SELECT title FROM titles WHERE media_item_id = ? ORDER BY variant
+  -> SEARCH titles USING COVERING INDEX idx_titles_unique (media_item_id=?)
+```
+
+It was added in migration 0001 and made redundant by 0007, which changed the unique
+index's shape. Nothing noticed for five migrations, because a redundant index costs
+disk and changes no behaviour at all.
+
+Dropping it (migration 0012) and vacuuming:
+
+| | |
+|---|---|
+| Before | 4,023 MB |
+| **After** | **3,486 MB** |
+| Recovered | **537 MB** — 183 from the dead index, ~354 from fragmentation |
+
+**~350 MB of that was fragmentation** accumulated across incremental ingestion — nine
+separate jobs writing, deleting and rewriting. Nothing was wrong with it; SQLite simply
+does not repack as it goes. Worth knowing that `VACUUM` is a 46-second operation that
+recovers a tenth of this database.
+
+**R4 headroom is now 610 MB**, so the full-catalogue trigram index fits after all and
+the core-only fallback is not needed. That answer came from measuring what was already
+there rather than from cutting the catalogue, which was the first thing I reached for.
+
+### Live search on the real catalogue
+
+2,702,737 titles indexed, exact-title short-circuit:
+
+| Query | Time | Top result |
+|---|---|---|
+| `Seven Samurai` | 3.8 ms | Seven Samurai (1954) |
+| `Sen to Chihiro no Kamikakushi` | 8.8 ms | **Spirited Away** (2001) |
+| `Tarkovsky` | 1.2 ms | Tarkovsky (2010) |
+| `Face/Off` | 0.7 ms | Face/Off (1997) |
+| `fullmetal alchemist brotherhood` | 1.4 ms | Fullmetal Alchemist: Brotherhood (2009) |
+
+Against E1's 80 ms p95 budget. **These are the short-circuit path, not the full hybrid**
+— they are a floor, not the criterion, which also has to include query embedding (~1 ms,
+Spike C) and the vector half. But the Japanese title resolving to the English one, and a
+title containing FTS5 syntax returning rather than erroring, are both real behaviour on
+real data.

@@ -1,0 +1,19 @@
+-- 0012 — Drop an index SQLite never uses.
+--
+-- MEASURED, 2026-09-06. The `titles` table is 444 MB and carried 882 MB of indexes —
+-- twice its own size. One of them is dead:
+--
+--   idx_titles_item   (media_item_id, variant)          183 MB
+--   idx_titles_unique (media_item_id, variant, title)   265 MB, UNIQUE
+--
+-- The second is a superset of the first. A B-tree on (a, b, c) serves every lookup a
+-- B-tree on (a, b) could, so SQLite never chooses the narrower one — confirmed with
+-- EXPLAIN QUERY PLAN against the real 6.2-million-row table:
+--
+--   SELECT title FROM titles WHERE media_item_id = ? ORDER BY variant
+--   -> SEARCH titles USING COVERING INDEX idx_titles_unique (media_item_id=?)
+--
+-- It was added in migration 0001 before 0007 replaced the unique index's shape, and
+-- 0007's new shape made it redundant without anyone noticing. Nothing regresses:
+-- the plan above is what already ran.
+DROP INDEX IF EXISTS idx_titles_item;

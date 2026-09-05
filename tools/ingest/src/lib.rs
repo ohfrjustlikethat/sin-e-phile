@@ -23,6 +23,7 @@ pub mod movielens;
 pub mod normalise;
 pub mod refresh;
 pub mod repair;
+pub mod search_index;
 pub mod tsv;
 pub mod verify;
 

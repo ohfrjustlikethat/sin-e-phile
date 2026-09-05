@@ -814,14 +814,14 @@
         {
           "id": "5.1",
           "text": "FTS5 index over titles, alternative titles, people and keywords, with BM25 ranking. Migration; unicode61 with diacritic folding, plus a trigram index for typo tolerance. Verified available: SQLite 3.46.0 bundled with sqlx supports fts5, trigram, unicode61 and bm25().",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "9d4123a"
         },
         {
           "id": "5.2",
           "text": "The exact-title short-circuit. E2 demands a 100% top-1 rate, so a literal title match must bypass ranking entirely rather than merely score highly. titles.normalised (migration 0009) already exists for this.",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "9d4123a"
         },
         {
           "id": "5.3",
@@ -1842,7 +1842,7 @@
       ]
     }
   ],
-  "next_action": "Phase 5 subtask 5.1, remaining half: POPULATE the index over the real catalogue and MEASURE it. Migration 0011 and SearchRepository exist and are tested; nothing has written 2.7M rows into them yet. Add an `ingest search-index` command that walks media_items, assembles title / alternative_titles / people / keywords per item and calls SearchRepository::index_item, resumably. Populate the MAIN index first and record its size, THEN the trigram index separately and record its size - the trigram tokenizer indexes every 3-character window and is the single largest unknown in Phase 5, against 452 MB of R4 headroom. If it is too big, it can be narrowed to the core tier or dropped without touching the main index, which is why 0011 keeps them apart.",
+  "next_action": "Phase 5 subtask 5.1 is done and measured. NEXT: build the FULL trigram index - `ingest search-index --trigram` - which now fits: R4 headroom is 610 MB after migration 0012 and a VACUUM, and the trigram index costs 71 bytes per title (61 MB for 855,703 core titles), so 2.7M is roughly 192 MB. Then wire fuzzy matching into SearchRepository::search as the third tier, below exact-title and keyword, marked MatchReason::Fuzzy. Then 5.3, the usearch HNSW index over the 313 MB artefact.",
   "blockers": [
     {
       "id": "B2",
@@ -2149,6 +2149,16 @@
       "id": "D27",
       "phase_raised": 4,
       "text": "The embedding artefact is PRODUCED but not PUBLISHED. ADR-0014 says it ships as a versioned GitHub Release asset with its checksum, downloaded on consent with the size shown. Producing it is automated; uploading a 313 MB file to a Release is a manual step the author takes, and the download-with-consent flow is Phase 5's, since nothing reads the artefact until search does. sha256 3fce6f062c25220a80425cce7e9f83a3b80412af3b34fe4e9071d3b80645a2b0."
+    },
+    {
+      "id": "D28",
+      "phase_raised": 5,
+      "text": "`ingest search-index` rebuilds from scratch on every run: Job::begin starts a NEW job when the previous one completed, so its steps are fresh and every one of 2.7M items is re-indexed. It is idempotent (delete-then-insert) so nothing corrupts, and it cost 49 MB of churn plus 150 s the one time it happened. The fix is to skip items already in search_indexed at the current generation - the column exists for exactly this and is unused."
+    },
+    {
+      "id": "D29",
+      "phase_raised": 5,
+      "text": "VACUUM recovered ~354 MB of fragmentation from incremental ingestion (4,023 -> 3,486 MB, 46 s), on top of 183 MB from the dead index. Nine ingestion jobs writing and rewriting leave a tenth of the database as slack. Ingestion should VACUUM when it finishes, and the first-run flow should say so rather than leaving the user with a database a tenth larger than it needs to be."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."
