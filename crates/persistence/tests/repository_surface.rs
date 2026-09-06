@@ -493,6 +493,24 @@ async fn db_surface() {
         1
     );
 
+    // core_ids — the probe item is not in the core tier, so the list is empty rather
+    // than "every title". The artefact is positional, so an over-broad core query would
+    // shift every vector onto the wrong film; this asserts the predicate, not the count.
+    assert!(
+        catalogue.core_ids().await.expect("core_ids").is_empty(),
+        "a title with in_core = 0 must not appear in artefact order"
+    );
+    sqlx::query("UPDATE media_items SET in_core = 1 WHERE id = ?")
+        .bind(probe)
+        .execute(db.pool())
+        .await
+        .expect("promote to core");
+    assert_eq!(
+        catalogue.core_ids().await.expect("core_ids"),
+        vec![probe],
+        "and one that is in_core must appear exactly once"
+    );
+
     // readiness — titles present and no ingest job ever ran, which is what a prebuilt
     // index looks like
     assert_eq!(

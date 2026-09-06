@@ -1238,3 +1238,103 @@ The code is right: E2's intent is "you get a film with that title", not "you get
 I would have picked". Corrected in the fixture with the reasoning kept, exactly as the
 E5 anime fixture records its own four errors. **Across two fixtures this session, the
 fixtures have been wrong eight times and the code twice.**
+
+### The vector index: recall measured against brute force, and the dial chosen from it
+
+`cargo run -p eval --release -- vector --report`, 2026-09-06, commit pending, over the
+real 855,703-vector artefact. Built by `./target/release/ingest vector-index`.
+
+| | |
+|---|---|
+| **vectors** | 855,703 |
+| **build** | **439 s** (1,947/s average; starts near 6,800/s, settles near 1,950/s) |
+| **index on disk** | **435 MB** — 1.4x the 313 MB artefact |
+| **open (mmap)** | 69.9 ms |
+| **resident** | **6.6 MB** against 435 MB on disk |
+| **recall@10** | **0.9670** (gate 0.95) |
+| **latency** | p50 1.59 ms, p95 4.20 ms |
+
+**The mmap claim is now a number.** `eval vector --memory`, opening the same file both
+ways:
+
+| | resident | open time |
+|---|---|---|
+| **`view` (mmap)** | **6.6 MB** | 70 ms |
+| `load` (read it all) | **758.6 MB** | 438 ms |
+
+758.6 MB is **three times Tier 0's entire 250 MB idle budget** (`SPEC.md` §2.3), for
+the tier the artefact exists to serve — and it exceeds the 435 MB file, because loading
+rebuilds the graph as live allocations rather than mapping it. This is P11 settled with
+a measurement instead of a library's description of itself.
+
+**The graph costs 122 MB on top of the vectors it indexes.** 435 MB against the
+artefact's 313 MB. It is derived, so it is not a download — but it is disk, and it sits
+outside the database alongside the artefact.
+
+#### expansion_search was swept, not guessed
+
+`eval vector --ef N`, same 200 queries:
+
+| ef | recall@10 | p50 | p95 |
+|---|---|---|---|
+| 64 (usearch's default) | 0.9400 | 0.97 ms | 2.09 ms |
+| 128 | 0.9550 | 1.23 ms | 3.33 ms |
+| **192 (shipped)** | **0.9670** | **1.57 ms** | **4.28 ms** |
+| 256 | 0.9750 | 1.93 ms | 4.96 ms |
+| 384 | 0.9845 | 2.55 ms | 6.03 ms |
+
+**The library default missed the gate.** 0.9400 at ef 64 — which is the number that
+would have shipped had the constant been taken on trust and the harness written
+afterwards. 192 is the smallest value clearing 0.95 with margin. Higher was affordable
+on this machine, but the 80 ms budget is a *Tier 0* budget and the query embedding
+(P8: 24–33 ms padded) and keyword pass come out of the same 80 ms.
+
+#### The harness was proved before its numbers were believed
+
+`eval vector --prove` rotates the position → catalogue-id mapping by one, leaving the
+artefact, the index and the metric untouched.
+
+| | recall@10 |
+|---|---|
+| correct mapping | 0.9670 |
+| **mapping shifted by one** | **0.0055** |
+
+This is the check §10.8 asks for: a wrong key mapping is invisible by inspection,
+because it returns ten plausible films for every query. Ground truth comes from
+`crates/vector-index/src/brute.rs`, which scans the artefact bytes directly —
+deliberately **not** usearch's own `exact_search`, which would have compared usearch
+against usearch over the vectors usearch stored, and would have agreed with itself.
+
+#### One query loses 8 of its 10 neighbours, and it is not a measurement artefact
+
+`worst 0.20` at *every* ef value, which is the signature of something other than a
+lossy dial. Two explanations, opposite in meaning, so both were measured rather than
+assumed:
+
+- **Tied vectors** — duplicates in the artefact making "the true top ten" arbitrary:
+  **1** vector ties for last place. Not this.
+- **A crowded band** — thousands of vectors equally distant: **12** lie within 1% of
+  the 10th distance. Not this either.
+
+Position 697,314 has a real neighbourhood — nearest at 0.0000, tenth at 0.4009 — and
+HNSW misses most of it regardless of how many candidates it keeps. A genuinely
+poorly-connected node. Recorded as debt rather than smoothed away; the mean clears the
+gate and the shape of a single bad neighbourhood matters again in 5.4, where fusion
+decides what a weak candidate set does to a result page.
+
+#### E2 unchanged, and a cold-cache number worth having
+
+`eval search --report` after all of the above: **43/43 = 100%**, unchanged.
+
+Latency, however, split cleanly in two:
+
+| | p50 | p95 | max |
+|---|---|---|---|
+| **cold** (straight after 750 MB of index I/O) | 5.6 ms | **36.8 ms** | **131.9 ms** |
+| warm (three consecutive runs) | 0.9 ms | 7.1–7.4 ms | 59.9–61.7 ms |
+
+Not a regression — the warm numbers reproduce the 7.3 ms already recorded. But the
+cold column is the one a user meets on the first search after launch, and its **max
+already exceeds E1's 80 ms budget on a single query**. E1 is a p95 criterion so this
+does not fail it; it does mean E1 must eventually be measured cold, and Phase 21 owns
+that.

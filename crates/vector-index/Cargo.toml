@@ -1,0 +1,25 @@
+[package]
+name = "sinephile-vector-index"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "HNSW over the embedding artefact: built once, memory-mapped thereafter (P11, ADR-0014)."
+
+# SEPARATE FROM `crates/embedding` ON PURPOSE.
+#
+# That crate is what VERIFIES a 313 MB download before anything trusts it, so it stays
+# dependency-light and pure Rust. This one pulls in a C++ toolchain to build usearch.
+# Keeping them apart means checking an artefact's checksum and model identity never
+# depends on a native build succeeding.
+
+[dependencies]
+sinephile-embedding = { path = "../embedding" }
+usearch = "=2.26.2"
+# usearch speaks to C++ through cxx, so its errors ARE cxx::Exception. Named here so
+# the conversion into this crate's error type is a normal `From` rather than a string.
+cxx = "1"
+thiserror = "2"
+
+[dev-dependencies]
+tempfile = "3"

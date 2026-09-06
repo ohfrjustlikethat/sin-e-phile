@@ -74,23 +74,31 @@ impl Row {
     }
 }
 
+/// The core-tier predicate, borrowed from the crate that owns it.
+///
+/// It lives in `crates/persistence` rather than here because the **application** needs
+/// the same definition to map artefact positions onto catalogue ids after a download,
+/// and the application cannot depend on a dev tool. Producer and consumer therefore
+/// share one string; see `CatalogueRepository::core_ids`.
+use sinephile_persistence::repositories::CORE_TIER as CORE;
+
 /// How many core-tier titles will be embedded.
 pub async fn core_count(db: &Db) -> Result<i64, JobError> {
-    Ok(sqlx::query_scalar(
-        "SELECT COUNT(*) FROM media_items WHERE in_core = 1 AND kind <> 'episode'",
+    Ok(
+        sqlx::query_scalar(&format!("SELECT COUNT(*) FROM media_items WHERE {CORE}"))
+            .fetch_one(db.pool())
+            .await?,
     )
-    .fetch_one(db.pool())
-    .await?)
 }
 
 /// Read one batch of core titles, in id order.
 async fn rows(db: &Db, after: i64, limit: i64) -> Result<Vec<Row>, JobError> {
-    let base: Vec<CoreRow> = sqlx::query_as(
+    let base: Vec<CoreRow> = sqlx::query_as(&format!(
         "SELECT id, primary_title, release_year, kind, synopsis
            FROM media_items
-          WHERE in_core = 1 AND kind <> 'episode' AND id > ?
-          ORDER BY id LIMIT ?",
-    )
+          WHERE {CORE} AND id > ?
+          ORDER BY id LIMIT ?"
+    ))
     .bind(after)
     .bind(limit)
     .fetch_all(db.pool())
@@ -283,11 +291,11 @@ async fn last_id_for(db: &Db, written: i64) -> Result<i64, JobError> {
     if written == 0 {
         return Ok(0);
     }
-    Ok(sqlx::query_scalar(
+    Ok(sqlx::query_scalar(&format!(
         "SELECT id FROM media_items
-          WHERE in_core = 1 AND kind <> 'episode'
-          ORDER BY id LIMIT 1 OFFSET ?",
-    )
+          WHERE {CORE}
+          ORDER BY id LIMIT 1 OFFSET ?"
+    ))
     .bind(written - 1)
     .fetch_optional(db.pool())
     .await?
@@ -299,7 +307,7 @@ async fn last_id_for(db: &Db, written: i64) -> Result<i64, JobError> {
 /// The identity names the QUANTISATION as well as the model, because
 /// `all-MiniLM-L6-v2-int8` and `all-MiniLM-L6-v2-fp32` produce different vectors and
 /// must never be interchangeable — the artefact header compares this verbatim.
-pub const MODEL_IDENTITY: &str = "all-MiniLM-L6-v2-int8";
+pub use sinephile_embedding::MODEL as MODEL_IDENTITY;
 
 /// Where the model came from, and what it must hash to.
 ///

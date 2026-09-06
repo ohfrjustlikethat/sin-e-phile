@@ -16,6 +16,13 @@ path = "src/main.rs"
 
 [dependencies]
 sinephile-persistence = { path = "../../crates/persistence" }
+# The vector harness measures the index against brute force over the artefact, and
+# derives the position -> catalogue id mapping with the SAME query the producer walked.
+# Depending on the producer is deliberate: a second copy of that query here would be the
+# one place a drift could not be noticed.
+sinephile-embedding = { path = "../../crates/embedding" }
+sinephile-vector-index = { path = "../../crates/vector-index" }
+sinephile-ingest = { path = "../ingest" }
 sqlx = { version = "=0.8.6", default-features = false, features = [
     "runtime-tokio", "sqlite", "macros",
 ] }

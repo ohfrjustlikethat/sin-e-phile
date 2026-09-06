@@ -8,7 +8,7 @@
 [workspace]
 resolver = "2"
 members = ["src-tauri", "crates/tiers", "crates/artwork", "crates/embedding",
-    "crates/persistence", "crates/metadata-api", "tools/ingest", "tools/eval"]
+    "crates/persistence", "crates/vector-index", "crates/metadata-api", "tools/ingest", "tools/eval"]
 
 [workspace.package]
 edition = "2021"

@@ -51,6 +51,11 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
   ingest search-index      build the FTS5 index (Phase 5). --trigram also builds
                            the typo-tolerance index, --trigram-core restricts it
                            to the core tier. Each index is measured separately.
+  ingest vector-index      build the HNSW index over the embedding artefact
+                           (Phase 5 subtask 5.3). Derived on the machine rather
+                           than downloaded, so it needs `ingest embed` to have
+                           produced the artefact first. Re-runnable: it replaces
+                           the index it finds.
   ingest verify-embeddings verify the artefact: checksum, header, and whether it
                            matches the model and document builder this build has
   ingest verify-anime      check the catalogue against
@@ -149,6 +154,7 @@ async fn main() -> Result<(), JobError> {
             let trigram_core = args.iter().any(|a| a == "--trigram-core");
             search_index(&db, trigram || trigram_core, trigram_core).await
         }
+        "vector-index" => vector_index(&db, &dir).await,
         "verify-embeddings" => verify_embeddings(&dir),
         "verify-anime" => verify_anime(&db).await,
         "status" => status(&db).await,
@@ -771,7 +777,7 @@ async fn embed_artefact(db: &Db, dir: &Path) -> Result<(), JobError> {
     tracing::info!("embedding {count} core-tier titles, snapshot {snapshot}");
     let mut embedder = embed::OnnxEmbedder::load(&model, &tokenizer, embed::MODEL_IDENTITY)?;
 
-    let artefact_path = dir.join("embeddings-all-MiniLM-L6-v2-int8.bin");
+    let artefact_path = sinephile_embedding::artefact_path(dir);
     let mut job = Job::begin(db, "embed").await?;
     if job.is_resuming().await? {
         tracing::info!("resuming a previous run");
@@ -852,6 +858,90 @@ async fn search_index(db: &Db, trigram: bool, trigram_core: bool) -> Result<(), 
 
 /// Verify the embedding artefact, as the application will at startup.
 ///
+/// Build the HNSW index over the artefact (subtask 5.3).
+///
+/// Not a `Job`: it is one indivisible pass that ends in a single `save`, so there is no
+/// half-done state a checkpoint could resume from. Interrupt it and the previous index
+/// is still there, untouched, because the new one is written to a temporary path and
+/// moved into place only once it is complete.
+async fn vector_index(db: &Db, dir: &Path) -> Result<(), JobError> {
+    use sinephile_embedding::Artefact;
+    use sinephile_persistence::repositories::CatalogueRepository;
+    use sinephile_vector_index::VectorIndex;
+
+    let artefact_path = sinephile_embedding::artefact_path(dir);
+    let mut file = std::fs::File::open(&artefact_path).map_err(|e| {
+        JobError::step(
+            "vector-index",
+            format!(
+                "{}: {e}\nRun `ingest embed` first, or download the published artefact.",
+                artefact_path.display()
+            ),
+        )
+    })?;
+
+    println!("ingest: reading {}", artefact_path.display());
+    let artefact =
+        Artefact::read(&mut file).map_err(|e| JobError::step("vector-index", e.to_string()))?;
+
+    let ids = CatalogueRepository::new(db).core_ids().await?;
+    println!(
+        "ingest: {} vectors, {} core ids, {} dimensions",
+        artefact.header.count,
+        ids.len(),
+        artefact.header.dimension
+    );
+
+    let final_path = sinephile_vector_index::index_path(dir);
+    let building = final_path.with_extension("usearch.part");
+
+    let total = ids.len();
+    let started = std::time::Instant::now();
+    let report = VectorIndex::build(&artefact, &ids, &building, |done| {
+        if done > 0 && done % 50_000 == 0 {
+            let rate = done as f64 / started.elapsed().as_secs_f64();
+            println!(
+                "  {done}/{total}  {:.0}/s  eta {:.0}s",
+                rate,
+                (total - done) as f64 / rate
+            );
+        }
+    })
+    .map_err(|e| JobError::step("vector-index", e.to_string()))?;
+
+    std::fs::rename(&building, &final_path).map_err(|e| {
+        JobError::step(
+            "vector-index",
+            format!("{} -> {}: {e}", building.display(), final_path.display()),
+        )
+    })?;
+
+    println!();
+    println!("  {}", final_path.display());
+    println!("  vectors          {}", report.vectors);
+    println!(
+        "  index size       {:.0} MB  ({:.1}x the artefact's {:.0} MB)",
+        report.bytes as f64 / 1_048_576.0,
+        report.bytes as f64 / artefact_bytes(&artefact_path).max(1.0),
+        artefact_bytes(&artefact_path) / 1_048_576.0
+    );
+    println!(
+        "  build            {:.0}s  ({:.0} vectors/s)",
+        report.seconds,
+        report.vectors as f64 / report.seconds
+    );
+    println!();
+    println!("  Recall is NOT measured here — `cargo run -p eval --release -- vector --report`");
+    println!("  compares this index against brute force over the same artefact.");
+    Ok(())
+}
+
+fn artefact_bytes(path: &Path) -> f64 {
+    std::fs::metadata(path)
+        .map(|m| m.len() as f64)
+        .unwrap_or(0.0)
+}
+
 /// Reproduces the check that matters: not merely "is the file intact" but "would
 /// loading it produce meaningful results on this build". A mismatched artefact is
 /// intact and useless.
@@ -859,7 +949,7 @@ fn verify_embeddings(dir: &Path) -> Result<(), JobError> {
     use sinephile_embedding::{document, Artefact};
     use sinephile_ingest::embed;
 
-    let path = dir.join("embeddings-all-MiniLM-L6-v2-int8.bin");
+    let path = sinephile_embedding::artefact_path(dir);
     let mut file = std::fs::File::open(&path)
         .map_err(|e| JobError::step("verify", format!("{}: {e}", path.display())))?;
     let artefact =

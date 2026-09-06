@@ -98,6 +98,17 @@ impl Readiness {
     }
 }
 
+/// Which titles the embedding artefact covers, written once, in the crate both the
+/// producer and the application depend on.
+///
+/// The artefact is **positional**: vector `n` belongs to the nth core title in id
+/// order, and the file records no ids of its own. Everything that walks the core tier
+/// — the producer's count, its batch reader, its resume cursor, and
+/// [`CatalogueRepository::core_ids`] — is part of one definition between them. A
+/// predicate that drifted in any of them would not fail; it would silently return a
+/// different film for every position after the drift.
+pub const CORE_TIER: &str = "in_core = 1 AND kind <> 'episode'";
+
 pub struct CatalogueRepository<'a> {
     db: &'a Db,
 }
@@ -105,6 +116,23 @@ pub struct CatalogueRepository<'a> {
 impl<'a> CatalogueRepository<'a> {
     pub fn new(db: &'a Db) -> Self {
         Self { db }
+    }
+
+    /// Every core title's id, in artefact order.
+    ///
+    /// This is the mapping the artefact does not carry: position → `media_items.id`.
+    /// Deriving it means re-running the ordering the producer walked, which is sound
+    /// only because [`CORE_TIER`] is shared and `ORDER BY id` is total.
+    ///
+    /// The consumer checks this list's length against the artefact header before
+    /// trusting any of it (`sinephile_vector_index::VectorIndex::build`) — that check
+    /// is what catches a catalogue which has grown since the artefact was built.
+    pub async fn core_ids(&self) -> Result<Vec<i64>, DbError> {
+        Ok(sqlx::query_scalar(&format!(
+            "SELECT id FROM media_items WHERE {CORE_TIER} ORDER BY id"
+        ))
+        .fetch_all(self.db.pool())
+        .await?)
     }
 
     /// Titles a search could return. Episodes are excluded: they are not what a first

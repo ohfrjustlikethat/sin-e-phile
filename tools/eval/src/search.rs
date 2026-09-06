@@ -13,15 +13,7 @@ use std::time::Instant;
 use sinephile_persistence::repositories::{MatchReason, SearchRepository};
 use sinephile_persistence::Db;
 
-#[derive(Debug, thiserror::Error)]
-pub enum EvalError {
-    #[error("{0}: {1}")]
-    Fixture(String, String),
-    #[error(transparent)]
-    Db(#[from] sinephile_persistence::DbError),
-    #[error("database: {0}")]
-    Sqlx(#[from] sqlx::Error),
-}
+use crate::error::EvalError;
 
 struct Case {
     query: String,
