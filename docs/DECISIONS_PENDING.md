@@ -289,6 +289,11 @@ number is bad, that is visible rather than inferred.
 ## P12 — The catalogue has no synopses, so semantic search has nothing to be semantic about
 
 **Raised:** 2026-09-07 (Phase 5, subtask 5.4) · **Blocks:** E3, E4 · **Decide by:** Phase 5
+**DECIDED 2026-09-07 — option 2, Wikidata.** The author has no TMDB key and does not want
+one as a build dependency. That also removes ADR-0018's licensing question from the
+published artefact completely, since no TMDB-derived text goes into it. P12 stays open
+only until the re-measurement below says whether Wikidata's coverage is enough; if it is
+not, the fallback is a per-user key enriching *live*, not a rebuilt artefact.
 
 ### The decision
 

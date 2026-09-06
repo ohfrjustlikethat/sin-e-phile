@@ -1890,7 +1890,7 @@
     },
     {
       "id": "P12",
-      "text": "THE CATALOGUE HAS NO SYNOPSES - 0 of 855,703 core items - so every embedded document is title, year, genres, kind and cast, and semantic search behaves like a fuzzy title matcher. E4's own example query returns ten films literally titled 'Grief'. E3 (nDCG@10 > 0.75) and E4 cannot be met against this artefact and no tuning changes that. Synopses come from TMDB, which ADR-0027 makes optional and absent by default - the configuration this catalogue was built in. ADR-0018 already anticipated a swappable text source (tmdb/imdb/wikidata) precisely so its contribution could be measured; that seam was specified and never exercised. Options, costs and a recommendation in docs/DECISIONS_PENDING.md. Blocks E3 and E4, not the rest of the phase.",
+      "text": "DECIDED 2026-09-07 BY THE AUTHOR: option 2, Wikidata/Wikipedia abstracts. The author has no TMDB key and does not want one as a build dependency, which also removes ADR-0018's licensing question from the published artefact entirely. Remaining work: a Wikidata abstract loader joined on IMDb id (property P345), a re-embed, and an index rebuild, then re-measure E4's two queries with `eval search --query`. P12 stays open only until that measurement says whether coverage is enough; if it is not, the fallback is a per-user TMDB key enriching live rather than a rebuilt artefact. Original options in docs/DECISIONS_PENDING.md.",
       "raised": "2026-09-07",
       "decide_by_phase": 5
     }
@@ -2205,6 +2205,11 @@
     {
       "id": "D36",
       "text": "RRF's k=60 IS AN UNMEASURED LITERATURE DEFAULT. crates/search-engine::RRF_K. It cannot be swept yet: E2's fixture is exact titles, which never reach fusion, so every value of k produces identical numbers. The sweep belongs with 5.6's semantic fixture, and this phase has already caught one library default (usearch's ef=64) being wrong for this corpus.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D37",
+      "text": "NOTHING SCHEDULES THE CATALOGUE REFRESH, AND NO PHASE OWNS IT. `ingest refresh` works and is measured (71 s, 1,542 titles added, 2026-09-04) but it is a MANUAL CLI COMMAND: nothing in src-tauri calls it, and the app does not open the database at all yet (D26). docs/specs/catalogue-freshness.md assigns owners to all four LAYERS but not to the thing that RUNS them, so a user who installs the app and never opens a terminal has a catalogue frozen at install time - which is precisely the outcome ADR-0030 exists to prevent. Found when the author asked, for the second time, how titles stay current. Cheapest correct fix: on launch, if the last successful refresh job is older than 7 days, run it in the background and surface it through CatalogueRepository::readiness. That is small and belongs with subtask 5.7, which already opens the database and re-measures cold start. Phase 20 (Windows platform integration) would be the tidier home but it is TIER C and optional, so a Tier B stop would ship an app that never refreshes.",
       "phase_raised": 5
     }
   ],
