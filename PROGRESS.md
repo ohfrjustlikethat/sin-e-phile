@@ -12,15 +12,15 @@
 
 **Phase 4 — Metadata Backbone** (`in_progress`, branch `phase/04-metadata-backbone`)
 
-5 of 7 exit criteria met with evidence.
+6 of 7 exit criteria met with evidence.
 
 > The catalogue. Three constraints carry in: ADR-0013 and ADR-0027 mean the app must be complete and good-looking with NO TMDB key and no key ever ships; ADR-0026 means SQL is runtime-checked, so every new repository method needs a line in crates/persistence/tests/repository_surface.rs; and R4 (ingestion larger or slower than expected) is this phase's named risk — measure before committing to a shape, and scope by a popularity threshold rather than ingesting everything.
 
-### Subtasks — 9/13 complete
+### Subtasks — 10/13 complete
 
 - [x] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts · `4a78d64`
 - [x] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres · `048180a`
-- [ ] **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device)
+- [x] **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device) · `42177d6`
 - [x] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, and seasonal episode numbering into episode_numbering. Absolute numbering is NULL by ADR-0031 - no free source publishes one. · `a170532`
 - [x] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules · `f67d939`
 - [x] **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline · `38d75d7`
@@ -34,7 +34,8 @@
 
 ### Exit criteria
 
-- [ ] **E1** Full ingestion completes on the dev machine and the resulting database is under a documented size budget.
+- [x] **E1** Full ingestion completes on the dev machine and the resulting database is under a documented size budget.
+      - *Evidence:* `./target/release/ingest movielens` completed 2026-09-07, closing the last loader. Full ingestion now complete across every job: title.basics 2,701,195, title.principals 10,092,368, name.basics 2,736,235, title.akas 5,908,381, episodes 132,845 rows / 5,862 seasons / 4,529 series, MovieLens 61,912 of 62,423 films matched (99.2%) over 25,000,095 ratings streamed. RESULTING DATABASE 3,659 MB (3,836,723,200 bytes, `ls -la data/sinephile.db`), against the 4 GB budget documented in docs/RISKS.md R4 - 341 MB of headroom. The 313 MB artefact and 435 MB index live OUTSIDE the database and are counted separately (D33).
 - [x] **E2** Ingestion killed mid-run resumes correctly.
       - *Evidence:* `cargo test -p sinephile-ingest --test resume` -> 10 passing, 2026-09-05. a_killed_run_resumes_and_repeats_nothing asserts 50 items exist EXACTLY once after a kill at item 20; progress_survives_a_restart; a_step_that_does_not_advance_its_cursor_is_stopped; and an_interrupted_run_resumes_at_the_next_page in tests/anime.rs. Demonstrated for real as well: the AniList sweep was interrupted and resumed during development, and a_crash_mid_step_reports_that_it_is_resuming was corrected after `is_resuming` was found reporting a fresh run on every real resume.
 - [x] **E3** Catalogue lookups work with the network disconnected.
@@ -46,6 +47,7 @@
 - [x] **E6** The catalogue is fully usable with no TMDB key (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.
       - *Evidence:* MEASURED on the real catalogue, 2026-09-05, with NO TMDB key ever supplied: 0 rows in external_ids with source='tmdb' and 0 TMDB responses in http_cache. The catalogue nonetheless holds 2,702,737 titles, 855,703 core-tier, 10,079,841 credits, 6,176,950 title rows, 4,450,735 genre links, 1,086,210 ratings, 2,008,183 runtimes and 539,817 episodes - all from IMDb and AniList alone. ADR-0027's per-profile key surface exists (crates/persistence/src/repositories/credentials.rs) and defaults to TmdbAccess::Absent.
 - [ ] **E7** The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.
+      - *Evidence:* PARTIALLY MET, AND NOT CLAIMED. Produced: 855,703 vectors, 313 MB, sha256 3fce6f062c25220a80425cce7e9f83a3b80412af3b34fe4e9071d3b80645a2b0, deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version and snapshot date - `ingest verify-embeddings`. PUBLISHED by the author 2026-09-06 as release `embeddings-v1` on github.com/ohfrjustlikethat/sin-e-phile, asset embeddings-all-MiniLM-L6-v2-int8.bin, confirmed with `gh release view embeddings-v1`. Degradation to FTS5-only when the artefact is absent is now real and exercised: sinephile_search_engine::Engine::keyword_only, selected automatically by the eval harness when the model or index is missing. WHAT REMAINS IS MINE, NOT THE AUTHOR'S: 'the application refuses to load an artefact whose model identity does not match its own' cannot be evidenced while the application does not open the artefact at all (D26). Header::compatible_with exists and is tested in crates/embedding, and index_path names the file after the model so a mismatch misses rather than misreads - but neither is the application refusing. Subtask 5.9 wires it. SEPARATELY: P12 will REBUILD this artefact with Wikidata text, superseding embeddings-v1, so the published asset is about to be replaced.
 
 ---
 
@@ -57,8 +59,7 @@ Phase 5 subtask 5.5: query understanding. Write crates/search-engine/src/query.r
 
 ## Blockers
 
-- **B2** **(needs you)** E1 / subtask 4.3: files.grouplens.org has served an EXPIRED certificate since 2026-08-28 (re-checked 2026-09-06, nine days). NOT worked around - disabling certificate verification would ship a security downgrade to every user. THE AUTHOR CAN UNBLOCK THIS: download https://files.grouplens.org/datasets/movielens/ml-25m.zip by hand, accepting the browser's certificate warning, and drop it in data/datasets/. `ingest movielens` now verifies it against md5 544c4d86ea9f05e056d8075398539b34, which is published on grouplens.org - a host with a VALID certificate - so the file's integrity is checkable even though its transport was not authenticated. That risk judgement is the author's to make, not the application's to make for every user.
-- **B3** **(needs you)** E7 says the embedding artefact is 'produced AND PUBLISHED'. It is produced: 855,703 vectors, 313 MB, sha256 3fce6f062c25220a80425cce7e9f83a3b80412af3b34fe4e9071d3b80645a2b0, at data/embeddings-all-MiniLM-L6-v2-int8.bin, verified by `ingest verify-embeddings`. It is NOT published. ONLY THE AUTHOR CAN DO THAT: upload it as a GitHub Release asset on this repository with its sha256 alongside (ADR-0014). E7 is marked NOT MET until then - marking it met would be the overclaim SPEC.md 10.8 forbids, and I had marked it met before re-reading the criterion.
+None.
 
 ---
 
@@ -72,7 +73,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 1 | Application Shell and Capability Tiers | A | 0 | 1–2 | 7/7 |
 | [x] | 2 | Design System and Visual Language | A | 1 | 1–2 | 5/5 |
 | [x] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 5/5 |
-| [~] | 4 | Metadata Backbone | A | 3 | 2–3 | 5/7 |
+| [~] | 4 | Metadata Backbone | A | 3 | 2–3 | 6/7 |
 | [~] | 5 | Semantic Search Engine | A | 4 | 2 | 1/5 |
 | [ ] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 0/6 |
 | [ ] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 0/8 |

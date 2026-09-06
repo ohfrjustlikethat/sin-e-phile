@@ -15,7 +15,7 @@ A local catalogue of hundreds of thousands of titles that works offline, enriche
 
 ## Exit criteria
 
-- [ ] **E1** Full ingestion completes on the dev machine and the resulting database is under a documented size budget.
+- [x] **E1** Full ingestion completes on the dev machine and the resulting database is under a documented size budget.
 - [x] **E2** Ingestion killed mid-run resumes correctly.
 - [x] **E3** Catalogue lookups work with the network disconnected.
 - [x] **E4** Rate limits are never exceeded under a stress test of 1,000 rapid lookups.
@@ -27,7 +27,7 @@ A local catalogue of hundreds of thousands of titles that works offline, enriche
 
 - [x] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts
 - [x] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres
-- [ ] **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device)
+- [x] **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device)
 - [x] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, and seasonal episode numbering into episode_numbering. Absolute numbering is NULL by ADR-0031 - no free source publishes one.
 - [x] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules
 - [x] **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline
@@ -62,3 +62,4 @@ ETL pipelines; why offline-first beats API-first here; rate limiting and backoff
 - **4.11** 50-title anime fixture for E5: fixtures/anime/e5-hand-checked.tsv, 64 rows, checked by `ingest v
 - **4.13** Incremental catalogue refresh (ADR-0030): re-fetch title.basics/ratings/episode and insert only  · `47e7353`
 - **4.10** The embedding artefact producer (ADR-0014). crates/embedding holds the document builder, int8 qu · `4f302d5`
+- **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device) · `42177d6`

@@ -28,7 +28,7 @@
         "id": "4.3",
         "text": "MovieLens join for ratings and popularity (ADR-0019, on-device)",
         "status": "complete",
-        "commit": "pending"
+        "commit": "42177d6"
       },
       {
         "id": "4.4",
@@ -706,7 +706,7 @@
           "id": "4.3",
           "text": "MovieLens join for ratings and popularity (ADR-0019, on-device)",
           "status": "complete",
-          "commit": "pending"
+          "commit": "42177d6"
         },
         {
           "id": "4.4",
