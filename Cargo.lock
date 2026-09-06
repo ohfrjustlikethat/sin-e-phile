@@ -1144,6 +1144,7 @@ dependencies = [
  "sinephile-embedding",
  "sinephile-ingest",
  "sinephile-persistence",
+ "sinephile-search-engine",
  "sinephile-vector-index",
  "sqlx",
  "thiserror 2.0.20",
@@ -4285,6 +4286,18 @@ dependencies = [
  "tracing",
  "unicode-normalization",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "sinephile-search-engine"
+version = "0.1.0"
+dependencies = [
+ "sinephile-embedder",
+ "sinephile-embedding",
+ "sinephile-persistence",
+ "sinephile-vector-index",
+ "thiserror 2.0.20",
+ "tokio",
 ]
 
 [[package]]

@@ -1,0 +1,27 @@
+[package]
+name = "sinephile-search-engine"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "Hybrid search: BM25 and vectors fused by reciprocal rank (SPEC.md Phase 5)."
+
+# WHY THIS IS NOT IN `crates/persistence`.
+#
+# Fusion needs three things: the keyword tier (SQL), the vector index (usearch, C++) and
+# the query embedder (ONNX Runtime). Putting it in the persistence crate would make a
+# native model runtime a dependency of every test that touches the database — including
+# `repository_surface.rs`, which exists to run against a bare migrated file and is the
+# whole of the protection ADR-0026 buys.
+#
+# So persistence keeps SQL, and this crate composes it with the other two.
+
+[dependencies]
+sinephile-persistence = { path = "../persistence" }
+sinephile-embedding = { path = "../embedding" }
+sinephile-embedder = { path = "../embedder" }
+sinephile-vector-index = { path = "../vector-index" }
+thiserror = "2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

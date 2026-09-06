@@ -14,6 +14,8 @@ pub enum EvalError {
     Artefact(#[from] sinephile_embedding::ArtefactError),
     #[error(transparent)]
     VectorIndex(#[from] sinephile_vector_index::VectorIndexError),
+    #[error(transparent)]
+    Search(#[from] sinephile_search_engine::SearchError),
     #[error("{path}: {source}")]
     Io {
         path: String,

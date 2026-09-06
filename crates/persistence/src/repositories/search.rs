@@ -32,6 +32,7 @@ pub struct Hit {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(clippy::enum_variant_names)]
 pub enum MatchReason {
     /// The query IS this title, normalised. Ranked above everything.
     ExactTitle,
@@ -39,6 +40,11 @@ pub enum MatchReason {
     Keyword,
     /// Matched only after typo tolerance.
     Fuzzy,
+    /// Near the query in embedding space, sharing no words with it necessarily.
+    Semantic,
+    /// Both halves found it. The strongest signal there is, and the one worth telling
+    /// the user about in 5.8's "why this matched" hint.
+    Both,
 }
 
 /// Column weights for `bm25()`.
@@ -258,6 +264,50 @@ impl<'a> SearchRepository<'a> {
                 kind,
                 score: Some(score),
                 why: MatchReason::Fuzzy,
+            })
+            .collect())
+    }
+
+    /// Title, year and kind for ids that arrived without them.
+    ///
+    /// The vector half returns catalogue ids and nothing else — the index holds no text
+    /// — so the fusion layer needs one batch lookup rather than ten round trips it would
+    /// pay on every keystroke. `why` is supplied by the caller, which is the only thing
+    /// that knows why these ids are here.
+    ///
+    /// Order is not preserved and does not need to be: whatever ranks these re-sorts
+    /// them. Ids not in the catalogue are simply absent, which is the right answer for
+    /// an index built against an older snapshot.
+    pub async fn describe(&self, ids: &[i64], why: MatchReason) -> Result<Vec<Hit>, DbError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        // Built rather than macro-checked: the placeholder count varies with the input,
+        // which is exactly the case ADR-0026 says `query!` cannot serve. The values are
+        // still bound, never interpolated.
+        let placeholders = std::iter::repeat_n("?", ids.len())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!(
+            "SELECT id, primary_title, release_year, kind
+               FROM media_items
+              WHERE id IN ({placeholders})"
+        );
+        let mut query = sqlx::query_as(&sql);
+        for id in ids {
+            query = query.bind(id);
+        }
+        let rows: Vec<(i64, String, Option<i64>, String)> = query.fetch_all(self.db.pool()).await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|(media_item_id, title, year, kind)| Hit {
+                media_item_id,
+                title,
+                year,
+                kind,
+                score: None,
+                why,
             })
             .collect())
     }

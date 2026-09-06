@@ -22,7 +22,7 @@ use sinephile_persistence::archive::Archiver;
 use sinephile_persistence::model::EpisodeNumbering;
 use sinephile_persistence::repositories::profiles::PlaybackPosition;
 use sinephile_persistence::repositories::{
-    CatalogueRepository, CredentialRepository, EpisodeRepository, MediaRepository,
+    CatalogueRepository, CredentialRepository, EpisodeRepository, MatchReason, MediaRepository,
     ProfileRepository, Readiness, SearchRepository, TmdbAccess,
 };
 use sinephile_persistence::{Db, IdSource, MediaKind, NewMediaItem, TitleVariant};
@@ -480,6 +480,25 @@ async fn db_surface() {
         .expect("exact")
         .is_empty());
     assert_eq!(search.search("probe", 5).await.expect("search").len(), 1);
+
+    // describe — the batch lookup the vector half needs, since it returns bare ids.
+    // An id that is not in the catalogue is absent rather than an error: an index built
+    // against an older snapshot is a real situation, not a corruption.
+    let described = search
+        .describe(&[probe, probe, 999_999], MatchReason::Semantic)
+        .await
+        .expect("describe");
+    assert_eq!(described.len(), 1, "duplicates collapse, strangers vanish");
+    assert_eq!(described[0].media_item_id, probe);
+    assert_eq!(described[0].why, MatchReason::Semantic);
+    assert!(
+        search
+            .describe(&[], MatchReason::Semantic)
+            .await
+            .expect("describe of nothing")
+            .is_empty(),
+        "an empty id list must not build a query with no placeholders"
+    );
 
     // ── CatalogueRepository ───────────────────────────────────────────────────
     let catalogue = CatalogueRepository::new(&db);

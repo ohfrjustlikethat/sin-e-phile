@@ -29,7 +29,14 @@ async fn main() {
     let data_dir = std::env::var("SINEPHILE_DATA_DIR").unwrap_or_else(|_| "data".into());
 
     let outcome = match command {
-        "search" => search::run(Path::new(&data_dir), report).await,
+        "search" => match args
+            .iter()
+            .position(|a| a == "--query")
+            .and_then(|i| args.get(i + 1))
+        {
+            Some(query) => search::one(Path::new(&data_dir), query).await,
+            None => search::run(Path::new(&data_dir), report).await,
+        },
         "vector" if args.iter().any(|a| a == "--memory") => vector::memory(Path::new(&data_dir)),
         "vector" => vector::run(Path::new(&data_dir), report, prove, expansion).await,
         "embed" => embed::run(Path::new(&data_dir), report).await,
