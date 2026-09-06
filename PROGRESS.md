@@ -73,7 +73,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 2 | Design System and Visual Language | A | 1 | 1–2 | 5/5 |
 | [x] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 5/5 |
 | [~] | 4 | Metadata Backbone | A | 3 | 2–3 | 5/7 |
-| [ ] | 5 | Semantic Search Engine | A | 4 | 2 | 0/5 |
+| [ ] | 5 | Semantic Search Engine | A | 4 | 2 | 1/5 |
 | [ ] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 0/6 |
 | [ ] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 0/8 |
 | [ ] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 0/6 |

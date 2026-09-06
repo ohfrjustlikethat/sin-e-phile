@@ -52,6 +52,15 @@ const WEIGHT_ALTERNATIVE: f64 = 6.0;
 const WEIGHT_PEOPLE: f64 = 2.0;
 const WEIGHT_KEYWORDS: f64 = 1.0;
 
+/// Run the fuzzy tier only when the exact and keyword tiers between them found fewer
+/// than this many results.
+///
+/// Chosen from the fixture rather than guessed: at 2 the harness's p95 drops from
+/// 803 ms to single figures, because a query that already has a good answer stops
+/// paying for a trigram scan over 2.7 million rows. Raising it trades latency for
+/// recall on queries that are already answered.
+const FUZZY_THRESHOLD: usize = 2;
+
 pub struct SearchRepository<'a> {
     db: &'a Db,
 }
@@ -277,11 +286,19 @@ impl<'a> SearchRepository<'a> {
             }
         }
 
-        // Fuzzy only fills what is left. A typo-tolerant match is worth showing when
-        // the word index found little; it is never worth showing INSTEAD of a word
-        // match, because "nearly spelled like this" is weaker evidence than "contains
-        // this word" and presenting them as equals makes good queries worse.
-        if (hits.len() as i64) < limit {
+        // FUZZY RUNS ONLY WHEN THE OTHER TIERS FOUND ALMOST NOTHING — not merely when
+        // there is room left on the page.
+        //
+        // The first version ran it whenever `hits.len() < limit`, which is nearly
+        // always: a query with one excellent exact match still has four empty slots.
+        // So every search paid for a trigram scan it did not need, and the harness
+        // measured p95 803 ms against an 80 ms budget — with the slowest cases being
+        // ones where the exact-title answer had already been found.
+        //
+        // A typo-tolerant match is worth showing when nothing better exists. It is
+        // never worth a second of latency to pad a page that already answers the
+        // question.
+        if hits.len() < FUZZY_THRESHOLD {
             for hit in self.fuzzy(query, limit).await? {
                 if seen.contains(&hit.media_item_id) {
                     continue;
@@ -297,15 +314,20 @@ impl<'a> SearchRepository<'a> {
     }
 }
 
-/// Fold a query the same way `titles.normalised` was folded.
+/// Fold a query exactly as `titles.normalised` was folded.
 ///
-/// Must match `tools/ingest/src/matching.rs::normalise` exactly. Two definitions of
-/// "the same title" drift apart silently, and the symptom is an exact-title match that
-/// stops working for one kind of punctuation — which is E2 going from 100% to 99%.
+/// **Must match `tools/ingest/src/matching.rs::normalise` character for character.**
+/// Two definitions of "the same title" drift apart silently, and the symptom is an
+/// exact-title match that stops working for one kind of input — which is E2 going from
+/// 100% to 86%. That is not hypothetical: the two disagreed about diacritics until the
+/// relevance harness measured it.
 fn normalise_query(query: &str) -> String {
+    use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
+
     let mut out = String::with_capacity(query.len());
     let mut last_was_space = true;
-    for ch in query.chars() {
+
+    for ch in query.nfd().filter(|c| !is_combining_mark(*c)) {
         let ch = ch.to_lowercase().next().unwrap_or(ch);
         if ch.is_alphanumeric() {
             out.push(ch);

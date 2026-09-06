@@ -788,8 +788,8 @@
         {
           "id": "E2",
           "text": "Exact-title top-1 rate is 100% on the fixture corpus.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "`cargo run -p eval --release -- search --report` -> 43/43 = 100%, 2026-09-06, over fixtures/search/exact-titles.tsv against the real 2,702,737-title catalogue. Queries chosen to be awkward: one-letter titles, FTS5 syntax (Face/Off, Mission: Impossible, And Then There Were None), dropped diacritics, romaji forms, and titles several works share. The harness exits non-zero on any miss, so it gates rather than informs."
         },
         {
           "id": "E3",
@@ -843,8 +843,8 @@
         },
         {
           "id": "5.6",
-          "text": "fixtures/search/ corpus and the relevance eval harness: exact-title top-1 (E2) and nDCG@10 (E3).",
-          "status": "not_started",
+          "text": "fixtures/search/ and the relevance harness. exact-titles.tsv (43 queries) and tools/eval are done and E2 is at 100%. semantic-queries.tsv and nDCG@10 (E3) need the vector half from 5.3.",
+          "status": "in_progress",
           "commit": null
         },
         {

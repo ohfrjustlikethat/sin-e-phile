@@ -71,24 +71,37 @@ pub struct Candidate {
 /// ends. Two is too loose — it starts matching adjacent seasons of the same show.
 const YEAR_TOLERANCE: i64 = 1;
 
-/// Normalise a title for comparison.
+/// Fold a title for comparison: lowercase, strip punctuation, **and remove diacritics**.
 ///
-/// Lowercases, strips punctuation and collapses whitespace. Deliberately does NOT
-/// transliterate or strip diacritics beyond what casing does: "Kimi no Na wa" and
-/// "君の名は" are different strings and are supposed to be, because they are matched
-/// as separate title forms rather than folded together.
+/// # Why diacritics are folded
+///
+/// The FTS5 index is built with `remove_diacritics 2`, so the keyword tier already
+/// treats "Amelie" and "Amélie" as the same word. The exact-title tier did not, which
+/// meant the two halves of the same search disagreed about what a title is — and the
+/// harness caught it: "Nausicaa of the Valley of the Wind" missed
+/// "Nausicaä of the Valley of the Wind" and fell through to a keyword match on a
+/// making-of documentary.
+///
+/// People type accented titles without the accents. A search that requires them is a
+/// search that fails on Amélie, Nausicaä, Kieślowski and most of world cinema.
+///
+/// NFD then drop combining marks, which is what SQLite's `remove_diacritics 2` does —
+/// so both halves now agree by construction rather than by coincidence.
+///
+/// Deliberately does NOT transliterate: "君の名は" stays as it is, because it is matched
+/// as its own title form rather than folded into a romanisation.
 pub fn normalise(title: &str) -> String {
+    use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
+
     let mut out = String::with_capacity(title.len());
     let mut last_was_space = true;
 
-    for ch in title.chars() {
+    for ch in title.nfd().filter(|c| !is_combining_mark(*c)) {
         let ch = ch.to_lowercase().next().unwrap_or(ch);
         if ch.is_alphanumeric() {
             out.push(ch);
             last_was_space = false;
         } else if !last_was_space {
-            // Punctuation becomes a single space: "Fullmetal Alchemist: Brotherhood"
-            // and "Fullmetal Alchemist Brotherhood" are the same title written twice.
             out.push(' ');
             last_was_space = true;
         }

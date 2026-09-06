@@ -1032,6 +1032,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "eval"
+version = "0.1.0"
+dependencies = [
+ "sinephile-persistence",
+ "sqlx",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
 name = "event-listener"
 version = "5.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4099,6 +4109,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "unicode-normalization",
  "zip",
 ]
 
@@ -4129,6 +4140,7 @@ dependencies = [
  "time",
  "tokio",
  "tracing",
+ "unicode-normalization",
  "windows-sys 0.61.2",
 ]
 
