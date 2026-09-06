@@ -2,7 +2,7 @@
   "spec_version": "1.9.0",
   "project": "sin-e-phile",
   "last_updated": "2026-09-06",
-  "sessions_completed": 5,
+  "sessions_completed": 10,
   "current_phase": {
     "number": 4,
     "slug": "metadata-backbone",
@@ -776,7 +776,7 @@
       "title": "Semantic Search Engine",
       "depends_on": "4",
       "sessions": "2",
-      "status": "not_started",
+      "status": "in_progress",
       "completion_commit": null,
       "exit_criteria": [
         {
@@ -826,8 +826,8 @@
         {
           "id": "5.3",
           "text": "HNSW over the 855,703-vector artefact, persisted and memory-mapped. P11 resolved: usearch, chosen because Index::view() mmaps rather than loads - a 313 MB index in RAM breaks the SPEC.md 2.3 Tier 0 budget of 250 MB, which is the tier the artefact exists to serve. Recall must be measured against brute force before any relevance number is reported.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "554c50d"
         },
         {
           "id": "5.4",
@@ -843,7 +843,7 @@
         },
         {
           "id": "5.6",
-          "text": "fixtures/search/ and the relevance harness. exact-titles.tsv (43 queries) and tools/eval are done and E2 is at 100%. semantic-queries.tsv and nDCG@10 (E3) need the vector half from 5.3.",
+          "text": "fixtures/search/ and the relevance harness. exact-titles.tsv (43 queries) and `eval search` are done and E2 is at 100%. `eval vector` is done: recall@10 0.9670 against brute force, with a --prove negative control. semantic-queries.tsv and nDCG@10 (E3) still need the query embedder and the fusion from 5.4.",
           "status": "in_progress",
           "commit": null
         },
@@ -1842,7 +1842,7 @@
       ]
     }
   ],
-  "next_action": "Phase 5 subtask 5.6: write fixtures/search/exact-titles.tsv and fixtures/search/semantic-queries.tsv, then a harness that reads them at tools/eval/src/search.rs (a new binary, as SPEC.md 15 Phase 5 names `cargo run -p eval -- search --report`). Do this BEFORE fixing D30 and D31: both need a BM25 score threshold and a fuzzy-tier cutoff chosen from a corpus rather than guessed, and E2 (exact-title top-1 = 100%) and E3 (nDCG@10 > 0.75) cannot be evidenced without the harness at all. The trigram index is built and typo tolerance works - see SearchRepository::fuzzy in crates/persistence/src/repositories/search.rs - but costs 256-390 ms against E1's 80 ms budget.",
+  "next_action": "Phase 5 subtask 5.4: reciprocal rank fusion of the BM25 and vector halves, with the exact-title short-circuit above both. Write it in crates/persistence/src/repositories/search.rs alongside SearchRepository::search, which today runs exact -> keyword -> fuzzy and knows nothing about vectors. The vector half is ready and measured: sinephile_vector_index::VectorIndex::view opens data/vector-index-all-MiniLM-L6-v2-int8.usearch in 70 ms for 6.6 MB resident and returns catalogue ids at recall@10 0.9670. THE MISSING PIECE IS THE QUERY EMBEDDER: nothing embeds a user's query on device yet - tools/ingest/src/embed.rs has OnnxEmbedder but it lives in a dev tool, so lifting it into a crate the application can use (crates/embedding deliberately has no ort dependency - read its header before deciding where) is the first step and is what E1's 80 ms must finally include. RRF constant k=60 is the literature default; measure it with `eval vector` rather than adopting it, since usearch's default ef was measured wrong for this corpus.",
   "blockers": [
     {
       "id": "B2",
@@ -2169,6 +2169,21 @@
       "id": "D31",
       "phase_raised": 5,
       "text": "A WEAK KEYWORD HIT BLOCKS A GOOD FUZZY ONE. `kurosowa` returns 'Margazhi Raagam' because the keyword tier matched something irrelevant, filled the result limit and fuzzy never ran. SearchRepository::search should discount weak keyword hits by BM25 score before deciding whether to fall through, rather than counting them. Needs a threshold chosen from the fixture corpus in subtask 5.6, not guessed."
+    },
+    {
+      "id": "D32",
+      "text": "ONE QUERY IN 200 LOSES 8 OF ITS 10 TRUE NEIGHBOURS, at every expansion_search value from 64 to 384 — so it is not the recall/latency dial. Both benign explanations were measured and both are false: 1 vector ties for last place, and 12 lie within 1% of the 10th distance, so it is neither a tie set nor a crowded band. Artefact position 697,314 has a real neighbourhood (nearest 0.0000, tenth 0.4009) and HNSW misses most of it: a poorly-connected node. The mean 0.9670 clears the 0.95 gate so this does not block 5.3, but a bad candidate set for one query becomes a bad result page for that query, and 5.4's fusion is where that shows. Look again when E3 has real embedded queries rather than artefact vectors.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D33",
+      "text": "THE INDEX COSTS 435 MB ON DISK, 1.4x the 313 MB artefact it indexes — the HNSW graph is 122 MB of that. It is DERIVED, so it is not a download and `ingest vector-index` rebuilds it from a checksummed file, but it is disk sitting outside the database next to the artefact. Together they are 748 MB of ./data/ that the R4 budget did not name. Phase 5 subtask 5.9 shows the artefact's size before consent; it should show this one too, or the user consents to 313 MB and receives 748 MB.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D34",
+      "text": "SEARCH IS FOUR TIMES SLOWER COLD. Measured the same day on the same fixture: warm p95 7.1-7.4 ms (three consecutive runs), cold p95 36.8 ms with a max of 131.9 ms, taken straight after 750 MB of index I/O evicted SQLite's page cache. Not a regression - the warm numbers reproduce - but the cold column is what a user meets on the first search after launch, and its MAX already exceeds E1's 80 ms budget on a single query. E1 is a p95 criterion so it survives; it must eventually be measured cold. Phase 21 owns the budget, and subtask 5.7's cold-start re-measurement is the natural place to take the number.",
+      "phase_raised": 5
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

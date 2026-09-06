@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 1.9.0** · 5 session(s) completed · last updated 2026-09-06
+**Spec version 1.9.0** · 10 session(s) completed · last updated 2026-09-06
 
 ---
 
@@ -51,7 +51,7 @@
 
 ## What's next
 
-Phase 5 subtask 5.6: write fixtures/search/exact-titles.tsv and fixtures/search/semantic-queries.tsv, then a harness that reads them at tools/eval/src/search.rs (a new binary, as SPEC.md 15 Phase 5 names `cargo run -p eval -- search --report`). Do this BEFORE fixing D30 and D31: both need a BM25 score threshold and a fuzzy-tier cutoff chosen from a corpus rather than guessed, and E2 (exact-title top-1 = 100%) and E3 (nDCG@10 > 0.75) cannot be evidenced without the harness at all. The trigram index is built and typo tolerance works - see SearchRepository::fuzzy in crates/persistence/src/repositories/search.rs - but costs 256-390 ms against E1's 80 ms budget.
+Phase 5 subtask 5.4: reciprocal rank fusion of the BM25 and vector halves, with the exact-title short-circuit above both. Write it in crates/persistence/src/repositories/search.rs alongside SearchRepository::search, which today runs exact -> keyword -> fuzzy and knows nothing about vectors. The vector half is ready and measured: sinephile_vector_index::VectorIndex::view opens data/vector-index-all-MiniLM-L6-v2-int8.usearch in 70 ms for 6.6 MB resident and returns catalogue ids at recall@10 0.9670. THE MISSING PIECE IS THE QUERY EMBEDDER: nothing embeds a user's query on device yet - tools/ingest/src/embed.rs has OnnxEmbedder but it lives in a dev tool, so lifting it into a crate the application can use (crates/embedding deliberately has no ort dependency - read its header before deciding where) is the first step and is what E1's 80 ms must finally include. RRF constant k=60 is the literature default; measure it with `eval vector` rather than adopting it, since usearch's default ef was measured wrong for this corpus.
 
 ---
 
@@ -73,7 +73,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 2 | Design System and Visual Language | A | 1 | 1–2 | 5/5 |
 | [x] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 5/5 |
 | [~] | 4 | Metadata Backbone | A | 3 | 2–3 | 5/7 |
-| [ ] | 5 | Semantic Search Engine | A | 4 | 2 | 1/5 |
+| [~] | 5 | Semantic Search Engine | A | 4 | 2 | 1/5 |
 | [ ] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 0/6 |
 | [ ] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 0/8 |
 | [ ] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 0/6 |
@@ -134,6 +134,9 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D29** (raised in Phase 5) VACUUM recovered ~354 MB of fragmentation from incremental ingestion (4,023 -> 3,486 MB, 46 s), on top of 183 MB from the dead index. Nine ingestion jobs writing and rewriting leave a tenth of the database as slack. Ingestion should VACUUM when it finishes, and the first-run flow should say so rather than leaving the user with a database a tenth larger than it needs to be.
 - **D30** (raised in Phase 5) THE FUZZY PATH MISSES E1's 80 ms BUDGET: 256-390 ms measured on the real 2.7M-row trigram index, because OR-ing ~10 trigrams touches a large part of it. Options, none yet measured: restrict the trigram index to the core tier (855,703, roughly 3x less work, and it already fits either way); require a minimum number of matching trigrams instead of a pure OR; or run fuzzy only when the keyword tier returns nothing strong. MEASURE BEFORE CHOOSING - the last three size questions in this project were all answered wrongly by intuition and correctly by measurement.
 - **D31** (raised in Phase 5) A WEAK KEYWORD HIT BLOCKS A GOOD FUZZY ONE. `kurosowa` returns 'Margazhi Raagam' because the keyword tier matched something irrelevant, filled the result limit and fuzzy never ran. SearchRepository::search should discount weak keyword hits by BM25 score before deciding whether to fall through, rather than counting them. Needs a threshold chosen from the fixture corpus in subtask 5.6, not guessed.
+- **D32** (raised in Phase 5) ONE QUERY IN 200 LOSES 8 OF ITS 10 TRUE NEIGHBOURS, at every expansion_search value from 64 to 384 — so it is not the recall/latency dial. Both benign explanations were measured and both are false: 1 vector ties for last place, and 12 lie within 1% of the 10th distance, so it is neither a tie set nor a crowded band. Artefact position 697,314 has a real neighbourhood (nearest 0.0000, tenth 0.4009) and HNSW misses most of it: a poorly-connected node. The mean 0.9670 clears the 0.95 gate so this does not block 5.3, but a bad candidate set for one query becomes a bad result page for that query, and 5.4's fusion is where that shows. Look again when E3 has real embedded queries rather than artefact vectors.
+- **D33** (raised in Phase 5) THE INDEX COSTS 435 MB ON DISK, 1.4x the 313 MB artefact it indexes — the HNSW graph is 122 MB of that. It is DERIVED, so it is not a download and `ingest vector-index` rebuilds it from a checksummed file, but it is disk sitting outside the database next to the artefact. Together they are 748 MB of ./data/ that the R4 budget did not name. Phase 5 subtask 5.9 shows the artefact's size before consent; it should show this one too, or the user consents to 313 MB and receives 748 MB.
+- **D34** (raised in Phase 5) SEARCH IS FOUR TIMES SLOWER COLD. Measured the same day on the same fixture: warm p95 7.1-7.4 ms (three consecutive runs), cold p95 36.8 ms with a max of 131.9 ms, taken straight after 750 MB of index I/O evicted SQLite's page cache. Not a regression - the warm numbers reproduce - but the cold column is what a user meets on the first search after launch, and its MAX already exceeds E1's 80 ms budget on a single query. E1 is a p95 criterion so it survives; it must eventually be measured cold. Phase 21 owns the budget, and subtask 5.7's cold-start re-measurement is the natural place to take the number.
 
 ---
 

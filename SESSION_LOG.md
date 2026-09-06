@@ -891,3 +891,82 @@ synthetic archive; it needs only a working download.
 The embedding run finishes E7. Then `/closephase` again — it will still refuse if E1 is
 unmet, and E1 needs MovieLens. If GroupLens is still down, close Phase 4 with 4.3 and
 E1 carried forward explicitly rather than fudged.
+
+---
+
+## Session 10 — 2026-09-06 — Phase 5: the vector half, and a library default that was wrong
+
+**Phase 5, subtask 5.3.** Three of nine subtasks done. E2 still met; no exit criterion
+newly met, because 5.3 is not one — it is what E3 and E4 will be measured on.
+
+### What was built
+
+`crates/vector-index`: an HNSW over the 855,703-vector artefact via usearch, keyed by
+catalogue id, memory-mapped on open, with an independent brute-force scan beside it as
+ground truth. `ingest vector-index` derives it (439 s, 435 MB). `eval vector` measures
+it three ways — `--report`, `--prove`, `--memory`.
+
+### Three measurements, and one of them changed what ships
+
+**usearch's default `ef` of 64 missed the gate.** recall@10 0.9400 against a 0.95
+target. Swept 64 → 384; 192 ships at 0.9670 and p95 4.2 ms. Had the harness been
+written after the constant was chosen, the wrong value would have shipped and looked
+fine — this is the whole argument for writing the measurement first, made concrete a
+second time this phase.
+
+**mmap is worth 752 MB.** `view` 6.6 MB resident, `load` 758.6 MB, same 435 MB file.
+Tier 0's entire idle budget is 250 MB, so loading would have broken it three times over
+on this one structure. P11 is now settled by a number rather than by usearch's
+description of itself.
+
+**The harness was proved before its numbers were believed.** `--prove` rotates the
+position → catalogue-id mapping by one: recall 0.9670 → 0.0055. Necessary because a
+wrong mapping is invisible by inspection — it returns ten plausible films for every
+query. Ground truth is a scan of the artefact bytes, deliberately *not* usearch's own
+`exact_search`, which would have compared usearch against usearch and agreed.
+
+### What I expected to explain away and could not
+
+`worst 0.20` was identical at every `ef`, which is the signature of tied vectors rather
+than a lossy dial — so I measured the two benign explanations and both were false. One
+vector ties for last place; twelve lie within 1% of it. Position 697,314 has a real
+neighbourhood and HNSW misses most of it. Recorded as **D32** rather than smoothed away.
+
+### Two costs the budget had not named
+
+**D33 — the index is 435 MB**, 1.4x the artefact it indexes. Derived, so not a
+download, but it sits in `./data/` beside the 313 MB artefact: 748 MB where subtask
+5.9's consent screen currently plans to show 313.
+
+**D34 — search is four times slower cold.** Warm p95 7.1–7.4 ms across three runs; cold
+p95 36.8 ms, max 131.9 ms, straight after 750 MB of index I/O evicted the page cache.
+Not a regression — the warm numbers reproduce exactly — but the cold column is what a
+user meets on the first search after launch, and its max already exceeds E1's 80 ms on
+a single query. E1 is a p95 criterion, so it survives; it must eventually be measured
+cold.
+
+### One structural change
+
+`CORE_TIER` and `core_ids` moved from `tools/ingest` into `crates/persistence`, with
+their line in `repository_surface.rs` (ADR-0026). The artefact is positional and carries
+no ids, so "which film is position n" has to be re-derived — and the *application* will
+need to do that after a download, which a dev tool cannot help it with.
+
+### State corrections
+
+`sessions_completed` had read 5 since 2026-08-31 against nine logged sessions; now 10.
+Phase 5's record said `not_started` with three subtasks complete; now `in_progress`.
+`current_phase` still reads 4 deliberately — Phase 4 cannot close while B2 and B3 both
+wait on the author, and the schema requires a phase to be complete before
+`current_phase` advances.
+
+### What the next session should do first
+
+Subtask 5.4, reciprocal rank fusion — but the first real step is the **query embedder**,
+which does not exist outside `tools/ingest`. Nothing embeds a user's query on device
+yet, and E1's 80 ms budget is defined to include it.
+
+### Blockers
+
+**B2** (GroupLens' expired certificate) and **B3** (the artefact needs publishing as a
+Release asset) are both unchanged and both the author's to clear.
