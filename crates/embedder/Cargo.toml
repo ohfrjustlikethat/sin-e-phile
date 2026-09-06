@@ -1,0 +1,28 @@
+[package]
+name = "sinephile-embedder"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "Text to vector: ONNX Runtime over a quantised sentence-transformer (ADR-0015)."
+
+# SEPARATE FROM `crates/embedding`, AND FOR THE SAME REASON `vector-index` IS.
+#
+# That crate is the artefact FORMAT — it verifies a 313 MB download before anything
+# trusts it, and it must be able to do that without a 22 MB model or a native runtime.
+# This crate is the model. Keeping them apart means checking an artefact's checksum
+# never depends on ONNX Runtime loading.
+#
+# It is a crate rather than a module in `tools/ingest` because the APPLICATION embeds
+# every query the user types (ADR-0015: queries on device on every tier, documents
+# never), and the application cannot depend on a dev tool. One implementation, so a
+# query cannot be tokenised or pooled differently from the documents it is compared
+# against.
+
+[dependencies]
+ort = { version = "2.0.0-rc.13", features = ["download-binaries"] }
+tokenizers = { version = "0.20", default-features = false, features = ["onig"] }
+thiserror = "2"
+
+[dev-dependencies]
+sinephile-embedding = { path = "../embedding" }

@@ -34,7 +34,7 @@ const BATCH: i64 = 500;
 /// A trait so the producer is testable without a 22 MB model — the same reason
 /// `metadata-api` has a `Transport` trait, and it earns its keep the same way: every
 /// bug found here so far was in the batching and the resume, not in the arithmetic.
-pub trait Embedder {
+pub trait DocumentEmbedder {
     /// The model's identity, recorded in the artefact and compared on load.
     fn identity(&self) -> &str;
     fn dimension(&self) -> u16;
@@ -159,6 +159,24 @@ fn part_path(artefact_path: &Path) -> PathBuf {
     artefact_path.with_extension("vectors.part")
 }
 
+/// The exact sentence the producer would embed for one catalogue item.
+///
+/// Public so the harness can re-derive a document and compare its vector against the
+/// one already in the artefact — which is the only way to catch the producer and the
+/// query path having drifted apart. It reuses [`rows`] rather than reimplementing the
+/// assembly, because a second copy of "what a document is" would agree on the day it
+/// was written and never again.
+pub async fn document_for(db: &Db, media_item_id: i64) -> Result<Option<String>, JobError> {
+    // `rows` reads *after* an id, so ask for the one before it and take the first row —
+    // which also confirms the item is in the core tier at all, since a non-core id
+    // simply returns its next core neighbour and the id check below catches it.
+    let batch = rows(db, media_item_id - 1, 1).await?;
+    Ok(batch
+        .into_iter()
+        .find(|r| r.id == media_item_id)
+        .map(|r| r.sentence()))
+}
+
 /// Produce the artefact.
 ///
 /// `snapshot_date` is an input rather than today's date: ADR-0014 requires the same
@@ -167,7 +185,7 @@ fn part_path(artefact_path: &Path) -> PathBuf {
 pub async fn produce(
     job: &mut Job<'_>,
     db: &Db,
-    embedder: &mut dyn Embedder,
+    embedder: &mut dyn DocumentEmbedder,
     artefact_path: &Path,
     snapshot_date: &str,
 ) -> Result<Produced, JobError> {
@@ -350,118 +368,28 @@ pub fn verify_sha256(path: &Path, expected: &str) -> Result<(), JobError> {
 /// Reuses the inference path proven in Phase 1 Spike C — tokenize, run, mean-pool over
 /// non-padding tokens, L2-normalise — because that is the code the R3 measurement was
 /// taken with and rewriting it would invalidate the number.
-pub struct OnnxEmbedder {
-    session: ort::session::Session,
-    tokenizer: tokenizers::Tokenizer,
-    identity: String,
-    dimension: u16,
-}
+/// The ONNX embedder, from the crate the APPLICATION can also use.
+///
+/// It moved out of this tool in Phase 5: a query is embedded on every tier (ADR-0015)
+/// and the application cannot depend on a dev tool. Producer and query path now share
+/// one tokenizer configuration and one pooling implementation, which is what stops a
+/// query from landing somewhere the documents are not.
+pub use sinephile_embedder::Embedder as OnnxEmbedder;
 
-impl OnnxEmbedder {
-    /// Load a model and its tokenizer.
-    ///
-    /// `identity` is written into the artefact and compared on load, so it must name
-    /// the model AND its quantisation: `all-MiniLM-L6-v2-int8` and
-    /// `all-MiniLM-L6-v2-fp32` produce different vectors and must not be interchangeable.
-    pub fn load(model: &Path, tokenizer: &Path, identity: &str) -> Result<Self, JobError> {
-        fn fail(what: &str, e: impl std::fmt::Display) -> JobError {
-            JobError::step("embed", format!("{what}: {e}"))
-        }
-
-        let session = ort::session::Session::builder()
-            .map_err(|e| fail("session builder", e))?
-            .with_optimization_level(ort::session::builder::GraphOptimizationLevel::Level3)
-            .map_err(|e| fail("optimisation level", e))?
-            .commit_from_file(model)
-            .map_err(|e| fail(&format!("loading {}", model.display()), e))?;
-
-        let mut tok = tokenizers::Tokenizer::from_file(tokenizer)
-            .map_err(|e| fail(&format!("loading {}", tokenizer.display()), e))?;
-        // This tokenizer.json pads to a fixed 128 tokens. Spike C found that it makes
-        // the model do roughly four times the work a short input needs; over 855,703
-        // documents that is the difference between twenty minutes and an hour.
-        tok.with_padding(None);
-        // Documents are longer than queries and the model's limit is 256. Truncating
-        // here makes the cut deterministic rather than leaving it to a tokenizer
-        // version, which matters because the artefact must be byte-reproducible.
-        tok.with_truncation(Some(tokenizers::TruncationParams {
-            max_length: 256,
-            ..Default::default()
-        }))
-        .map_err(|e| fail("truncation", e))?;
-
-        Ok(Self {
-            session,
-            tokenizer: tok,
-            identity: identity.to_string(),
-            // Filled in on the first embedding; MiniLM is 384 and this is asserted
-            // against the artefact header rather than assumed.
-            dimension: 384,
-        })
-    }
-}
-
-impl Embedder for OnnxEmbedder {
+/// The producer's seam, kept: `produce` takes `&mut dyn DocumentEmbedder` so its
+/// batching and resume can be tested without a 22 MB model. Every bug found in this
+/// module so far was in the batching or the resume, never in the arithmetic.
+impl DocumentEmbedder for sinephile_embedder::Embedder {
     fn identity(&self) -> &str {
-        &self.identity
+        sinephile_embedder::Embedder::identity(self)
     }
 
     fn dimension(&self) -> u16 {
-        self.dimension
+        sinephile_embedder::Embedder::dimension(self)
     }
 
     fn embed(&mut self, text: &str) -> Result<Vec<f32>, JobError> {
-        use ort::value::TensorRef;
-
-        let encoded = self
-            .tokenizer
-            .encode(text, true)
-            .map_err(|e| JobError::step("embed", format!("tokenize: {e}")))?;
-        let len = encoded.len().max(1);
-
-        let ids: Vec<i64> = encoded.get_ids().iter().map(|i| *i as i64).collect();
-        let mask: Vec<i64> = encoded
-            .get_attention_mask()
-            .iter()
-            .map(|i| *i as i64)
-            .collect();
-        let types: Vec<i64> = vec![0; len];
-        let shape = [1_i64, len as i64];
-
-        let map = |e: ort::Error| JobError::step("embed", e.to_string());
-        let outputs = self
-            .session
-            .run(ort::inputs![
-                "input_ids" => TensorRef::from_array_view((shape, ids.as_slice())).map_err(map)?,
-                "attention_mask" => TensorRef::from_array_view((shape, mask.as_slice())).map_err(map)?,
-                "token_type_ids" => TensorRef::from_array_view((shape, types.as_slice())).map_err(map)?,
-            ])
-            .map_err(map)?;
-
-        let (out_shape, data) = outputs[0].try_extract_tensor::<f32>().map_err(map)?;
-        let hidden = *out_shape.last().unwrap_or(&384) as usize;
-
-        // Mean-pool over non-padding tokens, then L2-normalise. Padding tokens carry
-        // real activations, so averaging them in makes every long document drift
-        // toward the same point.
-        let mut pooled = vec![0f32; hidden];
-        let mut counted = 0f32;
-        for t in 0..len {
-            if mask.get(t).copied().unwrap_or(0) == 0 {
-                continue;
-            }
-            counted += 1.0;
-            for h in 0..hidden {
-                pooled[h] += data[t * hidden + h];
-            }
-        }
-        for v in pooled.iter_mut() {
-            *v /= counted.max(1.0);
-        }
-        let norm = pooled.iter().map(|v| v * v).sum::<f32>().sqrt().max(1e-12);
-        for v in pooled.iter_mut() {
-            *v /= norm;
-        }
-        Ok(pooled)
+        sinephile_embedder::Embedder::embed(self, text)
+            .map_err(|e| JobError::step("embed", e.to_string()))
     }
 }

@@ -45,11 +45,12 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # other dependency (standing rule 15), and cut down to deflate-over-flate2 so it reuses
 # the decompressor already here rather than pulling in bzip2, zstd, lzma and AES.
 zip = { version = "=8.6.0", default-features = false, features = ["deflate-flate2"] }
-ort = { version = "2.0.0-rc.13", features = ["download-binaries"] }
+# The model moved to crates/embedder so the application can use it too; this tool
+# keeps only the producer around it.
+sinephile-embedder = { path = "../../crates/embedder" }
 # The HNSW index is DERIVED from the artefact this tool produces, on this machine —
 # ADR-0014 publishes vectors, not graphs. See crates/vector-index.
 sinephile-vector-index = { path = "../../crates/vector-index" }
-tokenizers = { version = "0.20", default-features = false, features = ["onig"] }
 sinephile-embedding = { version = "0.1.0", path = "../../crates/embedding" }
 sha2 = "0.10.9"
 md-5 = "0.10"

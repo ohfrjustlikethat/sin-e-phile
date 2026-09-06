@@ -775,7 +775,8 @@ async fn embed_artefact(db: &Db, dir: &Path) -> Result<(), JobError> {
     };
 
     tracing::info!("embedding {count} core-tier titles, snapshot {snapshot}");
-    let mut embedder = embed::OnnxEmbedder::load(&model, &tokenizer, embed::MODEL_IDENTITY)?;
+    let mut embedder = embed::OnnxEmbedder::load(&model, &tokenizer, embed::MODEL_IDENTITY)
+        .map_err(|e| JobError::step("embed", e.to_string()))?;
 
     let artefact_path = sinephile_embedding::artefact_path(dir);
     let mut job = Job::begin(db, "embed").await?;

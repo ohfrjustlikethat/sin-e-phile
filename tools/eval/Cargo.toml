@@ -23,6 +23,7 @@ sinephile-persistence = { path = "../../crates/persistence" }
 sinephile-embedding = { path = "../../crates/embedding" }
 sinephile-vector-index = { path = "../../crates/vector-index" }
 sinephile-ingest = { path = "../ingest" }
+sinephile-embedder = { path = "../../crates/embedder" }
 sqlx = { version = "=0.8.6", default-features = false, features = [
     "runtime-tokio", "sqlite", "macros",
 ] }

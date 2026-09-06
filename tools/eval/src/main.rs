@@ -9,6 +9,7 @@
 
 use std::path::Path;
 
+mod embed;
 mod error;
 mod search;
 mod vector;
@@ -31,6 +32,7 @@ async fn main() {
         "search" => search::run(Path::new(&data_dir), report).await,
         "vector" if args.iter().any(|a| a == "--memory") => vector::memory(Path::new(&data_dir)),
         "vector" => vector::run(Path::new(&data_dir), report, prove, expansion).await,
+        "embed" => embed::run(Path::new(&data_dir), report).await,
         "all" => match search::run(Path::new(&data_dir), report).await {
             // Every harness runs even when an earlier one misses its target — stopping
             // at the first failure hides the rest, and §10.12 compares ALL the numbers
@@ -48,6 +50,8 @@ async fn main() {
                  \n       [--prove]           shift the id mapping and confirm recall collapses\
                  \n       [--memory]          what mmap saves over reading the index in\
                  \n                           full — the measurement behind P11\
+                 \n  eval embed [--report]    query-embedding latency, and whether a\
+                 \n                           re-embedded document still matches the artefact\
                  \n  eval all [--report]      every harness that exists\
                  \n\
                  \nReads the catalogue from $SINEPHILE_DATA_DIR, default ./data.\n"

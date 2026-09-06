@@ -7,7 +7,7 @@
 use std::path::Path;
 
 use sinephile_embedding::{document, Artefact};
-use sinephile_ingest::embed::{self, Embedder};
+use sinephile_ingest::embed::{self, DocumentEmbedder};
 use sinephile_ingest::{Job, JobError};
 use sinephile_persistence::{Db, NewMediaItem};
 
@@ -38,7 +38,7 @@ impl Fake {
     }
 }
 
-impl Embedder for Fake {
+impl DocumentEmbedder for Fake {
     fn identity(&self) -> &str {
         "fake-model-int8"
     }
@@ -90,7 +90,7 @@ async fn catalogue(db: &Db, count: usize) {
 
 async fn produce(
     db: &Db,
-    embedder: &mut dyn Embedder,
+    embedder: &mut dyn DocumentEmbedder,
     path: &Path,
 ) -> Result<embed::Produced, JobError> {
     let mut job = Job::begin(db, "embed").await.expect("begin");
