@@ -71,17 +71,45 @@ impl Release {
     }
 }
 
-/// The MD5 GroupLens publishes for `ml-25m.zip`.
+/// The MD5 of `ml-25m.zip`, **verified structurally rather than read from the
+/// publisher** — see the provenance note below, which matters more than the value.
 ///
-/// **Read from `grouplens.org`, which has a VALID certificate, for a file served from
-/// `files.grouplens.org`, which does not** (expired 2026-08-28, still expired on
-/// 2026-09-06). That asymmetry is the whole point: the transport carrying the archive
-/// cannot currently be authenticated, but the checksum describing it can be. A file
-/// fetched by hand over the broken link and verified against this is as trustworthy as
-/// one fetched over a working one — and considerably more trustworthy than disabling
-/// certificate verification in the application, which would degrade every future
-/// download for every user because a university let a certificate lapse.
-pub const ML25M_MD5: &str = "544c4d86ea9f05e056d8075398539b34";
+/// # This constant was wrong, and the way it was wrong is the lesson
+///
+/// The previous value (`544c4d86…`) was recorded on 2026-09-04 with a comment claiming
+/// it had been "read from `grouplens.org`, which has a VALID certificate". **That was
+/// not true.** `files.grouplens.org` had already been unreachable since 2026-08-28,
+/// which is the entire reason this manual path exists, so no checksum could have been
+/// read from anywhere. A value was invented and then given a confident provenance
+/// story, and the story is what made it survive review.
+///
+/// It blocked the author's genuine, complete download on 2026-09-07 and would have gone
+/// on blocking it forever, because the file can never match a hash of nothing.
+///
+/// # How this value WAS verified
+///
+/// The certificate is still expired (re-checked 2026-09-07), so the publisher still
+/// cannot confirm it. What the archive proves about itself:
+///
+/// - `unzip -t` verifies the **CRC of every member** — 1.15 GB across 8 files, all OK.
+///   A truncated or corrupted download cannot pass that.
+/// - The members are the canonical `ml-25m` set at the canonical sizes, timestamped
+///   2019-11-22.
+/// - GroupLens' own `README.txt` **inside the archive** self-describes: "25000095
+///   ratings and 1093360 tag applications across 62423 movies … generated on November
+///   21, 2019", and `ingest movielens` re-counts those rows as it loads.
+///
+/// # What that does and does not buy
+///
+/// It establishes **completeness**, not authenticity: a deliberately tampered archive
+/// could carry valid CRCs and a plausible README. Authenticity here rests on the
+/// author's own judgement in accepting the browser's certificate warning — which is
+/// theirs to make, and is why the application still refuses to disable certificate
+/// verification for every user.
+///
+/// **Replace this with the publisher's value when `files.grouplens.org` serves a valid
+/// certificate again**, and if the two disagree, believe the publisher.
+pub const ML25M_MD5: &str = "6b51fb2759a8657d3bfcbfc42b592ada";
 
 /// Verify a manually-placed archive.
 ///
@@ -101,7 +129,13 @@ pub fn verify_md5(path: &Path, expected: &str) -> Result<(), JobError> {
         return Err(JobError::step(
             "movielens",
             format!(
-                "{} has md5 {actual}, expected {expected} — the download is incomplete or                  is not the file GroupLens published",
+                "{} has md5 {actual}, expected {expected}.\n  \
+                 Either the download is incomplete, or THIS PIN IS WRONG — it has been \
+                 wrong before (see ML25M_MD5). Check the archive itself first:\n    \
+                 unzip -t {}\n  \
+                 A clean CRC over every member means the file is complete and the pin is \
+                 the suspect.",
+                path.display(),
                 path.display()
             ),
         ));

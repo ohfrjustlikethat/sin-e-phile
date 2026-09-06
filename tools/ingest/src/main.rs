@@ -600,7 +600,7 @@ async fn movielens(
         tracing::info!("{} is already here — verifying it", path.display());
         if release == ml::Release::Ml25m {
             ml::verify_md5(&path, ml::ML25M_MD5)?;
-            tracing::info!("md5 matches what GroupLens published");
+            tracing::info!("md5 matches the pinned value (see movielens::ML25M_MD5 for what that does and does not prove)");
         }
     } else {
         let result = downloader.fetch(&release.url(), &path, |_| {}).await?;
