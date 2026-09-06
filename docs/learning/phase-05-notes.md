@@ -1,6 +1,6 @@
 # Phase 5 — Learning notes
 
-**Semantic search engine.** In progress: 5.1, 5.2, 5.3 done. Four sections per ADR-0016
+**Semantic search engine.** In progress: 5.1, 5.2, 5.3, 5.4, 5.10 done. Four sections per ADR-0016
 (A4): what we built, why, new concepts as concept + `file:line`, and the five questions.
 No code tour.
 
@@ -22,6 +22,10 @@ No code tour.
 - **The vector harness** — `tools/eval/src/vector.rs`, `eval vector --report`. Recall@10
   against that ground truth, plus a `--prove` mode that deliberately breaks the id
   mapping and requires recall to collapse.
+- **The query embedder** — `crates/embedder`. The ONNX sentence-transformer, lifted out
+  of `tools/ingest` so the application can embed what the user types.
+- **The engine** — `crates/search-engine`. Exact title, then BM25 and vectors fused by
+  reciprocal rank, then fuzzy. Degrades to keyword-only when there is no artefact.
 
 ## 2. Why
 
@@ -44,6 +48,12 @@ No code tour.
   producer and the *application* both need the same definition, and the application
   cannot depend on a dev tool.
 
+- **The documents cannot answer a semantic question, and everything else was fine.**
+  Zero synopses in 855,703 items, so the embedding of every film is little more than its
+  title. Every artefact check passed — checksum, determinism, model identity, recall —
+  because they check the file is *correct*, not that the documents are *informative*.
+  The first real query found it in one look. See P12.
+
 ## 3. New concepts
 
 ### Rust
@@ -61,6 +71,11 @@ No code tour.
 - **Newtype-free unit safety by naming** — `Neighbour::distance` is documented as cosine
   *distance* (`crates/vector-index/src/lib.rs:117`), matching usearch's convention and
   BM25's "lower is better", because two conventions in one result list is a bug waiting.
+
+- **`Option<Semantic>` as a degradation strategy** —
+  `crates/search-engine/src/lib.rs:77`. The absent case is not an error path bolted on
+  afterwards; it is the same code path with an empty list, which is why the Tier 0
+  fallback cannot rot.
 
 ### Search and vectors
 
@@ -80,14 +95,25 @@ No code tour.
   mapped against 758.6 MB read in full**, for a 435 MB file. That is why usearch won
   P11 — 758 MB is three times Tier 0's whole 250 MB budget, and Tier 0 is the tier the
   artefact exists to serve.
+- **Reciprocal rank fusion** — `crates/search-engine/src/lib.rs:177`. Combine two ranked
+  lists by `Σ 1/(k + rank)`, ignoring the scores entirely. BM25 is negative and
+  corpus-scaled; cosine is 0..2. Normalising two distributions that both move with the
+  query is a tuning problem with no stable answer; positions need no calibration.
+- **Why the embedder had to be ONE implementation** — `crates/embedder/src/lib.rs:8`.
+  Tokenizer settings, truncation, pooling and normalisation are four chances for the
+  query path and the producer to differ, and all four fail silently. Changing
+  `MAX_TOKENS` from 256 to 32 dropped agreement to 2/10 — an ordinary-looking edit that
+  would have degraded search with no error anywhere.
 - **A library default is not a chosen value** — `crates/vector-index/src/lib.rs:74`.
   usearch's `ef` of 64 measured 0.9400 recall@10 and missed the 0.95 gate. The sweep
   (64 → 384) is in `docs/eval-results.md`; 192 ships.
 
-## 4. The five questions
+## 4. The questions
 
 Written, not asked — Phase 5 is not a tier boundary (`SPEC.md` §10.10). They accumulate
-until the end of Phase 8.
+until the end of Phase 8. Six rather than five: the sixth is the one this phase actually
+taught, and dropping one of the others to keep the count would be tidiness winning over
+the point.
 
 1. The exact-title short-circuit returns a film *without ranking it*. Why is that
    necessary for E2's 100%, when BM25 with a large enough title weight would almost
@@ -100,3 +126,7 @@ until the end of Phase 8.
    rather than just measuring nDCG — which is the number the exit criterion asks for?
 5. The index is derived on the machine, and the artefact is downloaded. What would have
    to be true for shipping the graph instead to be the better choice?
+6. The artefact passed every check Phase 4 wrote — checksum, determinism, model identity,
+   and later recall@10 of 0.967 — and the documents inside it still could not answer
+   "films about grief". What class of check was missing, and what would it have looked
+   like?

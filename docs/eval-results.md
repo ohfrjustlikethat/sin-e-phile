@@ -1338,3 +1338,102 @@ cold column is the one a user meets on the first search after launch, and its **
 already exceeds E1's 80 ms budget on a single query**. E1 is a p95 criterion so this
 does not fail it; it does mean E1 must eventually be measured cold, and Phase 21 owns
 that.
+
+### The query embedder, and proof the two halves have not drifted
+
+`cargo run -p eval --release -- embed --report`, 2026-09-07, commit 396f256.
+
+| | |
+|---|---|
+| model load | 141 ms (once, at startup) |
+| first inference | 2.5 ms (ONNX warm-up, paid once) |
+| **query latency** | **p50 2.2 ms, p95 2.4 ms** over 10 natural-language queries |
+| **agreement** | **10/10 byte-identical to the artefact** |
+
+The agreement number is the important one. A query is compared to document vectors by
+cosine, which only means anything if both were produced the same way — and tokenizer
+settings, truncation, pooling and normalisation are four chances to differ, every one of
+them silent. So the harness re-derives a document exactly as the producer built it,
+embeds it through the *query* path, quantises, and compares against that title's vector
+in the artefact. ADR-0014 makes the artefact deterministic, so the bar is byte-identical.
+
+**And the check was seen to fail.** Cutting `MAX_TOKENS` from 256 to 32 — one setting, in
+one crate, the most ordinary drift imaginable:
+
+| | agreement | worst cosine | exit |
+|---|---|---|---|
+| correct | 10/10 | 1.000000 | 0 |
+| **truncation changed** | **2/10** | **0.781292** | **1** |
+
+### E1, measured end to end for the first time
+
+`cargo run -p eval --release -- search --report`, 2026-09-07, commit bdbd560. The harness
+now drives the whole engine — query embedding, BM25, vector search and fusion — because
+E1's budget is keystroke-to-results and says the embedding is inside it.
+
+| | p50 | p95 | max |
+|---|---|---|---|
+| keyword only (previous phase state) | 0.9 ms | 7.3 ms | 60 ms |
+| **hybrid, warm** (3 consecutive runs) | **4.8 ms** | **15.0 ms** | 71 ms |
+| hybrid, cold | 17.1 ms | 67.5 ms | 324 ms |
+
+**E2 survives fusion at 43/43 = 100%** — the exact-title short-circuit still sits above
+everything, which is the property it exists to guarantee.
+
+**E1 is NOT claimed as met.** Both p95 figures are under 80 ms, but `SPEC.md` §2.3
+enforces budgets against **Tier 0** and this is a Tier 2 dev machine. At the 3–4x Tier 0
+penalty P8 already flags, warm lands at 45–60 ms and cold at 236–270 ms. The criterion is
+measured, not met.
+
+The rise from 7.3 to 15.0 ms warm is fusion doing what it is for: each half now returns
+50 candidates rather than 5, plus 2.4 ms of query embedding and 4.2 ms of vector search.
+
+### THE FINDING THAT MATTERS: the documents cannot answer a semantic question
+
+`eval search --query "films about grief that aren't depressing"` — the exact phrasing
+exit criterion **E4** names:
+
+| # | result | why |
+|---|---|---|
+| 1 | Grief (2017) | Semantic |
+| 2 | My Grief isn't Grief Enough (2024) | Semantic |
+| 3 | Grief (1994) | Semantic |
+| … | *seven more films titled "Grief"* | Semantic |
+
+And E4's second query, `"like Wong Kar-wai but Korean"`: *Wong Ka Yan*, *Hong Kil-dong*,
+*A Short Film About Wong Kar Wai*, *Miss Korea*. Name and word matching, with no notion
+of "like X" or "but Korean".
+
+**This is not a fusion defect.** The vector half is doing exactly what it was built to
+do. The problem is what it was built over:
+
+```sql
+SELECT COUNT(*) FROM media_items
+ WHERE in_core = 1 AND kind <> 'episode'
+   AND synopsis IS NOT NULL AND length(trim(synopsis)) > 0;
+-- 0    of 855,703
+```
+
+**Zero synopses in the entire catalogue.** So every embedded document is:
+
+```
+Placebo (2002), animation comedy short film, featuring Jim Carrey…
+```
+
+Title, year, genres, kind, cast — nothing about what a film is *about*. The embedding
+space encodes little more than the words of the title, which is why semantic search over
+it behaves like a fuzzy title matcher.
+
+**Why it was invisible until now.** Phase 4 built and verified the artefact — 855,703
+vectors, checksummed, deterministic, byte-reproducible — and every one of those checks
+passed, because they check that the file is *correct*, not that the documents are
+*informative*. Nothing had searched it. The first real query found it in one look.
+
+`SPEC.md` Phase 5 specifies the document as "synopsis, genres, keywords, director, mood
+descriptors, and era". Three of those six do not exist in the catalogue: synopsis,
+keywords, mood descriptors. Synopses come from TMDB, and ADR-0027 makes a TMDB key
+optional and absent by default — which is exactly the configuration this catalogue was
+built in.
+
+**E3 (nDCG@10 > 0.75) and E4 cannot be met against this artefact**, and no value of `k`
+or `ef` changes that. Raised as decision **P12** rather than worked around.

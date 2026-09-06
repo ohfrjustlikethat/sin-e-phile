@@ -283,3 +283,81 @@ AniList matcher refuses to guess: a wrong-but-plausible answer is the expensive 
 **Option 1**, with the recall measured against a brute-force baseline on the fixture
 corpus before any relevance number is reported — so that if the index is the reason a
 number is bad, that is visible rather than inferred.
+
+---
+
+## P12 — The catalogue has no synopses, so semantic search has nothing to be semantic about
+
+**Raised:** 2026-09-07 (Phase 5, subtask 5.4) · **Blocks:** E3, E4 · **Decide by:** Phase 5
+
+### The decision
+
+Where the text that describes what a film is *about* comes from — because there is
+currently none, and E3 and E4 cannot be met without it.
+
+### What was found
+
+`eval search --query "films about grief that aren't depressing"` — E4's own example —
+returns ten films literally **titled** "Grief". The vector half is working correctly over
+documents that cannot support the question:
+
+```
+Placebo (2002), animation comedy short film, featuring Jim Carrey…
+```
+
+That is the whole document. Title, year, genres, kind, cast.
+
+```sql
+SELECT COUNT(*) FROM media_items WHERE in_core = 1 AND kind <> 'episode'
+   AND synopsis IS NOT NULL AND length(trim(synopsis)) > 0;   -- 0 of 855,703
+```
+
+`SPEC.md` Phase 5 specifies the document as "synopsis, genres, keywords, director, mood
+descriptors, and era". **Three of those six do not exist in this catalogue.** IMDb's free
+datasets carry no plot text; synopses were to come from TMDB, which ADR-0027 makes
+optional and absent by default — the configuration the artefact was built in.
+
+ADR-0018 already anticipated exactly this, specifying a **swappable text source**
+(`tmdb` / `imdb` / `wikidata`) so its contribution could be measured. The seam was
+specified and never exercised, and nothing noticed because every artefact check verifies
+the file is *correct*, not that the documents are *informative*.
+
+### The options
+
+1. **Your TMDB key, used once, by you, to build the artefact.** ADR-0014 already has the
+   author producing the artefact and publishing it, so users still need no key — they
+   download vectors, not text.
+   **Cost:** you need a TMDB key. ~855,000 requests at TMDB's ~50/s is about 5 hours of
+   wall clock, plus a re-embed (~35 min) and an index rebuild (~7 min). Scoped to the
+   most-voted 100,000 titles it is ~35 minutes of fetching instead, and covers the part
+   of the catalogue anyone actually searches. Also leans on ADR-0018's reading that
+   embedding is inference, not training — a reading we recorded as probably-right and
+   whose enquiry letter (`docs/correspondence/tmdb-ai-clause.md`) is still unsent.
+
+2. **Wikidata/Wikipedia abstracts — no key, no rate limit, bulk download.** Matches to us
+   by IMDb id (Wikidata property P345), which is an exact join rather than a guess.
+   **Cost:** a new ingestion loader of roughly the size of `ingest imdb` — a day or two,
+   not an afternoon. Coverage is partial and skewed to notable films; obscure titles stay
+   empty. Fits the zero-key posture perfectly and needs nothing from you.
+
+3. **Accept it, and record E3/E4 as not met.** Semantic search stays a title, genre, cast
+   and era matcher, which is genuinely useful for "Kurosawa samurai films" and useless
+   for "films about grief".
+   **Cost:** two exit criteria fail, in the phase that is the centrepiece of the whole
+   project. `SPEC.md` §10.11 forbids redefining them, so this means carrying them as
+   failed — honest, and a bad look in a portfolio whose selling point is semantic search.
+
+### Recommendation
+
+**Option 2, then option 1 if it is not enough.** Wikidata costs my time rather than your
+money, keeps the zero-key posture that ADR-0013 and ADR-0027 built the whole catalogue
+around, and — the part that decides it — the resulting artefact carries no TMDB-derived
+text at all, so the ADR-0018 licensing question stops mattering for the thing we publish.
+
+Option 1 is faster and I would take it if this were a deadline. It is not.
+
+### The default if you say "your call"
+
+**Option 2, scoped to the core tier**, measured before and after with `eval search
+--query` on E4's two queries, and P12 stays open until that measurement says whether
+option 1 is still needed.

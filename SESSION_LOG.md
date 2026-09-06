@@ -970,3 +970,74 @@ yet, and E1's 80 ms budget is defined to include it.
 
 **B2** (GroupLens' expired certificate) and **B3** (the artefact needs publishing as a
 Release asset) are both unchanged and both the author's to clear.
+
+---
+
+## Session 11 — 2026-09-07 — Phase 5: fusion works, and the documents do not
+
+**Phase 5, subtasks 5.10 and 5.4.** Five of ten subtasks. E2 still 100%; E1 measured end
+to end for the first time and deliberately not claimed.
+
+### What was built
+
+`crates/embedder` — the ONNX sentence-transformer, lifted out of `tools/ingest` so the
+application can embed a query (ADR-0015 embeds queries on every tier). `crates/search-
+engine` — exact title, then BM25 and vectors fused by reciprocal rank, then fuzzy.
+`eval embed` and `eval search --query` to measure and to look.
+
+### The structural correction
+
+Yesterday's `next_action` said to put fusion in `crates/persistence`. That was wrong and
+I said so before writing it: fusion needs usearch and ONNX Runtime, and both inside the
+persistence crate would make a native model runtime a dependency of
+`repository_surface.rs` — the test ADR-0026 rests on. A fourth crate instead.
+
+### E1, finally including the thing its budget always included
+
+|  | p50 | p95 | max |
+|---|---|---|---|
+| keyword only (yesterday) | 0.9 ms | 7.3 ms | 60 ms |
+| hybrid, warm | 4.8 ms | **15.0 ms** | 71 ms |
+| hybrid, cold | 17.1 ms | 67.5 ms | 324 ms |
+
+Both p95s are under 80 ms and **E1 is still not claimed**: §2.3 enforces budgets against
+Tier 0 and this is a Tier 2 machine. At P8's 3–4x penalty, warm is 45–60 ms and cold is
+236–270 ms.
+
+E2 survives fusion at 43/43, which is the property the short-circuit exists to guarantee.
+
+### The agreement check, and breaking it on purpose
+
+`eval embed` re-derives a document exactly as the producer built it, embeds it through
+the *query* path, and requires the result to be **byte-identical** to that title's vector
+in the artefact: 10/10. Then `MAX_TOKENS` 256 → 32 — one setting, one crate, the most
+ordinary edit imaginable — gave 2/10, worst cosine 0.781, exit 1. Restored: 10/10.
+
+### The finding
+
+The first real semantic query, E4's own example, returned ten films literally **titled**
+"Grief". Not a fusion defect: the catalogue holds **0 synopses in 855,703 core items**, so
+every embedded document is title, year, genres, kind and cast. The embedding space
+encodes little more than title words.
+
+`SPEC.md` Phase 5 specifies six ingredients for the document — synopsis, genres,
+keywords, director, mood descriptors, era. **Three do not exist in this catalogue.**
+
+What makes it worth writing down: **every check Phase 4 built passed.** Checksum,
+determinism, model identity, and later recall@10 of 0.967. They verify the file is
+correct, not that the documents are informative, and nothing had ever searched it. One
+query found it immediately — which is the argument for looking at output, not only at
+metrics, and it is now the sixth question in the learning note.
+
+Raised as **P12** with three costed options rather than worked around. It blocks E3 and
+E4 and nothing else.
+
+### Blockers
+
+**B2** and **B3** unchanged, both the author's. **P12** is now the one that matters most:
+it decides whether this phase's headline feature can meet its criteria.
+
+### What the next session should do first
+
+Subtask 5.5, query understanding — deliberately chosen *because* it is the half that
+works without synopsis text.

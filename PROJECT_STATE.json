@@ -1,7 +1,7 @@
 {
   "spec_version": "1.9.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-09-06",
+  "last_updated": "2026-09-07",
   "sessions_completed": 10,
   "current_phase": {
     "number": 4,
@@ -783,7 +783,7 @@
           "id": "E1",
           "text": "p95 keystroke-to-results < 80 ms over the full catalogue.",
           "met": false,
-          "evidence": null
+          "evidence": "MEASURED, NOT MET. `cargo run -p eval --release -- search --report` -> hybrid p95 15.0 ms warm (p50 4.8, max 71; three consecutive runs) and p95 67.5 ms cold (p50 17.1, max 324), 2026-09-07, commit bdbd560, over the real 2,702,737-title catalogue INCLUDING query embedding, BM25, vector search and fusion. Both p95 figures are under 80 ms, but SPEC.md 2.3 enforces budgets against TIER 0 and this is a Tier 2 dev machine; at the 3-4x penalty P8 flags, warm lands at 45-60 ms and cold at 236-270 ms. Not claimed until measured on Tier 0 hardware or a constrained VM."
         },
         {
           "id": "E2",
@@ -831,9 +831,9 @@
         },
         {
           "id": "5.4",
-          "text": "Reciprocal rank fusion of BM25 and vector results, with the exact-title short-circuit above both.",
-          "status": "not_started",
-          "commit": null
+          "text": "Reciprocal rank fusion of BM25 and vector results, with the exact-title short-circuit above both. Built as crates/search-engine, NOT in crates/persistence: fusion needs usearch and ONNX Runtime, and those in the persistence crate would make a native model runtime a dependency of repository_surface.rs. RRF k=60 is the literature default and is NOT yet measured - nothing exists to measure it against until 5.6's semantic fixture.",
+          "status": "complete",
+          "commit": "bdbd560"
         },
         {
           "id": "5.5",
@@ -864,6 +864,12 @@
           "text": "Tier 0 artefact download with consent and the size shown (ADR-0014, debt D27), and the FTS5-only degradation when it is absent.",
           "status": "not_started",
           "commit": null
+        },
+        {
+          "id": "5.10",
+          "text": "crates/embedder: lift the ONNX sentence-transformer out of tools/ingest so the application can embed a query (ADR-0015 embeds queries on every tier). One implementation shared by producer and query path, because tokenizer settings, truncation, pooling and normalisation each fail SILENTLY when they differ. `eval embed --report` proves agreement byte-identically against the artefact and was seen to fail (2/10) when MAX_TOKENS was changed.",
+          "status": "complete",
+          "commit": "396f256"
         }
       ]
     },
@@ -1842,7 +1848,7 @@
       ]
     }
   ],
-  "next_action": "Phase 5 subtask 5.4: reciprocal rank fusion of the BM25 and vector halves, with the exact-title short-circuit above both. Write it in crates/persistence/src/repositories/search.rs alongside SearchRepository::search, which today runs exact -> keyword -> fuzzy and knows nothing about vectors. The vector half is ready and measured: sinephile_vector_index::VectorIndex::view opens data/vector-index-all-MiniLM-L6-v2-int8.usearch in 70 ms for 6.6 MB resident and returns catalogue ids at recall@10 0.9670. THE MISSING PIECE IS THE QUERY EMBEDDER: nothing embeds a user's query on device yet - tools/ingest/src/embed.rs has OnnxEmbedder but it lives in a dev tool, so lifting it into a crate the application can use (crates/embedding deliberately has no ort dependency - read its header before deciding where) is the first step and is what E1's 80 ms must finally include. RRF constant k=60 is the literature default; measure it with `eval vector` rather than adopting it, since usearch's default ef was measured wrong for this corpus.",
+  "next_action": "Phase 5 subtask 5.5: query understanding. Write crates/search-engine/src/query.rs - a parser that pulls year ranges, languages, runtime bounds and 'directed by' out of the query as structured FILTERS and returns them alongside the residual text, which is what actually gets embedded. Apply the filters inside SearchRepository's SQL in crates/persistence/src/repositories/search.rs rather than filtering after ranking, or a constrained search returns three results out of a page of fifty. SPEC.md 15 Phase 5 names the four filter kinds; ADR-0015 is why the residual text still gets embedded on every tier. DO THIS BEFORE 5.6: the semantic fixture has to separate filter-shaped queries ('films from the 90s') from meaning-shaped ones ('films about grief'), and mixing them makes nDCG unreadable. P12 IS OPEN AND BLOCKS E3/E4 - docs/DECISIONS_PENDING.md - because the catalogue holds 0 synopses, so the meaning-shaped half cannot score well whatever 5.5 does. Do not spend the session tuning it. 5.5 is worth doing now precisely because filters are the part that works WITHOUT synopsis text.",
   "blockers": [
     {
       "id": "B2",
@@ -1881,6 +1887,12 @@
       "text": "Spike C measured query-embedding latency on the Tier 2 dev machine only. ADR-0015 also asked for a constrained VM approximating Tier 0. Unpadded headroom is ~18x so this does not block Phase 5, but the padded worst case with a 3-4x Tier 0 penalty lands at 24-33 ms, close to the 30 ms trigger. Measure before Phase 21 signs off the 80 ms search budget.",
       "raised": "2026-08-31",
       "decide_by_phase": 21
+    },
+    {
+      "id": "P12",
+      "text": "THE CATALOGUE HAS NO SYNOPSES - 0 of 855,703 core items - so every embedded document is title, year, genres, kind and cast, and semantic search behaves like a fuzzy title matcher. E4's own example query returns ten films literally titled 'Grief'. E3 (nDCG@10 > 0.75) and E4 cannot be met against this artefact and no tuning changes that. Synopses come from TMDB, which ADR-0027 makes optional and absent by default - the configuration this catalogue was built in. ADR-0018 already anticipated a swappable text source (tmdb/imdb/wikidata) precisely so its contribution could be measured; that seam was specified and never exercised. Options, costs and a recommendation in docs/DECISIONS_PENDING.md. Blocks E3 and E4, not the rest of the phase.",
+      "raised": "2026-09-07",
+      "decide_by_phase": 5
     }
   ],
   "adrs": [
@@ -2183,6 +2195,16 @@
     {
       "id": "D34",
       "text": "SEARCH IS FOUR TIMES SLOWER COLD. Measured the same day on the same fixture: warm p95 7.1-7.4 ms (three consecutive runs), cold p95 36.8 ms with a max of 131.9 ms, taken straight after 750 MB of index I/O evicted SQLite's page cache. Not a regression - the warm numbers reproduce - but the cold column is what a user meets on the first search after launch, and its MAX already exceeds E1's 80 ms budget on a single query. E1 is a p95 criterion so it survives; it must eventually be measured cold. Phase 21 owns the budget, and subtask 5.7's cold-start re-measurement is the natural place to take the number.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D35",
+      "text": "EXACT-TITLE QUERIES PAY FOR THE SEMANTIC HALF THEY DO NOT NEED. The engine runs fusion whenever the exact tier did not fill the page, so typing a film's exact name still costs a query embedding (2.4 ms) plus a vector search (4.2 ms) plus a 50-candidate BM25 scan. That is most of the rise from 7.3 ms to 15.0 ms p95. Deliberate for now - the rest of the page is genuinely useful 'more like this' - but it is the first thing to cut if Tier 0 misses E1. Measure before cutting: the same page is what Phase 18's browsing surfaces will want.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D36",
+      "text": "RRF's k=60 IS AN UNMEASURED LITERATURE DEFAULT. crates/search-engine::RRF_K. It cannot be swept yet: E2's fixture is exact titles, which never reach fusion, so every value of k produces identical numbers. The sweep belongs with 5.6's semantic fixture, and this phase has already caught one library default (usearch's ef=64) being wrong for this corpus.",
       "phase_raised": 5
     }
   ],
