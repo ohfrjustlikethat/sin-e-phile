@@ -837,9 +837,9 @@
         },
         {
           "id": "5.5",
-          "text": "Query understanding: extract year ranges, languages, runtime bounds and 'directed by' as structured FILTERS rather than feeding them to the embedder.",
-          "status": "not_started",
-          "commit": null
+          "text": "Query understanding: crates/search-engine/src/query.rs extracts year ranges, runtime bounds and 'directed by' as structured FILTERS, applied in SQL. LANGUAGE IS NOT IMPLEMENTABLE: media_items.original_language is NULL on all 2,702,737 rows because the IMDb datasets do not publish it (D38). Filters both narrow candidates and retrieve, after 'directed by Akira Kurosawa' returned nothing at all.",
+          "status": "complete",
+          "commit": "1e71579"
         },
         {
           "id": "5.6",
@@ -1848,15 +1848,8 @@
       ]
     }
   ],
-  "next_action": "BLOCKED ON THE AUTHOR (B4/P13) for E3 and E4 only - read docs/DECISIONS_PENDING.md P13 first. If the answer is to swap the model: write the ADR (the model is checksum-pinned in tools/ingest/src/embed.rs::MODEL_SHA256), change sinephile_embedding::MODEL, add the query/passage prefixes bge and e5 require to crates/embedder/src/lib.rs::Embedder::embed - they are NOT optional for those models and omitting them costs most of the benefit - then re-embed (75 min), rebuild the index (28 s) and re-run `eval search --query` on the three queries in docs/eval-results.md. IF THE ANSWER IS TO WAIT: subtask 5.5 is unblocked and worth doing - write crates/search-engine/src/query.rs to pull year ranges, languages, runtime bounds and 'directed by' out of a query as structured FILTERS, applied in SearchRepository's SQL rather than after ranking. Filters are the half of search that works regardless of the model, and 5.6's fixture needs them to separate filter-shaped queries from meaning-shaped ones.",
-  "blockers": [
-    {
-      "id": "B4",
-      "raised": "2026-09-07",
-      "needs_user": true,
-      "description": "SPEC.md 10.9 ESCALATION - three genuinely distinct approaches to E3/E4, each measured, none sufficient. (1) Enriched every document with Wikipedia text: 233,114 synopses where there were 0. (2) Indexed only items that HAVE descriptive text: 855,703 -> 189,470, and the index fell from 435 MB to 96 MB. (3) Removed the title from the embedded document (document::VERSION 2), which SPEC.md Phase 5 never listed among its ingredients anyway; plus MIN_SYNOPSIS=300 to drop trivia-length hubs, 189,470 -> 119,874. Each helped. The measurement that ends it: against the query 'a grieving janitor becomes guardian of his teenage nephew in a Massachusetts fishing town', Manchester by the Sea - whose synopsis contains that plot almost verbatim - scores 0.1944, while Fish Hooky, whose synopsis says only that it was 'the 120th Our Gang short to be released', scores 0.4194. Giving Manchester its whole 1,847-character synopsis reaches only 0.2689. That is HUBNESS: short generic documents sit near the centre of the embedding space and are close to everything, and no amount of text fixes a document that has none. DIAGNOSIS: all-MiniLM-L6-v2 is a SYMMETRIC similarity model being used for ASYMMETRIC retrieval. Options, costs and a recommendation are in docs/DECISIONS_PENDING.md P13. E1, E2 and recall are all unaffected and healthy - this blocks E3 and E4 only."
-    }
-  ],
+  "next_action": "Phase 5 subtask 5.6: the semantic fixture and nDCG@10, the only thing that turns E3 from an opinion into a number. Write fixtures/search/semantic-queries.tsv - query, then the imdb ids that SHOULD rank top-10, graded 2 for an obvious answer and 1 for a defensible one - and extend tools/eval/src/search.rs with an nDCG@10 computation reported next to E2. Draw the queries from the worked examples in docs/eval-results.md plus the filter-shaped ones 5.5 added, and KEEP THE TWO KINDS SEPARATE: a filter-shaped query ('films from the 90s') and a meaning-shaped one ('films about grief') fail for different reasons, and averaging them makes nDCG unreadable. Write the expected ids from independent knowledge, NEVER by running the search - a fixture generated from the code it tests cannot fail, and this project's two existing fixtures were each wrong four times on their first run. THEN, with a number in hand, price D39's document-layout change using `eval embed --compare` before spending another 3-hour re-embed on it.",
+  "blockers": [],
   "decisions_pending": [
     {
       "id": "P1",
@@ -1890,7 +1883,7 @@
     },
     {
       "id": "P13",
-      "text": "Whether to swap the embedding model for a retrieval-trained one (bge-small-en-v1.5 or e5-small-v2, both 384 dimensions so the artefact format is unchanged), accept E3/E4 as not met, or try re-ranking. See docs/DECISIONS_PENDING.md. Raised by blocker B4 after three measured attempts.",
+      "text": "DECIDED 2026-09-07 BY THE AUTHOR: swap to bge-small-en-v1.5 (ADR-0034). Done and measured. E4's two named queries improved markedly - 'like Wong Kar-wai but Korean' now returns Chungking Express first, his signature film, which MiniLM never found. E1 p95 31.3 ms, E2 43/43, recall 0.9670, agreement 10/10. STILL OPEN only for the residue: a harder plot query does not surface Manchester by the Sea, and the evidence points at DOCUMENT LAYOUT rather than the model - its document opens with five cast names before any plot, inside a 400-character budget (D39). Next measurable step is synopsis-first plus a larger SYNOPSIS_CHARS, priced with `eval embed --compare` before another re-embed is spent.",
       "raised": "2026-09-07",
       "decide_by_phase": 5
     }
@@ -2210,6 +2203,16 @@
     {
       "id": "D37",
       "text": "NOTHING SCHEDULES THE CATALOGUE REFRESH, AND SUBTASK 5.7 IS BIGGER THAN IT LOOKS. The author asked for the catalogue to refresh on every app open, and D24's measurement makes the CHECK nearly free (conditional GET -> 304, 0 bytes). The blocker is not the check, it is WHO RUNS THE REFRESH: `ingest refresh` is 178 lines resting on ~1,800 lines of job runner, downloader and TSV reader that all live in tools/ingest, A DEV TOOL THE APPLICATION CANNOT DEPEND ON. The same wall the query embedder hit in 5.10, and solved the same way - crates/embedder - but this is an order of magnitude larger. Options for 5.7: (a) move job.rs, download.rs, tsv.rs and refresh.rs into a crates/catalogue crate, roughly a session's work, and the app calls it on launch; (b) ship the ingest binary alongside the app and spawn it, rejected because a dev tool is not a shipped artefact and Phase 27 would have to package it; (c) app decides and reports, user runs the command, which is not what was asked for. RECOMMEND (a). Until it exists an installed app's catalogue is frozen at install time, which ADR-0030 exists to prevent, and Phase 20 is Tier C so it cannot be the owner.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D38",
+      "text": "THE LANGUAGE FILTER SPEC.md PHASE 5 NAMES CANNOT BE BUILT. media_items.original_language is NULL on all 2,702,737 rows: the IMDb datasets do not publish it and nothing has ever written the column. So 'in Japanese' is parsed by nothing, and 'like Wong Kar-wai but Korean' cannot constrain by language - it has to hope the embedding carries it. Three sources could fill it: title.akas carries a language per alternative-title row and could be aggregated (free, imprecise; D17 already notes akas language handling is wrong in a related way); AniList publishes it for anime; TMDB publishes original_language for everything but needs the per-user key. Recorded rather than shipped, because a filter that silently matches nothing is worse than an absent one.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D39",
+      "text": "THE DOCUMENT PUTS METADATA BEFORE MEANING. Every embedded document opens with year, genres and up to six names - Manchester by the Sea spends its first 120 characters on five cast members - and the synopsis is then truncated at SYNOPSIS_CHARS = 400. Measured 2026-09-07 with `eval embed --compare`: that film scores 0.4947 against a plot query describing it almost verbatim, rising to 0.5239 given its whole 1,847-character synopsis, while a 336-character documentary about an unrelated murder scores 0.5788. The gap narrows by two thirds when the plot is not truncated, which points at LAYOUT rather than the model. Two changes to try, cheapest first: put the synopsis FIRST, and raise the budget toward the ~1,000 characters the model's 256 tokens can actually read. Both are document-builder changes and cost a 3-hour re-embed, so price them with --compare first.",
       "phase_raised": 5
     }
   ],

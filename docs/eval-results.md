@@ -1620,3 +1620,60 @@ filtering 2.7 million down to them, is the whole difference.
 **Still over budget and recorded as such**: 190 ms for a director query, 356 ms when a
 year filter joins it, against E1's 80 ms. E1's fixture is exact titles so this does not
 appear in that number — which is exactly why it is written down here.
+
+### The model swap, measured (ADR-0034)
+
+`bge-small-en-v1.5` replacing `all-MiniLM-L6-v2`. Re-embed 11,247 s (BGE is slower per
+document), index rebuild 29 s, artefact sha256 `b17f15da…`, document builder v2, text
+source `wikipedia`.
+
+**E4's two named queries, before and after:**
+
+| | MiniLM | **BGE** |
+|---|---|---|
+| *films about grief that are not depressing* | Funeral Home · Children of Sorrow · The Sadness · Sea Sorrow | **Good Grief (2023)** · Grief (1993) · Mourning Has Broken · **About Memory and Loss** · **No Sad Songs** · Bereavement |
+| *like Wong Kar-wai but Korean* | Miss Korea · You Are the Best! · Dear Hongrang · Mouse | **Chungking Express (1994)** · *wkw/tk/1996* · *There's Only One Sun* · then Korean series |
+
+The second is the striking one: **Chungking Express is Wong Kar-wai's signature film**,
+and positions 2 and 3 are also his. The model recognised the director from the name alone
+— MiniLM never did. It has not combined "like Wong Kar-wai" *with* "but Korean"; the page
+mixes his films and Korean drama rather than finding Korean films that resemble his.
+
+The first now leads with *Good Grief*, a comedy about bereavement, which is close to
+literally what the query asked for.
+
+**Everything else held or improved:**
+
+| | |
+|---|---|
+| **E2 exact-title top-1** | **43/43 = 100%** |
+| **E1** hybrid, warm | p50 9.8 ms, **p95 31.3 ms**, max 90.7 ms |
+| **recall@10** | **0.9670** (gate 0.95) |
+| vector search | p50 0.94 ms, p95 1.49 ms |
+| query embedding | p50 5.5 ms, p95 7.2 ms (BGE is ~3x MiniLM's 2.2 ms) |
+| producer/query agreement | **10/10 byte-identical** |
+| index | 61 MB, **1.0 MB resident** |
+
+#### What is still wrong, and the next measurable step
+
+A third, harder query — *"a grieving janitor becomes guardian of his teenage nephew in a
+Massachusetts fishing town"* — still does not surface *Manchester by the Sea*:
+
+| item | cosine | synopsis |
+|---|---|---|
+| They Killed Sister Dorothy | **0.5788** | 336 chars |
+| Manchester by the Sea | 0.4947 → **0.5239** with its whole synopsis | 1,847 chars |
+
+The gap narrows from 0.084 to 0.029 when the full synopsis is used, which points at the
+**document layout** rather than at the model. Manchester's document opens with
+`(2016) drama film, featuring Kenneth Lonergan, Casey Affleck, Michelle Williams, Kyle
+Chandler and Lucas Hedges.` — five names before a word of plot, inside a 400-character
+budget.
+
+Two untried changes, in order of expected value: **put the synopsis first**, and **raise
+`SYNOPSIS_CHARS`** (the model reads roughly 1,000 characters' worth of tokens; we give it
+400). Both are document-builder changes, so both cost a re-embed — and
+`eval embed --compare` can price them in a minute before that is spent.
+
+**E3 and E4 are still not claimed.** E4 additionally requires screenshots in a case
+study, which needs the Phase 5.8 UI; E3 needs the semantic fixture from 5.6.
