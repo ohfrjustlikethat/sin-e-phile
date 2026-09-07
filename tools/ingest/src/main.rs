@@ -61,6 +61,10 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            than downloaded, so it needs `ingest embed` to have
                            produced the artefact first. Re-runnable: it replaces
                            the index it finds.
+  ingest tidy [--dry-run]  delete dataset archives whose loader has completed. They
+                           are 2.1 GB of a 6.4 GB data directory and every one has
+                           already been read. Re-downloadable; ml-25m.zip is never
+                           touched because GroupLens cannot currently serve it.
   ingest verify-embeddings verify the artefact: checksum, header, and whether it
                            matches the model and document builder this build has
   ingest verify-anime      check the catalogue against
@@ -172,6 +176,14 @@ async fn main() -> Result<(), JobError> {
             // command almost certainly wants.
             let both = !map && !extracts;
             wikipedia(&db, map || both, extracts || both, limit).await
+        }
+        "tidy" => {
+            tidy(
+                &db,
+                &dir.join("datasets"),
+                args.iter().any(|a| a == "--dry-run"),
+            )
+            .await
         }
         "vector-index" => vector_index(&db, &dir).await,
         "verify-embeddings" => verify_embeddings(&dir),
@@ -802,7 +814,15 @@ async fn embed_artefact(db: &Db, dir: &Path) -> Result<(), JobError> {
     if job.is_resuming().await? {
         tracing::info!("resuming a previous run");
     }
-    let produced = embed::produce(&mut job, db, &mut embedder, &artefact_path, &snapshot).await?;
+    let produced = embed::produce(
+        &mut job,
+        db,
+        &mut embedder,
+        &artefact_path,
+        &snapshot,
+        sinephile_embedding::TEXT_SOURCE,
+    )
+    .await?;
     job.finish().await?;
 
     println!();
@@ -878,6 +898,93 @@ async fn search_index(db: &Db, trigram: bool, trigram_core: bool) -> Result<(), 
 
 /// Verify the embedding artefact, as the application will at startup.
 ///
+/// Delete dataset archives whose loader has finished with them.
+///
+/// # Why this exists
+///
+/// The seven archives are 2.1 GB of a 6.4 GB data directory and every one of them was
+/// consumed during ingestion. They are kept only because nothing deleted them. Measured
+/// 2026-09-07: `title.principals` 745 MB, `title.akas` 489 MB, `name.basics` 295 MB,
+/// `ml-25m.zip` 250 MB, `title.basics` 216 MB, `title.episode` 52 MB, `title.ratings`
+/// 8 MB.
+///
+/// # Why a command rather than a line at the end of each loader
+///
+/// A loader that deletes its own input makes re-running it a 745 MB download, and makes
+/// a *resumed* run depend on the deletion having not happened yet. Doing it in one
+/// place, explicitly, after checking the job actually completed, cannot surprise anyone.
+///
+/// The first-run flow will call this once the catalogue is built (subtask 4.9).
+async fn tidy(db: &Db, datasets: &Path, dry_run: bool) -> Result<(), JobError> {
+    // Which job must have COMPLETED before a file is spare. A file whose loader never
+    // finished is still work in progress, and deleting it would turn a resumable run
+    // into a fresh download.
+    let owned: [(&str, &str); 6] = [
+        ("title.basics.tsv.gz", "imdb"),
+        ("title.ratings.tsv.gz", "imdb"),
+        ("name.basics.tsv.gz", "imdb-credits"),
+        ("title.principals.tsv.gz", "imdb-credits"),
+        ("title.akas.tsv.gz", "imdb-akas"),
+        ("title.episode.tsv.gz", "episodes"),
+    ];
+
+    let mut freed = 0u64;
+    let mut kept = 0u64;
+    println!();
+    for (filename, job) in owned {
+        let path = datasets.join(filename);
+        let Ok(meta) = std::fs::metadata(&path) else {
+            continue;
+        };
+        let complete: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM ingest_jobs WHERE name = ? AND status = 'complete'",
+        )
+        .bind(job)
+        .fetch_one(db.pool())
+        .await?;
+
+        let megabytes = meta.len() as f64 / 1_048_576.0;
+        if complete == 0 {
+            println!("  keep    {filename:<26} {megabytes:>6.0} MB  ({job} has not completed)");
+            kept += meta.len();
+            continue;
+        }
+        if dry_run {
+            println!("  would   {filename:<26} {megabytes:>6.0} MB");
+        } else {
+            std::fs::remove_file(&path)
+                .map_err(|e| JobError::step("tidy", format!("{}: {e}", path.display())))?;
+            println!("  removed {filename:<26} {megabytes:>6.0} MB");
+        }
+        freed += meta.len();
+    }
+
+    // ml-25m.zip is deliberately never touched. GroupLens has served an expired
+    // certificate since 2026-08-28, so this file was placed here BY HAND after the
+    // author accepted a browser warning. Deleting a file the machine cannot re-fetch,
+    // to save 250 MB, is not a trade worth making on someone's behalf.
+    if let Ok(meta) = std::fs::metadata(datasets.join("ml-25m.zip")) {
+        println!(
+            "  keep    {:<26} {:>6.0} MB  (hand-placed; GroupLens is unreachable)",
+            "ml-25m.zip",
+            meta.len() as f64 / 1_048_576.0
+        );
+        kept += meta.len();
+    }
+
+    println!();
+    println!(
+        "  {} {:.0} MB · {:.0} MB kept",
+        if dry_run { "would free" } else { "freed" },
+        freed as f64 / 1_048_576.0,
+        kept as f64 / 1_048_576.0
+    );
+    if !dry_run && freed > 0 {
+        println!("  Everything removed is re-downloadable; re-running a loader fetches it again.");
+    }
+    Ok(())
+}
+
 /// Load Wikipedia lead extracts into the catalogue (ADR-0033).
 ///
 /// Two phases. `--map` walks Wikidata for the IMDb-id → article mapping; `--extracts`
@@ -916,8 +1023,15 @@ async fn wikipedia(db: &Db, map: bool, extracts: bool, limit: i64) -> Result<(),
             let done = loaded.fetched + loaded.empty;
             if done % 200 == 0 {
                 let rate = done as f64 / started.elapsed().as_secs_f64().max(0.001);
+                // `--limit` defaults to i64::MAX, and printing that at someone is
+                // noise rather than information.
+                let of = if limit == i64::MAX {
+                    String::new()
+                } else {
+                    format!("/{limit}")
+                };
                 println!(
-                    "  {done}/{limit}  {} with text, {} without  {rate:.1}/s",
+                    "  {done}{of}  {} with text, {} without  {rate:.1}/s",
                     loaded.fetched, loaded.empty
                 );
             }
@@ -1047,6 +1161,7 @@ fn verify_embeddings(dir: &Path) -> Result<(), JobError> {
         artefact.header.document_builder_version
     );
     println!("  catalogue        {}", artefact.header.snapshot_date);
+    println!("  text source      {}", artefact.header.text_source);
     println!("  vectors          {}", artefact.header.count);
     println!("  sha256           {}", artefact.checksum_hex());
 

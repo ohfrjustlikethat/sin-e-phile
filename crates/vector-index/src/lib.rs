@@ -294,6 +294,7 @@ mod tests {
             quantisation: Quantisation::Int8,
             document_builder_version: 1,
             snapshot_date: "2026-09-06".into(),
+            text_source: "wikipedia".into(),
             count: vectors.len() as u64,
         };
         let mut bytes = Vec::new();

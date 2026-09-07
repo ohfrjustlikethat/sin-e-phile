@@ -32,6 +32,14 @@ pub fn artefact_path(data_dir: &std::path::Path) -> std::path::PathBuf {
     data_dir.join(format!("embeddings-{MODEL}.bin"))
 }
 
+/// Where the document text came from, for artefacts this build produces (ADR-0033).
+///
+/// Recorded in the artefact header so a rebuild is identifiable. It is deliberately a
+/// plain string rather than an enum: ADR-0018 makes the source swappable and
+/// composable, and "wikipedia+tmdb" is a value a future build may legitimately want to
+/// write without a format change.
+pub const TEXT_SOURCE: &str = "wikipedia";
+
 pub use artefact::{Artefact, ArtefactError, Header, Quantisation};
 pub use document::{build as build_document, Document};
 pub use quantise::{cosine, dequantise, quantise, Quantised};

@@ -188,6 +188,7 @@ pub async fn produce(
     embedder: &mut dyn DocumentEmbedder,
     artefact_path: &Path,
     snapshot_date: &str,
+    text_source: &str,
 ) -> Result<Produced, JobError> {
     let count = core_count(db).await?;
     let dimension = embedder.dimension();
@@ -248,6 +249,7 @@ pub async fn produce(
         quantisation: Quantisation::Int8,
         document_builder_version: document::VERSION,
         snapshot_date: snapshot_date.to_string(),
+        text_source: text_source.to_string(),
         count: written as u64,
     };
     let vectors = std::fs::read(&part)

@@ -29,7 +29,14 @@ pub const MAGIC: [u8; 8] = *b"SINEEMB\0";
 
 /// The container format's own version, distinct from the model's and the document
 /// builder's. Bumped only when the layout below changes.
-pub const FORMAT_VERSION: u16 = 1;
+///
+/// **2 adds `text_source`** (ADR-0033). A version bump rather than a quiet use of the
+/// reserved bytes, because the failure it prevents is silent: two artefacts identical in
+/// model, dimension and builder version but built from different text are otherwise
+/// indistinguishable, and searching the wrong one is simply worse with nothing to point
+/// at. A v1 artefact — everything published before the catalogue had any synopses — is
+/// now refused rather than quietly used.
+pub const FORMAT_VERSION: u16 = 2;
 
 /// Bytes of header before the vectors begin.
 const HEADER_BYTES: usize = 256;
@@ -68,6 +75,14 @@ pub struct Header {
     pub document_builder_version: u32,
     /// The catalogue this was built from, as `YYYY-MM-DD`. An input, never `now()`.
     pub snapshot_date: String,
+    /// Where the document text came from — `wikipedia`, `tmdb`, `imdb`, or a
+    /// combination. Required by ADR-0018, which made the source swappable precisely so
+    /// its contribution could be measured, and by ADR-0033, which changed it.
+    ///
+    /// It is recorded rather than enforced: an artefact from a different text source is
+    /// still *valid*, just built from different sentences. What it must never be is
+    /// unidentifiable.
+    pub text_source: String,
     pub count: u64,
 }
 
@@ -148,7 +163,8 @@ impl Header {
         // without parsing anything first.
         write_string(&mut out[25..89], &self.model, "model")?;
         write_string(&mut out[89..105], &self.snapshot_date, "snapshot_date")?;
-        // 105..256 is reserved and stays zero, so an older reader that ignores it and
+        write_string(&mut out[105..137], &self.text_source, "text_source")?;
+        // 137..256 is reserved and stays zero, so an older reader that ignores it and
         // a newer one that uses it produce the same bytes for the same content today.
         Ok(out)
     }
@@ -177,6 +193,7 @@ impl Header {
             quantisation,
             document_builder_version,
             snapshot_date: read_string(&bytes[89..105])?,
+            text_source: read_string(&bytes[105..137])?,
             count,
         })
     }
@@ -321,6 +338,7 @@ mod tests {
             quantisation: Quantisation::Int8,
             document_builder_version: 1,
             snapshot_date: "2026-09-05".into(),
+            text_source: "wikipedia".into(),
             count,
         }
     }
@@ -382,6 +400,36 @@ mod tests {
             .compatible_with("all-MiniLM-L6-v2-int8", 2)
             .expect_err("must refuse");
         assert!(matches!(err, ArtefactError::DocumentBuilderMismatch { .. }));
+    }
+
+    #[test]
+    fn a_v1_artefact_is_refused_rather_than_read_as_if_it_were_this_format() {
+        // The whole point of bumping the version for `text_source` (ADR-0033). Before
+        // the bump, the catalogue held NO synopses, so every v1 artefact was built from
+        // title, year, genre and cast alone. Reading one now would not fail — it would
+        // just be a worse search engine, silently, which is the failure mode ADR-0014
+        // exists to prevent.
+        let mut bytes = built(2);
+        bytes[8..10].copy_from_slice(&1u16.to_le_bytes());
+
+        // `Artefact` holds 313 MB in the real case, so it deliberately does not derive
+        // Debug — match on the error rather than unwrapping through it.
+        match Artefact::read(&mut bytes.as_slice()) {
+            Err(ArtefactError::FormatVersion {
+                found: 1,
+                expected: 2,
+            }) => {}
+            Err(other) => panic!("wrong error: {other}"),
+            Ok(_) => panic!("a v1 artefact must be refused, not read"),
+        }
+    }
+
+    #[test]
+    fn the_text_source_survives_a_round_trip() {
+        // ADR-0018 requires the artefact to name where its sentences came from, so that
+        // the contribution of a text source is measurable rather than assumed.
+        let artefact = Artefact::read(&mut built(1).as_slice()).expect("read");
+        assert_eq!(artefact.header.text_source, "wikipedia");
     }
 
     #[test]
