@@ -39,6 +39,15 @@ async fn main() {
         },
         "vector" if args.iter().any(|a| a == "--memory") => vector::memory(Path::new(&data_dir)),
         "vector" => vector::run(Path::new(&data_dir), report, prove, expansion).await,
+        "embed" if args.iter().any(|a| a == "--compare") => {
+            let i = args.iter().position(|a| a == "--compare").expect("present");
+            let query = args.get(i + 1).cloned().unwrap_or_default();
+            let ids: Vec<i64> = args
+                .get(i + 2)
+                .map(|s| s.split(',').filter_map(|n| n.trim().parse().ok()).collect())
+                .unwrap_or_default();
+            embed::compare(Path::new(&data_dir), &query, &ids).await
+        }
         "embed" => embed::run(Path::new(&data_dir), report).await,
         "all" => match search::run(Path::new(&data_dir), report).await {
             // Every harness runs even when an earlier one misses its target — stopping

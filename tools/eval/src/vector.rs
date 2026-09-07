@@ -115,7 +115,13 @@ pub async fn run(
     let artefact = Artefact::read(&mut file)?;
 
     let db = Db::open_in(data_dir).await?;
-    let mut ids = CatalogueRepository::new(&db).core_ids().await?;
+    // The SAME subset the index was built from, or recall compares two different
+    // populations and means nothing. Positions with no descriptive text are not in the
+    // graph and must not be in the ground truth either.
+    // The SAME subset the index was built from, holes included, or recall compares two
+    // different populations and means nothing.
+    let mut ids = CatalogueRepository::new(&db).core_ids_for_vectors().await?;
+    let indexable = ids.iter().filter(|id| id.is_some()).count();
 
     if prove {
         // THE NEGATIVE CONTROL. A check that has never been seen to fail is not
@@ -149,7 +155,7 @@ pub async fn run(
     let expansion = expansion.unwrap_or(sinephile_vector_index::EXPANSION_SEARCH);
     index.set_expansion_search(expansion);
 
-    if index.len() != ids.len() {
+    if index.len() != indexable {
         return Err(EvalError::Missing(format!(
             "the index holds {} vectors and the catalogue offers {} core ids — \
              rebuild it with `ingest vector-index`",

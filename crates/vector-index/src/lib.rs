@@ -135,7 +135,11 @@ pub struct Neighbour {
 /// What a build cost — reported because ADR-0014's budget is a number, not a feeling.
 #[derive(Debug, Clone, Copy)]
 pub struct BuildReport {
+    /// How many made it into the graph.
     pub vectors: usize,
+    /// How many positions were offered — the whole catalogue, including the ones with
+    /// nothing to say. The gap between the two is the point.
+    pub considered: usize,
     pub bytes: u64,
     pub seconds: f64,
 }
@@ -148,11 +152,21 @@ impl VectorIndex {
     /// Build the graph from a verified artefact and save it.
     ///
     /// `ids` is the catalogue id of each vector **in artefact order** — the order
-    /// `tools/ingest`'s embed job wrote them in. `progress` is called with a running
-    /// count, because this is minutes of work and a silent minute looks like a hang.
+    /// `tools/ingest`'s embed job wrote them in — and **`None` means do not index this
+    /// position**. `progress` is called with a running count, because this is minutes of
+    /// work and a silent minute looks like a hang.
+    ///
+    /// # Why positions are skipped rather than the artefact being rebuilt smaller
+    ///
+    /// The artefact is published and positional: vector *n* is the nth core title, and
+    /// every consumer depends on that. The index is derived locally, so it is the right
+    /// place to be selective. Skipping keeps the two in step — the length check below
+    /// still sees the full catalogue — while the graph holds only items worth searching
+    /// semantically. See `CatalogueRepository::core_ids_for_vectors` for why that is not
+    /// all of them.
     pub fn build(
         artefact: &Artefact,
-        ids: &[i64],
+        ids: &[Option<i64>],
         path: &Path,
         mut progress: impl FnMut(usize),
     ) -> Result<BuildReport, VectorIndexError> {
@@ -175,22 +189,26 @@ impl VectorIndex {
         })?;
         // Reserved up front: usearch grows by reallocating, and 855,703 unplanned
         // growth steps is the difference between minutes and an afternoon.
-        index.reserve(ids.len())?;
+        let indexable = ids.iter().filter(|id| id.is_some()).count();
+        index.reserve(indexable)?;
 
+        let mut added = 0usize;
         for (position, id) in ids.iter().enumerate() {
-            if *id <= 0 {
-                return Err(VectorIndexError::NonPositiveId(*id));
+            let Some(id) = *id else { continue };
+            if id <= 0 {
+                return Err(VectorIndexError::NonPositiveId(id));
             }
             let vector = artefact
                 .vector(position as u64)
                 .ok_or(VectorIndexError::MissingVector(position as u64))?;
-            index.add(*id as u64, vector)?;
+            index.add(id as u64, vector)?;
 
-            if position % 10_000 == 0 {
-                progress(position);
+            added += 1;
+            if added.is_multiple_of(10_000) {
+                progress(added);
             }
         }
-        progress(ids.len());
+        progress(added);
 
         let path_string = path.to_string_lossy().to_string();
         index.save(&path_string)?;
@@ -203,7 +221,8 @@ impl VectorIndex {
             .len();
 
         Ok(BuildReport {
-            vectors: ids.len(),
+            vectors: indexable,
+            considered: ids.len(),
             bytes,
             seconds: started.elapsed().as_secs_f64(),
         })
@@ -326,7 +345,7 @@ mod tests {
         let artefact = artefact_of(vectors.clone());
         // Ids deliberately not 0..n: the whole point of the keys is that position and
         // catalogue id are different things.
-        let ids: Vec<i64> = (0..64).map(|i| 5_000 + i * 7).collect();
+        let ids: Vec<Option<i64>> = (0..64).map(|i| Some(5_000 + i * 7)).collect();
 
         let report = VectorIndex::build(&artefact, &ids, &path, |_| {}).expect("build");
         assert_eq!(report.vectors, 64);
@@ -339,9 +358,9 @@ mod tests {
         // Querying with a stored vector must return that item first, and its neighbours
         // on the circle next — the id mapping and the metric checked in one assertion.
         let hits = index.search(&vectors[10], 3).expect("search");
-        assert_eq!(hits[0].media_item_id, ids[10]);
+        assert_eq!(hits[0].media_item_id, ids[10].expect("indexed"));
         assert!(hits[0].distance < 1e-4, "{:?}", hits[0]);
-        let neighbours = [ids[9], ids[11]];
+        let neighbours = [ids[9].expect("indexed"), ids[11].expect("indexed")];
         assert!(neighbours.contains(&hits[1].media_item_id), "{hits:?}");
         assert!(neighbours.contains(&hits[2].media_item_id), "{hits:?}");
     }
@@ -353,7 +372,7 @@ mod tests {
         // unchecked, because every offset still reads a valid vector.
         let dir = tempfile::tempdir().expect("tempdir");
         let artefact = artefact_of(circle(16));
-        let ids: Vec<i64> = (1..=17).collect();
+        let ids: Vec<Option<i64>> = (1..=17).map(Some).collect();
 
         let err = VectorIndex::build(&artefact, &ids, &dir.path().join("i.usearch"), |_| {})
             .expect_err("must refuse");
@@ -374,8 +393,13 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("index.usearch");
         let artefact = artefact_of(circle(8));
-        VectorIndex::build(&artefact, &(1..=8).collect::<Vec<i64>>(), &path, |_| {})
-            .expect("build");
+        VectorIndex::build(
+            &artefact,
+            &(1..=8).map(Some).collect::<Vec<Option<i64>>>(),
+            &path,
+            |_| {},
+        )
+        .expect("build");
 
         let index = VectorIndex::view(&path).expect("view");
         let err = index.search(&[1i8, 2, 3], 5).expect_err("must refuse");

@@ -49,6 +49,81 @@ const QUERIES: &[&str] = &[
 /// setting that changed does not affect one title in a thousand, it affects all of them.
 const AGREEMENT_SAMPLES: usize = 10;
 
+/// `--compare "<query>" <id>,<id>,…`: cosine between a query and each item's document,
+/// at the shipped synopsis budget and at a longer one.
+///
+/// Exists because the alternative was a 75-minute re-embed on a hunch. `SYNOPSIS_CHARS`
+/// truncates at 400, and *Manchester by the Sea*'s lead puts its plot at characters
+/// 280-420 — so the sentence that answers a plot query is cut in half. This measures
+/// whether that is actually what costs the ranking, before anything is rebuilt.
+pub async fn compare(data_dir: &Path, query: &str, ids: &[i64]) -> Result<bool, EvalError> {
+    let models = Path::new("models");
+    let mut embedder = sinephile_embedder::Embedder::load(
+        &models.join("all-MiniLM-L6-v2-int8.onnx"),
+        &models.join("all-MiniLM-L6-v2-tokenizer.json"),
+        sinephile_embedding::MODEL,
+    )
+    .map_err(|e| EvalError::Missing(e.to_string()))?;
+
+    let db = Db::open_in(data_dir).await?;
+    let query_vector = embedder
+        .embed(query)
+        .map_err(|e| EvalError::Missing(e.to_string()))?;
+
+    println!();
+    println!("  query: {query:?}");
+    println!();
+    println!(
+        "  {:<34} {:>9} {:>9}  {:>5}",
+        "item", "shipped", "longer", "chars"
+    );
+
+    for id in ids {
+        let Some(document) = sinephile_ingest::embed::document_for(&db, *id)
+            .await
+            .map_err(|e| EvalError::Missing(e.to_string()))?
+        else {
+            println!("  {id}: not in the core tier");
+            continue;
+        };
+        let title: String =
+            sqlx::query_scalar("SELECT primary_title FROM media_items WHERE id = ?")
+                .bind(id)
+                .fetch_one(db.pool())
+                .await?;
+        let full: Option<String> =
+            sqlx::query_scalar("SELECT synopsis FROM media_items WHERE id = ?")
+                .bind(id)
+                .fetch_one(db.pool())
+                .await?;
+
+        // The shipped document, and the same document with the whole synopsis rather
+        // than its first 400 characters. The model reads 256 tokens either way, so the
+        // second is what the budget is leaving on the table.
+        let longer = match &full {
+            Some(text) => format!("{document} {text}"),
+            None => document.clone(),
+        };
+
+        let a = embedder
+            .embed(&document)
+            .map_err(|e| EvalError::Missing(e.to_string()))?;
+        let b = embedder
+            .embed(&longer)
+            .map_err(|e| EvalError::Missing(e.to_string()))?;
+
+        println!(
+            "  {:<34} {:>9.4} {:>9.4}  {:>5}",
+            title.chars().take(34).collect::<String>(),
+            sinephile_embedding::cosine(&query_vector, &a),
+            sinephile_embedding::cosine(&query_vector, &b),
+            full.as_ref().map(|t| t.len()).unwrap_or(0)
+        );
+    }
+    println!();
+    Ok(true)
+}
+
 pub async fn run(data_dir: &Path, report: bool) -> Result<bool, EvalError> {
     let models = Path::new("models");
     let model = models.join("all-MiniLM-L6-v2-int8.onnx");

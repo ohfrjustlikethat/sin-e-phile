@@ -783,7 +783,7 @@
           "id": "E1",
           "text": "p95 keystroke-to-results < 80 ms over the full catalogue.",
           "met": false,
-          "evidence": "MEASURED, NOT MET. `cargo run -p eval --release -- search --report` -> hybrid p95 15.0 ms warm (p50 4.8, max 71; three consecutive runs) and p95 67.5 ms cold (p50 17.1, max 324), 2026-09-07, commit bdbd560, over the real 2,702,737-title catalogue INCLUDING query embedding, BM25, vector search and fusion. Both p95 figures are under 80 ms, but SPEC.md 2.3 enforces budgets against TIER 0 and this is a Tier 2 dev machine; at the 3-4x penalty P8 flags, warm lands at 45-60 ms and cold at 236-270 ms. Not claimed until measured on Tier 0 hardware or a constrained VM."
+          "evidence": "MEASURED, NOT MET. `cargo run -p eval --release -- search --report` -> hybrid p95 22.2 ms warm (p50 7.5, max 78.7), 2026-09-07, over the real catalogue INCLUDING query embedding, BM25, vector search and fusion. Under 80 ms, but SPEC.md 2.3 enforces against TIER 0 and this is a Tier 2 machine; at P8's 3-4x penalty the warm case lands at 67-89 ms, which straddles the budget. Not claimed until measured on Tier 0 hardware or a constrained VM."
         },
         {
           "id": "E2",
@@ -795,13 +795,13 @@
           "id": "E3",
           "text": "nDCG@10 > 0.75 on the semantic query set.",
           "met": false,
-          "evidence": null
+          "evidence": "NOT MET, and blocked by B4 rather than unattempted. Three distinct approaches were measured - Wikipedia enrichment (233,114 synopses), indexing only items with descriptive text (855,703 -> 189,470), and removing titles from the document plus a 300-character minimum (-> 119,874). Each improved results; none was sufficient. The measurement that ends it is in docs/eval-results.md: a trivia-only synopsis outscores a verbatim plot match 0.4194 to 0.1944. all-MiniLM-L6-v2 is a symmetric similarity model doing asymmetric retrieval. See P13."
         },
         {
           "id": "E4",
           "text": "\"films about grief that aren't depressing\" and \"like Wong Kar-wai but Korean\" both return defensible results — documented with screenshots in the case study.",
           "met": false,
-          "evidence": null
+          "evidence": "NOT MET, and blocked by B4 rather than unattempted. Three distinct approaches were measured - Wikipedia enrichment (233,114 synopses), indexing only items with descriptive text (855,703 -> 189,470), and removing titles from the document plus a 300-character minimum (-> 119,874). Each improved results; none was sufficient. The measurement that ends it is in docs/eval-results.md: a trivia-only synopsis outscores a verbatim plot match 0.4194 to 0.1944. all-MiniLM-L6-v2 is a symmetric similarity model doing asymmetric retrieval. See P13."
         },
         {
           "id": "E5",
@@ -843,7 +843,7 @@
         },
         {
           "id": "5.6",
-          "text": "fixtures/search/ and the relevance harness. exact-titles.tsv (43 queries) and `eval search` are done and E2 is at 100%. `eval vector` is done: recall@10 0.9670 against brute force, with a --prove negative control. semantic-queries.tsv and nDCG@10 (E3) still need the query embedder and the fusion from 5.4.",
+          "text": "fixtures/search/ and the relevance harness. exact-titles.tsv (43 queries), `eval search`, `eval vector` (recall 0.9810 with a --prove control) and `eval embed` (byte-identical agreement, plus --compare for per-document cosine) all exist. semantic-queries.tsv and nDCG@10 are BLOCKED BY B4: a fixture measured against a model that cannot do asymmetric retrieval would record the model's ceiling as the system's score.",
           "status": "in_progress",
           "commit": null
         },
@@ -1848,8 +1848,15 @@
       ]
     }
   ],
-  "next_action": "Phase 5 subtask 5.5: query understanding. Write crates/search-engine/src/query.rs - a parser that pulls year ranges, languages, runtime bounds and 'directed by' out of the query as structured FILTERS and returns them alongside the residual text, which is what actually gets embedded. Apply the filters inside SearchRepository's SQL in crates/persistence/src/repositories/search.rs rather than filtering after ranking, or a constrained search returns three results out of a page of fifty. SPEC.md 15 Phase 5 names the four filter kinds; ADR-0015 is why the residual text still gets embedded on every tier. DO THIS BEFORE 5.6: the semantic fixture has to separate filter-shaped queries ('films from the 90s') from meaning-shaped ones ('films about grief'), and mixing them makes nDCG unreadable. P12 IS OPEN AND BLOCKS E3/E4 - docs/DECISIONS_PENDING.md - because the catalogue holds 0 synopses, so the meaning-shaped half cannot score well whatever 5.5 does. Do not spend the session tuning it. 5.5 is worth doing now precisely because filters are the part that works WITHOUT synopsis text.",
-  "blockers": [],
+  "next_action": "BLOCKED ON THE AUTHOR (B4/P13) for E3 and E4 only - read docs/DECISIONS_PENDING.md P13 first. If the answer is to swap the model: write the ADR (the model is checksum-pinned in tools/ingest/src/embed.rs::MODEL_SHA256), change sinephile_embedding::MODEL, add the query/passage prefixes bge and e5 require to crates/embedder/src/lib.rs::Embedder::embed - they are NOT optional for those models and omitting them costs most of the benefit - then re-embed (75 min), rebuild the index (28 s) and re-run `eval search --query` on the three queries in docs/eval-results.md. IF THE ANSWER IS TO WAIT: subtask 5.5 is unblocked and worth doing - write crates/search-engine/src/query.rs to pull year ranges, languages, runtime bounds and 'directed by' out of a query as structured FILTERS, applied in SearchRepository's SQL rather than after ranking. Filters are the half of search that works regardless of the model, and 5.6's fixture needs them to separate filter-shaped queries from meaning-shaped ones.",
+  "blockers": [
+    {
+      "id": "B4",
+      "raised": "2026-09-07",
+      "needs_user": true,
+      "description": "SPEC.md 10.9 ESCALATION - three genuinely distinct approaches to E3/E4, each measured, none sufficient. (1) Enriched every document with Wikipedia text: 233,114 synopses where there were 0. (2) Indexed only items that HAVE descriptive text: 855,703 -> 189,470, and the index fell from 435 MB to 96 MB. (3) Removed the title from the embedded document (document::VERSION 2), which SPEC.md Phase 5 never listed among its ingredients anyway; plus MIN_SYNOPSIS=300 to drop trivia-length hubs, 189,470 -> 119,874. Each helped. The measurement that ends it: against the query 'a grieving janitor becomes guardian of his teenage nephew in a Massachusetts fishing town', Manchester by the Sea - whose synopsis contains that plot almost verbatim - scores 0.1944, while Fish Hooky, whose synopsis says only that it was 'the 120th Our Gang short to be released', scores 0.4194. Giving Manchester its whole 1,847-character synopsis reaches only 0.2689. That is HUBNESS: short generic documents sit near the centre of the embedding space and are close to everything, and no amount of text fixes a document that has none. DIAGNOSIS: all-MiniLM-L6-v2 is a SYMMETRIC similarity model being used for ASYMMETRIC retrieval. Options, costs and a recommendation are in docs/DECISIONS_PENDING.md P13. E1, E2 and recall are all unaffected and healthy - this blocks E3 and E4 only."
+    }
+  ],
   "decisions_pending": [
     {
       "id": "P1",
@@ -1878,6 +1885,12 @@
     {
       "id": "P12",
       "text": "DECIDED 2026-09-07 BY THE AUTHOR: option 2, Wikidata/Wikipedia abstracts. The author has no TMDB key and does not want one as a build dependency, which also removes ADR-0018's licensing question from the published artefact entirely. Remaining work: a Wikidata abstract loader joined on IMDb id (property P345), a re-embed, and an index rebuild, then re-measure E4's two queries with `eval search --query`. P12 stays open only until that measurement says whether coverage is enough; if it is not, the fallback is a per-user TMDB key enriching live rather than a rebuilt artefact. Original options in docs/DECISIONS_PENDING.md.",
+      "raised": "2026-09-07",
+      "decide_by_phase": 5
+    },
+    {
+      "id": "P13",
+      "text": "Whether to swap the embedding model for a retrieval-trained one (bge-small-en-v1.5 or e5-small-v2, both 384 dimensions so the artefact format is unchanged), accept E3/E4 as not met, or try re-ranking. See docs/DECISIONS_PENDING.md. Raised by blocker B4 after three measured attempts.",
       "raised": "2026-09-07",
       "decide_by_phase": 5
     }

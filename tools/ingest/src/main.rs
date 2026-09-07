@@ -1080,9 +1080,10 @@ async fn vector_index(db: &Db, dir: &Path) -> Result<(), JobError> {
     let artefact =
         Artefact::read(&mut file).map_err(|e| JobError::step("vector-index", e.to_string()))?;
 
-    let ids = CatalogueRepository::new(db).core_ids().await?;
+    let ids = CatalogueRepository::new(db).core_ids_for_vectors().await?;
+    let indexable = ids.iter().filter(|id| id.is_some()).count();
     println!(
-        "ingest: {} vectors, {} core ids, {} dimensions",
+        "ingest: {} vectors, {} core ids, {indexable} with descriptive text, {} dimensions",
         artefact.header.count,
         ids.len(),
         artefact.header.dimension
@@ -1091,7 +1092,7 @@ async fn vector_index(db: &Db, dir: &Path) -> Result<(), JobError> {
     let final_path = sinephile_vector_index::index_path(dir);
     let building = final_path.with_extension("usearch.part");
 
-    let total = ids.len();
+    let total = indexable;
     let started = std::time::Instant::now();
     let report = VectorIndex::build(&artefact, &ids, &building, |done| {
         if done > 0 && done % 50_000 == 0 {
@@ -1114,7 +1115,10 @@ async fn vector_index(db: &Db, dir: &Path) -> Result<(), JobError> {
 
     println!();
     println!("  {}", final_path.display());
-    println!("  vectors          {}", report.vectors);
+    println!(
+        "  vectors          {} of {} considered",
+        report.vectors, report.considered
+    );
     println!(
         "  index size       {:.0} MB  ({:.1}x the artefact's {:.0} MB)",
         report.bytes as f64 / 1_048_576.0,

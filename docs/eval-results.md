@@ -1500,3 +1500,78 @@ thing that surfaced it. Average extract is 495 characters, against the document
 builder's 400-character budget — so most titles contribute their whole lead.
 
 Before this, the same query was `0 of 855,703`.
+
+### Three distinct attempts at E3/E4, and where they stopped (§10.9)
+
+Wikipedia text was loaded, and semantic search still could not answer a plot query.
+Three genuinely different fixes followed; each helped, none was enough.
+
+**Attempt 1 — enrich the documents** (233,114 synopses). "films about grief that aren't
+depressing" still returned ten obscure films *titled* Grief, every one with **no**
+synopsis. A document reading `Grief (1921), drama short film` is almost entirely the
+word "grief", so it sits on top of any query containing it. **Sparse documents are
+louder than rich ones.**
+
+**Attempt 2 — index only items that have descriptive text** (855,703 → 189,470). Real
+gains, and free improvements elsewhere:
+
+| | before | after |
+|---|---|---|
+| index on disk | 435 MB | **96 MB** |
+| build | 428 s | 54 s |
+| resident (mmap) | 6.6 MB | 1.0 MB |
+
+Results improved but stayed lexical: *Fish Hooky*, *Killer Fish* for a query containing
+"fishing".
+
+**Attempt 3 — remove the title from the embedded document** (`document::VERSION` 2).
+`SPEC.md` Phase 5 lists the ingredients as "synopsis, genres, keywords, director, mood
+descriptors, and era" — the title was never among them; including it was my addition.
+
+Still not enough, and this measurement is why:
+
+```
+cargo run -p eval --release -- embed --compare \
+  "a grieving janitor becomes guardian of his teenage nephew in a Massachusetts fishing town"
+```
+
+| item | shipped (400 chars) | whole synopsis | synopsis |
+|---|---|---|---|
+| **Manchester by the Sea** | 0.1944 | **0.2689** | 1,847 chars |
+| Fish Hooky | **0.4194** | 0.3921 | 126 chars |
+| The Nephew | 0.3932 | 0.3835 | 159 chars |
+
+*Manchester by the Sea*'s synopsis contains the query almost verbatim — "a depressed and
+grief-stricken man who becomes the legal guardian of his teenage nephew after the death
+of his…". *Fish Hooky*'s says it was "the 120th Our Gang short to be released". The
+trivia scores **twice as high**, and giving the real answer its whole text does not close
+the gap.
+
+**That is hubness, not truncation.** Short generic documents land near the centre of the
+embedding space and are therefore close to every query. More text cannot fix a document
+that has no more text.
+
+**Attempt 3b — exclude trivia-length synopses** (`MIN_SYNOPSIS = 300`, 189,470 → 119,874).
+The hubs disappear — no more *Fish Hooky* or *The Nephew* — and *My Mister*, an acclaimed
+melancholic Korean drama, now answers "like Wong Kar-wai but Korean". But *Manchester by
+the Sea* still does not surface for its own plot.
+
+#### What the phase gained anyway
+
+| | |
+|---|---|
+| **E2 exact-title top-1** | **43/43 = 100%**, unchanged throughout |
+| **E1 latency** (hybrid, warm) | p50 7.5 ms, **p95 22.2 ms** against 80 ms |
+| **recall@10** | **0.9810** (gate 0.95) |
+| vector search | p50 1.01 ms, p95 1.72 ms |
+| index | 61 MB, **1.0 MB resident** |
+
+#### The conclusion, stated plainly
+
+`all-MiniLM-L6-v2` is a **symmetric similarity** model being asked to do **asymmetric
+retrieval** — a short query against a long document. Retrieval-trained models
+(`bge-small-en-v1.5`, `e5-small-v2`) exist for exactly this, use query/passage prefixes,
+and are the same 384 dimensions, so the artefact format would not change.
+
+E3 and E4 remain **not met**, and are not claimed on the strength of a plan. Raised as
+blocker **B4** under §10.9: three distinct approaches, each measured, none sufficient.

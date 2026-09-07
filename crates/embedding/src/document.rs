@@ -18,7 +18,11 @@
 //! A different separator is a different string is a different vector.
 
 /// The document-builder version. See the module note: bump on ANY change to `build`.
-pub const VERSION: u32 = 1;
+///
+/// **2 removed the title and the alternative titles.** See the comment in [`build`]:
+/// they are names rather than descriptions, and they were dominating the embedding to
+/// the point that a plot query returned films whose titles shared a word with it.
+pub const VERSION: u32 = 2;
 
 /// What the builder is given about one catalogue item.
 ///
@@ -59,33 +63,31 @@ const SYNOPSIS_CHARS: usize = 400;
 pub fn build(doc: &Document<'_>) -> String {
     let mut out = String::with_capacity(256);
 
-    out.push_str(doc.title.trim());
-    if let Some(year) = doc.year {
-        out.push_str(&format!(" ({year})"));
-    }
-
-    // Alternative titles, de-duplicated against the primary and each other. A film
-    // whose romaji and English titles are identical must not say it twice.
-    let mut seen: Vec<String> = vec![normalise_for_dedupe(doc.title)];
-    let mut alternatives: Vec<&str> = Vec::new();
-    for alt in doc.alternative_titles {
-        let key = normalise_for_dedupe(alt);
-        if key.is_empty() || seen.contains(&key) {
-            continue;
-        }
-        seen.push(key);
-        alternatives.push(alt.trim());
-    }
-    if !alternatives.is_empty() {
-        out.push_str(", also known as ");
-        out.push_str(&join_prose(&alternatives));
-    }
+    // NO TITLE. Version 2 removed it, and the measurement that forced the change is
+    // worth keeping: with the title leading the document, "a grieving janitor becomes
+    // guardian of his teenage nephew in a Massachusetts fishing town" returned *Fish
+    // Hooky* and *Killer Fish* — matching the word "fishing" in a TITLE — while the film
+    // whose synopsis describes exactly that plot never appeared.
+    //
+    // A title is a name, not a description, and it was drowning out the description.
+    // Nothing is lost: the exact-title short-circuit and BM25 both index titles already,
+    // and they match names better than an embedding ever will. For an enriched item the
+    // title is in the text anyway, because a Wikipedia lead opens with it.
+    //
+    // `SPEC.md` Phase 5 lists the document's ingredients as "synopsis, genres, keywords,
+    // director, mood descriptors, and era". The title is not among them; including it
+    // was my addition, and removing it is a correction toward the spec.
+    let year_prefix = match doc.year {
+        Some(year) => format!("({year}) "),
+        None => String::new(),
+    };
+    out.push_str(&year_prefix);
 
     let descriptor = describe_kind(doc.kind);
     if doc.genres.is_empty() {
-        out.push_str(&format!(", {descriptor}"));
+        out.push_str(descriptor);
     } else {
-        out.push_str(&format!(", {} {descriptor}", lowercase_list(doc.genres)));
+        out.push_str(&format!("{} {descriptor}", lowercase_list(doc.genres)));
     }
 
     if !doc.people.is_empty() {
@@ -118,10 +120,6 @@ fn describe_kind(kind: &str) -> &'static str {
         // noise, and a wrong guess is worse than a vague one.
         _ => "title",
     }
-}
-
-fn normalise_for_dedupe(text: &str) -> String {
-    text.trim().to_lowercase()
 }
 
 fn lowercase_list(items: &[&str]) -> String {
@@ -179,9 +177,11 @@ mod tests {
             people: &["Andrei Tarkovsky", "Alexander Kaidanovsky"],
             synopsis: Some("A guide leads two men through the Zone."),
         };
+        // No title and no alternative titles — see `build`. What survives describes the
+        // work rather than naming it, which is the only thing an embedding is good at.
         assert_eq!(
             build(&doc),
-            "Stalker (1979), also known as Сталкер, science fiction drama film, \
+            "(1979) science fiction drama film, \
              featuring Andrei Tarkovsky and Alexander Kaidanovsky. \
              A guide leads two men through the Zone."
         );
@@ -204,36 +204,39 @@ mod tests {
             kind: "something_new",
             ..base.clone()
         };
-        assert!(build(&unknown).contains(", title"));
+        assert!(build(&unknown).contains("title"));
         assert!(!build(&unknown).contains("something_new"));
     }
 
     #[test]
-    fn a_duplicate_alternative_title_is_not_said_twice() {
-        // Extremely common: AniList's romaji and English forms are identical for a
-        // great many titles, and repeating a name skews its own embedding.
+    fn no_name_of_the_work_reaches_the_document() {
+        // Version 2's whole point. Titles are names, not descriptions, and while they
+        // were in the document a plot query returned films that merely shared a word
+        // with a title. The de-duplication this test used to check is gone with them.
         let doc = Document {
             title: "Akira",
-            alternative_titles: &["Akira", "AKIRA", " akira "],
+            alternative_titles: &["Akira", "AKIRA", "アキラ"],
             year: Some(1988),
             kind: "anime_film",
             ..Default::default()
         };
         let built = build(&doc);
-        assert_eq!(built.matches("Akira").count(), 1, "{built}");
-        assert!(!built.contains("also known as"));
+        assert!(!built.contains("Akira"), "{built}");
+        assert!(!built.contains("アキラ"), "{built}");
+        assert!(!built.contains("also known as"), "{built}");
+        assert_eq!(built, "(1988) anime film.");
     }
 
     #[test]
     fn a_missing_field_leaves_no_gap_in_the_sentence() {
-        // Every field except the title is optional in the catalogue, and an item with
-        // only a title must still produce something a model can read.
+        // Every field is optional in the catalogue, and an item with nothing but a kind
+        // must still produce something a model can read rather than an empty string.
         let bare = Document {
             title: "Untitled",
             kind: "film",
             ..Default::default()
         };
-        assert_eq!(build(&bare), "Untitled, film.");
+        assert_eq!(build(&bare), "film.");
 
         let no_year = Document {
             title: "Nosferatu",
@@ -241,7 +244,7 @@ mod tests {
             genres: &["Horror"],
             ..Default::default()
         };
-        assert_eq!(build(&no_year), "Nosferatu, horror film.");
+        assert_eq!(build(&no_year), "horror film.");
     }
 
     #[test]

@@ -44,19 +44,25 @@ pub fn cosine_i8(a: &[i8], b: &[i8]) -> f32 {
 /// The true `k` nearest items, by scanning the whole artefact.
 ///
 /// `ids[n]` is the catalogue id of artefact position `n`, exactly as
-/// [`crate::VectorIndex::build`] takes it. Distance is `1 - cosine`, matching usearch's
-/// `Cos` convention so the two are directly comparable.
+/// [`crate::VectorIndex::build`] takes it — **including the `None` holes**, which are
+/// positions the index deliberately does not hold. Passing a compacted list instead
+/// would silently shift every position onto the wrong vector, and the recall number
+/// would still look plausible.
+///
+/// Distance is `1 - cosine`, matching usearch's `Cos` convention so the two are directly
+/// comparable.
 ///
 /// Ties break on `media_item_id`, so a query with duplicate vectors — which a catalogue
 /// with two identical documents genuinely has — produces the same answer every run.
-pub fn nearest(artefact: &Artefact, ids: &[i64], query: &[i8], k: usize) -> Vec<Neighbour> {
+pub fn nearest(artefact: &Artefact, ids: &[Option<i64>], query: &[i8], k: usize) -> Vec<Neighbour> {
     let mut scored: Vec<Neighbour> = Vec::with_capacity(ids.len());
     for (position, id) in ids.iter().enumerate() {
+        let Some(id) = *id else { continue };
         let Some(vector) = artefact.vector(position as u64) else {
             break;
         };
         scored.push(Neighbour {
-            media_item_id: *id,
+            media_item_id: id,
             distance: 1.0 - cosine_i8(query, vector),
         });
     }
@@ -134,7 +140,7 @@ mod tests {
             vec![0, 100],  // id 33 — orthogonal
             vec![-100, 0], // id 44 — opposite
         ]);
-        let ids = vec![11, 22, 33, 44];
+        let ids = vec![Some(11), Some(22), Some(33), Some(44)];
 
         let hits = nearest(&artefact, &ids, &[100, 0], 4);
         assert_eq!(
@@ -148,11 +154,31 @@ mod tests {
     #[test]
     fn identical_vectors_are_ordered_by_id_so_a_rerun_agrees_with_itself() {
         let artefact = artefact_of(vec![vec![50, 50], vec![50, 50], vec![50, 50]]);
-        let hits = nearest(&artefact, &[70, 30, 50], &[50, 50], 3);
+        let hits = nearest(&artefact, &[Some(70), Some(30), Some(50)], &[50, 50], 3);
         assert_eq!(
             hits.iter().map(|h| h.media_item_id).collect::<Vec<_>>(),
             vec![30, 50, 70]
         );
+    }
+
+    #[test]
+    fn a_position_with_no_id_is_skipped_without_shifting_the_rest() {
+        // The index does not hold items with no descriptive text, so neither may the
+        // ground truth — and the holes must stay in place. If `None` shifted the
+        // positions instead of skipping them, every vector after the first hole would be
+        // attributed to the wrong film and recall would still look plausible.
+        let artefact = artefact_of(vec![
+            vec![100, 0], // position 0 — id 11
+            vec![90, 40], // position 1 — NOT indexed
+            vec![0, 100], // position 2 — id 33
+        ]);
+        let hits = nearest(&artefact, &[Some(11), None, Some(33)], &[0, 100], 3);
+        assert_eq!(hits.len(), 2, "the hole is skipped, not filled");
+        assert_eq!(
+            hits[0].media_item_id, 33,
+            "and position 2 is still position 2"
+        );
+        assert!(hits[0].distance < 1e-5, "{:?}", hits[0]);
     }
 
     #[test]

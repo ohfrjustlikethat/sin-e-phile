@@ -94,7 +94,8 @@ async fn produce(
     path: &Path,
 ) -> Result<embed::Produced, JobError> {
     let mut job = Job::begin(db, "embed").await.expect("begin");
-    let produced = embed::produce(&mut job, db, embedder, path, "2026-09-06", "test-source").await?;
+    let produced =
+        embed::produce(&mut job, db, embedder, path, "2026-09-06", "test-source").await?;
     job.finish().await.expect("finish");
     Ok(produced)
 }

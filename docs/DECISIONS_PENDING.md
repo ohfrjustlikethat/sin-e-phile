@@ -366,3 +366,81 @@ Option 1 is faster and I would take it if this were a deadline. It is not.
 **Option 2, scoped to the core tier**, measured before and after with `eval search
 --query` on E4's two queries, and P12 stays open until that measurement says whether
 option 1 is still needed.
+
+---
+
+## P13 — The embedding model cannot do what E3 and E4 ask of it
+
+**Raised:** 2026-09-07 (Phase 5, blocker B4, §10.9 escalation) · **Blocks:** E3, E4
+
+### The decision
+
+Whether to swap `all-MiniLM-L6-v2` for a retrieval-trained model, accept E3/E4 as not
+met, or add a re-ranking stage.
+
+### What was tried, and what each cost
+
+Three genuinely distinct approaches, each measured (`docs/eval-results.md`):
+
+1. **Enrich the documents.** 233,114 Wikipedia synopses where there were **zero**.
+2. **Index only items with descriptive text.** 855,703 → 189,470; index 435 MB → 96 MB.
+3. **Remove the title from the document** (`VERSION` 2 — the spec never listed it), plus
+   a 300-character minimum to drop trivia-length hubs. → 119,874.
+
+Each helped. The result that ends the sequence:
+
+| item | cosine to a plot query | synopsis |
+|---|---|---|
+| **Manchester by the Sea** — synopsis contains the query almost verbatim | **0.1944** | 1,847 chars |
+| **Fish Hooky** — "the 120th Our Gang short to be released" | **0.4194** | 126 chars |
+
+Giving Manchester its *whole* synopsis reaches 0.2689 — still far behind trivia.
+
+**This is hubness.** Short generic documents sit near the centre of the embedding space
+and are close to everything. It cannot be fixed with more text, because those documents
+have no more text.
+
+**The diagnosis:** `all-MiniLM-L6-v2` is a **symmetric similarity** model — trained to
+say whether two sentences mean the same thing. E3 and E4 need **asymmetric retrieval** —
+a short query against a long document. They are different tasks.
+
+### The options
+
+1. **Swap to `bge-small-en-v1.5`.** Trained for retrieval, MIT licensed, **384
+   dimensions** — so the artefact format, the index, the quantiser and the whole
+   pipeline are unchanged. ~33 M parameters, comparable download to what ships now.
+   **Cost:** an ADR (the model is checksum-pinned), a re-embed (75 min), an index
+   rebuild (28 s). It requires query/passage **prefixes** — `"Represent this sentence
+   for searching relevant passages: "` on the query side — which are not optional and
+   are most of where the benefit comes from. **Risk, stated honestly: I cannot promise
+   it fixes E4.** It is the established fix for this exact failure, not a guarantee.
+
+2. **`e5-small-v2`.** Same size and dimension, same prefix requirement (`query:` /
+   `passage:`), MIT. Equivalent choice; `bge` benchmarks slightly better on retrieval.
+
+3. **Add a re-ranker.** A cross-encoder over the top 50 candidates would fix ordering
+   properly and is what production systems do. **Cost:** a second model, and it runs
+   *per query* rather than once — straight into E1's 80 ms Tier 0 budget. Wrong shape
+   for this project.
+
+4. **Accept it.** Semantic search understands era, genre, nationality and creator — "like
+   Wong Kar-wai but Korean" now returns *My Mister* — but not plot. Record E3 and E4 as
+   not met. **Cost:** the two criteria fail in the phase that is the project's
+   centrepiece, and §10.11 forbids redefining them.
+
+### Recommendation
+
+**Option 1.** It is one pinned constant, one prefix, and 75 minutes of compute, against
+two exit criteria in the phase this project is built around. Nothing else in the
+pipeline changes, and if it disappoints, option 4 is still there — measured rather than
+assumed, which is the whole point.
+
+### The default if you say "your call"
+
+**Option 1**, with the three queries in `docs/eval-results.md` re-run before and after,
+and E3/E4 still not claimed unless the numbers earn it.
+
+### What is unaffected
+
+E1 (p95 22.2 ms), E2 (43/43 = 100%) and recall@10 (0.9810) are all healthy. This blocks
+E3 and E4 and nothing else.

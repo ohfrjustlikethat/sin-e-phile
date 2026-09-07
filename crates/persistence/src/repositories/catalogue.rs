@@ -109,6 +109,27 @@ impl Readiness {
 /// different film for every position after the drift.
 pub const CORE_TIER: &str = "in_core = 1 AND kind <> 'episode'";
 
+/// How much descriptive text an item needs before it belongs in the vector index.
+///
+/// # Measured, and it is not about truncation
+///
+/// *Fish Hooky*'s entire synopsis is "…a 1933 Our Gang short comedy film directed by
+/// Robert F. McGowan. It was the 120th Our Gang short to be released" — 126 characters
+/// of production trivia. Against the query "a grieving janitor becomes guardian of his
+/// teenage nephew in a Massachusetts fishing town" it scores **0.4194**, while
+/// *Manchester by the Sea*, whose synopsis describes that exact plot, scores **0.1944**
+/// and only reaches 0.2689 given its whole text.
+///
+/// Short generic documents sit near the middle of the embedding space and are therefore
+/// close to everything — the hubness problem. Feeding them more text does not help,
+/// because they have no more text; the fix is to keep them out of the index, where the
+/// exact-title and BM25 tiers already cover them properly.
+///
+/// 300 characters keeps 119,874 of 189,470 items. It is a threshold and it is arbitrary
+/// in the way thresholds are, but it is chosen from the distribution rather than from
+/// taste, and `eval search --query` is how a different value would be argued for.
+pub const MIN_SYNOPSIS: usize = 300;
+
 pub struct CatalogueRepository<'a> {
     db: &'a Db,
 }
@@ -133,6 +154,41 @@ impl<'a> CatalogueRepository<'a> {
         ))
         .fetch_all(self.db.pool())
         .await?)
+    }
+
+    /// Core ids in artefact order, `None` where the item has no descriptive text.
+    ///
+    /// # Why an item without a synopsis must not be in the vector index
+    ///
+    /// Measured 2026-09-07, and it is the opposite of what I expected. After loading
+    /// 233,114 Wikipedia extracts, "films about grief that aren't depressing" STILL
+    /// returned ten obscure films titled *Grief* — every one of them with no synopsis.
+    ///
+    /// A document that is only `Grief (1921), drama short film` is almost entirely the
+    /// word "grief", so its vector sits nearly on top of any query containing that word.
+    /// *Manchester by the Sea*, with four hundred characters describing a man returning
+    /// home after a death, spreads its vector across many concepts and scores lower.
+    /// **Sparse documents are louder than rich ones**, and they drown out exactly the
+    /// items the enrichment was for.
+    ///
+    /// So the vector half indexes only what has something to say. Nothing is lost: an
+    /// item with no description is still found by exact title and by BM25, which handle
+    /// titles better and more predictably than an embedding ever will.
+    pub async fn core_ids_for_vectors(&self) -> Result<Vec<Option<i64>>, DbError> {
+        let rows: Vec<(i64, i64)> = sqlx::query_as(&format!(
+            "SELECT id,
+                    CASE WHEN synopsis IS NOT NULL
+                          AND length(trim(synopsis)) >= {MIN_SYNOPSIS}
+                         THEN 1 ELSE 0 END
+               FROM media_items WHERE {CORE_TIER} ORDER BY id"
+        ))
+        .fetch_all(self.db.pool())
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|(id, has_text)| (has_text == 1).then_some(id))
+            .collect())
     }
 
     /// Titles a search could return. Episodes are excluded: they are not what a first
