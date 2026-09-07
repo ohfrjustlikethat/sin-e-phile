@@ -1575,3 +1575,48 @@ and are the same 384 dimensions, so the artefact format would not change.
 
 E3 and E4 remain **not met**, and are not claimed on the strength of a plan. Raised as
 blocker **B4** under §10.9: three distinct approaches, each measured, none sufficient.
+
+### Query understanding (subtask 5.5): filters, and two failures found by typing
+
+`crates/search-engine/src/query.rs` extracts year ranges, runtime bounds and "directed
+by" as **constraints**, leaving the rest as the text that gets embedded. Measured against
+the real catalogue, 2026-09-07.
+
+| query | result |
+|---|---|
+| `directed by Akira Kurosawa` | Seven Samurai · Rashomon · Ran · Yojimbo · Ikiru |
+| `films directed by Alfred Hitchcock from the 1950s` | Rear Window · Vertigo · North by Northwest · Dial M for Murder · Strangers on a Train |
+| `comedies under 90 minutes from the 1980s` | filtered from four fuzzy hits to the one 1984 title |
+
+**Three of the four filters the spec names are implementable. Language is not** —
+`media_items.original_language` is NULL on all 2,702,737 rows, because the IMDb datasets
+do not publish it. A language filter today would be one that silently matches nothing.
+
+#### Two failures that only appeared by running it
+
+**1. A filter with a hole in it.** The first version filtered the fused tier and not the
+fuzzy tier, so "comedies under 90 minutes" cheerfully returned three-hour films the
+moment fuzzy ran. A filter the user believes and that does not hold is worse than none.
+
+**2. A purely structural query returned nothing at all.** "directed by Akira Kurosawa"
+leaves no text after extraction, and `admitted` can only *narrow* candidates some text
+tier produced. Filters now **retrieve** as well as narrow.
+
+#### And a 63x latency bug, in my own SQL
+
+`EXISTS (… JOIN people … WHERE p.name LIKE '%kurosawa%')` against `media_items` runs
+per row, so SQLite considered 2.7 million of them:
+
+| | |
+|---|---|
+| first version | **11,932 ms** |
+| resolve the person first, then `person_id IN (…)` | 1,800 ms |
+| **drive the query from `credits` rather than `media_items`** | **190 ms** |
+
+The indexes (`idx_people_name`, `idx_credits_person`) existed the whole time; the query
+shape defeated them. Starting from the thirty rows a director actually has, instead of
+filtering 2.7 million down to them, is the whole difference.
+
+**Still over budget and recorded as such**: 190 ms for a director query, 356 ms when a
+year filter joins it, against E1's 80 ms. E1's fixture is exact titles so this does not
+appear in that number — which is exactly why it is written down here.

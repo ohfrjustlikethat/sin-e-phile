@@ -27,6 +27,8 @@
 //! which `SPEC.md` §8 and ADR-0014 both require to be *diminished but genuinely useful*,
 //! never broken or empty. That path is the floor, and it is the same code path.
 
+pub mod query;
+
 use sinephile_persistence::repositories::{Hit, MatchReason, SearchRepository};
 use sinephile_persistence::{Db, DbError};
 use sinephile_vector_index::VectorIndex;
@@ -107,7 +109,16 @@ impl Engine {
     ) -> Result<Vec<Hit>, SearchError> {
         let search = SearchRepository::new(db);
 
+        // Filters out first: a decade or a runtime bound is a CONSTRAINT, not something
+        // to embed. What is left is the part that carries meaning (`query::parse`).
+        let parsed = query::parse(query);
+        let text = parsed.text.as_str();
+
         // TIER 1. Never displaced, never ranked.
+        //
+        // The ORIGINAL query, not the residual: "blade runner 2049" must reach the
+        // exact-title tier whole, and a filter that stripped a year from a title would
+        // be the one failure E2 is not allowed to have.
         let mut results = search.exact_title(query, limit).await?;
         let mut seen: Vec<i64> = results.iter().map(|h| h.media_item_id).collect();
         if results.len() as i64 >= limit {
@@ -115,12 +126,38 @@ impl Engine {
             return Ok(results);
         }
 
+        let (under, over) = match parsed.runtime {
+            Some(query::Runtime::Under(m)) => (Some(m), None),
+            Some(query::Runtime::Over(m)) => (None, Some(m)),
+            None => (None, None),
+        };
+
+        // A QUERY THAT IS NOTHING BUT FILTERS is answered from the filters. "directed by
+        // Akira Kurosawa" leaves no text, and searching for an empty string returns
+        // nothing — which is what it did until someone typed it.
+        if text.is_empty() {
+            for hit in search
+                .by_filters(parsed.years, under, over, parsed.director.as_deref(), limit)
+                .await?
+            {
+                if seen.contains(&hit.media_item_id) {
+                    continue;
+                }
+                seen.push(hit.media_item_id);
+                results.push(hit);
+                if results.len() as i64 >= limit {
+                    break;
+                }
+            }
+            return Ok(results);
+        }
+
         // TIER 2. Both halves, as deep as CANDIDATES, then fused by position.
-        let keyword = search.keyword(query, CANDIDATES).await?;
+        let keyword = search.keyword(text, CANDIDATES).await?;
         let semantic = match self.semantic.as_mut() {
             Some(semantic) => {
                 // embed_QUERY: this is the side that carries the instruction prefix.
-                let vector = semantic.embedder.embed_query(query)?;
+                let vector = semantic.embedder.embed_query(text)?;
                 // Quantised to match the artefact's own representation. Cosine ignores
                 // the per-vector scale the quantiser applies, so this is exact rather
                 // than approximate — see `crates/vector-index`.
@@ -141,7 +178,31 @@ impl Engine {
             None => Vec::new(),
         };
 
-        for hit in fuse(&keyword, &semantic, RRF_K) {
+        let mut fused = fuse(&keyword, &semantic, RRF_K);
+
+        // Applied AFTER fusion and BEFORE the page is filled, so the filter removes
+        // candidates rather than results: dropping them afterwards would leave a short
+        // page where a full one was available.
+        //
+        // EVERY tier that can put something on the page goes through this, fuzzy
+        // included. The first version filtered only the fused tier, so "comedies under
+        // 90 minutes" happily returned three-hour films the moment the fuzzy tier ran —
+        // a filter with a hole in it is worse than none, because the user believes it.
+        if parsed.has_filters() {
+            let candidates: Vec<i64> = fused.iter().map(|h| h.media_item_id).collect();
+            let admitted = search
+                .admitted(
+                    &candidates,
+                    parsed.years,
+                    under,
+                    over,
+                    parsed.director.as_deref(),
+                )
+                .await?;
+            fused.retain(|h| admitted.contains(&h.media_item_id));
+        }
+
+        for hit in fused {
             if seen.contains(&hit.media_item_id) {
                 continue;
             }
@@ -152,9 +213,49 @@ impl Engine {
             }
         }
 
+        // TOP UP FROM THE FILTERS, when they are present and the page is not full.
+        //
+        // `admitted` can only narrow what the retrieval tiers already found, and they
+        // find by TEXT. "films directed by Alfred Hitchcock from the 1950s" leaves the
+        // residual "films" — so generic that Hitchcock's fifties never appear among the
+        // fifty candidates, and the filter had nothing correct to keep. The page was
+        // empty, which is the worst possible answer to a query whose answer is famous.
+        //
+        // So the filter also RETRIEVES. Text-ranked matches keep their places at the top;
+        // these fill what is left, by votes.
+        if parsed.has_filters() && (results.len() as i64) < limit {
+            for hit in search
+                .by_filters(parsed.years, under, over, parsed.director.as_deref(), limit)
+                .await?
+            {
+                if seen.contains(&hit.media_item_id) {
+                    continue;
+                }
+                seen.push(hit.media_item_id);
+                results.push(hit);
+                if results.len() as i64 >= limit {
+                    return Ok(results);
+                }
+            }
+        }
+
         // TIER 3. Only when there is almost nothing, because it is expensive.
         if results.len() < FUZZY_THRESHOLD {
-            for hit in search.fuzzy(query, limit).await? {
+            let mut fuzzy = search.fuzzy(text, limit).await?;
+            if parsed.has_filters() {
+                let candidates: Vec<i64> = fuzzy.iter().map(|h| h.media_item_id).collect();
+                let admitted = search
+                    .admitted(
+                        &candidates,
+                        parsed.years,
+                        under,
+                        over,
+                        parsed.director.as_deref(),
+                    )
+                    .await?;
+                fuzzy.retain(|h| admitted.contains(&h.media_item_id));
+            }
+            for hit in fuzzy {
                 if seen.contains(&hit.media_item_id) {
                     continue;
                 }

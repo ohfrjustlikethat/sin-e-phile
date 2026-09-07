@@ -500,6 +500,76 @@ async fn db_surface() {
         "an empty id list must not build a query with no placeholders"
     );
 
+    // admitted — structured filters over a candidate set (subtask 5.5).
+    // The probe is "Probe Title" (1970), no runtime, no director.
+    assert_eq!(
+        search
+            .admitted(&[probe], Some((1960, 1979)), None, None, None)
+            .await
+            .expect("admitted: year in range"),
+        vec![probe]
+    );
+    assert!(search
+        .admitted(&[probe], Some((1980, 1989)), None, None, None)
+        .await
+        .expect("admitted: year out of range")
+        .is_empty());
+    // A NULL runtime cannot satisfy a runtime bound. It must be excluded deliberately
+    // rather than by SQL's three-valued logic doing it for the wrong reason.
+    assert!(
+        search
+            .admitted(&[probe], None, Some(200), None, None)
+            .await
+            .expect("admitted: null runtime")
+            .is_empty(),
+        "an item with no runtime cannot satisfy a runtime filter"
+    );
+    // No director credited, so a director filter admits nothing.
+    assert!(search
+        .admitted(&[probe], None, None, None, Some("Kurosawa"))
+        .await
+        .expect("admitted: director")
+        .is_empty());
+    // No filters at all is a pass-through, not an empty set.
+    assert_eq!(
+        search
+            .admitted(&[probe], None, None, None, None)
+            .await
+            .expect("admitted: no filters"),
+        vec![probe]
+    );
+    assert!(
+        search
+            .admitted(&[], Some((1900, 2000)), None, None, None)
+            .await
+            .expect("admitted: no candidates")
+            .is_empty(),
+        "an empty candidate list must not build a query with no placeholders"
+    );
+
+    // by_filters — retrieval BY a filter, for a query that is nothing but filters
+    let found = search
+        .by_filters(Some((1960, 1979)), None, None, None, 5)
+        .await
+        .expect("by_filters: year");
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].media_item_id, probe);
+    assert!(search
+        .by_filters(Some((1980, 1989)), None, None, None, 5)
+        .await
+        .expect("by_filters: year miss")
+        .is_empty());
+    // No constraints at all would be "every title, most popular first" — a browse
+    // surface, not a search result.
+    assert!(
+        search
+            .by_filters(None, None, None, None, 5)
+            .await
+            .expect("by_filters: unconstrained")
+            .is_empty(),
+        "an unconstrained filter query must return nothing, not everything"
+    );
+
     // ── CatalogueRepository ───────────────────────────────────────────────────
     let catalogue = CatalogueRepository::new(&db);
 

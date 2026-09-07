@@ -268,6 +268,238 @@ impl<'a> SearchRepository<'a> {
             .collect())
     }
 
+    /// Narrow a set of candidate ids to those a structured filter admits.
+    ///
+    /// # Why this is a filter over candidates rather than a WHERE clause in each tier
+    ///
+    /// The three retrieval tiers are very different queries — an FTS5 MATCH, a trigram
+    /// scan, and an HNSW graph that is not SQL at all. Threading `release_year BETWEEN
+    /// ? AND ?` through each of them would mean writing the filter three times and
+    /// keeping the three in step forever, and the vector half could not honour it at
+    /// all without a second index.
+    ///
+    /// So the filter is applied once, to the ids the tiers returned. **Candidates are
+    /// fetched deep** (50 per tier) precisely so this can remove most of them and still
+    /// fill a page. That is a real limit and worth stating: a filter matching nothing in
+    /// the top 50 returns nothing, even if the catalogue holds a match at rank 500.
+    /// Subtask 5.6's fixture is where that becomes a measurable trade rather than a
+    /// guess.
+    pub async fn admitted(
+        &self,
+        ids: &[i64],
+        years: Option<(i64, i64)>,
+        runtime_under: Option<i64>,
+        runtime_over: Option<i64>,
+        director: Option<&str>,
+    ) -> Result<Vec<i64>, DbError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let placeholders = std::iter::repeat_n("?", ids.len())
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let mut sql = format!("SELECT m.id FROM media_items m WHERE m.id IN ({placeholders})");
+        if years.is_some() {
+            // NOT NULL is explicit: an item with no year cannot satisfy a year filter,
+            // and SQL's three-valued logic would otherwise drop it silently for the
+            // wrong reason.
+            sql.push_str(" AND m.release_year IS NOT NULL AND m.release_year BETWEEN ? AND ?");
+        }
+        if runtime_under.is_some() {
+            sql.push_str(" AND m.runtime_minutes IS NOT NULL AND m.runtime_minutes <= ?");
+        }
+        if runtime_over.is_some() {
+            sql.push_str(" AND m.runtime_minutes IS NOT NULL AND m.runtime_minutes >= ?");
+        }
+        let people = match director {
+            Some(name) => {
+                let ids = self.director_ids(name).await?;
+                if ids.is_empty() {
+                    return Ok(Vec::new());
+                }
+                Some(ids)
+            }
+            None => None,
+        };
+        if let Some(people) = &people {
+            let list = std::iter::repeat_n("?", people.len())
+                .collect::<Vec<_>>()
+                .join(", ");
+            sql.push_str(&format!(
+                " AND EXISTS (SELECT 1 FROM credits c
+                               WHERE c.media_item_id = m.id
+                                 AND c.role = 'director'
+                                 AND c.person_id IN ({list}))"
+            ));
+        }
+
+        let mut query = sqlx::query_scalar(&sql);
+        for id in ids {
+            query = query.bind(id);
+        }
+        if let Some((from, to)) = years {
+            query = query.bind(from).bind(to);
+        }
+        if let Some(minutes) = runtime_under {
+            query = query.bind(minutes);
+        }
+        if let Some(minutes) = runtime_over {
+            query = query.bind(minutes);
+        }
+        if let Some(people) = &people {
+            for id in people {
+                query = query.bind(id);
+            }
+        }
+
+        Ok(query.fetch_all(self.db.pool()).await?)
+    }
+
+    /// The people a director filter names.
+    ///
+    /// # Why this is two queries and not a subquery
+    ///
+    /// The first version put `p.name LIKE '%kurosawa%'` in an EXISTS clause against
+    /// `media_items`, so SQLite ran it per row: **11,932 ms** for "directed by Akira
+    /// Kurosawa", against E1's 80 ms budget. The indexes were there; the query defeated
+    /// them.
+    ///
+    /// A leading `%` cannot use `idx_people_name`, so the prefix form is tried first —
+    /// "directed by Akira Kurosawa" gives the name in natural order and hits the index
+    /// directly. Substring is the fallback, for "directed by Kurosawa", and it scans
+    /// `people` **once** instead of once per catalogue row.
+    ///
+    /// Capped: a filter naming twenty different people is not a filter.
+    async fn director_ids(&self, name: &str) -> Result<Vec<i64>, DbError> {
+        let prefix: Vec<i64> =
+            sqlx::query_scalar("SELECT id FROM people WHERE name LIKE ? LIMIT 20")
+                .bind(format!("{name}%"))
+                .fetch_all(self.db.pool())
+                .await?;
+        if !prefix.is_empty() {
+            return Ok(prefix);
+        }
+        Ok(
+            sqlx::query_scalar("SELECT id FROM people WHERE name LIKE ? LIMIT 20")
+                .bind(format!("%{name}%"))
+                .fetch_all(self.db.pool())
+                .await?,
+        )
+    }
+
+    /// Retrieve BY the filters, when there is no text left to retrieve with.
+    ///
+    /// # The gap this closes
+    ///
+    /// "directed by Akira Kurosawa" is a complete, natural query, and stripping its
+    /// filter leaves nothing to search for. [`SearchRepository::admitted`] can only
+    /// narrow candidates some other tier produced, so a purely structural query returned
+    /// **nothing at all** — found by typing it, not by reasoning about it.
+    ///
+    /// Ordered by votes because a filter expresses no preference between the things it
+    /// admits, and "most people have seen this" is the least surprising default. That is
+    /// the same rule the exact-title tier already uses when several works share a name.
+    pub async fn by_filters(
+        &self,
+        years: Option<(i64, i64)>,
+        runtime_under: Option<i64>,
+        runtime_over: Option<i64>,
+        director: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Hit>, DbError> {
+        // A query with no constraints at all would be "every title, most popular first",
+        // which is a browse surface (Phase 18), not a search result.
+        if years.is_none()
+            && runtime_under.is_none()
+            && runtime_over.is_none()
+            && director.is_none()
+        {
+            return Ok(Vec::new());
+        }
+
+        // DRIVEN FROM `credits` WHEN A DIRECTOR IS NAMED, and from `media_items`
+        // otherwise. The difference is not cosmetic: scanning media_items and testing
+        // each row against the director took 1,800 ms, because 2.7 million rows have to
+        // be considered before the top ten by votes are known. Starting from
+        // `idx_credits_person` yields the thirty films that person directed, and the
+        // sort is over thirty rows.
+        let people = match director {
+            Some(name) => {
+                let ids = self.director_ids(name).await?;
+                // A named director nobody matches admits nothing. Returning everything
+                // that satisfied the OTHER filters would answer a different question
+                // than the one asked.
+                if ids.is_empty() {
+                    return Ok(Vec::new());
+                }
+                Some(ids)
+            }
+            None => None,
+        };
+
+        let mut sql = match &people {
+            Some(ids) => {
+                let placeholders = std::iter::repeat_n("?", ids.len())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!(
+                    "SELECT m.id, m.primary_title, m.release_year, m.kind
+                       FROM credits c
+                       JOIN media_items m ON m.id = c.media_item_id
+                      WHERE c.role = 'director'
+                        AND c.person_id IN ({placeholders})
+                        AND m.kind <> 'episode'"
+                )
+            }
+            None => String::from(
+                "SELECT m.id, m.primary_title, m.release_year, m.kind
+                   FROM media_items m
+                  WHERE m.kind <> 'episode'",
+            ),
+        };
+        if years.is_some() {
+            sql.push_str(" AND m.release_year IS NOT NULL AND m.release_year BETWEEN ? AND ?");
+        }
+        if runtime_under.is_some() {
+            sql.push_str(" AND m.runtime_minutes IS NOT NULL AND m.runtime_minutes <= ?");
+        }
+        if runtime_over.is_some() {
+            sql.push_str(" AND m.runtime_minutes IS NOT NULL AND m.runtime_minutes >= ?");
+        }
+        sql.push_str(" ORDER BY m.rating_votes DESC NULLS LAST LIMIT ?");
+
+        let mut query = sqlx::query_as(&sql);
+        if let Some(ids) = &people {
+            for id in ids {
+                query = query.bind(id);
+            }
+        }
+        if let Some((from, to)) = years {
+            query = query.bind(from).bind(to);
+        }
+        if let Some(minutes) = runtime_under {
+            query = query.bind(minutes);
+        }
+        if let Some(minutes) = runtime_over {
+            query = query.bind(minutes);
+        }
+        let rows: Vec<(i64, String, Option<i64>, String)> =
+            query.bind(limit).fetch_all(self.db.pool()).await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|(media_item_id, title, year, kind)| Hit {
+                media_item_id,
+                title,
+                year,
+                kind,
+                score: None,
+                why: MatchReason::Keyword,
+            })
+            .collect())
+    }
+
     /// Title, year and kind for ids that arrived without them.
     ///
     /// The vector half returns catalogue ids and nothing else — the index holds no text
