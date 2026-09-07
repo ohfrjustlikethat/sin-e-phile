@@ -72,10 +72,18 @@ pub async fn map(
     let repo = WikipediaRepository::new(db);
     let mut loaded = Loaded::default();
 
-    // Depth-first over prefixes, so progress is monotonic and a resume can restart the
-    // current chunk without redoing finished ones — `map` is idempotent per id, so a
-    // repeated chunk costs a query and writes nothing new.
-    let mut queue: Vec<String> = (0..10).map(|d| format!("tt{d}")).rev().collect();
+    // STARTING TWO DIGITS DEEP, NOT ONE, because the top level cannot answer.
+    //
+    // Measured: the whole join is 509,464 rows in 58.9 s against a 60 s timeout, and
+    // `tt004` is 7,513 rows in 11.6 s. A one-digit prefix like `tt0` spans decades of
+    // cinema and times out — and a timeout is expensive twice over, because the client
+    // retries it before this loop ever gets to subdivide. Two digits is ~50,000 rows,
+    // comfortably inside the limit, and 100 chunks at roughly 25 s each is under an
+    // hour. Deeper still would be safe and needlessly slow.
+    //
+    // Anything that does time out subdivides anyway, so this is a starting guess the
+    // data is allowed to correct — not a constant the run depends on being right.
+    let mut queue: Vec<String> = (0..100).map(|d| format!("tt{d:02}")).rev().collect();
 
     while let Some(prefix) = queue.pop() {
         loaded.queried += 1;

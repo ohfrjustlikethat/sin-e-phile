@@ -1437,3 +1437,27 @@ built in.
 
 **E3 (nDCG@10 > 0.75) and E4 cannot be met against this artefact**, and no value of `k`
 or `ef` changes that. Raised as decision **P12** rather than worked around.
+
+### IMDb serves conditional requests — measured, and it decides the refresh design
+
+2026-09-07, resolving the open question in debt D24 and setting the shape of subtask 5.7.
+
+```
+HEAD https://datasets.imdbws.com/title.basics.tsv.gz
+  Content-Length: 226419080
+  Last-Modified:  Sun, 06 Sep 2026 00:48:16 GMT
+  ETag:           "c5a942c76317cde815f77fcf113ed80a-27"
+
+GET  with If-None-Match: "c5a942c76317cde815f77fcf113ed80a-27"
+  -> HTTP 304, 0 bytes downloaded
+```
+
+**Why it matters.** The author asked for the catalogue to refresh every time the app is
+opened. Taken literally that is a 216 MB download per launch (D24), which is not
+shippable. With a conditional request it is one round trip returning **zero bytes**
+whenever IMDb has not republished — and IMDb republishes daily, so at most one real
+refresh a day and nothing on every other launch.
+
+The `http_cache` table from migration 0008 already stores ETag and Last-Modified, and
+`crates/metadata-api` already handles revalidation, so the pieces exist. D24 guessed this
+would work; it now has a number.
