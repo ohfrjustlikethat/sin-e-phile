@@ -21,7 +21,18 @@ pub mod quantise;
 /// It lives here rather than with the producer because **both sides need it**: the
 /// producer stamps it into the artefact, and the application checks a downloaded
 /// artefact against it before trusting a single vector.
-pub const MODEL: &str = "all-MiniLM-L6-v2-int8";
+pub const MODEL: &str = "bge-small-en-v1.5-int8";
+
+/// What a QUERY is prefixed with before it is embedded, and documents are not.
+///
+/// BGE is trained asymmetrically: the query side is instructed, the passage side is
+/// bare. **This is not decoration and it is not optional** — omitting it costs most of
+/// the model's retrieval advantage, and costs it silently, because the vectors are still
+/// perfectly valid and merely worse. It is the reason the model was swapped
+/// (ADR-0034), so leaving it out would be swapping the model and discarding the point.
+///
+/// Empty for a symmetric model: `all-MiniLM-L6-v2` used no prefix at all.
+pub const QUERY_PREFIX: &str = "Represent this sentence for searching relevant passages: ";
 
 /// Where the artefact lives inside the data directory.
 ///

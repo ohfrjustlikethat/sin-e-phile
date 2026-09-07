@@ -119,7 +119,8 @@ impl Engine {
         let keyword = search.keyword(query, CANDIDATES).await?;
         let semantic = match self.semantic.as_mut() {
             Some(semantic) => {
-                let vector = semantic.embedder.embed(query)?;
+                // embed_QUERY: this is the side that carries the instruction prefix.
+                let vector = semantic.embedder.embed_query(query)?;
                 // Quantised to match the artefact's own representation. Cosine ignores
                 // the per-vector scale the quantiser applies, so this is exact rather
                 // than approximate — see `crates/vector-index`.

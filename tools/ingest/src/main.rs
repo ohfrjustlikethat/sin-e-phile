@@ -46,7 +46,7 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            highest id already held, and re-apply every rating.
                            Weekly is ample.
   ingest embed             produce the embedding artefact (ADR-0014) over the
-                           core tier. Needs models/all-MiniLM-L6-v2-int8.onnx and
+                           core tier. Needs models/bge-small-en-v1.5-int8.onnx and
                            its tokenizer; both are checksum-pinned. Resumable.
   ingest search-index      build the FTS5 index (Phase 5). --trigram also builds
                            the typo-tolerance index, --trigram-core restricts it
@@ -765,8 +765,8 @@ async fn embed_artefact(db: &Db, dir: &Path) -> Result<(), JobError> {
     use std::time::Instant;
 
     let models = Path::new("models");
-    let model = models.join("all-MiniLM-L6-v2-int8.onnx");
-    let tokenizer = models.join("all-MiniLM-L6-v2-tokenizer.json");
+    let model = models.join("bge-small-en-v1.5-int8.onnx");
+    let tokenizer = models.join("bge-small-en-v1.5-tokenizer.json");
     for (path, expected) in [
         (&model, embed::MODEL_SHA256),
         (&tokenizer, embed::TOKENIZER_SHA256),
@@ -806,7 +806,7 @@ async fn embed_artefact(db: &Db, dir: &Path) -> Result<(), JobError> {
     };
 
     tracing::info!("embedding {count} core-tier titles, snapshot {snapshot}");
-    let mut embedder = embed::OnnxEmbedder::load(&model, &tokenizer, embed::MODEL_IDENTITY)
+    let mut embedder = embed::OnnxEmbedder::pinned(&model, &tokenizer)
         .map_err(|e| JobError::step("embed", e.to_string()))?;
 
     let artefact_path = sinephile_embedding::artefact_path(dir);

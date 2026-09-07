@@ -25,17 +25,16 @@ use crate::error::EvalError;
 /// which one it got.
 fn engine(data_dir: &Path) -> Result<(Engine, bool), EvalError> {
     let models = Path::new("models");
-    let model = models.join("all-MiniLM-L6-v2-int8.onnx");
-    let tokenizer = models.join("all-MiniLM-L6-v2-tokenizer.json");
+    let model = models.join("bge-small-en-v1.5-int8.onnx");
+    let tokenizer = models.join("bge-small-en-v1.5-tokenizer.json");
     let index = index_path(data_dir);
 
     if !model.is_file() || !tokenizer.is_file() || !index.exists() {
         return Ok((Engine::keyword_only(), false));
     }
 
-    let embedder =
-        sinephile_embedder::Embedder::load(&model, &tokenizer, sinephile_embedding::MODEL)
-            .map_err(|e| EvalError::Missing(e.to_string()))?;
+    let embedder = sinephile_embedder::Embedder::pinned(&model, &tokenizer)
+        .map_err(|e| EvalError::Missing(e.to_string()))?;
     let index = VectorIndex::view(&index)?;
     Ok((Engine::hybrid(Semantic { index, embedder }), true))
 }

@@ -43,8 +43,25 @@ use ort::value::TensorRef;
 /// bump.
 const MAX_TOKENS: usize = 256;
 
-/// MiniLM's output width. Asserted against the artefact header rather than assumed.
+/// The output width. Asserted against the artefact header rather than assumed.
+///
+/// `all-MiniLM-L6-v2` and `bge-small-en-v1.5` are both 384, which is why ADR-0034's
+/// model swap left the artefact format, the quantiser and the index untouched.
 pub const DIMENSION: u16 = 384;
+
+/// How a sequence of token vectors becomes one vector — and **models disagree**.
+///
+/// BGE is trained with the `[CLS]` token as the sentence representation; MiniLM is
+/// trained with mean pooling. Using the wrong one does not fail, it just produces a
+/// worse embedding — the most expensive kind of mistake here, because the vectors stay
+/// valid, the search gets quietly poorer, and there is nothing to point at.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Pooling {
+    /// The first token. Correct for BGE.
+    Cls,
+    /// The average over non-padding tokens. Correct for MiniLM and E5.
+    Mean,
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum EmbedError {
@@ -64,6 +81,8 @@ pub struct Embedder {
     tokenizer: tokenizers::Tokenizer,
     identity: String,
     dimension: u16,
+    pooling: Pooling,
+    query_prefix: String,
 }
 
 impl Embedder {
@@ -73,7 +92,28 @@ impl Embedder {
     /// must name the model **and its quantisation**: `all-MiniLM-L6-v2-int8` and
     /// `all-MiniLM-L6-v2-fp32` produce different vectors and must never be
     /// interchangeable.
-    pub fn load(model: &Path, tokenizer: &Path, identity: &str) -> Result<Self, EmbedError> {
+    /// Load the model this build is pinned to, with its pooling and its query prefix.
+    ///
+    /// Every call site should use this rather than [`Embedder::load`]: the three
+    /// settings belong together, and a caller choosing them individually is a caller
+    /// that can get one wrong.
+    pub fn pinned(model: &Path, tokenizer: &Path) -> Result<Self, EmbedError> {
+        Self::load(
+            model,
+            tokenizer,
+            sinephile_embedding::MODEL,
+            Pooling::Cls,
+            sinephile_embedding::QUERY_PREFIX,
+        )
+    }
+
+    pub fn load(
+        model: &Path,
+        tokenizer: &Path,
+        identity: &str,
+        pooling: Pooling,
+        query_prefix: &str,
+    ) -> Result<Self, EmbedError> {
         let fail = |path: &Path, e: &dyn std::fmt::Display| EmbedError::Load {
             path: path.display().to_string(),
             message: e.to_string(),
@@ -104,6 +144,8 @@ impl Embedder {
             tokenizer: tok,
             identity: identity.to_string(),
             dimension: DIMENSION,
+            pooling,
+            query_prefix: query_prefix.to_string(),
         })
     }
 
@@ -115,7 +157,22 @@ impl Embedder {
         self.dimension
     }
 
-    /// One forward pass: tokenize, run, mean-pool over real tokens, L2-normalise.
+    /// Embed a **query** — the thing a person typed.
+    ///
+    /// Applies [`sinephile_embedding::QUERY_PREFIX`]. Documents must NOT get it: the
+    /// asymmetry is the model's training, and prefixing both sides throws it away as
+    /// surely as prefixing neither.
+    pub fn embed_query(&mut self, text: &str) -> Result<Vec<f32>, EmbedError> {
+        let prefixed = format!("{}{text}", self.query_prefix);
+        self.embed(&prefixed)
+    }
+
+    /// Embed a **document** — a catalogue item's sentence. No prefix.
+    pub fn embed_document(&mut self, text: &str) -> Result<Vec<f32>, EmbedError> {
+        self.embed(text)
+    }
+
+    /// One forward pass: tokenize, run, pool, L2-normalise.
     pub fn embed(&mut self, text: &str) -> Result<Vec<f32>, EmbedError> {
         let encoded = self
             .tokenizer
@@ -151,30 +208,40 @@ impl Embedder {
             });
         }
 
-        Ok(pool(data, &mask, len, hidden))
+        Ok(pool(self.pooling, data, &mask, len, hidden))
     }
 }
 
-/// Mean-pool over non-padding tokens, then L2-normalise.
+/// Reduce the token vectors to one, then L2-normalise.
 ///
-/// **Padding tokens carry real activations**, so averaging them in drags every long
-/// document toward the same point — the mask is not a formality. Extracted as a free
-/// function so it can be tested without a 22 MB model, which is the only part of this
-/// crate that can be.
-fn pool(data: &[f32], mask: &[i64], len: usize, hidden: usize) -> Vec<f32> {
+/// Under [`Pooling::Mean`], **padding tokens carry real activations**, so averaging them
+/// in drags every long document toward the same point — the mask is not a formality.
+/// Under [`Pooling::Cls`] the mask is irrelevant, because only token zero is read.
+///
+/// A free function so it can be tested without a 32 MB model, which is the only part of
+/// this crate that can be.
+fn pool(strategy: Pooling, data: &[f32], mask: &[i64], len: usize, hidden: usize) -> Vec<f32> {
     let mut pooled = vec![0f32; hidden];
-    let mut counted = 0f32;
-    for t in 0..len {
-        if mask.get(t).copied().unwrap_or(0) == 0 {
-            continue;
+
+    match strategy {
+        // The first token carries the sentence, by training. No mask arithmetic needed:
+        // token zero is never padding.
+        Pooling::Cls => pooled.copy_from_slice(&data[..hidden]),
+        Pooling::Mean => {
+            let mut counted = 0f32;
+            for t in 0..len {
+                if mask.get(t).copied().unwrap_or(0) == 0 {
+                    continue;
+                }
+                counted += 1.0;
+                for h in 0..hidden {
+                    pooled[h] += data[t * hidden + h];
+                }
+            }
+            for v in pooled.iter_mut() {
+                *v /= counted.max(1.0);
+            }
         }
-        counted += 1.0;
-        for h in 0..hidden {
-            pooled[h] += data[t * hidden + h];
-        }
-    }
-    for v in pooled.iter_mut() {
-        *v /= counted.max(1.0);
     }
     let norm = pooled.iter().map(|v| v * v).sum::<f32>().sqrt().max(1e-12);
     for v in pooled.iter_mut() {
@@ -196,7 +263,7 @@ mod tests {
             1.0, 0.0, // token 1
             0.0, 9.0, // token 2, masked out
         ];
-        let pooled = pool(&data, &[1, 1, 0], 3, 2);
+        let pooled = pool(Pooling::Mean, &data, &[1, 1, 0], 3, 2);
         assert!((pooled[0] - 1.0).abs() < 1e-6, "{pooled:?}");
         assert!(
             pooled[1].abs() < 1e-6,
@@ -205,10 +272,30 @@ mod tests {
     }
 
     #[test]
+    fn cls_pooling_reads_the_first_token_and_nothing_else() {
+        // BGE's training puts the sentence in token zero (ADR-0034). Mean pooling over
+        // the same tensor gives a DIFFERENT vector — both valid-looking, one of them
+        // wrong for this model, and nothing anywhere would say so.
+        let data = vec![
+            3.0, 4.0, // token 0 — the sentence
+            0.0, 9.0, // token 1 — must be ignored
+        ];
+        let cls = pool(Pooling::Cls, &data, &[1, 1], 2, 2);
+        assert!((cls[0] - 0.6).abs() < 1e-6, "{cls:?}");
+        assert!((cls[1] - 0.8).abs() < 1e-6, "{cls:?}");
+
+        let mean = pool(Pooling::Mean, &data, &[1, 1], 2, 2);
+        assert!(
+            (cls[0] - mean[0]).abs() > 0.1,
+            "the two strategies must not be interchangeable: {cls:?} vs {mean:?}"
+        );
+    }
+
+    #[test]
     fn the_result_is_a_unit_vector() {
         // Cosine over these vectors is computed without re-normalising, and the
         // artefact's quantiser assumes components sit in roughly [-1, 1].
-        let pooled = pool(&[3.0, 4.0, 0.0, 0.0], &[1, 1], 2, 2);
+        let pooled = pool(Pooling::Mean, &[3.0, 4.0, 0.0, 0.0], &[1, 1], 2, 2);
         let norm: f32 = pooled.iter().map(|v| v * v).sum::<f32>().sqrt();
         assert!((norm - 1.0).abs() < 1e-6, "{norm}");
     }
@@ -217,7 +304,7 @@ mod tests {
     fn an_all_padding_input_does_not_divide_by_zero() {
         // A query of nothing but stop-words the tokenizer drops is not an error, and it
         // must not be NaN either — NaN propagates into every distance it touches.
-        let pooled = pool(&[1.0, 2.0], &[0], 1, 2);
+        let pooled = pool(Pooling::Mean, &[1.0, 2.0], &[0], 1, 2);
         assert!(pooled.iter().all(|v| v.is_finite()), "{pooled:?}");
     }
 }

@@ -337,12 +337,12 @@ pub use sinephile_embedding::MODEL as MODEL_IDENTITY;
 /// 22,972,370 bytes is the 21.9 MiB Phase 1 Spike C measured, which is how we know it
 /// is the same model the R3 latency number was taken with.
 pub const MODEL_URL: &str =
-    "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model_quantized.onnx";
-pub const MODEL_SHA256: &str = "afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1";
+    "https://huggingface.co/Xenova/bge-small-en-v1.5/resolve/main/onnx/model_quantized.onnx";
+pub const MODEL_SHA256: &str = "6c9c6101a956d62dfb5e7190c538226c0c5bb9cb27b651234b6df063ee7dbfe4";
 pub const TOKENIZER_URL: &str =
-    "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/tokenizer.json";
+    "https://huggingface.co/Xenova/bge-small-en-v1.5/resolve/main/tokenizer.json";
 pub const TOKENIZER_SHA256: &str =
-    "da0e79933b9ed51798a3ae27893d3c5fa4a201126cef75586296df9b4d2c62a0";
+    "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66";
 
 /// Verify a downloaded file against its pinned hash.
 pub fn verify_sha256(path: &Path, expected: &str) -> Result<(), JobError> {
@@ -391,7 +391,10 @@ impl DocumentEmbedder for sinephile_embedder::Embedder {
     }
 
     fn embed(&mut self, text: &str) -> Result<Vec<f32>, JobError> {
-        sinephile_embedder::Embedder::embed(self, text)
+        // embed_DOCUMENT. The producer must never apply the query prefix: the model's
+        // asymmetry is the whole reason it was chosen (ADR-0034), and prefixing both
+        // sides discards it exactly as thoroughly as prefixing neither.
+        sinephile_embedder::Embedder::embed_document(self, text)
             .map_err(|e| JobError::step("embed", e.to_string()))
     }
 }

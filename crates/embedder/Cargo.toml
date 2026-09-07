@@ -20,9 +20,11 @@ description = "Text to vector: ONNX Runtime over a quantised sentence-transforme
 # against.
 
 [dependencies]
+# Real, not dev: the model identity and its query prefix are part of the artefact
+# contract, and both live in the format crate so producer and application cannot
+# disagree about them.
+sinephile-embedding = { path = "../embedding" }
 ort = { version = "2.0.0-rc.13", features = ["download-binaries"] }
 tokenizers = { version = "0.20", default-features = false, features = ["onig"] }
 thiserror = "2"
 
-[dev-dependencies]
-sinephile-embedding = { path = "../embedding" }

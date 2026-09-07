@@ -58,16 +58,15 @@ const AGREEMENT_SAMPLES: usize = 10;
 /// whether that is actually what costs the ranking, before anything is rebuilt.
 pub async fn compare(data_dir: &Path, query: &str, ids: &[i64]) -> Result<bool, EvalError> {
     let models = Path::new("models");
-    let mut embedder = sinephile_embedder::Embedder::load(
-        &models.join("all-MiniLM-L6-v2-int8.onnx"),
-        &models.join("all-MiniLM-L6-v2-tokenizer.json"),
-        sinephile_embedding::MODEL,
+    let mut embedder = sinephile_embedder::Embedder::pinned(
+        &models.join("bge-small-en-v1.5-int8.onnx"),
+        &models.join("bge-small-en-v1.5-tokenizer.json"),
     )
     .map_err(|e| EvalError::Missing(e.to_string()))?;
 
     let db = Db::open_in(data_dir).await?;
     let query_vector = embedder
-        .embed(query)
+        .embed_query(query)
         .map_err(|e| EvalError::Missing(e.to_string()))?;
 
     println!();
@@ -106,10 +105,10 @@ pub async fn compare(data_dir: &Path, query: &str, ids: &[i64]) -> Result<bool, 
         };
 
         let a = embedder
-            .embed(&document)
+            .embed_document(&document)
             .map_err(|e| EvalError::Missing(e.to_string()))?;
         let b = embedder
-            .embed(&longer)
+            .embed_document(&longer)
             .map_err(|e| EvalError::Missing(e.to_string()))?;
 
         println!(
@@ -126,8 +125,8 @@ pub async fn compare(data_dir: &Path, query: &str, ids: &[i64]) -> Result<bool, 
 
 pub async fn run(data_dir: &Path, report: bool) -> Result<bool, EvalError> {
     let models = Path::new("models");
-    let model = models.join("all-MiniLM-L6-v2-int8.onnx");
-    let tokenizer = models.join("all-MiniLM-L6-v2-tokenizer.json");
+    let model = models.join("bge-small-en-v1.5-int8.onnx");
+    let tokenizer = models.join("bge-small-en-v1.5-tokenizer.json");
     for path in [&model, &tokenizer] {
         if !path.is_file() {
             return Err(EvalError::Missing(format!(
@@ -138,9 +137,8 @@ pub async fn run(data_dir: &Path, report: bool) -> Result<bool, EvalError> {
     }
 
     let loading = Instant::now();
-    let mut embedder =
-        sinephile_embedder::Embedder::load(&model, &tokenizer, sinephile_embedding::MODEL)
-            .map_err(|e| EvalError::Missing(e.to_string()))?;
+    let mut embedder = sinephile_embedder::Embedder::pinned(&model, &tokenizer)
+        .map_err(|e| EvalError::Missing(e.to_string()))?;
     let load_millis = loading.elapsed().as_secs_f64() * 1000.0;
 
     // A cold first inference includes ONNX Runtime's own warm-up, which a user pays
@@ -148,7 +146,7 @@ pub async fn run(data_dir: &Path, report: bool) -> Result<bool, EvalError> {
     // than hidden by discarding it.
     let first = Instant::now();
     embedder
-        .embed("warm up")
+        .embed_query("warm up")
         .map_err(|e| EvalError::Missing(e.to_string()))?;
     let first_millis = first.elapsed().as_secs_f64() * 1000.0;
 
@@ -156,7 +154,7 @@ pub async fn run(data_dir: &Path, report: bool) -> Result<bool, EvalError> {
     for query in QUERIES {
         let started = Instant::now();
         let vector = embedder
-            .embed(query)
+            .embed_query(query)
             .map_err(|e| EvalError::Missing(e.to_string()))?;
         latencies.push(started.elapsed().as_secs_f64() * 1000.0);
         debug_assert_eq!(vector.len(), sinephile_embedder::DIMENSION as usize);
@@ -200,7 +198,7 @@ pub async fn run(data_dir: &Path, report: bool) -> Result<bool, EvalError> {
 
         let fresh = quantise::quantise(
             &embedder
-                .embed(&document)
+                .embed_document(&document)
                 .map_err(|e| EvalError::Missing(e.to_string()))?,
         );
         let stored = artefact
