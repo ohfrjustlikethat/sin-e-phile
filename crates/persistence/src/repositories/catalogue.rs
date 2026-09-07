@@ -299,3 +299,143 @@ mod tests {
         .is_searchable());
     }
 }
+
+/// The Wikipedia mapping and the text it produces (ADR-0033, migration 0014).
+///
+/// Separate from [`CatalogueRepository`] because it is a loader's surface rather than
+/// the application's: nothing in the running app reads these, and the only consumer is
+/// `ingest wikipedia` plus the document builder that later reads `media_items.synopsis`.
+pub struct WikipediaRepository<'a> {
+    db: &'a Db,
+}
+
+/// One article waiting to be fetched.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingArticle {
+    pub media_item_id: i64,
+    pub article: String,
+}
+
+impl<'a> WikipediaRepository<'a> {
+    pub fn new(db: &'a Db) -> Self {
+        Self { db }
+    }
+
+    /// Record that an IMDb id has an article, resolving it to a catalogue item.
+    ///
+    /// Returns whether anything was stored. A mapping for a title we do not hold is not
+    /// an error — Wikidata knows about 509,464 IMDb ids and this catalogue holds a
+    /// subset — it is simply nothing to do.
+    ///
+    /// `ON CONFLICT DO UPDATE` on the article but **not** on `fetched_at`: re-running
+    /// the mapping after an article was moved should point at the new title and leave
+    /// the text already fetched in place, rather than silently queueing a re-fetch of
+    /// everything.
+    pub async fn map(&self, imdb_id: &str, article: &str) -> Result<bool, DbError> {
+        let media_item_id: Option<i64> = sqlx::query_scalar(
+            "SELECT media_item_id FROM external_ids WHERE source = 'imdb' AND external_id = ?",
+        )
+        .bind(imdb_id)
+        .fetch_optional(self.db.pool())
+        .await?;
+
+        let Some(media_item_id) = media_item_id else {
+            return Ok(false);
+        };
+
+        sqlx::query(
+            "INSERT INTO wikipedia_article (media_item_id, article) VALUES (?, ?)
+             ON CONFLICT (media_item_id) DO UPDATE SET article = excluded.article",
+        )
+        .bind(media_item_id)
+        .bind(article)
+        .execute(self.db.pool())
+        .await?;
+        Ok(true)
+    }
+
+    /// Articles mapped but not yet fetched, **most-voted first**.
+    ///
+    /// The order is the scoping decision: a full run is hours, so a bounded one must
+    /// cover what people actually search for rather than an arbitrary slice. Same
+    /// reasoning as `ingest anime --pages`.
+    pub async fn pending(&self, limit: i64) -> Result<Vec<PendingArticle>, DbError> {
+        let rows: Vec<(i64, String)> = sqlx::query_as(
+            "SELECT w.media_item_id, w.article
+               FROM wikipedia_article w
+               JOIN media_items m ON m.id = w.media_item_id
+              WHERE w.fetched_at IS NULL
+              ORDER BY m.rating_votes DESC NULLS LAST
+              LIMIT ?",
+        )
+        .bind(limit)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|(media_item_id, article)| PendingArticle {
+                media_item_id,
+                article,
+            })
+            .collect())
+    }
+
+    /// Store an extract as the item's synopsis and mark the article fetched.
+    ///
+    /// Both writes in one transaction: a synopsis without a `fetched_at` would be
+    /// re-fetched forever, and a `fetched_at` without a synopsis would be lost forever.
+    pub async fn store(&self, media_item_id: i64, text: &str) -> Result<(), DbError> {
+        let mut tx = self.db.pool().begin().await?;
+
+        sqlx::query("UPDATE media_items SET synopsis = ? WHERE id = ?")
+            .bind(text)
+            .bind(media_item_id)
+            .execute(&mut *tx)
+            .await?;
+
+        sqlx::query(
+            "UPDATE wikipedia_article SET fetched_at = datetime('now') WHERE media_item_id = ?",
+        )
+        .bind(media_item_id)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Mark an article fetched **without** a synopsis.
+    ///
+    /// A title Wikipedia reports as missing, or whose lead is empty, must not be asked
+    /// for again on every subsequent run — an unanswerable request is still a request,
+    /// and there are enough of them to matter over a catalogue this size.
+    pub async fn mark_empty(&self, media_item_id: i64) -> Result<(), DbError> {
+        sqlx::query(
+            "UPDATE wikipedia_article SET fetched_at = datetime('now') WHERE media_item_id = ?",
+        )
+        .bind(media_item_id)
+        .execute(self.db.pool())
+        .await?;
+        Ok(())
+    }
+
+    /// (mapped, fetched, with a synopsis) — for reporting progress and for the eval.
+    pub async fn counts(&self) -> Result<(i64, i64, i64), DbError> {
+        let mapped: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM wikipedia_article")
+            .fetch_one(self.db.pool())
+            .await?;
+        let fetched: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM wikipedia_article WHERE fetched_at IS NOT NULL",
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+        let with_text: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM media_items
+              WHERE synopsis IS NOT NULL AND length(trim(synopsis)) > 0",
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+        Ok((mapped, fetched, with_text))
+    }
+}

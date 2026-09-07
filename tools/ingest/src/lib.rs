@@ -26,6 +26,7 @@ pub mod repair;
 pub mod search_index;
 pub mod tsv;
 pub mod verify;
+pub mod wikipedia;
 
 pub use download::{Downloaded, Downloader, Progress};
 pub use job::{Batch, Job, JobError, StepOutcome, StepProgress, StepStatus};

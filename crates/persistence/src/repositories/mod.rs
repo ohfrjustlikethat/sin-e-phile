@@ -11,7 +11,9 @@ pub mod media;
 pub mod profiles;
 pub mod search;
 
-pub use catalogue::{CatalogueRepository, Readiness, StepProgress, CORE_TIER};
+pub use catalogue::{
+    CatalogueRepository, PendingArticle, Readiness, StepProgress, WikipediaRepository, CORE_TIER,
+};
 pub use credentials::{CredentialRepository, TmdbAccess};
 pub use episodes::EpisodeRepository;
 pub use media::MediaRepository;

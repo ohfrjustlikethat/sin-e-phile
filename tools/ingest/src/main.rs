@@ -51,6 +51,11 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
   ingest search-index      build the FTS5 index (Phase 5). --trigram also builds
                            the typo-tolerance index, --trigram-core restricts it
                            to the core tier. Each index is measured separately.
+  ingest wikipedia         load Wikipedia lead extracts as the embedding text source
+                           (ADR-0033). --map does the Wikidata id mapping, --extracts
+                           fetches the text, neither flag does both. --limit N bounds
+                           the fetch; the queue is ordered by votes, so a bounded run
+                           covers what people actually search for.
   ingest vector-index      build the HNSW index over the embedding artefact
                            (Phase 5 subtask 5.3). Derived on the machine rather
                            than downloaded, so it needs `ingest embed` to have
@@ -153,6 +158,20 @@ async fn main() -> Result<(), JobError> {
             let trigram = args.iter().any(|a| a == "--trigram");
             let trigram_core = args.iter().any(|a| a == "--trigram-core");
             search_index(&db, trigram || trigram_core, trigram_core).await
+        }
+        "wikipedia" => {
+            let limit = args
+                .iter()
+                .position(|a| a == "--limit")
+                .and_then(|i| args.get(i + 1))
+                .and_then(|n| n.parse::<i64>().ok())
+                .unwrap_or(i64::MAX);
+            let map = args.iter().any(|a| a == "--map");
+            let extracts = args.iter().any(|a| a == "--extracts");
+            // Neither flag means both phases, which is what someone typing the bare
+            // command almost certainly wants.
+            let both = !map && !extracts;
+            wikipedia(&db, map || both, extracts || both, limit).await
         }
         "vector-index" => vector_index(&db, &dir).await,
         "verify-embeddings" => verify_embeddings(&dir),
@@ -859,6 +878,68 @@ async fn search_index(db: &Db, trigram: bool, trigram_core: bool) -> Result<(), 
 
 /// Verify the embedding artefact, as the application will at startup.
 ///
+/// Load Wikipedia lead extracts into the catalogue (ADR-0033).
+///
+/// Two phases. `--map` walks Wikidata for the IMDb-id → article mapping; `--extracts`
+/// fetches the text. Run separately because the first is an hour and the second is
+/// several, and because a bounded extract run is genuinely useful on its own — the
+/// queue is ordered by votes, so the first 50,000 cover what anyone searches for.
+async fn wikipedia(db: &Db, map: bool, extracts: bool, limit: i64) -> Result<(), JobError> {
+    use sinephile_metadata_api::wikipedia::Wikipedia;
+    use sinephile_persistence::repositories::WikipediaRepository;
+    use std::time::Instant;
+
+    let transport = sinephile_metadata_api::HttpTransport::new();
+    let wiki = Wikipedia::new(&transport).await;
+    let started = Instant::now();
+
+    if map {
+        println!("ingest: mapping IMDb ids to Wikipedia articles through Wikidata");
+        let loaded = sinephile_ingest::wikipedia::map(db, &wiki, |prefix, loaded| {
+            println!(
+                "  {prefix:<10} {} mappings seen, {} in this catalogue  ({:.0}s)",
+                loaded.mapped,
+                loaded.matched,
+                started.elapsed().as_secs_f64()
+            );
+        })
+        .await?;
+        println!();
+        println!("  {} queries", loaded.queried);
+        println!("  {} mappings offered by Wikidata", loaded.mapped);
+        println!("  {} matched onto this catalogue", loaded.matched);
+    }
+
+    if extracts {
+        println!("ingest: fetching lead extracts, most-voted first");
+        let loaded = sinephile_ingest::wikipedia::extracts(db, &wiki, limit, |loaded| {
+            let done = loaded.fetched + loaded.empty;
+            if done % 200 == 0 {
+                let rate = done as f64 / started.elapsed().as_secs_f64().max(0.001);
+                println!(
+                    "  {done}/{limit}  {} with text, {} without  {rate:.1}/s",
+                    loaded.fetched, loaded.empty
+                );
+            }
+        })
+        .await?;
+        println!();
+        println!("  {} extracts stored", loaded.fetched);
+        println!("  {} articles had no usable lead", loaded.empty);
+    }
+
+    let (mapped, fetched, with_text) = WikipediaRepository::new(db)
+        .counts()
+        .await
+        .map_err(|e| JobError::step("wikipedia", e.to_string()))?;
+    println!();
+    println!(
+        "  {mapped} articles mapped · {fetched} fetched · {with_text} items now carry a synopsis"
+    );
+    println!("  {:.0}s total", started.elapsed().as_secs_f64());
+    Ok(())
+}
+
 /// Build the HNSW index over the artefact (subtask 5.3).
 ///
 /// Not a `Job`: it is one indivisible pass that ends in a single `save`, so there is no

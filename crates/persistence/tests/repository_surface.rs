@@ -23,7 +23,7 @@ use sinephile_persistence::model::EpisodeNumbering;
 use sinephile_persistence::repositories::profiles::PlaybackPosition;
 use sinephile_persistence::repositories::{
     CatalogueRepository, CredentialRepository, EpisodeRepository, MatchReason, MediaRepository,
-    ProfileRepository, Readiness, SearchRepository, TmdbAccess,
+    ProfileRepository, Readiness, SearchRepository, TmdbAccess, WikipediaRepository,
 };
 use sinephile_persistence::{Db, IdSource, MediaKind, NewMediaItem, TitleVariant};
 
@@ -539,6 +539,73 @@ async fn db_surface() {
 
     // steps — no job, so nothing to report rather than an error
     assert!(catalogue.steps().await.expect("steps").is_empty());
+
+    // ── WikipediaRepository (ADR-0033, migration 0014) ────────────────────────
+    let wiki = WikipediaRepository::new(&db);
+
+    // map — a mapping for an IMDb id we do not hold is nothing to do, not an error.
+    // Wikidata knows 509,464 of them and this catalogue holds a subset.
+    assert!(
+        !wiki
+            .map("tt9999999", "Some Article")
+            .await
+            .expect("map miss"),
+        "an unknown imdb id stores nothing and says so"
+    );
+    MediaRepository::new(&db)
+        .add_external_id(probe, IdSource::Imdb, "tt0000001", 1.0)
+        .await
+        .expect("probe imdb id");
+    assert!(wiki.map("tt0000001", "Probe Article").await.expect("map"));
+    // Re-mapping after an article was moved updates the title and must NOT re-queue.
+    assert!(wiki
+        .map("tt0000001", "Probe Article (film)")
+        .await
+        .expect("re-map"));
+
+    // pending — mapped and not yet fetched
+    let pending = wiki.pending(10).await.expect("pending");
+    assert_eq!(pending.len(), 1);
+    assert_eq!(pending[0].media_item_id, probe);
+    assert_eq!(pending[0].article, "Probe Article (film)");
+
+    // counts — (mapped, fetched, with a synopsis)
+    assert_eq!(wiki.counts().await.expect("counts"), (1, 0, 0));
+
+    // store — the synopsis and the fetch marker commit together
+    wiki.store(probe, "A film about a probe.")
+        .await
+        .expect("store");
+    assert!(
+        wiki.pending(10)
+            .await
+            .expect("pending after store")
+            .is_empty(),
+        "a fetched article leaves the queue"
+    );
+    assert_eq!(wiki.counts().await.expect("counts"), (1, 1, 1));
+
+    // mark_empty — an article Wikipedia has no lead for must not be re-asked forever
+    let second = MediaRepository::new(&db)
+        .insert(&NewMediaItem::film("Second Probe", 1971))
+        .await
+        .expect("second item");
+    MediaRepository::new(&db)
+        .add_external_id(second, IdSource::Imdb, "tt0000002", 1.0)
+        .await
+        .expect("second imdb id");
+    assert!(wiki.map("tt0000002", "Blank Article").await.expect("map"));
+    wiki.mark_empty(second).await.expect("mark_empty");
+    assert!(wiki
+        .pending(10)
+        .await
+        .expect("pending after mark_empty")
+        .is_empty());
+    assert_eq!(
+        wiki.counts().await.expect("counts"),
+        (2, 2, 1),
+        "both fetched, only one carries text"
+    );
 
     // schema_version
     assert_eq!(
