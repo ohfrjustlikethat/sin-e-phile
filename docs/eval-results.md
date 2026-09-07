@@ -1461,3 +1461,42 @@ refresh a day and nothing on every other launch.
 The `http_cache` table from migration 0008 already stores ETag and Last-Modified, and
 `crates/metadata-api` already handles revalidation, so the pieces exist. D24 guessed this
 would work; it now has a number.
+
+### Wikipedia as the text source: what the catalogue gained (ADR-0033)
+
+`ingest wikipedia`, 2026-09-07. Two phases, both measured.
+
+**Mapping** — IMDb id → English article, joined on Wikidata property P345:
+
+| | |
+|---|---|
+| queries | 110 (100 planned, **10 subdivided themselves** after timing out) |
+| mappings offered by Wikidata | 245,708 |
+| **matched onto this catalogue** | **233,661** (95.1%) |
+| time | 43 min |
+
+**Extracts** — the lead text, 20 articles per request:
+
+| | |
+|---|---|
+| articles fetched | 233,416 |
+| **with usable text** | **233,114** (99.87%) |
+| no usable lead | 302 |
+| time | 4.8 h (Wikimedia throttled us from 41/s to 13/s; the limiter absorbed it) |
+
+**Coverage is concentrated exactly where it matters**, which is the number that decides
+whether this was worth doing:
+
+| slice of the core tier | with a synopsis |
+|---|---|
+| top 1,000 by votes | **100.0%** |
+| top 10,000 | **98.8%** |
+| top 100,000 | 77.8% |
+| all 855,703 | 22.1% |
+
+The long tail stays empty and that is the correct outcome: a film nobody has voted on
+has no Wikipedia article either, and semantic search over it was never going to be the
+thing that surfaced it. Average extract is 495 characters, against the document
+builder's 400-character budget — so most titles contribute their whole lead.
+
+Before this, the same query was `0 of 855,703`.
