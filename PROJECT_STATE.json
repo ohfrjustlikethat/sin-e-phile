@@ -845,7 +845,7 @@
           "id": "5.6",
           "text": "fixtures/search/ and the relevance harness. exact-titles.tsv (43 queries), semantic-queries.tsv (10 queries, 37 graded answers, meaning and filter scored SEPARATELY), plus `eval vector` (recall, with a --prove control), `eval embed` (byte-identical agreement, and --compare to price a document change before spending a re-embed on it). nDCG@10 is now reported next to E1 and E2 and gates the exit code.",
           "status": "complete",
-          "commit": null
+          "commit": "8c04085"
         },
         {
           "id": "5.7",
