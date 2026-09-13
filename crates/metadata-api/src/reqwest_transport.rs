@@ -49,6 +49,7 @@ impl Transport for HttpTransport {
             let mut builder = match request.method {
                 Method::Get => self.client.get(&request.url),
                 Method::Post => self.client.post(&request.url),
+                Method::Head => self.client.head(&request.url),
             };
             for (name, value) in &request.headers {
                 builder = builder.header(name, value);

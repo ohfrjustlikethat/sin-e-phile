@@ -6,7 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
-use sinephile_ingest::{Job, JobError};
+use sinephile_catalogue::{Job, JobError};
 use sinephile_persistence::{paths, DataLocation, Db};
 
 const USAGE: &str = "\
@@ -116,8 +116,9 @@ async fn main() -> Result<(), JobError> {
             // Deliberately does not touch the database it was handed — a
             // measurement that mutates state cannot be re-run to check itself.
             let deep = !args.iter().any(|a| a == "--quick");
-            let measurement = sinephile_ingest::measure::run(&dir.join("datasets"), deep).await?;
-            sinephile_ingest::measure::report(&measurement);
+            let measurement =
+                sinephile_catalogue::measure::run(&dir.join("datasets"), deep).await?;
+            sinephile_catalogue::measure::report(&measurement);
             Ok(())
         }
         "imdb" => imdb(&db, &dir.join("datasets")).await,
@@ -151,8 +152,8 @@ async fn main() -> Result<(), JobError> {
                 .iter()
                 .position(|a| a == "--set")
                 .and_then(|i| args.get(i + 1))
-                .and_then(|s| sinephile_ingest::movielens::Release::parse(s))
-                .unwrap_or(sinephile_ingest::movielens::Release::Ml25m);
+                .and_then(|s| sinephile_catalogue::movielens::Release::parse(s))
+                .unwrap_or(sinephile_catalogue::movielens::Release::Ml25m);
             movielens(&db, &dir.join("datasets"), set).await
         }
         "repair-variants" => repair_variants(&db).await,
@@ -214,11 +215,11 @@ async fn imdb(db: &Db, datasets: &Path) -> Result<(), JobError> {
     use std::time::Instant;
 
     let started = Instant::now();
-    let downloader = sinephile_ingest::Downloader::new();
+    let downloader = sinephile_catalogue::Downloader::new();
 
     for dataset in [
-        &sinephile_ingest::imdb::TITLE_RATINGS,
-        &sinephile_ingest::imdb::TITLE_BASICS,
+        &sinephile_catalogue::imdb::TITLE_RATINGS,
+        &sinephile_catalogue::imdb::TITLE_BASICS,
     ] {
         let path = datasets.join(dataset.filename);
         let result = downloader.fetch(&dataset.url(), &path, |_| {}).await?;
@@ -232,13 +233,15 @@ async fn imdb(db: &Db, datasets: &Path) -> Result<(), JobError> {
                 " (already had it)"
             }
         );
-        sinephile_ingest::download::verify_gzip(&path)?;
+        sinephile_catalogue::download::verify_gzip(&path)?;
     }
 
-    let ratings_path = datasets.join(sinephile_ingest::imdb::TITLE_RATINGS.filename);
+    let ratings_path = datasets.join(sinephile_catalogue::imdb::TITLE_RATINGS.filename);
     tracing::info!("reading ratings");
-    let votes = Arc::new(sinephile_ingest::load::load_votes(&ratings_path)?);
-    let averages = Arc::new(sinephile_ingest::load::load_average_ratings(&ratings_path)?);
+    let votes = Arc::new(sinephile_catalogue::load::load_votes(&ratings_path)?);
+    let averages = Arc::new(sinephile_catalogue::load::load_average_ratings(
+        &ratings_path,
+    )?);
     tracing::info!("  {} rated titles", votes.len());
 
     let mut job = Job::begin(db, "imdb").await?;
@@ -247,12 +250,12 @@ async fn imdb(db: &Db, datasets: &Path) -> Result<(), JobError> {
     }
 
     tracing::info!("loading titles");
-    sinephile_ingest::load::load_titles(
+    sinephile_catalogue::load::load_titles(
         &mut job,
-        datasets.join(sinephile_ingest::imdb::TITLE_BASICS.filename),
+        datasets.join(sinephile_catalogue::imdb::TITLE_BASICS.filename),
         votes,
         averages,
-        sinephile_ingest::imdb::CatalogueScope::DEFAULT,
+        sinephile_catalogue::imdb::CatalogueScope::DEFAULT,
         // A first ingestion starts at the top of the file; `ingest refresh` is the
         // same call with a watermark.
         None,
@@ -260,7 +263,7 @@ async fn imdb(db: &Db, datasets: &Path) -> Result<(), JobError> {
     .await?;
     job.finish().await?;
 
-    let (total, core) = sinephile_ingest::load::counts(db).await?;
+    let (total, core) = sinephile_catalogue::load::counts(db).await?;
     let bytes = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
     println!();
     println!("  {total} titles indexed, {core} in the core tier");
@@ -281,11 +284,11 @@ async fn credits(db: &Db, datasets: &Path) -> Result<(), JobError> {
 
     let started = Instant::now();
     let before = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
-    let downloader = sinephile_ingest::Downloader::new();
+    let downloader = sinephile_catalogue::Downloader::new();
 
     for dataset in [
-        &sinephile_ingest::imdb::TITLE_PRINCIPALS,
-        &sinephile_ingest::imdb::NAME_BASICS,
+        &sinephile_catalogue::imdb::TITLE_PRINCIPALS,
+        &sinephile_catalogue::imdb::NAME_BASICS,
     ] {
         let path = datasets.join(dataset.filename);
         let result = downloader.fetch(&dataset.url(), &path, |_| {}).await?;
@@ -299,14 +302,14 @@ async fn credits(db: &Db, datasets: &Path) -> Result<(), JobError> {
                 " (already had it)"
             }
         );
-        sinephile_ingest::download::verify_gzip(&path)?;
+        sinephile_catalogue::download::verify_gzip(&path)?;
     }
 
-    let principals = datasets.join(sinephile_ingest::imdb::TITLE_PRINCIPALS.filename);
-    let names = datasets.join(sinephile_ingest::imdb::NAME_BASICS.filename);
+    let principals = datasets.join(sinephile_catalogue::imdb::TITLE_PRINCIPALS.filename);
+    let names = datasets.join(sinephile_catalogue::imdb::NAME_BASICS.filename);
 
     tracing::info!("reading core title ids");
-    let core = Arc::new(sinephile_ingest::credits::core_title_ids(db).await?);
+    let core = Arc::new(sinephile_catalogue::credits::core_title_ids(db).await?);
     if core.is_empty() {
         eprintln!("ingest: no core titles — run `ingest imdb` first");
         std::process::exit(2);
@@ -314,7 +317,7 @@ async fn credits(db: &Db, datasets: &Path) -> Result<(), JobError> {
     tracing::info!("  {} core titles", core.len());
 
     tracing::info!("scanning title.principals for the people they reference");
-    let needed = Arc::new(sinephile_ingest::credits::scan_needed_people(
+    let needed = Arc::new(sinephile_catalogue::credits::scan_needed_people(
         &principals,
         &core,
     )?);
@@ -327,10 +330,10 @@ async fn credits(db: &Db, datasets: &Path) -> Result<(), JobError> {
     }
 
     tracing::info!("loading people");
-    sinephile_ingest::credits::load_people(&mut job, names, needed).await?;
+    sinephile_catalogue::credits::load_people(&mut job, names, needed).await?;
     // Read back which people actually landed. principals references nconsts that
     // name.basics does not have, and a credit cannot exist without its person.
-    let loaded = Arc::new(sinephile_ingest::credits::loaded_people(db).await?);
+    let loaded = Arc::new(sinephile_catalogue::credits::loaded_people(db).await?);
     let missing = needed_count.saturating_sub(loaded.len());
     if missing > 0 {
         tracing::warn!(
@@ -339,10 +342,10 @@ async fn credits(db: &Db, datasets: &Path) -> Result<(), JobError> {
     }
 
     tracing::info!("loading credits");
-    sinephile_ingest::credits::load_credits(&mut job, principals, core, loaded).await?;
+    sinephile_catalogue::credits::load_credits(&mut job, principals, core, loaded).await?;
     job.finish().await?;
 
-    let (people, credits) = sinephile_ingest::credits::counts(db).await?;
+    let (people, credits) = sinephile_catalogue::credits::counts(db).await?;
     let after = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
     println!();
     println!("  {people} people, {credits} credits");
@@ -364,9 +367,9 @@ async fn akas(db: &Db, datasets: &Path) -> Result<(), JobError> {
     let started = Instant::now();
     let before = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
 
-    let dataset = &sinephile_ingest::imdb::TITLE_AKAS;
+    let dataset = &sinephile_catalogue::imdb::TITLE_AKAS;
     let path = datasets.join(dataset.filename);
-    let result = sinephile_ingest::Downloader::new()
+    let result = sinephile_catalogue::Downloader::new()
         .fetch(&dataset.url(), &path, |_| {})
         .await?;
     tracing::info!(
@@ -379,9 +382,9 @@ async fn akas(db: &Db, datasets: &Path) -> Result<(), JobError> {
             " (already had it)"
         }
     );
-    sinephile_ingest::download::verify_gzip(&path)?;
+    sinephile_catalogue::download::verify_gzip(&path)?;
 
-    let core = Arc::new(sinephile_ingest::credits::core_title_ids(db).await?);
+    let core = Arc::new(sinephile_catalogue::credits::core_title_ids(db).await?);
     if core.is_empty() {
         eprintln!("ingest: no core titles — run `ingest imdb` first");
         std::process::exit(2);
@@ -392,7 +395,7 @@ async fn akas(db: &Db, datasets: &Path) -> Result<(), JobError> {
     if job.is_resuming().await? {
         tracing::info!("resuming a previous run");
     }
-    sinephile_ingest::akas::load_akas(&mut job, path, core).await?;
+    sinephile_catalogue::akas::load_akas(&mut job, path, core).await?;
     job.finish().await?;
 
     let titles: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM titles")
@@ -416,7 +419,7 @@ async fn anime(db: &Db, max_pages: Option<i64>) -> Result<(), JobError> {
     use std::sync::Arc;
     use std::time::Instant;
 
-    let unnormalised = sinephile_ingest::normalise::remaining(db).await?;
+    let unnormalised = sinephile_catalogue::normalise::remaining(db).await?;
     if unnormalised > 0 {
         // Failing loudly beats matching against a catalogue that is only partly
         // searchable: a NULL normalised form is invisible to the matcher, so the run
@@ -443,7 +446,7 @@ async fn anime(db: &Db, max_pages: Option<i64>) -> Result<(), JobError> {
         tracing::info!("resuming a previous run");
     }
     let report =
-        sinephile_ingest::anime::ingest(&mut job, client, max_pages, Some(&unmatched)).await?;
+        sinephile_catalogue::anime::ingest(&mut job, client, max_pages, Some(&unmatched)).await?;
     job.finish().await?;
 
     println!();
@@ -510,8 +513,8 @@ async fn episodes(
     measure_only: bool,
     min_votes: Option<i64>,
 ) -> Result<(), JobError> {
-    let downloader = sinephile_ingest::Downloader::new();
-    let dataset = &sinephile_ingest::imdb::TITLE_EPISODE;
+    let downloader = sinephile_catalogue::Downloader::new();
+    let dataset = &sinephile_catalogue::imdb::TITLE_EPISODE;
     let path = datasets.join(dataset.filename);
     let result = downloader.fetch(&dataset.url(), &path, |_| {}).await?;
     tracing::info!(
@@ -524,15 +527,15 @@ async fn episodes(
             " (already had it)"
         }
     );
-    sinephile_ingest::download::verify_gzip(&path)?;
+    sinephile_catalogue::download::verify_gzip(&path)?;
 
     if measure_only {
-        let measurement = sinephile_ingest::episodes::measure(db, datasets).await?;
+        let measurement = sinephile_catalogue::episodes::measure(db, datasets).await?;
         measurement.report();
         return Ok(());
     }
 
-    use sinephile_ingest::episodes_load as ep;
+    use sinephile_catalogue::episodes_load as ep;
     use std::sync::Arc;
     use std::time::Instant;
 
@@ -574,7 +577,7 @@ async fn episodes(
     ep::load_series_rows(&mut job, Arc::clone(&wanted)).await?;
     ep::load_episodes(
         &mut job,
-        datasets.join(sinephile_ingest::imdb::TITLE_BASICS.filename),
+        datasets.join(sinephile_catalogue::imdb::TITLE_BASICS.filename),
         Arc::new(by_id),
     )
     .await?;
@@ -611,15 +614,15 @@ async fn episodes(
 async fn movielens(
     db: &Db,
     datasets: &Path,
-    release: sinephile_ingest::movielens::Release,
+    release: sinephile_catalogue::movielens::Release,
 ) -> Result<(), JobError> {
-    use sinephile_ingest::movielens as ml;
+    use sinephile_catalogue::movielens as ml;
     use std::sync::Arc;
     use std::time::Instant;
 
     let started = Instant::now();
     let before = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
-    let downloader = sinephile_ingest::Downloader::new();
+    let downloader = sinephile_catalogue::Downloader::new();
 
     let path = datasets.join(release.filename());
 
@@ -699,8 +702,8 @@ async fn refresh(db: &Db, datasets: &Path) -> Result<(), JobError> {
     use std::time::Instant;
 
     let started = Instant::now();
-    let before = sinephile_ingest::refresh::title_count(db).await?;
-    let watermark = sinephile_ingest::refresh::watermark(db).await?;
+    let before = sinephile_catalogue::refresh::title_count(db).await?;
+    let watermark = sinephile_catalogue::refresh::watermark(db).await?;
     match &watermark {
         Some(w) => tracing::info!("{before} titles held; refreshing past {w}"),
         None => tracing::info!("empty catalogue — this is a first ingestion"),
@@ -708,10 +711,10 @@ async fn refresh(db: &Db, datasets: &Path) -> Result<(), JobError> {
 
     // Both files are re-fetched: gzip cannot be seeked and IMDb publishes no
     // changelog, so the download is the unavoidable cost of layer 1.
-    let downloader = sinephile_ingest::Downloader::new();
+    let downloader = sinephile_catalogue::Downloader::new();
     for dataset in [
-        &sinephile_ingest::imdb::TITLE_RATINGS,
-        &sinephile_ingest::imdb::TITLE_BASICS,
+        &sinephile_catalogue::imdb::TITLE_RATINGS,
+        &sinephile_catalogue::imdb::TITLE_BASICS,
     ] {
         let path = datasets.join(dataset.filename);
         // Deleting first, because the downloader skips a file it already has — which
@@ -723,30 +726,32 @@ async fn refresh(db: &Db, datasets: &Path) -> Result<(), JobError> {
             dataset.name,
             result.bytes as f64 / 1_048_576.0
         );
-        sinephile_ingest::download::verify_gzip(&path)?;
+        sinephile_catalogue::download::verify_gzip(&path)?;
     }
 
-    let ratings_path = datasets.join(sinephile_ingest::imdb::TITLE_RATINGS.filename);
-    let votes = Arc::new(sinephile_ingest::load::load_votes(&ratings_path)?);
-    let averages = Arc::new(sinephile_ingest::load::load_average_ratings(&ratings_path)?);
+    let ratings_path = datasets.join(sinephile_catalogue::imdb::TITLE_RATINGS.filename);
+    let votes = Arc::new(sinephile_catalogue::load::load_votes(&ratings_path)?);
+    let averages = Arc::new(sinephile_catalogue::load::load_average_ratings(
+        &ratings_path,
+    )?);
 
     let mut job = Job::begin(db, "refresh").await?;
     if job.is_resuming().await? {
         tracing::info!("resuming a previous refresh");
     }
-    sinephile_ingest::load::load_titles(
+    sinephile_catalogue::load::load_titles(
         &mut job,
-        datasets.join(sinephile_ingest::imdb::TITLE_BASICS.filename),
+        datasets.join(sinephile_catalogue::imdb::TITLE_BASICS.filename),
         Arc::clone(&votes),
         Arc::clone(&averages),
-        sinephile_ingest::imdb::CatalogueScope::DEFAULT,
+        sinephile_catalogue::imdb::CatalogueScope::DEFAULT,
         watermark,
     )
     .await?;
-    let rerated = sinephile_ingest::refresh::ratings(&mut job, votes, averages).await?;
+    let rerated = sinephile_catalogue::refresh::ratings(&mut job, votes, averages).await?;
     job.finish().await?;
 
-    let after = sinephile_ingest::refresh::title_count(db).await?;
+    let after = sinephile_catalogue::refresh::title_count(db).await?;
     println!();
     println!("  {} titles added", after - before);
     println!("  {rerated} ratings re-applied");
@@ -761,7 +766,7 @@ async fn refresh(db: &Db, datasets: &Path) -> Result<(), JobError> {
 
 /// Produce the embedding artefact (ADR-0014, subtask 4.10).
 async fn embed_artefact(db: &Db, dir: &Path) -> Result<(), JobError> {
-    use sinephile_ingest::embed;
+    use sinephile_catalogue::embed;
     use std::time::Instant;
 
     let models = Path::new("models");
@@ -840,7 +845,7 @@ async fn embed_artefact(db: &Db, dir: &Path) -> Result<(), JobError> {
 
 /// Build the FTS5 index, measuring each half separately.
 async fn search_index(db: &Db, trigram: bool, trigram_core: bool) -> Result<(), JobError> {
-    use sinephile_ingest::search_index as si;
+    use sinephile_catalogue::search_index as si;
     use std::time::Instant;
 
     let started = Instant::now();
@@ -1002,7 +1007,7 @@ async fn wikipedia(db: &Db, map: bool, extracts: bool, limit: i64) -> Result<(),
 
     if map {
         println!("ingest: mapping IMDb ids to Wikipedia articles through Wikidata");
-        let loaded = sinephile_ingest::wikipedia::map(db, &wiki, |prefix, loaded| {
+        let loaded = sinephile_catalogue::wikipedia::map(db, &wiki, |prefix, loaded| {
             println!(
                 "  {prefix:<10} {} mappings seen, {} in this catalogue  ({:.0}s)",
                 loaded.mapped,
@@ -1019,7 +1024,7 @@ async fn wikipedia(db: &Db, map: bool, extracts: bool, limit: i64) -> Result<(),
 
     if extracts {
         println!("ingest: fetching lead extracts, most-voted first");
-        let loaded = sinephile_ingest::wikipedia::extracts(db, &wiki, limit, |loaded| {
+        let loaded = sinephile_catalogue::wikipedia::extracts(db, &wiki, limit, |loaded| {
             let done = loaded.fetched + loaded.empty;
             if done % 200 == 0 {
                 let rate = done as f64 / started.elapsed().as_secs_f64().max(0.001);
@@ -1146,8 +1151,8 @@ fn artefact_bytes(path: &Path) -> f64 {
 /// loading it produce meaningful results on this build". A mismatched artefact is
 /// intact and useless.
 fn verify_embeddings(dir: &Path) -> Result<(), JobError> {
+    use sinephile_catalogue::embed;
     use sinephile_embedding::{document, Artefact};
-    use sinephile_ingest::embed;
 
     let path = sinephile_embedding::artefact_path(dir);
     let mut file = std::fs::File::open(&path)
@@ -1209,9 +1214,9 @@ fn verify_embeddings(dir: &Path) -> Result<(), JobError> {
 /// Check the catalogue against the E5 fixture.
 async fn verify_anime(db: &Db) -> Result<(), JobError> {
     let path = Path::new("fixtures/anime/e5-hand-checked.tsv");
-    let rows = sinephile_ingest::verify::load(path)?;
-    let outcomes = sinephile_ingest::verify::run(db, &rows).await?;
-    if !sinephile_ingest::verify::report(&outcomes) {
+    let rows = sinephile_catalogue::verify::load(path)?;
+    let outcomes = sinephile_catalogue::verify::run(db, &rows).await?;
+    if !sinephile_catalogue::verify::report(&outcomes) {
         // Non-zero, so this is usable as evidence in CI rather than only by eye.
         std::process::exit(1);
     }
@@ -1223,14 +1228,14 @@ async fn repair_variants(db: &Db) -> Result<(), JobError> {
     use std::time::Instant;
 
     let started = Instant::now();
-    let before = sinephile_ingest::repair::mislabelled_english(db).await?;
+    let before = sinephile_catalogue::repair::mislabelled_english(db).await?;
     tracing::info!("{before} rows claim to be english while carrying another language");
 
     let mut job = Job::begin(db, "repair-variants").await?;
-    sinephile_ingest::repair::english_variants(&mut job).await?;
+    sinephile_catalogue::repair::english_variants(&mut job).await?;
     job.finish().await?;
 
-    let after = sinephile_ingest::repair::mislabelled_english(db).await?;
+    let after = sinephile_catalogue::repair::mislabelled_english(db).await?;
     println!();
     println!(
         "  {} rows repaired, {after} still mislabelled",
@@ -1246,17 +1251,17 @@ async fn normalise(db: &Db) -> Result<(), JobError> {
     use std::time::Instant;
 
     let started = Instant::now();
-    let before = sinephile_ingest::normalise::remaining(db).await?;
+    let before = sinephile_catalogue::normalise::remaining(db).await?;
     tracing::info!("{before} titles need normalising");
 
     let mut job = Job::begin(db, "titles-normalise").await?;
     if job.is_resuming().await? {
         tracing::info!("resuming a previous run");
     }
-    sinephile_ingest::normalise::backfill(&mut job).await?;
+    sinephile_catalogue::normalise::backfill(&mut job).await?;
     job.finish().await?;
 
-    let after = sinephile_ingest::normalise::remaining(db).await?;
+    let after = sinephile_catalogue::normalise::remaining(db).await?;
     println!();
     println!(
         "  {} titles normalised, {after} still without a form",

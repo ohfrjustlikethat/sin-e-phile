@@ -4,58 +4,27 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 license = "GPL-3.0-only"
-description = "Offline dataset ingestion (SPEC.md §7, Phase 4)."
+description = "The command line over the catalogue pipeline (SPEC.md §7)."
 
-# At tools/ingest/ because SPEC.md §7 puts it there, and a cargo package rather than
-# a script because it writes through the persistence layer's types. It does not
-# depend on tauri, so its tests run (ADR-0022).
-
-[lib]
-name = "sinephile_ingest"
-path = "src/lib.rs"
+# A CLI and nothing else. Everything it drives lives in `crates/catalogue`, because the
+# application needs the same pipeline to refresh the catalogue on launch and cannot
+# depend on a tool (D37).
 
 [[bin]]
 name = "ingest"
 path = "src/main.rs"
 
 [dependencies]
+sinephile-catalogue = { path = "../../crates/catalogue" }
 sinephile-persistence = { path = "../../crates/persistence" }
-# AniList lives here rather than in this crate: rate limiting, backoff and cache
-# freshness are HTTP concerns, and the app needs them at runtime too (Phase 11).
+sinephile-embedding = { path = "../../crates/embedding" }
+sinephile-vector-index = { path = "../../crates/vector-index" }
+# The CLI constructs the HTTP clients it hands to the pipeline — which transport and
+# which rate limit is a caller's decision, not the pipeline's.
 sinephile-metadata-api = { path = "../../crates/metadata-api" }
 sqlx = { version = "=0.8.6", default-features = false, features = [
     "runtime-tokio", "sqlite", "macros",
 ] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
-thiserror = "2"
-
-# rustls rather than native-tls: no OpenSSL build story on Windows, which is the
-# only platform this ships on. `stream` gives a chunked body so a 1 GB dataset is
-# never held in memory. Version pinned (standing rule 15).
-reqwest = { version = "=0.12.24", default-features = false, features = [
-    "rustls-tls", "stream", "gzip",
-] }
-futures-util = "=0.3.31"
-# miniz_oxide backend (the default) — pure Rust, so no C toolchain requirement
-# beyond the MSVC one already needed.
-flate2 = "=1.1.4"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-# MovieLens ships .zip and GroupLens publishes no gzip alternative. Pinned like every
-# other dependency (standing rule 15), and cut down to deflate-over-flate2 so it reuses
-# the decompressor already here rather than pulling in bzip2, zstd, lzma and AES.
-zip = { version = "=8.6.0", default-features = false, features = ["deflate-flate2"] }
-# The model moved to crates/embedder so the application can use it too; this tool
-# keeps only the producer around it.
-sinephile-embedder = { path = "../../crates/embedder" }
-# The HNSW index is DERIVED from the artefact this tool produces, on this machine —
-# ADR-0014 publishes vectors, not graphs. See crates/vector-index.
-sinephile-vector-index = { path = "../../crates/vector-index" }
-sinephile-embedding = { version = "0.1.0", path = "../../crates/embedding" }
-sha2 = "0.10.9"
-md-5 = "0.10"
-unicode-normalization = "0.1"
-
-[dev-dependencies]
-tempfile = "3"
-flate2 = "=1.1.4"

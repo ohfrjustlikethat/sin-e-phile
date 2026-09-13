@@ -23,6 +23,9 @@ pub type ResponseFuture<'a> =
 pub enum Method {
     Get,
     Post,
+    /// Headers only. The cheap way to ask "has this changed?" of a 216 MB file — and
+    /// the only safe way, because a conditional GET that guesses wrong downloads it.
+    Head,
 }
 
 #[derive(Debug, Clone)]
@@ -37,6 +40,16 @@ impl Request {
     pub fn get(url: impl Into<String>) -> Self {
         Self {
             method: Method::Get,
+            url: url.into(),
+            body: None,
+            headers: Vec::new(),
+        }
+    }
+
+    /// Ask only for the headers — validators, length, content type.
+    pub fn head(url: impl Into<String>) -> Self {
+        Self {
+            method: Method::Head,
             url: url.into(),
             body: None,
             headers: Vec::new(),

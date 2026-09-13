@@ -6,9 +6,9 @@
 
 use std::path::Path;
 
+use sinephile_catalogue::embed::{self, DocumentEmbedder};
+use sinephile_catalogue::{Job, JobError};
 use sinephile_embedding::{document, Artefact};
-use sinephile_ingest::embed::{self, DocumentEmbedder};
-use sinephile_ingest::{Job, JobError};
 use sinephile_persistence::{Db, NewMediaItem};
 
 /// Deterministic vectors derived from the text, so a wrong sentence produces a

@@ -1140,9 +1140,9 @@ dependencies = [
 name = "eval"
 version = "0.1.0"
 dependencies = [
+ "sinephile-catalogue",
  "sinephile-embedder",
  "sinephile-embedding",
- "sinephile-ingest",
  "sinephile-persistence",
  "sinephile-search-engine",
  "sinephile-vector-index",
@@ -4215,6 +4215,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "sinephile-catalogue"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "futures-util",
+ "md-5",
+ "reqwest 0.12.24",
+ "sha2",
+ "sinephile-embedder",
+ "sinephile-embedding",
+ "sinephile-metadata-api",
+ "sinephile-persistence",
+ "sinephile-vector-index",
+ "sqlx",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "unicode-normalization",
+ "zip",
+]
+
+[[package]]
 name = "sinephile-embedder"
 version = "0.1.0"
 dependencies = [
@@ -4237,24 +4261,15 @@ dependencies = [
 name = "sinephile-ingest"
 version = "0.1.0"
 dependencies = [
- "flate2",
- "futures-util",
- "md-5",
- "reqwest 0.12.24",
- "sha2",
- "sinephile-embedder",
+ "sinephile-catalogue",
  "sinephile-embedding",
  "sinephile-metadata-api",
  "sinephile-persistence",
  "sinephile-vector-index",
  "sqlx",
- "tempfile",
- "thiserror 2.0.20",
  "tokio",
  "tracing",
  "tracing-subscriber",
- "unicode-normalization",
- "zip",
 ]
 
 [[package]]

@@ -22,7 +22,7 @@ sinephile-persistence = { path = "../../crates/persistence" }
 # one place a drift could not be noticed.
 sinephile-embedding = { path = "../../crates/embedding" }
 sinephile-vector-index = { path = "../../crates/vector-index" }
-sinephile-ingest = { path = "../ingest" }
+sinephile-catalogue = { path = "../../crates/catalogue" }
 sinephile-embedder = { path = "../../crates/embedder" }
 sinephile-search-engine = { path = "../../crates/search-engine" }
 sqlx = { version = "=0.8.6", default-features = false, features = [

@@ -78,7 +78,7 @@ pub async fn compare(data_dir: &Path, query: &str, ids: &[i64]) -> Result<bool, 
     );
 
     for id in ids {
-        let Some(document) = sinephile_ingest::embed::document_for(&db, *id)
+        let Some(document) = sinephile_catalogue::embed::document_for(&db, *id)
             .await
             .map_err(|e| EvalError::Missing(e.to_string()))?
         else {
@@ -209,7 +209,7 @@ pub async fn run(data_dir: &Path, report: bool) -> Result<bool, EvalError> {
 
     for position in (0..ids.len()).step_by(stride).take(AGREEMENT_SAMPLES) {
         let id = ids[position];
-        let Some(document) = sinephile_ingest::embed::document_for(&db, id)
+        let Some(document) = sinephile_catalogue::embed::document_for(&db, id)
             .await
             .map_err(|e| EvalError::Missing(e.to_string()))?
         else {
