@@ -1741,3 +1741,70 @@ anyway, on its merits.
 
 **E3 is not met, and it is now a number rather than an impression** — which is the whole
 point of the subtask.
+
+### The app opens the database, and refreshes itself (subtask 5.7, D26, D37)
+
+Release build, dev machine (Tier 2), 2026-09-13. `cold_start_ms` from
+`target/release/data/logs/`, process start → frontend painted.
+
+**Cold start is unchanged**, which is the point of opening the database off the startup
+path:
+
+| launch | cold start |
+|---|---|
+| Phase 1 baseline | 515 / 660 ms |
+| first run of a fresh binary | 871 ms |
+| subsequent | **522 · 366 · 342 · 339 · 328 ms** |
+
+The 871 ms outlier is the first execution of a newly-linked binary; every warm launch
+sits at or below the Phase 1 figures. The database handle is created on a background
+task and installed when ready, so nothing on the path to the first painted frame waits
+for a disk.
+
+**And the catalogue now refreshes itself**, automatically and silently, by the author's
+decision:
+
+```
+02:19:27  database open
+02:19:27  frontend interactive cold_start_ms=871
+02:20:27  catalogue freshness outcome=Refreshed { titles_added: 4604 }
+…
+02:55:11  frontend interactive cold_start_ms=339
+02:55:11  catalogue freshness outcome=AlreadyCurrent
+```
+
+**4,604 titles the catalogue did not have**, fetched without anyone typing a command —
+the thing ADR-0030 specified and nothing had ever done. And a launch where IMDb has not
+republished resolves to `AlreadyCurrent` **260 ms after the frontend paints**, costing
+one HEAD request and no download.
+
+#### Two bugs, both found by running it rather than reasoning about it
+
+**1. Every launch re-downloaded 216 MB.** The first check is stale *without* a request —
+there is no cached validator to compare — so it carried none, so nothing was recorded,
+so the next launch was stale again. Observed directly: two consecutive launches, the
+second reporting `Refreshed { titles_added: 0 }` after downloading the lot.
+
+**2. Recording it at the end did not fix it either.** The app exits when its window
+closes and a refresh takes about a minute, so a user who opens and closes quickly never
+reaches the end — and never learns a validator. Confirmed by four launches leaving
+`http_cache` empty.
+
+The validator is now recorded **after the download and before the load**, which is the
+only boundary that is wrong in neither direction:
+
+| killed during | consequence |
+|---|---|
+| the download | nothing recorded, fetched again — correct |
+| the load | bytes kept, validator recorded, `Job` resumes — correct |
+
+#### One number worth chasing later
+
+```
+slow statement: SELECT MAX(CAST(SUBSTR(e.external_id, 3) AS INTEGER)) …   13.68 s
+```
+
+The refresh watermark — the highest IMDb id already held — is a full scan with a cast
+over 3.2 million rows, and no index can serve it. It runs on the background task so it
+costs no user-visible time today, but 13.7 s of disk on every refresh is not free.
+Recorded as debt.

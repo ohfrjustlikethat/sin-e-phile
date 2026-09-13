@@ -130,6 +130,106 @@ pub async fn remember(db: &Db, validator: &str) -> Result<(), crate::job::JobErr
         .map_err(|e| crate::job::JobError::step("freshness", e.to_string()))
 }
 
+/// Check, and refresh if the answer is yes. **This is what the application calls on
+/// launch**, and it is deliberately the whole policy in one place.
+///
+/// # Automatic and silent, by the author's decision
+///
+/// A refresh that is due runs in the background without asking. The alternative — a
+/// prompt saying an update is available — puts a decision in front of someone who opened
+/// the app to watch something, about a dataset they have never heard of. Progress is
+/// visible through `CatalogueRepository::readiness` for any screen that wants it.
+///
+/// # Returns what happened, and never fails the caller
+///
+/// A launch-time task that can return an error invites a caller that handles it by
+/// crashing. The outcome is a value; the caller logs it.
+pub async fn refresh_if_stale(
+    db: &Db,
+    transport: &dyn Transport,
+    datasets: &std::path::Path,
+) -> Outcome {
+    let freshness = check(db, transport).await;
+    let Freshness::Stale { validator } = freshness else {
+        return match freshness {
+            Freshness::UpToDate => Outcome::AlreadyCurrent,
+            _ => Outcome::CouldNotTell,
+        };
+    };
+
+    // WHERE THE VALIDATOR IS RECORDED, AND WHY IT IS HERE.
+    //
+    // After the download, before the load. Measured, having got it wrong twice:
+    //
+    //   after the whole refresh — the app exits when its window closes, the refresh
+    //     takes about a minute, and a user who opens and closes quickly never reaches
+    //     the end. Nothing is ever remembered, so EVERY launch re-downloads 216 MB.
+    //     Observed on real launches: two in a row, the second adding `titles_added: 0`.
+    //   before the download — an interrupted refresh looks complete, and the catalogue
+    //     silently never updates again.
+    //
+    // The download is the expensive, all-or-nothing half; the load is resumable through
+    // `Job`. So the boundary between them is the only place that is wrong in neither
+    // direction: killed mid-download, nothing is recorded and it is fetched again;
+    // killed mid-load, the bytes are kept and the job resumes.
+    let validator = match validator {
+        Some(validator) => Some(validator),
+        // Nothing was cached, so `check` returned stale without asking. Ask now.
+        None => current_validator(transport, &cache_key()).await,
+    };
+
+    if let Err(error) = crate::refresh::download(datasets).await {
+        tracing::warn!(%error, "catalogue download failed; carrying on with what we have");
+        return Outcome::Failed;
+    }
+    if let Some(validator) = &validator {
+        if let Err(error) = remember(db, validator).await {
+            tracing::warn!(%error, "downloaded, but could not record the validator");
+        }
+    }
+
+    match crate::refresh::load(db, datasets).await {
+        Ok(refreshed) => Outcome::Refreshed {
+            titles_added: refreshed.titles_added,
+        },
+        Err(error) => {
+            // The bytes are on disk and the validator is recorded, so this does not
+            // re-download; `Job` resumes the load on the next launch.
+            tracing::warn!(%error, "catalogue load failed; it will resume next launch");
+            Outcome::Failed
+        }
+    }
+}
+
+/// The publisher's current validator, or `None` if it will not say.
+///
+/// Separate from [`check`] because it answers a different question: not "has this
+/// changed" but "what is it now", which is what a first refresh needs in order to have
+/// something to compare against next time.
+async fn current_validator(transport: &dyn Transport, url: &str) -> Option<String> {
+    let response = transport.send(Request::head(url)).await.ok()?;
+    if !(200..300).contains(&response.status) {
+        return None;
+    }
+    response
+        .header("etag")
+        .or_else(|| response.header("last-modified"))
+        .map(str::to_string)
+}
+
+/// What a launch-time refresh did, for the log and for any screen that cares.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Outcome {
+    AlreadyCurrent,
+    Refreshed {
+        titles_added: i64,
+    },
+    /// Offline, or the publisher would not say. Not an error.
+    CouldNotTell,
+    /// It was due and it did not work. Also not an error, to the caller.
+    Failed,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -198,6 +298,81 @@ mod tests {
         let freshness = check(&db, &transport).await;
         assert_eq!(freshness, Freshness::Unknown);
         assert!(!freshness.should_refresh());
+    }
+
+    #[tokio::test]
+    async fn nothing_is_downloaded_when_the_catalogue_is_already_current() {
+        // The whole point of the check: a launch where IMDb has not republished must
+        // cost one HEAD request and nothing else. If this ever regresses, every launch
+        // pays 216 MB.
+        let db = db().await;
+        remember(&db, "\"abc-27\"").await.expect("remember");
+
+        let transport = FakeTransport::default();
+        transport.push(Response::new(200, "").with_header("etag", "\"abc-27\""));
+
+        let outcome = refresh_if_stale(&db, &transport, std::path::Path::new("/nonexistent")).await;
+        assert_eq!(outcome, Outcome::AlreadyCurrent);
+        assert_eq!(
+            transport.requests.lock().expect("lock").len(),
+            1,
+            "exactly one HEAD, and no download"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_first_refresh_learns_a_validator_so_the_second_launch_is_free() {
+        // THE BUG THIS CAUGHT, measured on two real launches before it was written: the
+        // first check is stale WITHOUT a request, so it carries no validator, so nothing
+        // was remembered, so the second launch downloaded 216 MB to add nothing. The
+        // per-launch download this module exists to prevent, arriving through the one
+        // path that skips the HEAD.
+        //
+        // A refresh cannot run in a test, so this asserts the half that was wrong: with
+        // no stored validator, the check is stale and carries none — and `remember` is
+        // therefore the only thing standing between the first launch and the second.
+        let db = db().await;
+        let transport = FakeTransport::default();
+
+        assert_eq!(
+            check(&db, &transport).await,
+            Freshness::Stale { validator: None },
+            "a fresh catalogue is stale and has nothing to remember"
+        );
+
+        // What `refresh_if_stale` now does after a successful first refresh.
+        let learned = current_validator(
+            &{
+                let t = FakeTransport::default();
+                t.push(Response::new(200, "").with_header("etag", "\"abc-27\""));
+                t
+            },
+            "https://example.invalid/title.basics.tsv.gz",
+        )
+        .await;
+        assert_eq!(learned.as_deref(), Some("\"abc-27\""));
+        remember(&db, &learned.expect("learned"))
+            .await
+            .expect("remember");
+
+        // The second launch now costs one HEAD and finds nothing to do.
+        let second = FakeTransport::default();
+        second.push(Response::new(200, "").with_header("etag", "\"abc-27\""));
+        assert_eq!(check(&db, &second).await, Freshness::UpToDate);
+    }
+
+    #[tokio::test]
+    async fn being_unable_to_tell_never_triggers_a_refresh() {
+        // `/nonexistent` would make a real refresh fail loudly. Reaching it at all would
+        // mean an offline launch had decided to re-download the catalogue.
+        let db = db().await;
+        remember(&db, "\"abc-27\"").await.expect("remember");
+
+        let transport = FakeTransport::default();
+        transport.push_error(sinephile_metadata_api::TransportError::Timeout);
+
+        let outcome = refresh_if_stale(&db, &transport, std::path::Path::new("/nonexistent")).await;
+        assert_eq!(outcome, Outcome::CouldNotTell);
     }
 
     #[tokio::test]

@@ -849,9 +849,9 @@
         },
         {
           "id": "5.7",
-          "text": "Open the database in the application (debt D26) and RE-MEASURE COLD START against Phase 1's 515/660 ms before and after.",
-          "status": "not_started",
-          "commit": null
+          "text": "The application opens the database (D26) and refreshes the catalogue on launch (D37). Both on a background task, so cold start is unchanged: 328-522 ms against Phase 1's 515/660. The catalogue pipeline moved from tools/ingest to crates/catalogue to make the second possible at all. Measured end to end: a launch added 4,604 titles nobody asked for, and a launch with nothing to do reports AlreadyCurrent 260 ms after the frontend paints.",
+          "status": "complete",
+          "commit": "49d2fe6"
         },
         {
           "id": "5.8",
@@ -1848,7 +1848,7 @@
       ]
     }
   ],
-  "next_action": "Phase 5 subtask 5.7: open the database in the application (debt D26) and re-measure cold start against Phase 1's recorded 515/660 ms, before and after. src-tauri/src/state.rs holds only the hardware profile today, so AppState gains a Db opened from paths::data_dir, and the Tauri commands that need it stop being unreachable from the running app. FOLD D37 IN WHILE YOU ARE THERE, as the author asked: the catalogue must refresh when the app opens. D24's measurement makes that nearly free - IMDb answers a conditional GET with 304 and zero bytes - but READ D37 FIRST, because `ingest refresh` lives in a dev tool the application cannot depend on, and moving job.rs, download.rs, tsv.rs and refresh.rs into a crate is most of the subtask rather than a detail inside it. E3 is measured and not met (0.1188 meaning, 1.0000 filter); D39 was priced and rejected, D40 says the fixture's known-item queries are measured with the wrong metric - neither blocks 5.7.",
+  "next_action": "Phase 5 subtask 5.8: the search UI. Build the results surface in src/features/search/ - results as you type, grouped by kind, keyboard navigable, with a 'why this matched' hint driven by the MatchReason the engine already returns (ExactTitle, Keyword, Fuzzy, Semantic, Both). The backend is done and measured: sinephile_search_engine::Engine::search returns Hits at p95 31.3 ms, and AppState now holds the Db (5.7) so a Tauri command can reach it - add one in src-tauri/src/commands/, thin, with the logic staying in the engine crate per ADR-0022. IT MUST CONSULT CatalogueRepository::readiness BEFORE SAYING 'no results': at 3% ingested that phrase is a lie, and the readiness surface exists precisely so the UI cannot tell it. E4 also needs this screen - its criterion asks for screenshots in a case study, so 5.8 is what makes E4 answerable at all.",
   "blockers": [],
   "decisions_pending": [
     {
@@ -2148,7 +2148,7 @@
     {
       "id": "D26",
       "phase_raised": 4,
-      "text": "THE APPLICATION DOES NOT OPEN THE DATABASE YET. src-tauri's AppState holds the hardware profile and nothing else, so CatalogueRepository::readiness, CredentialRepository and the artwork cache are all reachable from tests and from tools/ingest but not from the running app. Phase 5 needs the database open for search and is the natural place to do it. WHEN IT DOES: re-measure cold start. Phase 1 recorded 515/660 ms to interactive against a 2 s Tier 2 budget, and opening a 3.6 GB SQLite file plus a migration version check is the first thing since then that could move it. Measuring after the change rather than before would make a regression invisible."
+      "text": "RESOLVED 2026-09-13 (subtask 5.7). AppState now holds a Db, opened on a background task and installed when ready, so nothing on the path to the first painted frame waits for a disk. Cold start re-measured at 328-522 ms across five launches against Phase 1's 515/660 baseline - no regression. Callers that arrive before the open completes get None rather than a stall."
     },
     {
       "id": "D27",
@@ -2202,7 +2202,7 @@
     },
     {
       "id": "D37",
-      "text": "NOTHING SCHEDULES THE CATALOGUE REFRESH, AND SUBTASK 5.7 IS BIGGER THAN IT LOOKS. The author asked for the catalogue to refresh on every app open, and D24's measurement makes the CHECK nearly free (conditional GET -> 304, 0 bytes). The blocker is not the check, it is WHO RUNS THE REFRESH: `ingest refresh` is 178 lines resting on ~1,800 lines of job runner, downloader and TSV reader that all live in tools/ingest, A DEV TOOL THE APPLICATION CANNOT DEPEND ON. The same wall the query embedder hit in 5.10, and solved the same way - crates/embedder - but this is an order of magnitude larger. Options for 5.7: (a) move job.rs, download.rs, tsv.rs and refresh.rs into a crates/catalogue crate, roughly a session's work, and the app calls it on launch; (b) ship the ingest binary alongside the app and spawn it, rejected because a dev tool is not a shipped artefact and Phase 27 would have to package it; (c) app decides and reports, user runs the command, which is not what was asked for. RECOMMEND (a). Until it exists an installed app's catalogue is frozen at install time, which ADR-0030 exists to prevent, and Phase 20 is Tier C so it cannot be the owner.",
+      "text": "RESOLVED 2026-09-13 (subtask 5.7). The pipeline moved from tools/ingest to crates/catalogue, which is what made it reachable from the application at all, and freshness::refresh_if_stale runs on launch - automatic and silent, by the author's decision. Measured: one launch added 4,604 titles, and a launch with nothing to do reports AlreadyCurrent 260 ms after the frontend paints, costing one HEAD request. TWO BUGS WERE FOUND BY RUNNING IT: the first check is stale without a request so it carried no validator and every launch re-downloaded 216 MB; and recording the validator at the END did not fix it either, because the app exits when its window closes and a refresh takes a minute. It is now recorded after the download and before the load - the only boundary that is wrong in neither direction.",
       "phase_raised": 5
     },
     {
@@ -2218,6 +2218,16 @@
     {
       "id": "D40",
       "text": "THE SEMANTIC FIXTURE MIXES TWO KINDS OF QUERY AND ONE OF THEM IS MEASURED WRONG. Two of the eight meaning queries - 'a man returns to his hometown to care for his nephew after a death' and 'slow science fiction about memory' - are KNOWN-ITEM queries: they describe one specific film, so the honest metric is MRR or top-10 presence, not nDCG over a fixture listing two answers where everything else scores 0. Both score 0.0000 and drag the mean down in a way that says little about the six topical queries around them. Either split them into a third kind with their own metric, or widen their graded sets - but ONLY with films that would have been listed on their merits, because widening a fixture to match what the code returns is how a fixture stops being able to fail. Noted while writing it, not after it disappointed.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D41",
+      "text": "THE REFRESH WATERMARK IS A 13.7-SECOND FULL SCAN. `SELECT MAX(CAST(SUBSTR(e.external_id, 3) AS INTEGER)) FROM external_ids e JOIN media_items m ...` computes the highest IMDb id already held, and the cast defeats every index: 13.68 s over 3.2 million rows, logged as a slow statement on every launch that refreshes. It runs on the background task so it costs no user-visible time today. The fix is to store the watermark rather than derive it - the refresh already knows the highest id it inserted - or to add a generated column carrying the numeric id, which ADR-0032 makes tempting anyway since IMDb ids sort as text.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D42",
+      "text": "TWO APP INSTANCES CAN BOTH REFRESH. Nothing configures Tauri's single-instance plugin, so two copies can run, and both will check freshness and both may download. Observed while measuring: an instance that checked before another had committed its validator logged `Refreshed { titles_added: 0 }` immediately after a sibling logged `AlreadyCurrent`. Harmless today - `Job` serialises the load through the database and the second refresh inserts nothing - but it is 216 MB of wasted download and it will matter more when Phase 7 adds a torrent session that genuinely cannot run twice. Single-instance is the one-line fix; it belongs with Phase 20's platform integration, or sooner if anything else needs exclusivity.",
       "phase_raised": 5
     }
   ],

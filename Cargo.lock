@@ -4188,6 +4188,8 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "sinephile-catalogue",
+ "sinephile-metadata-api",
  "sinephile-persistence",
  "sinephile-tiers",
  "specta",

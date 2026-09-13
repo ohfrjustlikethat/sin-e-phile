@@ -72,6 +72,52 @@ pub fn run() {
             builder.mount_events(app);
             app.manage(AppState::new());
 
+            // THE DATABASE OPENS OFF THE STARTUP PATH, and the catalogue refreshes
+            // itself behind it (D37, ADR-0030). Both on a background task, because
+            // SPEC.md 2.3 budgets cold start and neither of these is worth a
+            // millisecond of it: the window is what the user is waiting for.
+            //
+            // The refresh is automatic and silent by the author's decision. A prompt
+            // would put a question about a dataset in front of someone who opened the
+            // app to watch something. When IMDb has not republished — which is most
+            // launches — the whole thing costs one HEAD request.
+            let db_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let dir = match sinephile_persistence::paths::data_dir(
+                    sinephile_persistence::DataLocation::Development,
+                ) {
+                    Ok(dir) => dir,
+                    Err(error) => {
+                        tracing::error!(%error, "no data directory; the catalogue is unavailable");
+                        return;
+                    }
+                };
+
+                let db = match sinephile_persistence::Db::open_in(&dir).await {
+                    Ok(db) => std::sync::Arc::new(db),
+                    Err(error) => {
+                        // The app keeps running. Search will report that the catalogue
+                        // is unavailable, which is a far better outcome than refusing
+                        // to start over a locked file.
+                        tracing::error!(%error, "could not open the database");
+                        return;
+                    }
+                };
+                db_handle
+                    .state::<AppState>()
+                    .set_db(std::sync::Arc::clone(&db));
+                tracing::info!("database open");
+
+                let transport = sinephile_metadata_api::HttpTransport::new();
+                let outcome = sinephile_catalogue::freshness::refresh_if_stale(
+                    &db,
+                    &transport,
+                    &dir.join("datasets"),
+                )
+                .await;
+                tracing::info!(?outcome, "catalogue freshness");
+            });
+
             // The window stays hidden (tauri.conf.json `visible: false`) until the
             // frontend calls `frontend_ready`, so the user never sees an empty
             // frame during cold start. A watchdog reveals it anyway if the

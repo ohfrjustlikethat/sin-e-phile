@@ -176,3 +176,76 @@ async fn apply(
     }
     Ok(updated)
 }
+
+/// What one refresh did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Refreshed {
+    pub titles_added: i64,
+    pub ratings_reapplied: i64,
+}
+
+/// Run ADR-0030 layer 1 end to end: fetch, insert what is new, re-apply every rating.
+///
+/// # Why this is here and not in the CLI
+///
+/// It was in `tools/ingest/src/main.rs`, which meant the only way to refresh a catalogue
+/// was to type a command — so an installed application never did (D37). The application
+/// calls this on launch now, through
+/// [`crate::freshness::refresh_if_stale`], and the CLI calls the same function.
+///
+/// Both files are re-fetched: gzip cannot be seeked and IMDb publishes no changelog, so
+/// the download is the unavoidable cost of layer 1. What it avoids is the expensive
+/// half — re-inserting 2.7 million rows — because anything already held is skipped
+/// before it is parsed.
+pub async fn run(db: &Db, datasets: &std::path::Path) -> Result<Refreshed, JobError> {
+    download(datasets).await?;
+    load(db, datasets).await
+}
+
+/// Fetch the two datasets. **The expensive, non-resumable half.**
+///
+/// Split from [`load`] so a caller can act between them — specifically, so the launch
+/// path can record the publisher's validator once the 216 MB is safely on disk. See
+/// `freshness::refresh_if_stale` for why that boundary and not another.
+pub async fn download(datasets: &std::path::Path) -> Result<(), JobError> {
+    let downloader = crate::download::Downloader::new();
+    for dataset in [&crate::imdb::TITLE_RATINGS, &crate::imdb::TITLE_BASICS] {
+        let path = datasets.join(dataset.filename);
+        // Deleted first, because the downloader skips a file it already has — which is
+        // right for resumption and exactly wrong for a refresh.
+        let _ = std::fs::remove_file(&path);
+        downloader.fetch(&dataset.url(), &path, |_| {}).await?;
+        crate::download::verify_gzip(&path)?;
+    }
+    Ok(())
+}
+
+/// Insert what is new and re-apply every rating. **The resumable half**, through `Job`.
+pub async fn load(db: &Db, datasets: &std::path::Path) -> Result<Refreshed, JobError> {
+    use std::sync::Arc;
+
+    let before = title_count(db).await?;
+    let watermark = watermark(db).await?;
+
+    let ratings_path = datasets.join(crate::imdb::TITLE_RATINGS.filename);
+    let votes = Arc::new(crate::load::load_votes(&ratings_path)?);
+    let averages = Arc::new(crate::load::load_average_ratings(&ratings_path)?);
+
+    let mut job = Job::begin(db, "refresh").await?;
+    crate::load::load_titles(
+        &mut job,
+        datasets.join(crate::imdb::TITLE_BASICS.filename),
+        Arc::clone(&votes),
+        Arc::clone(&averages),
+        crate::imdb::CatalogueScope::DEFAULT,
+        watermark,
+    )
+    .await?;
+    let ratings_reapplied = ratings(&mut job, votes, averages).await?;
+    job.finish().await?;
+
+    Ok(Refreshed {
+        titles_added: title_count(db).await? - before,
+        ratings_reapplied,
+    })
+}

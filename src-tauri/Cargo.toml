@@ -1,4 +1,4 @@
-﻿[package]
+[package]
 name = "sin-e-phile"
 version = "0.1.0"
 description = "A Windows desktop media engine. Ships no content sources."
@@ -41,6 +41,10 @@ specta-typescript = "=0.0.12"
 tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 sinephile-tiers = { path = "../crates/tiers" }
 sinephile-persistence = { path = "../crates/persistence" }
+# The catalogue pipeline, so the app can refresh itself on launch (D37, ADR-0030).
+# It is a crate rather than a tool precisely so this line can exist.
+sinephile-catalogue = { path = "../crates/catalogue" }
+sinephile-metadata-api = { path = "../crates/metadata-api" }
 thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
