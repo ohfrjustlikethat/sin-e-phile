@@ -851,7 +851,7 @@
           "id": "5.7",
           "text": "The application opens the database (D26) and refreshes the catalogue on launch (D37). Both on a background task, so cold start is unchanged: 328-522 ms against Phase 1's 515/660. The catalogue pipeline moved from tools/ingest to crates/catalogue to make the second possible at all. Measured end to end: a launch added 4,604 titles nobody asked for, and a launch with nothing to do reports AlreadyCurrent 260 ms after the frontend paints.",
           "status": "complete",
-          "commit": "49d2fe6"
+          "commit": "b89bbe2"
         },
         {
           "id": "5.8",
