@@ -1677,3 +1677,67 @@ Two untried changes, in order of expected value: **put the synopsis first**, and
 
 **E3 and E4 are still not claimed.** E4 additionally requires screenshots in a case
 study, which needs the Phase 5.8 UI; E3 needs the semantic fixture from 5.6.
+
+### E3 is a number now (subtask 5.6)
+
+`cargo run -p eval --release -- search --report`, 2026-09-13, over
+`fixtures/search/semantic-queries.tsv` — 10 queries, 37 graded answers, every film named
+from independent knowledge before anything was run.
+
+| | nDCG@10 | queries | target |
+|---|---|---|---|
+| **filter** | **1.0000** | 2 | 0.75 |
+| **meaning** | **0.1188** | 8 | 0.75 |
+
+**The filter half is perfect.** "directed by Akira Kurosawa" and "films directed by
+Alfred Hitchcock from the 1950s" both return exactly the graded answers, in order. The
+structured half of search works.
+
+**The meaning half is nowhere near**, and the per-query detail says why:
+
+```
+"a man returns to his hometown to care for his nephew after a death"   nDCG 0.0000
+   The Returning · The Return · Kids Return · We Shall Return · Returning Home
+
+"slow science fiction about memory"                                    nDCG 0.0000
+   About Memory and Loss · 2009: Lost Memories · Mémoire entropique · Hauser's Memory
+```
+
+**Still matching query words in titles** — after the titles were removed from documents
+in `document::VERSION` 2. The route back in is Wikipedia itself: **every lead opens by
+restating the title and the credits** — *"The Return is a 2003 Russian drama film directed
+by…"* — so the title returns through the synopsis, and under CLS pooling that opening
+sentence is weighted heavily while the plot behind it falls past the 400-character cut.
+
+#### D39 priced, and rejected on the evidence
+
+The obvious fix was to strip that boilerplate lead and put the plot first.
+`eval embed --compare` measured it for the cost of one command rather than a three-hour
+re-embed:
+
+| item | shipped | whole synopsis | **plot first, lead stripped** |
+|---|---|---|---|
+| Manchester by the Sea *(the answer)* | 0.4884 | 0.5059 | **0.5539** |
+| The Return | 0.5698 | 0.5823 | 0.5977 |
+| Uncle Boonmee | 0.6069 | 0.5942 | 0.6295 |
+
+It lifts the correct answer by 0.065 — **and lifts the wrong answers by about as much.**
+The ordering does not change. A re-embed on this evidence would have bought nothing, and
+the measurement cost a minute.
+
+#### What the number actually indicts
+
+Two of the eight meaning queries are **known-item** queries: they describe one specific
+film, and nDCG over a fixture listing two answers scores 0 whenever that film lands at
+rank 11. The other six are topical and score better — "films about grief that aren't
+depressing" reaches 0.4770 with *Good Grief* first.
+
+Worth saying plainly: *The Return* and *Uncle Boonmee* are **not absurd answers** to a
+query about a man returning home after a death, and the fixture grades them 0. Some of
+the 0.1188 is the fixture being narrower than the truth. Widening it to match what the
+engine returns is exactly the trap the fixture header warns about, so the honest move is
+to record the tension and change the fixture only where a film would have been listed
+anyway, on its merits.
+
+**E3 is not met, and it is now a number rather than an impression** — which is the whole
+point of the subtask.

@@ -96,11 +96,27 @@ pub async fn compare(data_dir: &Path, query: &str, ids: &[i64]) -> Result<bool, 
                 .fetch_one(db.pool())
                 .await?;
 
-        // The shipped document, and the same document with the whole synopsis rather
-        // than its first 400 characters. The model reads 256 tokens either way, so the
-        // second is what the budget is leaving on the table.
+        // Three variants, because the harness now has to price a document-builder
+        // change rather than merely report one:
+        //
+        //   shipped   what the artefact actually holds
+        //   longer    the same, given the whole synopsis instead of 400 characters
+        //   plot      the synopsis with its BOILERPLATE LEAD SENTENCE REMOVED, first
+        //
+        // The third exists because every Wikipedia lead opens by restating the title and
+        // the credits — "The Return is a 2003 Russian drama film directed by…" — which is
+        // the metadata the document already carries, plus the title that v2 deliberately
+        // dropped. Under CLS pooling that sentence is weighted heavily, and the plot it
+        // precedes is what gets truncated away.
         let longer = match &full {
             Some(text) => format!("{document} {text}"),
+            None => document.clone(),
+        };
+        let plot = match &full {
+            Some(text) => {
+                let body = strip_lead_sentence(text);
+                format!("{body} {document}")
+            }
             None => document.clone(),
         };
 
@@ -110,12 +126,16 @@ pub async fn compare(data_dir: &Path, query: &str, ids: &[i64]) -> Result<bool, 
         let b = embedder
             .embed_document(&longer)
             .map_err(|e| EvalError::Missing(e.to_string()))?;
+        let c = embedder
+            .embed_document(&plot)
+            .map_err(|e| EvalError::Missing(e.to_string()))?;
 
         println!(
-            "  {:<34} {:>9.4} {:>9.4}  {:>5}",
-            title.chars().take(34).collect::<String>(),
+            "  {:<30} {:>9.4} {:>9.4} {:>9.4} {:>6}",
+            title.chars().take(30).collect::<String>(),
             sinephile_embedding::cosine(&query_vector, &a),
             sinephile_embedding::cosine(&query_vector, &b),
+            sinephile_embedding::cosine(&query_vector, &c),
             full.as_ref().map(|t| t.len()).unwrap_or(0)
         );
     }
@@ -249,6 +269,29 @@ pub async fn run(data_dir: &Path, report: bool) -> Result<bool, EvalError> {
     }
 
     Ok(all_identical)
+}
+
+/// Drop a Wikipedia lead's opening sentence when it is the usual boilerplate.
+///
+/// Leads overwhelmingly begin "TITLE is a YEAR NATIONALITY GENRE film directed by NAME."
+/// — the title this project removed from the document on purpose, plus metadata the
+/// document already states. Only removed when the sentence actually looks like that, so
+/// a synopsis that opens with plot keeps every word of it.
+fn strip_lead_sentence(synopsis: &str) -> &str {
+    let Some(end) = synopsis.find(". ") else {
+        return synopsis;
+    };
+    let lead = &synopsis[..end];
+    let looks_like_boilerplate = lead.contains(" is a ") || lead.contains(" is an ");
+    let names_a_form = ["film", "series", "documentary", "short", "anime", "drama"]
+        .iter()
+        .any(|form| lead.contains(form));
+
+    if looks_like_boilerplate && names_a_form {
+        synopsis[end + 2..].trim()
+    } else {
+        synopsis
+    }
 }
 
 fn percentile(sorted: &[f64], fraction: f64) -> f64 {

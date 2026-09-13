@@ -11,6 +11,7 @@ use std::path::Path;
 
 mod embed;
 mod error;
+mod relevance;
 mod search;
 mod vector;
 

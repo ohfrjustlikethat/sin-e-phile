@@ -169,6 +169,10 @@ pub async fn run(data_dir: &Path, report: bool) -> Result<bool, EvalError> {
         });
     }
 
+    // E3 shares this harness's engine deliberately: a relevance number taken against a
+    // differently-configured engine than E1 and E2 would not be comparable to them.
+    let relevance = crate::relevance::run(data_dir, &mut engine, &db).await?;
+
     let total = outcomes.len();
     let passed = outcomes.iter().filter(|o| o.passed).count();
     let mut times: Vec<f64> = outcomes.iter().map(|o| o.millis).collect();
@@ -196,6 +200,8 @@ pub async fn run(data_dir: &Path, report: bool) -> Result<bool, EvalError> {
         p(0.95),
         times.last().copied().unwrap_or(0.0)
     );
+
+    let relevance_passed = crate::relevance::report(&relevance, report);
 
     if report {
         let failures: Vec<&Outcome> = outcomes.iter().filter(|o| !o.passed).collect();
@@ -246,5 +252,8 @@ pub async fn run(data_dir: &Path, report: bool) -> Result<bool, EvalError> {
             p(0.95)
         );
     }
-    Ok(e2_met && e1_met)
+    if !relevance_passed {
+        println!("  E3 NOT MET: the meaning half is below the 0.75 target.");
+    }
+    Ok(e2_met && e1_met && relevance_passed)
 }

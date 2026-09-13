@@ -1,7 +1,7 @@
 {
   "spec_version": "1.9.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-09-07",
+  "last_updated": "2026-09-13",
   "sessions_completed": 10,
   "current_phase": {
     "number": 4,
@@ -795,7 +795,7 @@
           "id": "E3",
           "text": "nDCG@10 > 0.75 on the semantic query set.",
           "met": false,
-          "evidence": "NOT MET, and blocked by B4 rather than unattempted. Three distinct approaches were measured - Wikipedia enrichment (233,114 synopses), indexing only items with descriptive text (855,703 -> 189,470), and removing titles from the document plus a 300-character minimum (-> 119,874). Each improved results; none was sufficient. The measurement that ends it is in docs/eval-results.md: a trivia-only synopsis outscores a verbatim plot match 0.4194 to 0.1944. all-MiniLM-L6-v2 is a symmetric similarity model doing asymmetric retrieval. See P13."
+          "evidence": "MEASURED, NOT MET. `cargo run -p eval --release -- search --report` 2026-09-13 over fixtures/search/semantic-queries.tsv: FILTER half nDCG@10 = 1.0000 over 2 queries, MEANING half = 0.1188 over 8, against a 0.75 target. The structured half of search is exactly right; the meaning half still matches query words in TITLES even though titles were removed from documents in document::VERSION 2 - Wikipedia leads restate the title and credits in their opening sentence, which CLS pooling weights heavily and which pushes the plot past the 400-character budget. D39's proposed fix was PRICED with `eval embed --compare` and rejected: stripping the boilerplate lead lifts the correct answer 0.4884 -> 0.5539 and lifts the wrong answers by as much, leaving the order unchanged. Part of the 0.1188 is the fixture being narrower than the truth - two of the eight queries are known-item queries and some ungraded results are defensible. See docs/eval-results.md."
         },
         {
           "id": "E4",
@@ -843,8 +843,8 @@
         },
         {
           "id": "5.6",
-          "text": "fixtures/search/ and the relevance harness. exact-titles.tsv (43 queries), `eval search`, `eval vector` (recall 0.9810 with a --prove control) and `eval embed` (byte-identical agreement, plus --compare for per-document cosine) all exist. semantic-queries.tsv and nDCG@10 are BLOCKED BY B4: a fixture measured against a model that cannot do asymmetric retrieval would record the model's ceiling as the system's score.",
-          "status": "in_progress",
+          "text": "fixtures/search/ and the relevance harness. exact-titles.tsv (43 queries), semantic-queries.tsv (10 queries, 37 graded answers, meaning and filter scored SEPARATELY), plus `eval vector` (recall, with a --prove control), `eval embed` (byte-identical agreement, and --compare to price a document change before spending a re-embed on it). nDCG@10 is now reported next to E1 and E2 and gates the exit code.",
+          "status": "complete",
           "commit": null
         },
         {
@@ -1848,7 +1848,7 @@
       ]
     }
   ],
-  "next_action": "Phase 5 subtask 5.6: the semantic fixture and nDCG@10, the only thing that turns E3 from an opinion into a number. Write fixtures/search/semantic-queries.tsv - query, then the imdb ids that SHOULD rank top-10, graded 2 for an obvious answer and 1 for a defensible one - and extend tools/eval/src/search.rs with an nDCG@10 computation reported next to E2. Draw the queries from the worked examples in docs/eval-results.md plus the filter-shaped ones 5.5 added, and KEEP THE TWO KINDS SEPARATE: a filter-shaped query ('films from the 90s') and a meaning-shaped one ('films about grief') fail for different reasons, and averaging them makes nDCG unreadable. Write the expected ids from independent knowledge, NEVER by running the search - a fixture generated from the code it tests cannot fail, and this project's two existing fixtures were each wrong four times on their first run. THEN, with a number in hand, price D39's document-layout change using `eval embed --compare` before spending another 3-hour re-embed on it.",
+  "next_action": "Phase 5 subtask 5.7: open the database in the application (debt D26) and re-measure cold start against Phase 1's recorded 515/660 ms, before and after. src-tauri/src/state.rs holds only the hardware profile today, so AppState gains a Db opened from paths::data_dir, and the Tauri commands that need it stop being unreachable from the running app. FOLD D37 IN WHILE YOU ARE THERE, as the author asked: the catalogue must refresh when the app opens. D24's measurement makes that nearly free - IMDb answers a conditional GET with 304 and zero bytes - but READ D37 FIRST, because `ingest refresh` lives in a dev tool the application cannot depend on, and moving job.rs, download.rs, tsv.rs and refresh.rs into a crate is most of the subtask rather than a detail inside it. E3 is measured and not met (0.1188 meaning, 1.0000 filter); D39 was priced and rejected, D40 says the fixture's known-item queries are measured with the wrong metric - neither blocks 5.7.",
   "blockers": [],
   "decisions_pending": [
     {
@@ -2212,7 +2212,12 @@
     },
     {
       "id": "D39",
-      "text": "THE DOCUMENT PUTS METADATA BEFORE MEANING. Every embedded document opens with year, genres and up to six names - Manchester by the Sea spends its first 120 characters on five cast members - and the synopsis is then truncated at SYNOPSIS_CHARS = 400. Measured 2026-09-07 with `eval embed --compare`: that film scores 0.4947 against a plot query describing it almost verbatim, rising to 0.5239 given its whole 1,847-character synopsis, while a 336-character documentary about an unrelated murder scores 0.5788. The gap narrows by two thirds when the plot is not truncated, which points at LAYOUT rather than the model. Two changes to try, cheapest first: put the synopsis FIRST, and raise the budget toward the ~1,000 characters the model's 256 tokens can actually read. Both are document-builder changes and cost a 3-hour re-embed, so price them with --compare first.",
+      "text": "PARTLY ANSWERED, AND THE ANSWER WAS NO. The theory was that documents put metadata before meaning and truncated the plot away. Priced 2026-09-13 with `eval embed --compare` rather than with a 3-hour re-embed: stripping Wikipedia's boilerplate lead sentence and putting the plot first lifts Manchester by the Sea from 0.4884 to 0.5539 against a query describing its plot - and lifts the two films beating it by about the same, so the ORDER DOES NOT CHANGE. The layout is real and it is not the binding constraint. WHAT REMAINS UNTRIED, cheapest first: the SYNOPSIS_CHARS budget is 400 against roughly 1,000 the model's 256 tokens can read; and the document still leads with year, genres and up to six cast names. Neither is worth a re-embed until something predicts a REORDERING rather than a uniform lift - --compare is how to find out.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D40",
+      "text": "THE SEMANTIC FIXTURE MIXES TWO KINDS OF QUERY AND ONE OF THEM IS MEASURED WRONG. Two of the eight meaning queries - 'a man returns to his hometown to care for his nephew after a death' and 'slow science fiction about memory' - are KNOWN-ITEM queries: they describe one specific film, so the honest metric is MRR or top-10 presence, not nDCG over a fixture listing two answers where everything else scores 0. Both score 0.0000 and drag the mean down in a way that says little about the six topical queries around them. Either split them into a third kind with their own metric, or widen their graded sets - but ONLY with films that would have been listed on their merits, because widening a fixture to match what the code returns is how a fixture stops being able to fail. Noted while writing it, not after it disappointed.",
       "phase_raised": 5
     }
   ],
