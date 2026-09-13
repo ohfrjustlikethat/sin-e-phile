@@ -35,6 +35,17 @@
 # DISAGREEMENTS FOUND ON THE FIRST RUN
 #   (appended here as they are found, with who turned out to be right)
 #
+# 2026-09-13 — NOT a disagreement, and the more valuable kind of entry.
+#
+# The grade I was least confident of was Chungking Express at 1 for "like Wong Kar-wai
+# but Korean": the query asks for something LIKE him and Korean, and the film is him and
+# not Korean. Graded 2 it would flatter the engine; graded 0 the meaning score drops.
+#
+# Put to the author without saying which way I leaned. Answer: "defensible, grade 1 is
+# right." Recorded because the author writing the engine and grading its exam is the one
+# weakness in this fixture that care cannot fix, and this is the single point where that
+# circularity is broken by someone else.
+#
 kind	query	imdb_id	grade	why
 # ── meaning ──────────────────────────────────────────────────────────────────
 meaning	films about grief that aren't depressing	tt19887550	2	Good Grief — a comedy explicitly about bereavement; the query almost describes it
