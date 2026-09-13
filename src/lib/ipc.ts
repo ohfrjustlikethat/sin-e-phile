@@ -50,6 +50,13 @@ export const commands = {
 	 *  than a measurement of window creation.
 	 */
 	frontendReady: () => __TAURI_INVOKE<number>("frontend_ready"),
+	/**
+	 *  Search the catalogue.
+	 * 
+	 *  `limit` is `i32` rather than `i64`: it is clamped to 1..=100, and a function
+	 *  parameter cannot carry the specta annotation a struct field can.
+	 */
+	search: (query: string, limit: number | null) => typedError<SearchResponse, string>(__TAURI_INVOKE("search", { query, limit })),
 };
 
 /* Types */
@@ -103,6 +110,59 @@ export type HardwareProfile = {
 	overridden: boolean,
 };
 
+/**
+ *  One result, as the UI needs it.
+ * 
+ *  A DTO rather than re-exporting the engine's `Hit`: the engine's type carries a BM25
+ *  score whose scale is meaningless outside the ranker, and a UI that received it would
+ *  eventually display it.
+ *  # Why the numbers are annotated
+ * 
+ *  **Specta refuses to export `i64`, and it is right to.** A JavaScript number is a
+ *  double, so anything past 2^53 arrives silently wrong — the failure would be the wrong
+ *  film opening, with no error anywhere. The objection is answered rather than
+ *  suppressed: catalogue ids are SQLite rowids over 2.7 million titles, nine orders of
+ *  magnitude below that ceiling, and years are four digits.
+ * 
+ *  If an id could ever exceed 2^53 these must become strings.
+ */
+export type SearchHit = {
+	id: number,
+	title: string,
+	year: number | null,
+	kind: string,
+	/**  Why this is on the page — the "why this matched" hint §15 asks for. */
+	why: Why,
+};
+
+/**
+ *  What a search returned, **and what the catalogue is**.
+ * 
+ *  # Why readiness travels with the results
+ * 
+ *  "No results" means something entirely different at 3% ingested than at 100%, and a
+ *  screen that cannot tell the difference will confidently inform someone their film
+ *  does not exist. Rather than trust every caller to remember to ask, the answer carries
+ *  its own context — the UI cannot render the lie because it never holds the data alone.
+ */
+export type SearchResponse = {
+	hits: SearchHit[],
+	/**  Titles searchable right now. */
+	searchable_titles: number,
+	/**  Is the catalogue still being built? If so, "nothing found" is not an answer. */
+	catalogue_partial: boolean,
+	/**
+	 *  Is the semantic half available? Without it, a query like "films about grief"
+	 *  matches words rather than meaning, and the UI should not imply otherwise.
+	 */
+	semantic: boolean,
+	/**
+	 *  Not ready yet — the database or the model is still loading. Distinct from
+	 *  "found nothing", and the two must never render the same.
+	 */
+	ready: boolean,
+};
+
 /**  The three tiers from §8. */
 export type Tier = 
 /**  < 8 GB RAM, or no hardware decode, or <= 2 physical cores. */
@@ -111,4 +171,32 @@ export type Tier =
 "standard" | 
 /**  >= 16 GB RAM, discrete GPU or strong iGPU, >= 6 cores. */
 "capable";
+
+/**
+ *  The engine's [`MatchReason`], in the words a person would use.
+ * 
+ *  Translated here rather than in the UI because the mapping is a product decision, not
+ *  a rendering one, and a second copy of it in TypeScript would drift.
+ */
+export type Why = 
+/**  The query is this title. */
+"exact_title" | 
+/**  The words matched. */
+"keyword" | 
+/**  Matched after typo tolerance. */
+"fuzzy" | 
+/**  Close in meaning, possibly sharing no words at all. */
+"semantic" | 
+/**  Both halves found it — the strongest signal the engine has. */
+"both";
+
+/* Tauri Specta runtime */
+async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
+    try {
+        return { status: "ok", data: await result };
+    } catch (e) {
+        if (e instanceof Error) throw e;
+        return { status: "error", error: e as any };
+    }
+}
 

@@ -45,6 +45,15 @@ sinephile-persistence = { path = "../crates/persistence" }
 # It is a crate rather than a tool precisely so this line can exist.
 sinephile-catalogue = { path = "../crates/catalogue" }
 sinephile-metadata-api = { path = "../crates/metadata-api" }
+# Search itself. The IPC layer holds it and calls it; every decision it makes lives in
+# the crate, where it can be tested without an app handle (ADR-0022).
+sinephile-search-engine = { path = "../crates/search-engine" }
+sinephile-embedding = { path = "../crates/embedding" }
+sinephile-embedder = { path = "../crates/embedder" }
+sinephile-vector-index = { path = "../crates/vector-index" }
+# For the async mutex around the engine: its lock is held across awaits, which a std
+# mutex may not be.
+tokio = { version = "1", features = ["sync"] }
 thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }

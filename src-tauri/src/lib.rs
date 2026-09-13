@@ -42,6 +42,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
         commands::system::get_data_dir,
         commands::system::debug_trigger_panic,
         commands::system::frontend_ready,
+        commands::search::search,
     ])
 }
 
@@ -107,6 +108,38 @@ pub fn run() {
                     .state::<AppState>()
                     .set_db(std::sync::Arc::clone(&db));
                 tracing::info!("database open");
+
+                // The search engine, built the way the eval harness builds it: hybrid
+                // when the model and index are present, keyword-only otherwise. The
+                // keyword-only path is not a fallback for convenience — it is the Tier 0
+                // floor (SPEC.md §8, ADR-0014), and it is the same code path.
+                let models = dir.join("models");
+                let engine = match sinephile_embedder::Embedder::pinned(
+                    &models.join("bge-small-en-v1.5-int8.onnx"),
+                    &models.join("bge-small-en-v1.5-tokenizer.json"),
+                ) {
+                    Ok(embedder) => {
+                        match sinephile_vector_index::VectorIndex::view(
+                            &sinephile_vector_index::index_path(&dir),
+                        ) {
+                            Ok(index) => {
+                                tracing::info!("search: hybrid");
+                                sinephile_search_engine::Engine::hybrid(
+                                    sinephile_search_engine::Semantic { index, embedder },
+                                )
+                            }
+                            Err(error) => {
+                                tracing::info!(%error, "search: keyword only (no index)");
+                                sinephile_search_engine::Engine::keyword_only()
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        tracing::info!(%error, "search: keyword only (no model)");
+                        sinephile_search_engine::Engine::keyword_only()
+                    }
+                };
+                db_handle.state::<AppState>().set_engine(engine);
 
                 let transport = sinephile_metadata_api::HttpTransport::new();
                 let outcome = sinephile_catalogue::freshness::refresh_if_stale(

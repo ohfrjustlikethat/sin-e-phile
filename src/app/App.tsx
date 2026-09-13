@@ -3,6 +3,7 @@ import { TitleBar } from "@/app/TitleBar";
 import { NavRail } from "@/app/NavRail";
 import { Placeholder } from "@/app/Placeholder";
 import { SettingsScreen } from "@/features/settings/SettingsScreen";
+import { SearchScreen } from "@/features/search/SearchScreen";
 import { DesignGallery } from "@/features/design/DesignGallery";
 import { CommandPalette, type Command } from "@/design-system";
 import { DESTINATIONS, useUi, type Destination } from "@/lib/store";
@@ -21,6 +22,7 @@ const LABELS: Record<Destination, string> = {
 export function App() {
   const { destination, settingsOpen, setDestination, setSettingsOpen } = useUi();
   const [palette, setPalette] = useState(false);
+  const [searching, setSearching] = useState(false);
 
   // §3.1: the palette searches "media, actions, and settings". Phase 5 supplies
   // media; these are the actions and settings that exist today.
@@ -32,6 +34,7 @@ export function App() {
       run: () => { setSettingsOpen(false); setDestination(d); },
     })),
     { id: "settings", label: "Open settings", group: "Settings", run: () => setSettingsOpen(true) },
+    { id: "search", label: "Search", group: "Navigate", hint: "Ctrl+K", run: () => { setSettingsOpen(false); setSearching(true); } },
   ];
 
   if (DESIGN_ROUTE) {
@@ -49,7 +52,13 @@ export function App() {
       <div className="flex min-h-0 flex-1">
         <NavRail />
         <main className="min-w-0 flex-1 overflow-auto">
-          {settingsOpen ? <SettingsScreen /> : <Placeholder destination={destination} />}
+          {settingsOpen ? (
+            <SettingsScreen />
+          ) : searching ? (
+            <SearchScreen />
+          ) : (
+            <Placeholder destination={destination} />
+          )}
         </main>
       </div>
       <CommandPalette commands={commands} open={palette} onOpenChange={setPalette} />

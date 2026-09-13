@@ -21,6 +21,7 @@
 use std::sync::{Arc, RwLock};
 
 use sinephile_persistence::Db;
+use sinephile_search_engine::Engine;
 
 use crate::tiers::{self, HardwareProfile, Tier};
 
@@ -28,6 +29,12 @@ pub struct AppState {
     inner: RwLock<Inner>,
     /// `None` until the background open completes. Never blocks a caller.
     db: RwLock<Option<Arc<Db>>>,
+    /// The search engine, once its model and index are loaded.
+    ///
+    /// Behind a `tokio::Mutex` because `Engine::search` needs `&mut` — the embedder owns
+    /// an ONNX session and one forward pass at a time is the honest model of it — and
+    /// because it is held across awaits, which a `std` mutex may not be.
+    engine: RwLock<Option<Arc<tokio::sync::Mutex<Engine>>>>,
 }
 
 struct Inner {
@@ -52,12 +59,28 @@ impl AppState {
                 override_tier: None,
             }),
             db: RwLock::new(None),
+            engine: RwLock::new(None),
         }
     }
 
     /// Install the database handle once it has opened.
     pub fn set_db(&self, db: Arc<Db>) {
         *self.db.write().expect("db lock poisoned") = Some(db);
+    }
+
+    /// Install the search engine once its model and index are loaded.
+    pub fn set_engine(&self, engine: Engine) {
+        *self.engine.write().expect("engine lock poisoned") =
+            Some(Arc::new(tokio::sync::Mutex::new(engine)));
+    }
+
+    /// The search engine, if it is ready.
+    ///
+    /// `None` while the model is still loading — about 140 ms after launch on this
+    /// machine. A search that arrives first is told the catalogue is not ready yet,
+    /// which is the truth and is what the readiness surface exists to express.
+    pub fn engine(&self) -> Option<Arc<tokio::sync::Mutex<Engine>>> {
+        self.engine.read().expect("engine lock poisoned").clone()
     }
 
     /// The database, if it has finished opening.
