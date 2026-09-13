@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TitleBar } from "@/app/TitleBar";
 import { NavRail } from "@/app/NavRail";
 import { Placeholder } from "@/app/Placeholder";
@@ -24,6 +24,37 @@ export function App() {
   const [palette, setPalette] = useState(false);
   const [searching, setSearching] = useState(false);
 
+  // SEARCH IS A MODE, NOT A DESTINATION. §3.1 names five top-level surfaces and the rail
+  // comment is explicit that the navigation shape must never change under the user, so
+  // search does not join them — it is reached the way it is reached everywhere else:
+  // "/" or Ctrl+F from anywhere, Escape to leave.
+  //
+  // The guard matters. Someone typing "/" into the search box means a slash, not a
+  // shortcut, and a shortcut that fires inside a text field is the kind of bug that
+  // makes an app feel hostile.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable;
+
+      if (event.key === "Escape" && searching) {
+        setSearching(false);
+        return;
+      }
+      if (typing) return;
+      if (event.key === "/" || (event.key.toLowerCase() === "f" && event.ctrlKey)) {
+        event.preventDefault();
+        setSettingsOpen(false);
+        setSearching(true);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [searching, setSettingsOpen]);
+
   // §3.1: the palette searches "media, actions, and settings". Phase 5 supplies
   // media; these are the actions and settings that exist today.
   const commands: Command[] = [
@@ -34,7 +65,7 @@ export function App() {
       run: () => { setSettingsOpen(false); setDestination(d); },
     })),
     { id: "settings", label: "Open settings", group: "Settings", run: () => setSettingsOpen(true) },
-    { id: "search", label: "Search", group: "Navigate", hint: "Ctrl+K", run: () => { setSettingsOpen(false); setSearching(true); } },
+    { id: "search", label: "Search", group: "Navigate", hint: "/", run: () => { setSettingsOpen(false); setSearching(true); } },
   ];
 
   if (DESIGN_ROUTE) {
@@ -50,7 +81,7 @@ export function App() {
     <div className="flex h-full flex-col bg-base text-ink">
       <TitleBar />
       <div className="flex min-h-0 flex-1">
-        <NavRail />
+        <NavRail suppressActive={searching || settingsOpen} />
         <main className="min-w-0 flex-1 overflow-auto">
           {settingsOpen ? (
             <SettingsScreen />

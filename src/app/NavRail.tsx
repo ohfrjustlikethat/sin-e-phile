@@ -24,7 +24,7 @@ const ICONS: Record<Destination, React.ReactNode> = {
  * exist from Phase 1 so the navigation shape never changes under the user, even
  * though most are placeholders until their phase.
  */
-export function NavRail() {
+export function NavRail({ suppressActive = false }: { suppressActive?: boolean } = {}) {
   const { destination, railExpanded, setDestination, toggleRail, setSettingsOpen } = useUi();
 
   return (
@@ -35,7 +35,10 @@ export function NavRail() {
     >
       <ul className="flex flex-1 flex-col gap-1 p-3">
         {DESTINATIONS.map((d) => {
-          const active = destination === d;
+          // Nothing is active while search or settings is showing. The rail claiming
+          // "Live Channels" behind a page of search results tells the user they are
+          // somewhere they are not.
+          const active = !suppressActive && destination === d;
           return (
             <li key={d}>
               <button

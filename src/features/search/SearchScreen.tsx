@@ -30,6 +30,7 @@ const WHY: Record<Why, { label: string; tone: "accent" | "neutral" }> = {
   semantic: { label: "similar in meaning", tone: "neutral" },
   keyword: { label: "matched words", tone: "neutral" },
   fuzzy: { label: "close spelling", tone: "neutral" },
+  filter: { label: "matched your filters", tone: "accent" },
 };
 
 /** The order kinds appear in. Films first because that is what most searches are for. */

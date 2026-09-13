@@ -51,6 +51,8 @@ pub enum Why {
     Semantic,
     /// Both halves found it — the strongest signal the engine has.
     Both,
+    /// Retrieved because it satisfies a filter the query asked for.
+    Filter,
 }
 
 impl From<MatchReason> for Why {
@@ -61,6 +63,7 @@ impl From<MatchReason> for Why {
             MatchReason::Fuzzy => Why::Fuzzy,
             MatchReason::Semantic => Why::Semantic,
             MatchReason::Both => Why::Both,
+            MatchReason::Filter => Why::Filter,
         }
     }
 }

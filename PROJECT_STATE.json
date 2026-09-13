@@ -1,7 +1,7 @@
 {
   "spec_version": "1.9.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-09-13",
+  "last_updated": "2026-09-14",
   "sessions_completed": 10,
   "current_phase": {
     "number": 4,
@@ -801,7 +801,7 @@
           "id": "E4",
           "text": "\"films about grief that aren't depressing\" and \"like Wong Kar-wai but Korean\" both return defensible results — documented with screenshots in the case study.",
           "met": false,
-          "evidence": "NOT MET, and blocked by B4 rather than unattempted. Three distinct approaches were measured - Wikipedia enrichment (233,114 synopses), indexing only items with descriptive text (855,703 -> 189,470), and removing titles from the document plus a 300-character minimum (-> 119,874). Each improved results; none was sufficient. The measurement that ends it is in docs/eval-results.md: a trivia-only synopsis outscores a verbatim plot match 0.4194 to 0.1944. all-MiniLM-L6-v2 is a symmetric similarity model doing asymmetric retrieval. See P13."
+          "evidence": "NOT MET, AND NOW DOCUMENTED RATHER THAN ASSERTED. Screenshots of the release build on the real catalogue are in docs/case-study/shots/ and the case study is docs/case-study/search.md (2026-09-14). 'films about grief that aren't depressing' returns thematically coherent results led by Good Grief (2023), a comedy about bereavement - defensible - but the clause 'that aren't depressing' has no effect at all. 'like Wong Kar-wai but Korean' returns his own filmography (Chungking Express, Days of Being Wild, As Tears Go By, In the Mood for Love, found from his NAME with no credit lookup) and, separately, Korean drama: it understood both halves and composed neither. The criterion asks for defensible results for BOTH queries; one is defensible-in-part and the other answers a different question. E3's 0.1188 says the same thing with a number."
         },
         {
           "id": "E5",
@@ -855,9 +855,9 @@
         },
         {
           "id": "5.8",
-          "text": "Search UI: results as you type, grouped by kind, keyboard navigable, with a 'why this matched' hint. Must consult CatalogueRepository::readiness before saying 'no results'.",
-          "status": "not_started",
-          "commit": null
+          "text": "Search UI: results as you type (120 ms debounce, sequence-numbered so a slow old query cannot overwrite a fast new one), grouped by kind, keyboard navigable, with a 'why this matched' hint. Reached by '/' or Ctrl+F rather than joining the nav rail, because SPEC.md 3.1 names five top-level surfaces and the navigation shape must not change under the user. SearchResponse carries readiness, so the screen CANNOT say 'no results' while the catalogue is still building. tools/shots/capture.ps1 drives the real binary and captures the window; docs/case-study/search.md is written from those shots.",
+          "status": "complete",
+          "commit": "pending"
         },
         {
           "id": "5.9",
@@ -1848,7 +1848,7 @@
       ]
     }
   ],
-  "next_action": "Phase 5 subtask 5.8: the search UI. Build the results surface in src/features/search/ - results as you type, grouped by kind, keyboard navigable, with a 'why this matched' hint driven by the MatchReason the engine already returns (ExactTitle, Keyword, Fuzzy, Semantic, Both). The backend is done and measured: sinephile_search_engine::Engine::search returns Hits at p95 31.3 ms, and AppState now holds the Db (5.7) so a Tauri command can reach it - add one in src-tauri/src/commands/, thin, with the logic staying in the engine crate per ADR-0022. IT MUST CONSULT CatalogueRepository::readiness BEFORE SAYING 'no results': at 3% ingested that phrase is a lie, and the readiness surface exists precisely so the UI cannot tell it. E4 also needs this screen - its criterion asks for screenshots in a case study, so 5.8 is what makes E4 answerable at all.",
+  "next_action": "Phase 5 subtask 5.9, the last one: Tier 0 artefact download with consent and the size shown (ADR-0014, debt D27). The artefact is published as release embeddings-v1 at github.com/ohfrjustlikethat/sin-e-phile, BUT IT IS THE SUPERSEDED MiniLM BUILD - the current artefact is bge-small-en-v1.5, document builder v2, sha256 b17f15dab916816be1e4b959cbfce6f5d369ab6e7bd5c676e6760b0a2980b7bb, and the author must publish that one before this subtask can point at anything real. Build it in crates/catalogue (the download machinery is there now: download.rs has a resumable Downloader with progress) plus a Tauri command and a consent screen showing the 313 MB before it starts. THE MODEL IS A SECOND DOWNLOAD nobody has scoped: 32.4 MB of bge ONNX plus its tokenizer, currently copied into data/models by hand. Both belong behind the same consent. Degradation when either is absent already works and is the Tier 0 floor - Engine::keyword_only, and the UI already says so.",
   "blockers": [],
   "decisions_pending": [
     {
@@ -2228,6 +2228,11 @@
     {
       "id": "D42",
       "text": "TWO APP INSTANCES CAN BOTH REFRESH. Nothing configures Tauri's single-instance plugin, so two copies can run, and both will check freshness and both may download. Observed while measuring: an instance that checked before another had committed its validator logged `Refreshed { titles_added: 0 }` immediately after a sibling logged `AlreadyCurrent`. Harmless today - `Job` serialises the load through the database and the second refresh inserts nothing - but it is 216 MB of wasted download and it will matter more when Phase 7 adds a torrent session that genuinely cannot run twice. Single-instance is the one-line fix; it belongs with Phase 20's platform integration, or sooner if anything else needs exclusivity.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D43",
+      "text": "A SCREENSHOT CAUGHT A HINT THAT WAS LYING, AND THE CLI COULD NOT HAVE. Every result on 'films directed by Alfred Hitchcock from the 1950s' was labelled 'matched words'. They had not matched words - they came from SearchRepository::by_filters, which reused MatchReason::Keyword because there was no better variant. Fixed by adding MatchReason::Filter and a 'matched your filters' label. The general lesson is recorded here rather than only in the case study: eval prints titles, the UI prints EXPLANATIONS, and an explanation can be wrong while every title is right. Anything else that renders a reason to a user needs looking at the same way.",
       "phase_raised": 5
     }
   ],

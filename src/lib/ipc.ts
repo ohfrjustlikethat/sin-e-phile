@@ -188,7 +188,9 @@ export type Why =
 /**  Close in meaning, possibly sharing no words at all. */
 "semantic" | 
 /**  Both halves found it — the strongest signal the engine has. */
-"both";
+"both" | 
+/**  Retrieved because it satisfies a filter the query asked for. */
+"filter";
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

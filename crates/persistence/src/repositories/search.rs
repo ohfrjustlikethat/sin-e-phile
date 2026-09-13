@@ -45,6 +45,13 @@ pub enum MatchReason {
     /// Both halves found it. The strongest signal there is, and the one worth telling
     /// the user about in 5.8's "why this matched" hint.
     Both,
+    /// Retrieved by a structured filter — a director, a decade, a runtime bound.
+    ///
+    /// Distinct from [`MatchReason::Keyword`] because the hint shown to the user has to
+    /// be TRUE. A screenshot of "films directed by Alfred Hitchcock from the 1950s"
+    /// captioned every one of eleven correct results "matched words", which is not what
+    /// happened and not why they are there.
+    Filter,
 }
 
 /// Column weights for `bm25()`.
@@ -495,7 +502,7 @@ impl<'a> SearchRepository<'a> {
                 year,
                 kind,
                 score: None,
-                why: MatchReason::Keyword,
+                why: MatchReason::Filter,
             })
             .collect())
     }
