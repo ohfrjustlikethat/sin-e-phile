@@ -19,7 +19,7 @@ FTS5 index over titles, alternative titles, people, and keywords, with BM25 rank
 - [x] **E2** Exact-title top-1 rate is 100% on the fixture corpus.
 - [ ] **E3** nDCG@10 > 0.75 on the semantic query set.
 - [ ] **E4** "films about grief that aren't depressing" and "like Wong Kar-wai but Korean" both return defensible results — documented with screenshots in the case study.
-- [ ] **E5** Works fully offline.
+- [x] **E5** Works fully offline.
 
 ## Subtasks
 
@@ -31,7 +31,7 @@ FTS5 index over titles, alternative titles, people, and keywords, with BM25 rank
 - [x] **5.6** fixtures/search/ and the relevance harness. exact-titles.tsv (43 queries), semantic-queries.tsv (10 queries, 37 graded answers, meaning and filter scored SEPARATELY), plus `eval vector` (recall, with a --prove control), `eval embed` (byte-identical agreement, and --compare to price a document change before spending a re-embed on it). nDCG@10 is now reported next to E1 and E2 and gates the exit code.
 - [x] **5.7** The application opens the database (D26) and refreshes the catalogue on launch (D37). Both on a background task, so cold start is unchanged: 328-522 ms against Phase 1's 515/660. The catalogue pipeline moved from tools/ingest to crates/catalogue to make the second possible at all. Measured end to end: a launch added 4,604 titles nobody asked for, and a launch with nothing to do reports AlreadyCurrent 260 ms after the frontend paints.
 - [x] **5.8** Search UI: results as you type (120 ms debounce, sequence-numbered so a slow old query cannot overwrite a fast new one), grouped by kind, keyboard navigable, with a 'why this matched' hint. Reached by '/' or Ctrl+F rather than joining the nav rail, because SPEC.md 3.1 names five top-level surfaces and the navigation shape must not change under the user. SearchResponse carries readiness, so the screen CANNOT say 'no results' while the catalogue is still building. tools/shots/capture.ps1 drives the real binary and captures the window; docs/case-study/search.md is written from those shots.
-- [ ] **5.9** Tier 0 artefact download with consent and the size shown (ADR-0014, debt D27), and the FTS5-only degradation when it is absent.
+- [ ] **5.9** Tier 0 artefact download with consent and the size shown (ADR-0014, D27). BUILT: crates/catalogue/src/assets.rs lists what is missing and what it costs from PINNED values - the size is stated before any download, not discovered by starting one - verifies transport sha256, then the artefact's own checksum, then model identity and document-builder version; plus Tauri commands and a consent screen that names each file separately, because 367 MB with no breakdown is a number a person must simply trust. THE MODEL IS A SECOND DOWNLOAD nobody had scoped: 34 MB of the 367. BLOCKED ON THE AUTHOR for the happy path - the published release embeddings-v1 is the superseded MiniLM artefact, so the URL points at embeddings-v2, which does not exist yet.
 - [x] **5.10** crates/embedder: lift the ONNX sentence-transformer out of tools/ingest so the application can embed a query (ADR-0015 embeds queries on every tier). One implementation shared by producer and query path, because tokenizer settings, truncation, pooling and normalisation each fail SILENTLY when they differ. `eval embed --report` proves agreement byte-identically against the artefact and was seen to fail (2/10) when MAX_TOKENS was changed.
 
 ## Risks named by this phase

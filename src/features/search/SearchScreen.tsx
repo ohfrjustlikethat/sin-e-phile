@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { commands, type SearchHit, type SearchResponse, type Why } from "@/lib/ipc";
 import { Input, Badge, Skeleton, EmptyState } from "@/design-system";
+import { MeaningDownload } from "./MeaningDownload";
 
 /**
  * Search — `SPEC.md` §15 Phase 5: "results as you type, grouped by kind, keyboard
@@ -206,15 +207,21 @@ export function SearchScreen() {
       </div>
 
       {/*
-        Said plainly rather than implied. Without the artefact, "films about grief"
-        matches the WORD, and a user who does not know that concludes the search is
-        bad rather than unavailable (ADR-0014's degraded path, SPEC.md §8).
+        Said plainly rather than implied, and followed by the offer. Without the
+        artefact, "films about grief" matches the WORD, and a user who does not know
+        that concludes the search is bad rather than unavailable (ADR-0014's degraded
+        path, SPEC.md §8).
       */}
-      {response?.ready && !response.semantic && hits.length > 0 && (
-        <p className="text-sm text-ink-muted">
-          Searching titles and people only — the meaning index is not downloaded, so
-          describing a film rather than naming it will not find much.
-        </p>
+      {response?.ready && !response.semantic && (
+        <>
+          {hits.length > 0 && (
+            <p className="text-sm text-ink-muted">
+              Searching titles and people only — describing a film rather than naming it
+              will not find much yet.
+            </p>
+          )}
+          <MeaningDownload />
+        </>
       )}
     </div>
   );

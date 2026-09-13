@@ -57,9 +57,40 @@ export const commands = {
 	 *  parameter cannot carry the specta annotation a struct field can.
 	 */
 	search: (query: string, limit: number | null) => typedError<SearchResponse, string>(__TAURI_INVOKE("search", { query, limit })),
+	/**  What the semantic half needs that is not here yet. */
+	optionalAssets: () => __TAURI_INVOKE<AssetPlan>("optional_assets"),
+	/**
+	 *  Download everything that is missing, having been given permission.
+	 * 
+	 *  **Only ever called from an explicit action.** Nothing here runs on launch: ADR-0014's
+	 *  requirement is consent first, with the size shown, and the shape of this API is what
+	 *  enforces that — there is no path that fetches without someone having invoked it.
+	 */
+	downloadOptionalAssets: () => typedError<null, string>(__TAURI_INVOKE("download_optional_assets")),
 };
 
 /* Types */
+/**
+ *  What is missing, and what agreeing would cost.
+ * 
+ *  ADR-0014 requires the size to be shown **before** the download, so it is stated here
+ *  from pinned values rather than discovered by starting one.
+ */
+export type AssetPlan = {
+	assets: OptionalAsset[],
+	/**  Total bytes still to fetch — what the person is actually agreeing to. */
+	outstanding_bytes: number,
+	/**  Is the semantic half already working? If so there is nothing to consent to. */
+	complete: boolean,
+};
+
+/**  Progress, emitted as it happens. One event per asset per chunk. */
+export type AssetProgress = {
+	name: string,
+	done_bytes: number,
+	total_bytes: number,
+};
+
 /**  What a tier permits. Features ask about a `Capability`, never about hardware. */
 export type Capability = 
 /**
@@ -108,6 +139,17 @@ export type HardwareProfile = {
 	/**  The tier actually in force. Differs only when the user has overridden. */
 	effective_tier: Tier,
 	overridden: boolean,
+};
+
+/**  One optional download, as the consent screen needs it. */
+export type OptionalAsset = {
+	name: string,
+	purpose: string,
+	/**  Bytes, so the UI can format them in its own locale rather than parse a string. */
+	bytes: number,
+	/**  `absent`, `present`, or a reason it cannot be used. */
+	state: string,
+	unusable_reason: string | null,
 };
 
 /**

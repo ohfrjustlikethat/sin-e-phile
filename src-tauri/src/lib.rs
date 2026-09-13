@@ -35,15 +35,23 @@ use tauri_specta::{collect_commands, Builder};
 /// Hand-written bindings would drift silently, and the drift would only show up
 /// as a runtime error in front of a user.
 fn ipc_builder() -> Builder<tauri::Wry> {
-    Builder::<tauri::Wry>::new().commands(collect_commands![
-        commands::system::get_hardware_profile,
-        commands::system::set_tier_override,
-        commands::system::has_capability,
-        commands::system::get_data_dir,
-        commands::system::debug_trigger_panic,
-        commands::system::frontend_ready,
-        commands::search::search,
-    ])
+    Builder::<tauri::Wry>::new()
+        .commands(collect_commands![
+            commands::system::get_hardware_profile,
+            commands::system::set_tier_override,
+            commands::system::has_capability,
+            commands::system::get_data_dir,
+            commands::system::debug_trigger_panic,
+            commands::system::frontend_ready,
+            commands::search::search,
+            commands::assets::optional_assets,
+            commands::assets::download_optional_assets,
+        ])
+        // `AssetProgress` travels as an EVENT payload, so no command signature mentions it
+        // and specta would not export it. Registered explicitly rather than hand-written in
+        // TypeScript: a hand-written payload type is exactly the silent drift the generated
+        // boundary exists to prevent.
+        .typ::<commands::assets::AssetProgress>()
 }
 
 pub fn run() {

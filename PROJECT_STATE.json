@@ -132,7 +132,7 @@
         "id": "E7",
         "text": "The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.",
         "met": false,
-        "evidence": "PARTIALLY MET, AND NOT CLAIMED. Produced: 855,703 vectors, 313 MB, sha256 3fce6f062c25220a80425cce7e9f83a3b80412af3b34fe4e9071d3b80645a2b0, deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version and snapshot date - `ingest verify-embeddings`. PUBLISHED by the author 2026-09-06 as release `embeddings-v1` on github.com/ohfrjustlikethat/sin-e-phile, asset embeddings-all-MiniLM-L6-v2-int8.bin, confirmed with `gh release view embeddings-v1`. Degradation to FTS5-only when the artefact is absent is now real and exercised: sinephile_search_engine::Engine::keyword_only, selected automatically by the eval harness when the model or index is missing. WHAT REMAINS IS MINE, NOT THE AUTHOR'S: 'the application refuses to load an artefact whose model identity does not match its own' cannot be evidenced while the application does not open the artefact at all (D26). Header::compatible_with exists and is tested in crates/embedding, and index_path names the file after the model so a mismatch misses rather than misreads - but neither is the application refusing. Subtask 5.9 wires it. SEPARATELY: P12 will REBUILD this artefact with Wikidata text, superseding embeddings-v1, so the published asset is about to be replaced."
+        "evidence": "PARTIALLY MET, STILL NOT CLAIMED. Produced and published: release embeddings-v1 on github.com/ohfrjustlikethat/sin-e-phile, confirmed by `gh release view`. Deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version, snapshot date and (format v2) text source. THE REFUSAL IS NOW EVIDENCED, which it never was before: pointing this build's header check at the published artefact refuses it by name - 'artefact was built for model \"all-MiniLM-L6-v2-int8\", this build has \"bge-small-en-v1.5-int8\"' - while the current artefact reads USABLE (2026-09-14, sinephile_embedding::Header::peek + compatible_with, the same call crates/catalogue/src/assets.rs::state_of makes on the consent screen). Degradation to FTS5-only when the artefact is absent is real and exercised: Engine::keyword_only, selected by the app at launch and surfaced in the UI. WHAT REMAINS IS THE AUTHOR'S: the PUBLISHED artefact is the superseded MiniLM build. Subtask 5.9's download URL points at a release tag embeddings-v2 that does not exist yet."
       }
     ]
   },
@@ -686,7 +686,7 @@
           "id": "E7",
           "text": "The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.",
           "met": false,
-          "evidence": "PARTIALLY MET, AND NOT CLAIMED. Produced: 855,703 vectors, 313 MB, sha256 3fce6f062c25220a80425cce7e9f83a3b80412af3b34fe4e9071d3b80645a2b0, deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version and snapshot date - `ingest verify-embeddings`. PUBLISHED by the author 2026-09-06 as release `embeddings-v1` on github.com/ohfrjustlikethat/sin-e-phile, asset embeddings-all-MiniLM-L6-v2-int8.bin, confirmed with `gh release view embeddings-v1`. Degradation to FTS5-only when the artefact is absent is now real and exercised: sinephile_search_engine::Engine::keyword_only, selected automatically by the eval harness when the model or index is missing. WHAT REMAINS IS MINE, NOT THE AUTHOR'S: 'the application refuses to load an artefact whose model identity does not match its own' cannot be evidenced while the application does not open the artefact at all (D26). Header::compatible_with exists and is tested in crates/embedding, and index_path names the file after the model so a mismatch misses rather than misreads - but neither is the application refusing. Subtask 5.9 wires it. SEPARATELY: P12 will REBUILD this artefact with Wikidata text, superseding embeddings-v1, so the published asset is about to be replaced."
+          "evidence": "PARTIALLY MET, STILL NOT CLAIMED. Produced and published: release embeddings-v1 on github.com/ohfrjustlikethat/sin-e-phile, confirmed by `gh release view`. Deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version, snapshot date and (format v2) text source. THE REFUSAL IS NOW EVIDENCED, which it never was before: pointing this build's header check at the published artefact refuses it by name - 'artefact was built for model \"all-MiniLM-L6-v2-int8\", this build has \"bge-small-en-v1.5-int8\"' - while the current artefact reads USABLE (2026-09-14, sinephile_embedding::Header::peek + compatible_with, the same call crates/catalogue/src/assets.rs::state_of makes on the consent screen). Degradation to FTS5-only when the artefact is absent is real and exercised: Engine::keyword_only, selected by the app at launch and surfaced in the UI. WHAT REMAINS IS THE AUTHOR'S: the PUBLISHED artefact is the superseded MiniLM build. Subtask 5.9's download URL points at a release tag embeddings-v2 that does not exist yet."
         }
       ],
       "subtasks": [
@@ -806,8 +806,8 @@
         {
           "id": "E5",
           "text": "Works fully offline.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "STRUCTURAL PLUS MEASURED. The search path touches the network nowhere: sinephile_search_engine::Engine::search reads SQLite and a memory-mapped HNSW index and embeds the query locally through ONNX Runtime - no HTTP client is in the dependency tree of crates/search-engine, crates/vector-index or crates/embedder. Demonstrated 2026-09-14 in the release app: every screenshot in docs/case-study/shots/ is a real search over 2,702,737 titles, and the only network call the application makes on launch is the catalogue freshness HEAD (crates/catalogue/src/freshness.rs), which resolves to Freshness::Unknown when offline and never blocks or fails - with a test asserting exactly that (being_offline_is_not_an_error_and_is_not_a_refresh)."
         }
       ],
       "subtasks": [
@@ -861,8 +861,8 @@
         },
         {
           "id": "5.9",
-          "text": "Tier 0 artefact download with consent and the size shown (ADR-0014, debt D27), and the FTS5-only degradation when it is absent.",
-          "status": "not_started",
+          "text": "Tier 0 artefact download with consent and the size shown (ADR-0014, D27). BUILT: crates/catalogue/src/assets.rs lists what is missing and what it costs from PINNED values - the size is stated before any download, not discovered by starting one - verifies transport sha256, then the artefact's own checksum, then model identity and document-builder version; plus Tauri commands and a consent screen that names each file separately, because 367 MB with no breakdown is a number a person must simply trust. THE MODEL IS A SECOND DOWNLOAD nobody had scoped: 34 MB of the 367. BLOCKED ON THE AUTHOR for the happy path - the published release embeddings-v1 is the superseded MiniLM artefact, so the URL points at embeddings-v2, which does not exist yet.",
+          "status": "in_progress",
           "commit": null
         },
         {
@@ -1849,7 +1849,14 @@
     }
   ],
   "next_action": "Phase 5 subtask 5.9, the last one: Tier 0 artefact download with consent and the size shown (ADR-0014, debt D27). The artefact is published as release embeddings-v1 at github.com/ohfrjustlikethat/sin-e-phile, BUT IT IS THE SUPERSEDED MiniLM BUILD - the current artefact is bge-small-en-v1.5, document builder v2, sha256 b17f15dab916816be1e4b959cbfce6f5d369ab6e7bd5c676e6760b0a2980b7bb, and the author must publish that one before this subtask can point at anything real. Build it in crates/catalogue (the download machinery is there now: download.rs has a resumable Downloader with progress) plus a Tauri command and a consent screen showing the 313 MB before it starts. THE MODEL IS A SECOND DOWNLOAD nobody has scoped: 32.4 MB of bge ONNX plus its tokenizer, currently copied into data/models by hand. Both belong behind the same consent. Degradation when either is absent already works and is the Tier 0 floor - Engine::keyword_only, and the UI already says so.",
-  "blockers": [],
+  "blockers": [
+    {
+      "id": "B5",
+      "raised": "2026-09-14",
+      "needs_user": true,
+      "description": "SUBTASK 5.9 AND PHASE 4's E7 BOTH WAIT ON ONE UPLOAD. The published release embeddings-v1 holds the SUPERSEDED artefact: all-MiniLM-L6-v2, document builder v1, from before the catalogue had any synopses. This build correctly REFUSES it by name, which is good evidence for E7's refusal clause and useless as a download. The current artefact is data/embeddings-bge-small-en-v1.5-int8.bin, 313 MB, sha256 b17f15dab916816be1e4b959cbfce6f5d369ab6e7bd5c676e6760b0a2980b7bb, bge-small-en-v1.5, document builder v2, text source wikipedia. THE AUTHOR PUBLISHES IT as release tag `embeddings-v2` with the asset named exactly embeddings-bge-small-en-v1.5-int8.bin - both the tag and the filename are already compiled into crates/catalogue/src/assets.rs, so a different name means a 404 at the consent screen. Commands are in the session notes. Until then the download path is untestable end to end, though the refusal path is tested and the keyword-only degradation works."
+    }
+  ],
   "decisions_pending": [
     {
       "id": "P1",

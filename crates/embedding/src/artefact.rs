@@ -169,6 +169,21 @@ impl Header {
         Ok(out)
     }
 
+    /// Read only the header, without the vectors behind it.
+    ///
+    /// 256 bytes against 313 MB. The question "can this build use this artefact" has to
+    /// be answerable on a screen deciding whether to offer a download, and reading the
+    /// whole file to answer it would put half a second of disk behind a checkbox.
+    ///
+    /// It verifies the header's own integrity — magic and format version — and nothing
+    /// further: the vector checksum needs the vectors. [`Artefact::read`] is what to use
+    /// before trusting a single vector.
+    pub fn peek<R: Read>(reader: &mut R) -> Result<Self, ArtefactError> {
+        let mut head = [0u8; HEADER_BYTES];
+        reader.read_exact(&mut head)?;
+        Self::decode(&head)
+    }
+
     fn decode(bytes: &[u8]) -> Result<Self, ArtefactError> {
         if bytes.len() < HEADER_BYTES || bytes[0..8] != MAGIC {
             return Err(ArtefactError::NotAnArtefact);
