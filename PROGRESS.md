@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 1.9.0** · 10 session(s) completed · last updated 2026-09-14
+**Spec version 1.9.0** · 10 session(s) completed · last updated 2026-09-15
 
 ---
 
@@ -12,7 +12,7 @@
 
 **Phase 4 — Metadata Backbone** (`in_progress`, branch `phase/04-metadata-backbone`)
 
-6 of 7 exit criteria met with evidence.
+7 of 7 exit criteria met with evidence.
 
 > The catalogue. Three constraints carry in: ADR-0013 and ADR-0027 mean the app must be complete and good-looking with NO TMDB key and no key ever ships; ADR-0026 means SQL is runtime-checked, so every new repository method needs a line in crates/persistence/tests/repository_surface.rs; and R4 (ingestion larger or slower than expected) is this phase's named risk — measure before committing to a shape, and scope by a popularity threshold rather than ingesting everything.
 
@@ -46,20 +46,20 @@
       - *Evidence:* `./target/release/ingest verify-anime` -> 64/64 pass, 2026-09-04. Fixture fixtures/anime/e5-hand-checked.tsv covers long-running shonen, split-cour seasons and films tied to series, plus 3 expected REFUSALS and 2 season claims. Numbers and the four fixture errors the first run exposed are in docs/eval-results.md. TMDB half of E5 is not covered - no key ships (ADR-0027), so it is verified per-user in subtask 4.7.
 - [x] **E6** The catalogue is fully usable with no TMDB key (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.
       - *Evidence:* MEASURED on the real catalogue, 2026-09-05, with NO TMDB key ever supplied: 0 rows in external_ids with source='tmdb' and 0 TMDB responses in http_cache. The catalogue nonetheless holds 2,702,737 titles, 855,703 core-tier, 10,079,841 credits, 6,176,950 title rows, 4,450,735 genre links, 1,086,210 ratings, 2,008,183 runtimes and 539,817 episodes - all from IMDb and AniList alone. ADR-0027's per-profile key surface exists (crates/persistence/src/repositories/credentials.rs) and defaults to TmdbAccess::Absent.
-- [ ] **E7** The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.
-      - *Evidence:* PARTIALLY MET, STILL NOT CLAIMED. Produced and published: release embeddings-v1 on github.com/ohfrjustlikethat/sin-e-phile, confirmed by `gh release view`. Deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version, snapshot date and (format v2) text source. THE REFUSAL IS NOW EVIDENCED, which it never was before: pointing this build's header check at the published artefact refuses it by name - 'artefact was built for model "all-MiniLM-L6-v2-int8", this build has "bge-small-en-v1.5-int8"' - while the current artefact reads USABLE (2026-09-14, sinephile_embedding::Header::peek + compatible_with, the same call crates/catalogue/src/assets.rs::state_of makes on the consent screen). Degradation to FTS5-only when the artefact is absent is real and exercised: Engine::keyword_only, selected by the app at launch and surfaced in the UI. WHAT REMAINS IS THE AUTHOR'S: the PUBLISHED artefact is the superseded MiniLM build. Subtask 5.9's download URL points at a release tag embeddings-v2 that does not exist yet.
+- [x] **E7** The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.
+      - *Evidence:* MET 2026-09-15. PRODUCED: 855,703 vectors, 313 MB, deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version, snapshot date and text source (format v2). PUBLISHED: release embeddings-v2 on github.com/ohfrjustlikethat/sin-e-phile, asset embeddings-bge-small-en-v1.5-int8.bin, 328,590,240 bytes, confirmed by `gh release view` and by the URL returning HTTP 200 at that exact length. DOWNLOADED AND VERIFIED end to end through the application's own code path (`assets::download` then `assets::verify`): internal checksum, model identity and document-builder version all pass - see docs/eval-results.md. THE REFUSAL IS EVIDENCED TOO: the superseded embeddings-v1 artefact is refused by name, 'artefact was built for model "all-MiniLM-L6-v2-int8", this build has "bge-small-en-v1.5-int8"'. DEGRADES to FTS5-only when absent: Engine::keyword_only, selected by the app at launch and surfaced in the UI.
 
 ---
 
 ## What's next
 
-Phase 5 subtask 5.9, the last one: Tier 0 artefact download with consent and the size shown (ADR-0014, debt D27). The artefact is published as release embeddings-v1 at github.com/ohfrjustlikethat/sin-e-phile, BUT IT IS THE SUPERSEDED MiniLM BUILD - the current artefact is bge-small-en-v1.5, document builder v2, sha256 b17f15dab916816be1e4b959cbfce6f5d369ab6e7bd5c676e6760b0a2980b7bb, and the author must publish that one before this subtask can point at anything real. Build it in crates/catalogue (the download machinery is there now: download.rs has a resumable Downloader with progress) plus a Tauri command and a consent screen showing the 313 MB before it starts. THE MODEL IS A SECOND DOWNLOAD nobody has scoped: 32.4 MB of bge ONNX plus its tokenizer, currently copied into data/models by hand. Both belong behind the same consent. Degradation when either is absent already works and is the Tier 0 floor - Engine::keyword_only, and the UI already says so.
+Phase 5 is feature-complete: 10 of 10 subtasks, E1/E2/E5 met, E3 and E4 measured and NOT met. Run `/closephase` - it will REFUSE, correctly, because E3 (meaning nDCG@10 = 0.1188 against a 0.75 target) and E4 (both named queries documented failing in docs/case-study/search.md) have evidence of failure rather than evidence of success. THE DECISION IS THE AUTHOR'S and it is the one waiting: close Phase 5 with E3 and E4 carried forward explicitly, or spend further sessions on them. SPEC.md 10.11 forbids redefining them. If closing: the phase record needs status complete, a completion_commit and evidence on every criterion INCLUDING the two that failed, then current_phase advances to 6 - and note Phase 4 can close at the same time now that E7 is met, since its only other gap was E1 which was met on 2026-09-07. If continuing: D39 and D40 are the honest next moves, and docs/DECISIONS_PENDING.md P13 records what a further model change would and would not buy.
 
 ---
 
 ## Blockers
 
-- **B5** **(needs you)** SUBTASK 5.9 AND PHASE 4's E7 BOTH WAIT ON ONE UPLOAD. The published release embeddings-v1 holds the SUPERSEDED artefact: all-MiniLM-L6-v2, document builder v1, from before the catalogue had any synopses. This build correctly REFUSES it by name, which is good evidence for E7's refusal clause and useless as a download. The current artefact is data/embeddings-bge-small-en-v1.5-int8.bin, 313 MB, sha256 b17f15dab916816be1e4b959cbfce6f5d369ab6e7bd5c676e6760b0a2980b7bb, bge-small-en-v1.5, document builder v2, text source wikipedia. THE AUTHOR PUBLISHES IT as release tag `embeddings-v2` with the asset named exactly embeddings-bge-small-en-v1.5-int8.bin - both the tag and the filename are already compiled into crates/catalogue/src/assets.rs, so a different name means a 404 at the consent screen. Commands are in the session notes. Until then the download path is untestable end to end, though the refusal path is tested and the keyword-only degradation works.
+None.
 
 ---
 
@@ -73,7 +73,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 1 | Application Shell and Capability Tiers | A | 0 | 1–2 | 7/7 |
 | [x] | 2 | Design System and Visual Language | A | 1 | 1–2 | 5/5 |
 | [x] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 5/5 |
-| [~] | 4 | Metadata Backbone | A | 3 | 2–3 | 6/7 |
+| [~] | 4 | Metadata Backbone | A | 3 | 2–3 | 7/7 |
 | [~] | 5 | Semantic Search Engine | A | 4 | 2 | 2/5 |
 | [ ] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 0/6 |
 | [ ] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 0/8 |

@@ -863,7 +863,7 @@
           "id": "5.9",
           "text": "Tier 0 artefact download with consent and the size shown (ADR-0014, D27). crates/catalogue/src/assets.rs states what is missing and what it costs from PINNED values before any download; Tauri commands and a consent screen naming each file separately. VERIFIED END TO END 2026-09-15 against the real published release embeddings-v2: 346 MB across three files, each fetched and verified - the artefact by its own internal checksum plus model identity and document-builder version, the model and tokenizer by pinned file sha256. Degradation when absent is Engine::keyword_only, the Tier 0 floor, and the UI says so.",
           "status": "complete",
-          "commit": "pending"
+          "commit": "b664e27"
         },
         {
           "id": "5.10",
