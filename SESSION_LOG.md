@@ -1041,3 +1041,111 @@ it decides whether this phase's headline feature can meet its criteria.
 
 Subtask 5.5, query understanding — deliberately chosen *because* it is the half that
 works without synopsis text.
+
+---
+
+## Session 12 — 2026-09-07 — the text the catalogue never had
+
+**P12 decided by the author: Wikidata over a TMDB key.** ADR-0033, two domains added to
+the allowlist under ADR-0010, and `ingest wikipedia` built: Wikidata maps IMDb ids to
+articles through property P345 — an exact join, not a title guess — and Wikipedia's
+action API returns the lead text.
+
+**233,661 of Wikidata's 245,708 title mappings matched (95.1%); 233,114 articles had
+usable text.** The shape is what mattered: **100%** of the top 1,000 by votes, 98.8% of
+the top 10,000, 22.1% overall. Coverage is concentrated where people search, and the
+empty tail is films nobody has voted on, which have no article either.
+
+**Two blockers cleared, one by the author and one by me being wrong.** B3: the artefact
+was published. B2: the MovieLens download failed verification, and **the pin was mine and
+invented** — recorded with a comment claiming it had been "read from grouplens.org", a
+host that was already unreachable, which is why the manual path existed at all. The
+archive was genuine: CRC clean across 1.15 GB, GroupLens' own README inside, and the
+ingest then streamed exactly the 25,000,095 ratings that README states. Phase 4's E1 met.
+
+**`ingest tidy`** answered "does refreshing make the app bigger?" — it does not, refresh
+deletes before it downloads — but the question exposed 2.1 GB of spent dataset archives.
+6.4 GB → 4.7 GB.
+
+**Artefact format v2** records its text source, as ADR-0018 required and the format had
+no field for.
+
+---
+
+## Session 13 — 2026-09-07 — three attempts, a §10.9 stop, and a model swap
+
+Wikipedia text landed and semantic search still could not answer a plot query. Three
+distinct fixes, each measured, none enough: enrich the documents; index only items with
+descriptive text (855,703 → 189,470, index 435 MB → 96 MB); remove titles from the
+document (`document::VERSION` 2 — the spec never listed titles among its ingredients).
+
+**The measurement that ended it.** Against "a grieving janitor becomes guardian of his
+teenage nephew in a Massachusetts fishing town", *Manchester by the Sea* — whose synopsis
+contains that almost verbatim — scored **0.1944**, while *Fish Hooky*, whose synopsis says
+only that it was "the 120th Our Gang short to be released", scored **0.4194**. Giving the
+right answer its whole text reached 0.2689. That is hubness, and no amount of text fixes
+a document that has none.
+
+Stopped at three per §10.9, raised B4/P13 with costed options. **The author chose the
+model swap.** ADR-0034: `bge-small-en-v1.5`, verified with `eval embed --compare` BEFORE
+spending 75 minutes — the pair moved to 0.4947/0.4694, the correct answer overtaking the
+trivia. CLS pooling and the query prefix are both mandatory and both fail silently, so
+both are explicit with a test asserting the pooling strategies disagree.
+
+**"like Wong Kar-wai but Korean" now returns Chungking Express first.** The model
+recognised a director from his name alone, which MiniLM never did. It has not composed
+"like him" *with* "but Korean".
+
+---
+
+## Session 14 — 2026-09-13 — E3 becomes a number, and the app starts refreshing itself
+
+**5.6.** `fixtures/search/semantic-queries.tsv`: 10 queries, 37 graded answers, every film
+named from knowledge before anything was run. **Filter half nDCG@10 = 1.0000. Meaning half
+= 0.1188.** The structured half of search is exactly right; the meaning half still matches
+query words in titles, because Wikipedia leads restate the title in their opening
+sentence and CLS pooling weights it heavily.
+
+**D39 priced and rejected for the cost of one command.** Stripping the boilerplate lead
+lifts the right answer 0.4884 → 0.5539 *and lifts the wrong answers by as much*. A
+three-hour re-embed that would have bought nothing.
+
+**5.7, and D37 with it.** The pipeline moved from `tools/ingest` to `crates/catalogue` —
+the application cannot depend on a dev tool, which is why nothing had ever called
+`refresh`. Cold start unchanged at 328–522 ms against Phase 1's 515/660. The app added
+**4,604 titles** on launch without anyone typing a command.
+
+**Two bugs found by running it twice rather than reasoning about it**: the first check is
+stale *without* a request so it carried no validator and every launch re-downloaded
+216 MB; and recording the validator at the end did not fix it either, because the app
+exits when its window closes. It is now recorded after the download and before the load —
+the only boundary wrong in neither direction.
+
+---
+
+## Session 15 — 2026-09-14/15 — screenshots, which are tests
+
+**5.8 and 5.9.** The search screen, and `tools/shots/capture.ps1`, which launches the
+release binary and types into it — not headless Chrome, because every result comes
+through Tauri IPC and a browser screenshot would show an empty state and call it evidence.
+
+**The screenshots found two things the CLI could not.** Eleven correct Hitchcock films
+all labelled "matched words" when they had matched no words — they came from the filter
+path, which reused `MatchReason::Keyword` for want of a variant. And the nav rail claiming
+"Live Channels" was active behind a page of search results. **Eval prints titles; a UI
+prints explanations, and an explanation can be wrong while every title is right** (D43).
+
+**E7's refusal clause is finally evidenced**, having been unevidenced since Phase 4.
+Pointing this build's header check at the actual published artefact refuses it by name.
+
+**E5 met.** No HTTP client in the search crates' dependency tree, and the one launch-time
+network call resolves to `Unknown` offline with a test asserting it.
+
+**E4 documented as NOT met**, with screenshots. "films about grief that aren't depressing"
+is led by *Good Grief*, a genuine comedy about bereavement — and the clause "that aren't
+depressing" has no effect at all. "like Wong Kar-wai but Korean" returns his filmography
+and, separately, Korean drama: both halves understood, neither composed.
+
+**B5 raised.** `embeddings-v2` was reported published and is not there — the API shows
+only `embeddings-v1` with the superseded MiniLM asset, and the URL 404s. 5.9's happy path
+and Phase 4's E7 both wait on that one upload.
