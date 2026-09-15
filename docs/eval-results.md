@@ -1808,3 +1808,46 @@ The refresh watermark — the highest IMDb id already held — is a full scan wi
 over 3.2 million rows, and no index can serve it. It runs on the background task so it
 costs no user-visible time today, but 13.7 s of disk on every refresh is not free.
 Recorded as debt.
+
+### The optional downloads, end to end (subtask 5.9)
+
+`cargo run -p sinephile-catalogue --example fetch_assets -- <dir>`, 2026-09-15, against
+the real published release `embeddings-v2`.
+
+```
+  plan: 3 files, 346 MB total
+    Meaning index      313.4 MB  Absent
+    Language model      32.4 MB  Absent
+    Tokenizer            0.7 MB  Absent
+
+  Meaning index    VERIFIED      internal checksum + model identity + builder version
+  Language model   VERIFIED      pinned file sha256
+  Tokenizer        VERIFIED      pinned file sha256
+```
+
+**There are three downloads, not one.** The model that embeds the query is 32.4 MB of the
+346, and it had never been scoped because it was copied into place by hand during
+development. The consent screen names each file separately.
+
+#### The real download caught a mistake a unit test could not
+
+The first run downloaded all 313 MB and was **refused**:
+
+```
+has sha256 32b93f3ac0824683ec5e417d22493b6d01b8dc93ea826aec923ed308978955be,
+expected   b17f15dab916816be1e4b959cbfce6f5d369ab6e7bd5c676e6760b0a2980b7bb
+```
+
+`b17f15da…` is the value `ingest embed` prints — the artefact's **internal** checksum,
+computed over its header and vectors. `verify_sha256` hashes the **whole file**, which
+includes the 32-byte trailing checksum itself. Two different things both called "the
+sha256", and pinning one where the other was meant.
+
+The fix was not to pin the right constant. **The artefact verifies itself** — its own
+checksum covers its own bytes, catches truncation, and cannot go stale when the artefact
+is rebuilt — so `sha256` is now `Option`, `None` for the artefact, and pinned only for the
+model and tokenizer, which are opaque and cannot vouch for themselves.
+
+Worth noting what happened here: the refusal was *correct behaviour* firing on an
+*incorrect constant*, and the only thing that could distinguish those was running it
+against a real file.

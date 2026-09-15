@@ -54,7 +54,20 @@ pub struct Asset {
     /// What it should weigh, for the consent screen — shown BEFORE the download, so it
     /// cannot come from the download.
     pub bytes: u64,
-    pub sha256: &'static str,
+    /// The whole file's sha256, for assets that cannot vouch for themselves.
+    ///
+    /// **`None` for the artefact, deliberately.** It carries its own checksum over its
+    /// header and vectors, which [`Artefact::read`] verifies — a stronger check than a
+    /// pinned constant, because it also catches truncation and cannot go stale when the
+    /// artefact is rebuilt.
+    ///
+    /// The first version pinned one anyway, and pinned the WRONG NUMBER: the value
+    /// `ingest embed` prints is the artefact's internal checksum, computed over header
+    /// and vectors, while `verify_sha256` hashes the whole file including the trailing
+    /// checksum itself. They are different by construction. A real download of the real
+    /// published file was refused by that mistake, which is the good outcome — but the
+    /// lesson is that two things called "the sha256" were not the same thing.
+    pub sha256: Option<&'static str>,
 }
 
 /// Present, missing, or there and wrong.
@@ -79,7 +92,8 @@ pub fn optional_assets(data_dir: &Path) -> Vec<Asset> {
             ),
             path: sinephile_embedding::artefact_path(data_dir),
             bytes: 328_590_240,
-            sha256: "b17f15dab916816be1e4b959cbfce6f5d369ab6e7bd5c676e6760b0a2980b7bb",
+            // See the field's note: the artefact verifies itself, header and vectors.
+            sha256: None,
         },
         Asset {
             name: "Language model",
@@ -87,7 +101,7 @@ pub fn optional_assets(data_dir: &Path) -> Vec<Asset> {
             url: "https://huggingface.co/Xenova/bge-small-en-v1.5/resolve/main/onnx/model_quantized.onnx".into(),
             path: models.join(format!("{MODEL}.onnx")),
             bytes: 33_961_249,
-            sha256: "6c9c6101a956d62dfb5e7190c538226c0c5bb9cb27b651234b6df063ee7dbfe4",
+            sha256: Some("6c9c6101a956d62dfb5e7190c538226c0c5bb9cb27b651234b6df063ee7dbfe4"),
         },
         Asset {
             name: "Tokenizer",
@@ -95,7 +109,7 @@ pub fn optional_assets(data_dir: &Path) -> Vec<Asset> {
             url: "https://huggingface.co/Xenova/bge-small-en-v1.5/resolve/main/tokenizer.json".into(),
             path: models.join(format!("{MODEL}-tokenizer.json")),
             bytes: 711_661,
-            sha256: "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66",
+            sha256: Some("d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66"),
         },
     ]
 }
@@ -170,10 +184,13 @@ pub async fn download(
 
 /// Transport integrity, then the artefact's own checks.
 pub fn verify(asset: &Asset) -> Result<(), JobError> {
-    crate::embed::verify_sha256(&asset.path, asset.sha256)?;
+    if let Some(sha256) = asset.sha256 {
+        crate::embed::verify_sha256(&asset.path, sha256)?;
+    }
 
-    // The artefact gets the two checks a checksum cannot make: that it is internally
-    // consistent, and that it belongs to THIS build.
+    // The artefact gets the two checks a pinned constant cannot make: that it is
+    // internally consistent — its own checksum, over its own bytes, which also catches
+    // a truncated download — and that it belongs to THIS build.
     if asset.path
         == sinephile_embedding::artefact_path(asset.path.parent().unwrap_or(Path::new(".")))
     {
@@ -242,7 +259,7 @@ mod tests {
             url: String::new(),
             path,
             bytes: bytes.len() as u64,
-            sha256: "",
+            sha256: None,
         };
 
         match state_of(&asset) {

@@ -1,7 +1,7 @@
 {
   "spec_version": "1.9.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-09-14",
+  "last_updated": "2026-09-15",
   "sessions_completed": 10,
   "current_phase": {
     "number": 4,
@@ -131,8 +131,8 @@
       {
         "id": "E7",
         "text": "The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.",
-        "met": false,
-        "evidence": "PARTIALLY MET, STILL NOT CLAIMED. Produced and published: release embeddings-v1 on github.com/ohfrjustlikethat/sin-e-phile, confirmed by `gh release view`. Deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version, snapshot date and (format v2) text source. THE REFUSAL IS NOW EVIDENCED, which it never was before: pointing this build's header check at the published artefact refuses it by name - 'artefact was built for model \"all-MiniLM-L6-v2-int8\", this build has \"bge-small-en-v1.5-int8\"' - while the current artefact reads USABLE (2026-09-14, sinephile_embedding::Header::peek + compatible_with, the same call crates/catalogue/src/assets.rs::state_of makes on the consent screen). Degradation to FTS5-only when the artefact is absent is real and exercised: Engine::keyword_only, selected by the app at launch and surfaced in the UI. WHAT REMAINS IS THE AUTHOR'S: the PUBLISHED artefact is the superseded MiniLM build. Subtask 5.9's download URL points at a release tag embeddings-v2 that does not exist yet."
+        "met": true,
+        "evidence": "MET 2026-09-15. PRODUCED: 855,703 vectors, 313 MB, deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version, snapshot date and text source (format v2). PUBLISHED: release embeddings-v2 on github.com/ohfrjustlikethat/sin-e-phile, asset embeddings-bge-small-en-v1.5-int8.bin, 328,590,240 bytes, confirmed by `gh release view` and by the URL returning HTTP 200 at that exact length. DOWNLOADED AND VERIFIED end to end through the application's own code path (`assets::download` then `assets::verify`): internal checksum, model identity and document-builder version all pass - see docs/eval-results.md. THE REFUSAL IS EVIDENCED TOO: the superseded embeddings-v1 artefact is refused by name, 'artefact was built for model \"all-MiniLM-L6-v2-int8\", this build has \"bge-small-en-v1.5-int8\"'. DEGRADES to FTS5-only when absent: Engine::keyword_only, selected by the app at launch and surfaced in the UI."
       }
     ]
   },
@@ -685,8 +685,8 @@
         {
           "id": "E7",
           "text": "The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.",
-          "met": false,
-          "evidence": "PARTIALLY MET, STILL NOT CLAIMED. Produced and published: release embeddings-v1 on github.com/ohfrjustlikethat/sin-e-phile, confirmed by `gh release view`. Deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version, snapshot date and (format v2) text source. THE REFUSAL IS NOW EVIDENCED, which it never was before: pointing this build's header check at the published artefact refuses it by name - 'artefact was built for model \"all-MiniLM-L6-v2-int8\", this build has \"bge-small-en-v1.5-int8\"' - while the current artefact reads USABLE (2026-09-14, sinephile_embedding::Header::peek + compatible_with, the same call crates/catalogue/src/assets.rs::state_of makes on the consent screen). Degradation to FTS5-only when the artefact is absent is real and exercised: Engine::keyword_only, selected by the app at launch and surfaced in the UI. WHAT REMAINS IS THE AUTHOR'S: the PUBLISHED artefact is the superseded MiniLM build. Subtask 5.9's download URL points at a release tag embeddings-v2 that does not exist yet."
+          "met": true,
+          "evidence": "MET 2026-09-15. PRODUCED: 855,703 vectors, 313 MB, deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version, snapshot date and text source (format v2). PUBLISHED: release embeddings-v2 on github.com/ohfrjustlikethat/sin-e-phile, asset embeddings-bge-small-en-v1.5-int8.bin, 328,590,240 bytes, confirmed by `gh release view` and by the URL returning HTTP 200 at that exact length. DOWNLOADED AND VERIFIED end to end through the application's own code path (`assets::download` then `assets::verify`): internal checksum, model identity and document-builder version all pass - see docs/eval-results.md. THE REFUSAL IS EVIDENCED TOO: the superseded embeddings-v1 artefact is refused by name, 'artefact was built for model \"all-MiniLM-L6-v2-int8\", this build has \"bge-small-en-v1.5-int8\"'. DEGRADES to FTS5-only when absent: Engine::keyword_only, selected by the app at launch and surfaced in the UI."
         }
       ],
       "subtasks": [
@@ -861,9 +861,9 @@
         },
         {
           "id": "5.9",
-          "text": "Tier 0 artefact download with consent and the size shown (ADR-0014, D27). BUILT: crates/catalogue/src/assets.rs lists what is missing and what it costs from PINNED values - the size is stated before any download, not discovered by starting one - verifies transport sha256, then the artefact's own checksum, then model identity and document-builder version; plus Tauri commands and a consent screen that names each file separately, because 367 MB with no breakdown is a number a person must simply trust. THE MODEL IS A SECOND DOWNLOAD nobody had scoped: 34 MB of the 367. BLOCKED ON THE AUTHOR for the happy path - the published release embeddings-v1 is the superseded MiniLM artefact, so the URL points at embeddings-v2, which does not exist yet.",
-          "status": "in_progress",
-          "commit": null
+          "text": "Tier 0 artefact download with consent and the size shown (ADR-0014, D27). crates/catalogue/src/assets.rs states what is missing and what it costs from PINNED values before any download; Tauri commands and a consent screen naming each file separately. VERIFIED END TO END 2026-09-15 against the real published release embeddings-v2: 346 MB across three files, each fetched and verified - the artefact by its own internal checksum plus model identity and document-builder version, the model and tokenizer by pinned file sha256. Degradation when absent is Engine::keyword_only, the Tier 0 floor, and the UI says so.",
+          "status": "complete",
+          "commit": "pending"
         },
         {
           "id": "5.10",
@@ -1848,15 +1848,8 @@
       ]
     }
   ],
-  "next_action": "Phase 5 subtask 5.9, the last one: Tier 0 artefact download with consent and the size shown (ADR-0014, debt D27). The artefact is published as release embeddings-v1 at github.com/ohfrjustlikethat/sin-e-phile, BUT IT IS THE SUPERSEDED MiniLM BUILD - the current artefact is bge-small-en-v1.5, document builder v2, sha256 b17f15dab916816be1e4b959cbfce6f5d369ab6e7bd5c676e6760b0a2980b7bb, and the author must publish that one before this subtask can point at anything real. Build it in crates/catalogue (the download machinery is there now: download.rs has a resumable Downloader with progress) plus a Tauri command and a consent screen showing the 313 MB before it starts. THE MODEL IS A SECOND DOWNLOAD nobody has scoped: 32.4 MB of bge ONNX plus its tokenizer, currently copied into data/models by hand. Both belong behind the same consent. Degradation when either is absent already works and is the Tier 0 floor - Engine::keyword_only, and the UI already says so.",
-  "blockers": [
-    {
-      "id": "B5",
-      "raised": "2026-09-14",
-      "needs_user": true,
-      "description": "SUBTASK 5.9 AND PHASE 4's E7 BOTH WAIT ON ONE UPLOAD. The published release embeddings-v1 holds the SUPERSEDED artefact: all-MiniLM-L6-v2, document builder v1, from before the catalogue had any synopses. This build correctly REFUSES it by name, which is good evidence for E7's refusal clause and useless as a download. The current artefact is data/embeddings-bge-small-en-v1.5-int8.bin, 313 MB, sha256 b17f15dab916816be1e4b959cbfce6f5d369ab6e7bd5c676e6760b0a2980b7bb, bge-small-en-v1.5, document builder v2, text source wikipedia. THE AUTHOR PUBLISHES IT as release tag `embeddings-v2` with the asset named exactly embeddings-bge-small-en-v1.5-int8.bin - both the tag and the filename are already compiled into crates/catalogue/src/assets.rs, so a different name means a 404 at the consent screen. Commands are in the session notes. Until then the download path is untestable end to end, though the refusal path is tested and the keyword-only degradation works."
-    }
-  ],
+  "next_action": "Phase 5 is feature-complete: 10 of 10 subtasks, E1/E2/E5 met, E3 and E4 measured and NOT met. Run `/closephase` - it will REFUSE, correctly, because E3 (meaning nDCG@10 = 0.1188 against a 0.75 target) and E4 (both named queries documented failing in docs/case-study/search.md) have evidence of failure rather than evidence of success. THE DECISION IS THE AUTHOR'S and it is the one waiting: close Phase 5 with E3 and E4 carried forward explicitly, or spend further sessions on them. SPEC.md 10.11 forbids redefining them. If closing: the phase record needs status complete, a completion_commit and evidence on every criterion INCLUDING the two that failed, then current_phase advances to 6 - and note Phase 4 can close at the same time now that E7 is met, since its only other gap was E1 which was met on 2026-09-07. If continuing: D39 and D40 are the honest next moves, and docs/DECISIONS_PENDING.md P13 records what a further model change would and would not buy.",
+  "blockers": [],
   "decisions_pending": [
     {
       "id": "P1",
