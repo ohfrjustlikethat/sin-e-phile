@@ -1851,3 +1851,130 @@ model and tokenizer, which are opaque and cannot vouch for themselves.
 Worth noting what happened here: the refusal was *correct behaviour* firing on an
 *incorrect constant*, and the only thing that could distinguish those was running it
 against a real file.
+
+## Session 16 — 2026-09-21/22 — the document layout, priced properly
+
+### D39 was answered with the wrong documents, and the answer flips
+
+`cargo run -p eval --release -- embed --compare "<query>" <ids>`, 2026-09-22, real
+catalogue, `bge-small-en-v1.5-int8`.
+
+D39 concluded that re-laying-out the document lifts the right answer and the wrong ones
+by the same amount, leaving the order unchanged — so a re-embed would buy nothing. That
+conclusion came from variants built with `format!`:
+
+```
+longer = format!("{document} {synopsis}")        // synopsis prefix appears TWICE
+plot   = format!("{stripped} {document}")        // metadata AND prefix appear twice
+```
+
+Neither is a document any rebuild could produce. `document::build_with` now takes a
+`Layout`, so a variant is assembled by the producer's own builder and each part appears
+exactly once. Measured again, **the order does change.**
+
+`"a man returns to his hometown to care for his nephew after a death"`
+
+| item | shipped | 1000 chars | plot first | no cast |
+|---|---|---|---|---|
+| **Manchester by the Sea** *(graded 2)* | 0.4884 **#5** | 0.5136 #5 | 0.5609 **#3** | 0.5733 #3 |
+| Uncle Boonmee | 0.6069 #1 | 0.6105 #1 | 0.5958 #1 | 0.6005 #1 |
+| The Return | 0.5698 #3 | 0.5711 #3 | 0.5850 #2 | 0.6002 #2 |
+| The Returning | 0.5718 **#2** | 0.5666 #4 | 0.4798 **#6** | 0.4767 #6 |
+| Kids Return | 0.5691 #4 | 0.5807 #2 | 0.5395 #4 | 0.5420 #4 |
+| **Ordinary People** *(graded 1)* | 0.4689 **#6** | 0.4634 #6 | 0.4826 **#5** | 0.4865 #5 |
+
+`"films about grief that aren't depressing"` — the clearer one:
+
+| item | shipped | 1000 chars | plot first | no cast |
+|---|---|---|---|---|
+| **Good Grief** *(graded 2)* | 0.6760 #1 | 0.6771 #1 | 0.6522 #2 | 0.6598 #1 |
+| **Manchester by the Sea** *(graded 1)* | 0.5692 **#6** | 0.5795 #6 | 0.6553 **#1** | 0.6590 #2 |
+| **A Monster Calls** *(graded 1)* | 0.5430 **#7** | 0.5289 #7 | 0.5329 **#5** | 0.5343 #4 |
+| Grief *(ungraded)* | 0.6633 **#2** | 0.6638 #3 | 0.5186 **#6** | 0.5297 #5 |
+| Mourning Has Broken *(ungraded)* | 0.6579 #3 | 0.6654 #2 | 0.5701 #3 | 0.5815 #3 |
+| Disconnected *(ungraded)* | 0.6578 #4 | 0.6560 #4 | 0.5599 #4 | 0.5137 #6 |
+| Bereavement *(ungraded)* | 0.6369 **#5** | 0.6259 #5 | 0.4902 **#7** | 0.4849 #7 |
+
+Under `plot first` the three graded answers hold #1, #2 and #5 where they held #1, #6 and
+#7; every ungraded title falls. **That is a reordering, which is the trigger D39 set for
+spending a re-embed** — and `1000 chars` alone is not enough to produce it, so it is the
+position of the metadata rather than the length of the synopsis that does the work.
+
+What this does NOT establish: these are six- and seven-item probes over the fixture's own
+contested set, not the catalogue. Other items rise too, and nothing here predicts what
+nDCG@10 over 2.7 million titles would do. It says a rebuild is now worth its three hours,
+not what the rebuild would score.
+
+### E3's number, decomposed — it was measuring three things at once
+
+`cargo run -p eval --release -- search --report`, 2026-09-22. **The headline is
+unchanged** and stays the criterion as SPEC.md Phase 5 words it:
+
+```
+E3 — nDCG@10 over the semantic query set
+   meaning  0.1188  over 8 queries   (target 0.75)
+   filter   1.0000  over 2 queries   (target 0.75)
+
+diagnostics — what that number is made of, not a restatement of it
+   topical      nDCG@10 0.1584  over 6 queries
+   known-item   MRR 0.0000, found in the top 10: 0/2
+```
+
+D40's two known-item queries score 0.0000 and neither film reaches the top 10 at all, so
+MRR agrees with nDCG here rather than rescuing it. The topical six sit at 0.1584.
+
+### Two graded answers cannot be returned at all, and two queries are capped below E3
+
+The harness now reports, per query, the best nDCG@10 it could possibly reach given which
+graded answers are in the vector index:
+
+```
+UNREACHABLE ANSWERS — graded films the vector half cannot return at all
+   (synopsis under MIN_SYNOPSIS = 300, so not in the index)
+   ceiling 0.7468 — BELOW THE TARGET  "films about grief that aren't depressing"
+                      tt0103129  graded 2      (Truly Madly Deeply, 235 chars)
+   ceiling 0.7468 — BELOW THE TARGET  "like Wong Kar-wai but Korean"
+                      tt0140825  graded 2      (Christmas in August, 169 chars)
+```
+
+`MIN_SYNOPSIS = 300` keeps sparse documents out of the index, and it was measured and
+right. It also means two of the eight meaning queries **cannot reach 0.75 however good
+the engine gets** — the ceiling is 0.7468. A fixture that cannot distinguish "failing"
+from "already at its ceiling" is not measuring what it claims to.
+
+26 of the 28 graded meaning answers ARE reachable, so the rest of the 0.1188 is the
+engine, not the fixture.
+
+#### Seen to fail
+
+`MIN_SYNOPSIS` temporarily raised 300 → 1500 and one topical query retagged
+`meaning/known-item`: ceilings fell to 0.2385–0.7602, six queries reported capped instead
+of two, the "BELOW THE TARGET" marker appeared and disappeared correctly either side of
+0.75, and MRR moved 0.0000 → 0.3333 with presence 1/3. **E3's headline stayed 0.1188
+through both perturbations**, which is the property that matters. Both restored.
+
+### The agreement check had stopped running, and why
+
+`cargo run -p eval --release -- embed --report` errored:
+
+```
+the artefact holds 855703 vectors and the catalogue offers 858170 core ids
+```
+
+Subtask 5.7 made the catalogue refresh itself on launch; the artefact is a published
+snapshot. It had drifted **2,467 core titles in a week** and the equality check stopped
+the harness dead. All 2,467 new ids sit after the artefact's last position (verified
+directly), so position *n* still means the same title — the artefact is a prefix of the
+catalogue, and the check was stricter than the invariant. It now compares over the
+artefact's range, reports the gap, and still refuses if the catalogue has *fewer* ids,
+which would mean positions had shifted.
+
+Restored, and with `document::build_with` in place:
+
+```
+agreement  10/10 byte-identical to the artefact
+latency    p50 5.6 ms   p95 6.6 ms
+```
+
+**That 10/10 is what proves the `Layout` refactor changed no shipped bytes** — documents
+re-derived through the new builder quantise to exactly the published vectors.

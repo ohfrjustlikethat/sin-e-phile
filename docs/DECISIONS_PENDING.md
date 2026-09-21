@@ -444,3 +444,77 @@ and E3/E4 still not claimed unless the numbers earn it.
 
 E1 (p95 22.2 ms), E2 (43/43 = 100%) and recall@10 (0.9810) are all healthy. This blocks
 E3 and E4 and nothing else.
+
+
+---
+
+## P14 — A built phase cannot close with an unmet exit criterion, and Phase 5 has three
+
+**Raised:** 2026-09-22 (Phase 5) · **Blocks:** closing Phases 4 and 5 · **Decide by:** Phase 6
+
+### The decision
+
+Whether to amend `SPEC.md` so a phase can close with a criterion recorded **unmet and
+assigned to a later phase**, or keep Phase 5 open until E1, E3 and E4 are all met.
+
+### Why this is a decision and not a judgement call
+
+The previous session's `next_action` proposed closing Phase 5 "with E3 and E4 carried
+forward explicitly". **That option does not exist.** `docs/schemas/project-state.schema.json`
+makes it unrepresentable:
+
+```
+phases.items.allOf[0]:  if status == "complete"
+                        then every exit_criteria[].met must be const true
+```
+
+and `tools/state/validate_state.py:255` errors on any unmet criterion in a phase behind
+`current_phase`. Its message suggests the remedy "say in `SESSION_LOG.md` why the phase
+closed without it" — but nothing implements that escape hatch, so it is a hard block.
+`status: "skipped"` is for phases deliberately **not built** (Appendix E, Tier C/D);
+Phase 5 was built, and skipping it would be a different kind of untruth.
+
+Worth separating, because they get conflated: the rule being discussed is **Appendix B**
+("a phase is complete only when every exit criterion is met"), not **§10.8** ("a criterion
+is *met* only with an artefact"). Evidence stays mandatory under every option below.
+
+### E1 is the honest motivating case, not E3
+
+E1 asks for p95 < 80 ms and measures **17.5 ms** on this machine. It is recorded unmet
+only because §2.3 enforces against **Tier 0** and this is a Tier 2 dev box — and P8
+already schedules that measurement for **Phase 21**. So E1 is not failing; it is
+unmeasurable here, and the spec itself says where it gets measured. A criterion in that
+position should not hold two phases unmerged for twelve more.
+
+### Options
+
+1. **Amend.** ADR + schema + validator: allow `met: false` on a complete phase when it
+   carries `carried_to_phase` and `carried_reason`, both required, and a `SESSION_LOG.md`
+   entry. *Cost:* a permanent escape hatch on Appendix B. Every future phase can reach for
+   it, and nothing in the tooling can tell a genuine Phase-21 deferral from a tired
+   Friday. That is the real price and it does not go away.
+2. **Keep Phase 5 open until all three are met.** *Cost:* E1 cannot be met at all without
+   Tier 0 hardware or a constrained VM. Open-ended by construction, and R7 — abandonment
+   — is this project's own named top risk.
+3. **Amend narrowly: a criterion may be carried only to a phase that already names the
+   measurement.** E1 → Phase 21, which P8 already assigns. E3/E4 would NOT qualify.
+   *Cost:* more schema than option 1 for a rule that may fit exactly one criterion; and it
+   answers nothing for E3 and E4, which would still hold Phase 5 open.
+
+### Recommendation
+
+**Not yet — and this is a correction to what I recommended earlier in the session.** I
+recommended amending on the belief that the cheap levers on E3/E4 were exhausted. One of
+them came back positive hours later: D39's conclusion was measured with documents no
+rebuild could produce, and re-measured properly, the layout change **reorders** in favour
+of the graded answers (`docs/eval-results.md`, Session 16). A re-embed is now justified on
+its own evidence, and E3 and E4 should be re-measured after it before anyone decides
+whether they need carrying.
+
+If the re-embed lands and E3 is still far from 0.75, option 1 is the recommendation, on
+E1's merits rather than E3's.
+
+### The default if the answer is "your call"
+
+Leave P14 open, fix D44/D45, spend the re-embed, re-measure — and bring this back with
+numbers rather than with a schema change.

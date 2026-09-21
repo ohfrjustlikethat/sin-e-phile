@@ -157,6 +157,26 @@ No code tour.
   vectors.
 - **Conditional requests** — `crates/catalogue/src/freshness.rs`. A 216 MB file asked
   "have you changed?" costs one HEAD and a string compare.
+- **A parameterised builder beats four edits** — `crates/embedding/src/document.rs:78`.
+  `Layout` makes "what goes in the document, and in what order" a value, so a variant is
+  built by the *producer's own* code. The version it replaced hand-concatenated strings in
+  the harness, and those strings contained the synopsis twice.
+- **`#[derive(Clone, Copy)]` on a small config struct** —
+  `crates/embedding/src/document.rs:81`. Four fields, all `Copy`, so it passes by value
+  and a `const` table of variants needs no lifetimes.
+- **Struct update syntax as the diff** — `Layout { synopsis_first: true, ..SHIPPED }`,
+  `tools/eval/src/embed.rs:88`. The literal shows exactly what differs from what ships,
+  which is the thing being measured.
+- **`&str` slicing returns a borrow, so `strip_lead` needs no allocation** —
+  `crates/embedding/src/document.rs:196`. It returns a sub-slice of its input; the caller
+  decides whether to own it.
+- **Ordinal vs cardinal measurement** — `tools/eval/src/embed.rs:196`. Search is ordinal:
+  what a user sees is the *order*. A cosine that rises on every candidate changes nothing,
+  and reporting the rank next to the score is what made that visible.
+- **Prefix invariant vs equality invariant** — `tools/eval/src/embed.rs:276`. The artefact
+  is positional and the catalogue only grows at the tail, so "the artefact is a prefix" is
+  the true invariant. Asserting equality instead silently disabled a whole harness.
+
 - **A library default is not a chosen value** — `crates/vector-index/src/lib.rs:74`.
   usearch's `ef` of 64 measured 0.9400 recall@10 and missed the 0.95 gate. The sweep
   (64 → 384) is in `docs/eval-results.md`; 192 ships.
@@ -164,7 +184,7 @@ No code tour.
 ## 4. The questions
 
 Written, not asked — Phase 5 is not a tier boundary (`SPEC.md` §10.10). They accumulate
-until the end of Phase 8. Nine rather than five: this phase ran long and taught more than
+until the end of Phase 8. Twelve rather than five: this phase ran long and taught more than
 five things, and dropping four to keep the count would be tidiness winning over the
 point.
 
@@ -194,3 +214,13 @@ point.
 9. `freshness::remember` records the publisher's validator after the download and before
    the load, rather than at the end of the refresh. Both other placements were tried and
    both were wrong. What goes wrong at each end?
+10. `eval embed --compare` built its variants with `format!("{document} {synopsis}")`
+    and reported three columns of entirely plausible cosines. What was wrong with that
+    document, why did it make every variant look equally good, and what is the general
+    rule about cheap proxies for expensive experiments?
+11. Two of the eight meaning queries have a ceiling of 0.7468 — below E3's own 0.75
+    target — and no change to the model or the documents can lift them. Where does that
+    ceiling come from, and why is reporting it not the same as moving the goalposts?
+12. The application only ever *views* a prebuilt vector index, and the download flow
+    fetches the artefact but never builds one. Every test passed and the screenshots
+    looked right. What made this invisible, and what kind of test would have caught it?

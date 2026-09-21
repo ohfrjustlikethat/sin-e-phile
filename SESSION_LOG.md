@@ -1149,3 +1149,84 @@ and, separately, Korean drama: both halves understood, neither composed.
 **B5 raised.** `embeddings-v2` was reported published and is not there — the API shows
 only `embeddings-v1` with the superseded MiniLM asset, and the URL 404s. 5.9's happy path
 and Phase 4's E7 both wait on that one upload.
+
+## Session 16 — 2026-09-21/22 — a conclusion measured with the wrong documents
+
+**Nothing was built this session. Three things were found, and one of them reverses a
+decision we had already acted on.**
+
+### D39's answer was no because the question was wrong
+
+`eval embed --compare` priced document-layout changes by gluing strings together:
+`format!("{document} {synopsis}")` — which contains the first 400 characters of the
+synopsis **twice** — and `format!("{stripped} {document}")`, which duplicates the metadata
+as well. Every variant therefore kept the metadata head exactly where it was and merely
+added text, and text added to everything lifts everything. That is precisely the "uniform
+lift, no reordering" D39 recorded, and it read as a property of the model when it was a
+property of the harness.
+
+`document::build_with(doc, Layout)` now assembles variants through the **producer's own
+builder**, so each part appears once and a variant is what a rebuild would actually write.
+Re-measured, the order changes: on "films about grief that aren't depressing", *Manchester
+by the Sea* goes **#6 → #1** and every ungraded title falls. D39 set "predicts a
+reordering" as the bar for spending a re-embed. It now clears it.
+
+**The lesson is not about embeddings.** A cheap proxy for an expensive experiment is only
+worth anything if it is a proxy for the *same thing*, and ours differed in a way that was
+invisible from its output — three columns of plausible cosines, and the wrong answer.
+
+### E3's 0.1188 was measuring three different things
+
+The report now prints, beside the unchanged headline: topical nDCG (0.1584 over six),
+known-item MRR (0.0000, 0 of 2 in the top ten — so D40's objection is correct in principle
+and is **not** what is costing E3), and a per-query **ceiling**. That last one found
+something: two of the eight meaning queries have one grade-2 answer each whose synopsis is
+under `MIN_SYNOPSIS`, so it is not in the vector index at all and the query **cannot reach
+0.75 however good the engine gets** — the ceiling is 0.7468. A fixture that cannot tell
+"failing" from "already at its ceiling" is not measuring what it says.
+
+The headline stayed 0.1188 through both diagnostics and through the break test, which was
+the point: §10.11 forbids redefining a criterion, and a criterion rewritten after seeing
+its own number is not one.
+
+### The 313 MB nobody can use
+
+`src-tauri/src/lib.rs:130` only ever **views** a prebuilt `.usearch`. Nothing in the
+application builds one. The consent flow downloads the artefact, the model and the
+tokenizer — not an index — and the only builder is `tools/ingest`, a dev tool that does
+not ship. So on any machine but this one, a user consents to 346 MB and search stays
+keyword-only with the 313 MB sitting inert (D44).
+
+And building it on first run would fail anyway: the count guard demands equality, while
+5.7's self-refreshing catalogue has already run 2,467 titles past the published artefact
+and only grows (D45). The mapping is fine — every new id sorts after the artefact's last
+position, so the artefact is a strict *prefix* — the guard just asserts the wrong
+invariant. The same mistake had silently disabled `eval embed --report`; that one is
+fixed, and it immediately paid for itself by proving **10/10 byte-identical** that the
+`Layout` refactor changed no shipped bytes.
+
+**Why no test caught it:** the author's dev box is the single configuration where it
+works, because the index was built there by hand on 2026-09-07. 5.9 verified the
+*download* end to end — not that the downloaded thing becomes searchable. Both halves were
+correct in isolation and the seam between them was never exercised.
+
+### On closing the phase
+
+The previous `next_action` proposed closing Phase 5 with E3 and E4 "carried forward".
+The schema makes that unrepresentable: `status: "complete"` requires every criterion
+`met: true`. Recorded as **P14**, and I recommended amending — then withdrew it within the
+session, because the re-embed lever came back positive and an escape hatch argued for on
+E3's hopelessness is a bad reason for a permanent loosening. Fix D44/D45, spend the
+re-embed, re-measure, then decide.
+
+### Verified
+
+`cargo test --workspace` 46 suites, 0 failures · `cargo fmt --check` clean · `cargo clippy
+--workspace --all-targets -- -D warnings` clean · `npm test` 9/9 · guard and secret scan
+clean · `eval search --report` E2 43/43, E1 p95 17.5 ms, E3 meaning 0.1188 unchanged ·
+`eval embed --report` agreement 10/10.
+
+**A line-endings note, because it cost time:** editing files with Python in text mode
+rewrote CRLF as LF and turned four-line changes into whole-file diffs. The repo is mixed
+(no `.gitattributes`, `core.autocrlf=false`), so each file was restored to match what
+`HEAD` holds for it. Worth a `.gitattributes` before it happens again.

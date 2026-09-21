@@ -1,8 +1,8 @@
 {
   "spec_version": "1.9.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-09-15",
-  "sessions_completed": 10,
+  "last_updated": "2026-09-22",
+  "sessions_completed": 16,
   "current_phase": {
     "number": 4,
     "slug": "metadata-backbone",
@@ -1848,7 +1848,7 @@
       ]
     }
   ],
-  "next_action": "Phase 5 is feature-complete: 10 of 10 subtasks, E1/E2/E5 met, E3 and E4 measured and NOT met. Run `/closephase` - it will REFUSE, correctly, because E3 (meaning nDCG@10 = 0.1188 against a 0.75 target) and E4 (both named queries documented failing in docs/case-study/search.md) have evidence of failure rather than evidence of success. THE DECISION IS THE AUTHOR'S and it is the one waiting: close Phase 5 with E3 and E4 carried forward explicitly, or spend further sessions on them. SPEC.md 10.11 forbids redefining them. If closing: the phase record needs status complete, a completion_commit and evidence on every criterion INCLUDING the two that failed, then current_phase advances to 6 - and note Phase 4 can close at the same time now that E7 is met, since its only other gap was E1 which was met on 2026-09-07. If continuing: D39 and D40 are the honest next moves, and docs/DECISIONS_PENDING.md P13 records what a further model change would and would not buy.",
+  "next_action": "Fix D44/D45 FIRST - they are one defect in two places and they matter more than E3's number: on any machine but the author's, the 313 MB artefact a user consents to download never becomes searchable, because nothing in the application builds a .usearch and the count guard would refuse to anyway. (a) Relax crates/vector-index/src/lib.rs:173 from 'artefact.header.count == ids.len()' to 'the artefact is a PREFIX of the catalogue' - index positions 0..header.count, leave the tail to BM25 until the next artefact - and add the test that a catalogue with FEWER ids is still refused. (b) Build the index after the assets download in crates/catalogue/src/assets.rs, or add it as a fourth asset; whichever, `eval` and the app must take the same path, and the acceptance is a run from a data dir containing ONLY the three downloaded files. THEN the re-embed, which is now justified: D39 reversed - 'plot first' (Layout { synopsis_chars: 1000, synopsis_first: true, strip_lead: true }) REORDERS in favour of graded answers on both probed queries, and D39's own trigger for spending three hours was a reordering. Bump document::VERSION to 3, re-embed, rebuild, republish per ADR-0014, then re-measure E3 and E4. ONLY THEN is the close decision ripe. My earlier recommendation to amend SPEC.md so a phase can close with an unmet criterion was made believing the cheap levers were exhausted; one of them just came back positive, so the amendment is no longer urgent. It is recorded as P14 in docs/DECISIONS_PENDING.md and stays open, because E1 still cannot be measured on Tier 0 hardware that does not exist here (P8, decide_by_phase 21).",
   "blockers": [],
   "decisions_pending": [
     {
@@ -1886,6 +1886,12 @@
       "text": "DECIDED 2026-09-07 BY THE AUTHOR: swap to bge-small-en-v1.5 (ADR-0034). Done and measured. E4's two named queries improved markedly - 'like Wong Kar-wai but Korean' now returns Chungking Express first, his signature film, which MiniLM never found. E1 p95 31.3 ms, E2 43/43, recall 0.9670, agreement 10/10. STILL OPEN only for the residue: a harder plot query does not surface Manchester by the Sea, and the evidence points at DOCUMENT LAYOUT rather than the model - its document opens with five cast names before any plot, inside a 400-character budget (D39). Next measurable step is synopsis-first plus a larger SYNOPSIS_CHARS, priced with `eval embed --compare` before another re-embed is spent.",
       "raised": "2026-09-07",
       "decide_by_phase": 5
+    },
+    {
+      "id": "P14",
+      "text": "A built phase cannot close with an unmet exit criterion - the schema makes it unrepresentable and validate_state.py:255 blocks it - and Phase 5 has three. Amend SPEC.md Appendix B to allow a criterion carried to a named later phase, or keep Phase 5 open. E1 is the honest motivating case: it measures 17.5 ms against an 80 ms budget and is unmet only because SPEC.md 2.3 enforces at Tier 0, which P8 already schedules for Phase 21. RECOMMENDATION IS 'not yet' - see docs/DECISIONS_PENDING.md.",
+      "raised": "2026-09-22",
+      "decide_by_phase": 6
     }
   ],
   "adrs": [
@@ -2212,12 +2218,12 @@
     },
     {
       "id": "D39",
-      "text": "PARTLY ANSWERED, AND THE ANSWER WAS NO. The theory was that documents put metadata before meaning and truncated the plot away. Priced 2026-09-13 with `eval embed --compare` rather than with a 3-hour re-embed: stripping Wikipedia's boilerplate lead sentence and putting the plot first lifts Manchester by the Sea from 0.4884 to 0.5539 against a query describing its plot - and lifts the two films beating it by about the same, so the ORDER DOES NOT CHANGE. The layout is real and it is not the binding constraint. WHAT REMAINS UNTRIED, cheapest first: the SYNOPSIS_CHARS budget is 400 against roughly 1,000 the model's 256 tokens can read; and the document still leads with year, genres and up to six cast names. Neither is worth a re-embed until something predicts a REORDERING rather than a uniform lift - --compare is how to find out.",
+      "text": "REOPENED AND REVERSED 2026-09-22. The 'no reordering' answer was measured with variants built by string concatenation - `format!(\"{document} {synopsis}\")` puts the first 400 characters of the synopsis in the document TWICE, and the plot-first variant duplicated the metadata as well - so every variant kept the metadata head in place and merely added text, which is why everything rose together. document::build_with(doc, Layout) now assembles variants through the PRODUCER'S OWN builder, each part appearing once. Re-measured on two fixture queries: 'plot first' (synopsis_chars 1000, synopsis_first, strip_lead) moves Manchester by the Sea #6 -> #1 on the grief query and #5 -> #3 on the nephew query, lifts A Monster Calls #7 -> #5, and drops every ungraded title. THE ORDER CHANGES, which is the trigger D39 itself set for spending a re-embed. `1000 chars` alone does NOT reorder, so it is the position of the metadata rather than the synopsis budget that does the work. Numbers and the caveat - six-item probes over the contested set, not the catalogue - in docs/eval-results.md.",
       "phase_raised": 5
     },
     {
       "id": "D40",
-      "text": "THE SEMANTIC FIXTURE MIXES TWO KINDS OF QUERY AND ONE OF THEM IS MEASURED WRONG. Two of the eight meaning queries - 'a man returns to his hometown to care for his nephew after a death' and 'slow science fiction about memory' - are KNOWN-ITEM queries: they describe one specific film, so the honest metric is MRR or top-10 presence, not nDCG over a fixture listing two answers where everything else scores 0. Both score 0.0000 and drag the mean down in a way that says little about the six topical queries around them. Either split them into a third kind with their own metric, or widen their graded sets - but ONLY with films that would have been listed on their merits, because widening a fixture to match what the code returns is how a fixture stops being able to fail. Noted while writing it, not after it disappointed.",
+      "text": "PARTLY ADDRESSED 2026-09-22. The fixture now carries a sub-kind - 'meaning/known-item' - and `eval search --report` prints MRR and top-10 presence for those two queries BESIDE the headline, which is unchanged at 0.1188 over 8 meaning queries. No graded set was widened and no grade was touched: SPEC.md 10.11 forbids redefining an exit criterion, and a criterion rewritten after seeing its own number is not one. What the split shows: topical six = 0.1584, known-item MRR 0.0000 with 0 of 2 reaching the top 10 - so MRR AGREES with nDCG here rather than rescuing it, and the known-item objection, while correct in principle, is not what is costing E3. Still open: whether to widen the two graded sets, which must only ever be done with films that would have been listed on their merits.",
       "phase_raised": 5
     },
     {
@@ -2234,6 +2240,16 @@
       "id": "D43",
       "text": "A SCREENSHOT CAUGHT A HINT THAT WAS LYING, AND THE CLI COULD NOT HAVE. Every result on 'films directed by Alfred Hitchcock from the 1950s' was labelled 'matched words'. They had not matched words - they came from SearchRepository::by_filters, which reused MatchReason::Keyword because there was no better variant. Fixed by adding MatchReason::Filter and a 'matched your filters' label. The general lesson is recorded here rather than only in the case study: eval prints titles, the UI prints EXPLANATIONS, and an explanation can be wrong while every title is right. Anything else that renders a reason to a user needs looking at the same way.",
       "phase_raised": 5
+    },
+    {
+      "id": "D44",
+      "phase_raised": 5,
+      "text": "THE DOWNLOADED ARTEFACT NEVER BECOMES SEARCHABLE ON A CLEAN INSTALL. src-tauri/src/lib.rs:130 only ever VIEWS a prebuilt .usearch at index_path(dir); nothing in the application builds one. crates/catalogue/src/assets.rs:84 offers three downloads - the 313 MB embeddings artefact, the model and the tokenizer - and no index. The only builder is tools/ingest/src/main.rs:1102, a dev tool that does not ship. So a user consents to 346 MB, downloads it, and search stays keyword-only because VectorIndex::view finds no file; the 313 MB is inert. It works on this machine ONLY because data/vector-index-bge-small-en-v1.5-int8.usearch was built by hand on 2026-09-07, which is also why no test and no screenshot caught it - the author's dev box is the one configuration where it works. Subtask 5.9 verified the DOWNLOAD end to end, not that the downloaded thing becomes searchable."
+    },
+    {
+      "id": "D45",
+      "phase_raised": 5,
+      "text": "AND BUILDING THE INDEX ON FIRST RUN WOULD NOW FAIL. crates/vector-index/src/lib.rs:173 requires artefact.header.count == ids.len() exactly, but subtask 5.7 made the catalogue refresh itself on every launch (ADR-0030), so the catalogue outgrows the published artefact continuously: 858,170 core ids against 855,703 vectors, 2,467 apart one week after the artefact was cut, and it only grows. VERIFIED that the mapping itself is still sound - all 2,467 new core ids sort AFTER the artefact's last position (id 3242554), so position n still means the same title and the artefact is a strict PREFIX of the catalogue. The invariant that matters is 'prefix', not 'equal', and the guard asserts the wrong one. Same mistake had silently disabled `eval embed --report`, which is fixed: it compares over the artefact's range, reports how far the catalogue has run ahead, and still refuses when the catalogue has FEWER ids, which would mean positions really had shifted. D41 and this are one defect in two places and should be fixed together."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."
