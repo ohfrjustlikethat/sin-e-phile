@@ -25,6 +25,29 @@ function megabytes(bytes: number): string {
   return `${Math.round(bytes / 1_048_576).toLocaleString()} MB`;
 }
 
+/**
+ * What the progress bar is counting right now.
+ *
+ * There are two stages and they count different things. The download moves bytes; the
+ * build puts titles into a graph and takes about half a minute, during which no bytes
+ * move at all. Reporting the second as though it were the first would leave a bar
+ * labelled in megabytes sitting still — which reads as a hang, and is why the backend
+ * sends a `phase` rather than leaving this screen to infer one.
+ */
+function describe(progress: AssetProgress): { label: string; percent: number } {
+  const percent =
+    progress.total_bytes > 0 ? (progress.done_bytes / progress.total_bytes) * 100 : 0;
+
+  if (progress.phase === "building") {
+    return {
+      percent,
+      label: `Building the meaning index — ${progress.done_bytes.toLocaleString()} of ${progress.total_bytes.toLocaleString()} titles`,
+    };
+  }
+  const of = progress.total_bytes > 0 ? ` of ${megabytes(progress.total_bytes)}` : "";
+  return { percent, label: `${progress.name} — ${megabytes(progress.done_bytes)}${of}` };
+}
+
 export function MeaningDownload({ onDone }: { onDone?: () => void }) {
   const [plan, setPlan] = useState<AssetPlan | null>(null);
   const [progress, setProgress] = useState<AssetProgress | null>(null);
@@ -102,7 +125,9 @@ export function MeaningDownload({ onDone }: { onDone?: () => void }) {
       <div className="mt-5 flex items-center gap-4">
         <Button onClick={start} disabled={running}>
           {running
-            ? "Downloading…"
+            ? progress?.phase === "building"
+              ? "Building…"
+              : "Downloading…"
             : `Download ${megabytes(plan.outstanding_bytes)}`}
         </Button>
         {!running && (
@@ -114,13 +139,8 @@ export function MeaningDownload({ onDone }: { onDone?: () => void }) {
 
       {running && progress && (
         <div className="mt-4">
-          <ProgressBar
-            value={progress.total_bytes > 0 ? (progress.done_bytes / progress.total_bytes) * 100 : 0}
-          />
-          <p className="mt-2 text-[13.5px] text-ink-muted">
-            {progress.name} — {megabytes(progress.done_bytes)}
-            {progress.total_bytes > 0 && ` of ${megabytes(progress.total_bytes)}`}
-          </p>
+          <ProgressBar value={describe(progress).percent} />
+          <p className="mt-2 text-[13.5px] text-ink-muted">{describe(progress).label}</p>
         </div>
       )}
 

@@ -60,11 +60,21 @@ export const commands = {
 	/**  What the semantic half needs that is not here yet. */
 	optionalAssets: () => __TAURI_INVOKE<AssetPlan>("optional_assets"),
 	/**
-	 *  Download everything that is missing, having been given permission.
+	 *  Download everything that is missing, having been given permission — then make it
+	 *  usable.
 	 * 
 	 *  **Only ever called from an explicit action.** Nothing here runs on launch: ADR-0014's
 	 *  requirement is consent first, with the size shown, and the shape of this API is what
 	 *  enforces that — there is no path that fetches without someone having invoked it.
+	 * 
+	 *  # The download is not the deliverable
+	 * 
+	 *  Until 2026-09-22 this stopped after the last byte, and that was the whole bug (D44):
+	 *  ADR-0014 publishes *vectors*, and the graph over them is derived on the machine, so a
+	 *  downloaded artefact with no index is 313 MB that nothing reads. Search stayed
+	 *  keyword-only, permanently, on every machine but the one where the index had been built
+	 *  by hand. So the build is part of this command, and the engine is reinstalled at the end
+	 *  — without it the user would have to restart the app to use what they just fetched.
 	 */
 	downloadOptionalAssets: () => typedError<null, string>(__TAURI_INVOKE("download_optional_assets")),
 };
@@ -87,6 +97,15 @@ export type AssetPlan = {
 /**  Progress, emitted as it happens. One event per asset per chunk. */
 export type AssetProgress = {
 	name: string,
+	/**
+	 *  `downloading` or `building`.
+	 * 
+	 *  The two stages count different things — bytes off the network, then titles into a
+	 *  graph — and the screen has to be told which. A bar labelled in megabytes that sits
+	 *  still for half a minute reads as a hang, and inferring the stage from a zero total
+	 *  would be guessing at something the backend already knows.
+	 */
+	phase: string,
 	done_bytes: number,
 	total_bytes: number,
 };

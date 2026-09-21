@@ -17,6 +17,7 @@ pub mod episodes;
 pub mod episodes_load;
 pub mod freshness;
 pub mod imdb;
+pub mod index;
 pub mod job;
 pub mod load;
 pub mod matching;

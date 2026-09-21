@@ -1230,3 +1230,69 @@ clean · `eval search --report` E2 43/43, E1 p95 17.5 ms, E3 meaning 0.1188 unch
 rewrote CRLF as LF and turned four-line changes into whole-file diffs. The repo is mixed
 (no `.gitattributes`, `core.autocrlf=false`), so each file was restored to match what
 `HEAD` holds for it. Worth a `.gitattributes` before it happens again.
+
+## Session 17 — 2026-09-22 — the 313 MB becomes searchable
+
+**D44 and D45, fixed and measured.** Last session found that the artefact a user consents
+to download never becomes an index on any machine but this one. It does now.
+
+### One definition of how an index is derived
+
+`crates/catalogue/src/index.rs` builds the graph from the artefact, and
+`download_optional_assets` calls it and reinstalls the engine, so search turns hybrid
+without a restart. `tools/ingest` was rewritten to call the same function rather than keep
+its own copy — the duplication `document_for` warns about, which would have agreed on the
+day it was written and never again. The engine construction moved to `assets::engine_for`
+for the same reason: it is built twice now, at launch and after a download, and "how do we
+decide whether search is hybrid" must have one answer.
+
+### The invariant was right, and right by accident
+
+`VectorIndex::build` demanded that the catalogue and the artefact have *equal* length. It
+now refuses only a catalogue with **fewer** ids — titles removed, positions shifted — and
+indexes the artefact's range otherwise.
+
+Checking why that was safe turned up the more interesting thing. The prefix property is
+not structural: `in_core` is a function of vote count, and the ratings refresh updates
+votes **without** recomputing membership. So no existing row is ever promoted, and the
+artefact is a strict prefix **by omission**. Fix that omission — which is arguably what
+refreshing ratings is *for* — and a title crossing the popularity threshold enters the
+sequence in the middle, every position after it names a different film, and the count
+merely goes up. Length cannot tell that from an append.
+
+So it is checked by content. `index::verify_prefix` re-derives documents at eight sampled
+positions, embeds them, and requires byte-identity with the artefact. **The last position
+is the one that matters** — an insertion anywhere before the end shifts what sits at the
+end — and the others only narrow down where a mismatch begins. Seen to fail: with the
+byte comparison disabled, the promoted-into-the-middle test fails, as it must.
+
+The durable fix is a watermark in the artefact header, so the check is exact rather than
+sampled. It costs nothing if it rides the VERSION 3 re-embed, which is the next job.
+
+### Measured, on the real thing
+
+`ingest vector-index` against the real artefact and a catalogue already 2,467 titles past
+it — the exact condition that used to refuse — built 119,874 vectors in 33 s, and the
+release binary then logged `search: hybrid`, `cold_start_ms=485`. **recall@10 0.9670, E2
+43/43, E3 0.1188/1.0000: identical to the hand-built index it replaces.**
+
+### Two mistakes worth recording
+
+**A silent no-op, twice.** Editing CRLF files with Python string literals containing a
+bare newline matches nothing and reports success. It cost a confusing round trip where the
+Rust compiled, the TypeScript referenced a field that did not exist, and nothing said so.
+Every edit script now asserts the pattern was found before writing. The general rule: a
+find-and-replace that cannot fail is not a tool, it is a coin toss.
+
+**A file written outside the repository.** `tauri-specta` exports bindings to
+`../src/lib/ipc.ts`, relative to the *working directory* — which is `src-tauri/` under
+`npm run tauri dev` and the repo root when the binary is run directly. Running it from the
+root created a stray `src/lib/ipc.ts` under the author's `Documents` folder. Left for the
+author to delete: removing it needs permission this session does not have, and it is
+outside the project.
+
+### Verified
+
+`cargo test --workspace` 47 suites, 0 failures (6 new in `crates/catalogue/tests/index.rs`)
+· `cargo fmt --check` clean · `cargo clippy --workspace --all-targets -- -D warnings` clean
+· `npm test` 9/9 · `npm run lint` and `tsc --noEmit` clean · guard and secret scan clean.

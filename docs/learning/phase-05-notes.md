@@ -157,6 +157,20 @@ No code tour.
   vectors.
 - **Conditional requests** — `crates/catalogue/src/freshness.rs`. A 216 MB file asked
   "have you changed?" costs one HEAD and a string compare.
+- **`&mut (dyn Trait + Send)`** — `crates/catalogue/src/index.rs:81`. A trait object is
+  not `Send` by default, and an async Tauri command's future must be. The bound goes on
+  the object type, not the trait, so the fake embedders in the tests stay unaffected.
+- **A closure parameter that carries its own denominator** —
+  `crates/catalogue/src/index.rs:170`. `FnMut(usize, usize)` rather than `FnMut(usize)`:
+  only the callee knows how many titles have enough text to embed, so making the caller
+  guess the total is how a progress bar starts lying.
+- **Writing to `.part` and renaming** — `crates/catalogue/src/index.rs:189`. A rename is
+  atomic on the same volume; a half-written file under the real name is one the app would
+  open and search against.
+- **Sampling where the failure must show** — `crates/catalogue/src/index.rs:39`. An
+  insertion anywhere before the end shifts the *end*, so one well-chosen sample beats many
+  arbitrary ones. Choosing the sample is the design; the loop is not.
+
 - **A parameterised builder beats four edits** — `crates/embedding/src/document.rs:78`.
   `Layout` makes "what goes in the document, and in what order" a value, so a variant is
   built by the *producer's own* code. The version it replaced hand-concatenated strings in
@@ -184,7 +198,7 @@ No code tour.
 ## 4. The questions
 
 Written, not asked — Phase 5 is not a tier boundary (`SPEC.md` §10.10). They accumulate
-until the end of Phase 8. Twelve rather than five: this phase ran long and taught more than
+until the end of Phase 8. Thirteen rather than five: this phase ran long and taught more than
 five things, and dropping four to keep the count would be tidiness winning over the
 point.
 
@@ -224,3 +238,7 @@ point.
 12. The application only ever *views* a prebuilt vector index, and the download flow
     fetches the artefact but never builds one. Every test passed and the screenshots
     looked right. What made this invisible, and what kind of test would have caught it?
+13. `VectorIndex::build` used to require the catalogue and the artefact to be exactly
+    the same length, and relaxing it to "the artefact is a prefix" was safe — but only
+    because of something nobody wrote down. What is that thing, why is it fragile, and
+    what check replaced the one that was given up?

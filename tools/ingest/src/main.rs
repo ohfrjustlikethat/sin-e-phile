@@ -1066,74 +1066,68 @@ async fn wikipedia(db: &Db, map: bool, extracts: bool, limit: i64) -> Result<(),
 /// is still there, untouched, because the new one is written to a temporary path and
 /// moved into place only once it is complete.
 async fn vector_index(db: &Db, dir: &Path) -> Result<(), JobError> {
-    use sinephile_embedding::Artefact;
-    use sinephile_persistence::repositories::CatalogueRepository;
-    use sinephile_vector_index::VectorIndex;
-
+    // Routed through `sinephile_catalogue::index::build` rather than calling
+    // `VectorIndex::build` directly, because the application builds an index too (D44)
+    // and two copies of "how an index is derived" would agree on the day they were
+    // written and never again. This CLI is the progress reporting around it.
     let artefact_path = sinephile_embedding::artefact_path(dir);
-    let mut file = std::fs::File::open(&artefact_path).map_err(|e| {
-        JobError::step(
+    if !artefact_path.is_file() {
+        return Err(JobError::step(
             "vector-index",
             format!(
-                "{}: {e}\nRun `ingest embed` first, or download the published artefact.",
+                "{} is missing
+Run `ingest embed` first, or download the published artefact.",
                 artefact_path.display()
             ),
-        )
-    })?;
+        ));
+    }
+
+    // The verification embeds a handful of documents, so the model is needed even though
+    // the graph itself is pure arithmetic over vectors that already exist. That is the
+    // point: the check exists for a DOWNLOADED artefact, where the catalogue underneath
+    // may have moved, and the model is one of the three files downloaded alongside it.
+    let models = Path::new("models");
+    let mut embedder = sinephile_catalogue::embed::OnnxEmbedder::pinned(
+        &models.join("bge-small-en-v1.5-int8.onnx"),
+        &models.join("bge-small-en-v1.5-tokenizer.json"),
+    )
+    .map_err(|e| JobError::step("vector-index", e.to_string()))?;
 
     println!("ingest: reading {}", artefact_path.display());
-    let artefact =
-        Artefact::read(&mut file).map_err(|e| JobError::step("vector-index", e.to_string()))?;
-
-    let ids = CatalogueRepository::new(db).core_ids_for_vectors().await?;
-    let indexable = ids.iter().filter(|id| id.is_some()).count();
-    println!(
-        "ingest: {} vectors, {} core ids, {indexable} with descriptive text, {} dimensions",
-        artefact.header.count,
-        ids.len(),
-        artefact.header.dimension
-    );
-
-    let final_path = sinephile_vector_index::index_path(dir);
-    let building = final_path.with_extension("usearch.part");
-
-    let total = indexable;
     let started = std::time::Instant::now();
-    let report = VectorIndex::build(&artefact, &ids, &building, |done| {
+    let built = sinephile_catalogue::index::build(db, &mut embedder, dir, |done, total| {
         if done > 0 && done % 50_000 == 0 {
             let rate = done as f64 / started.elapsed().as_secs_f64();
             println!(
-                "  {done}/{total}  {:.0}/s  eta {:.0}s",
-                rate,
-                (total - done) as f64 / rate
+                "  {done}/{total}  {rate:.0}/s  eta {:.0}s",
+                (total - done) as f64 / rate.max(1e-9)
             );
         }
     })
-    .map_err(|e| JobError::step("vector-index", e.to_string()))?;
-
-    std::fs::rename(&building, &final_path).map_err(|e| {
-        JobError::step(
-            "vector-index",
-            format!("{} -> {}: {e}", building.display(), final_path.display()),
-        )
-    })?;
+    .await?;
 
     println!();
-    println!("  {}", final_path.display());
+    println!("  {}", built.path.display());
     println!(
         "  vectors          {} of {} considered",
-        report.vectors, report.considered
+        built.indexed, built.considered
     );
+    if built.beyond_artefact > 0 {
+        println!(
+            "  beyond artefact  {} core titles the catalogue has gained since — keyword only",
+            built.beyond_artefact
+        );
+    }
     println!(
         "  index size       {:.0} MB  ({:.1}x the artefact's {:.0} MB)",
-        report.bytes as f64 / 1_048_576.0,
-        report.bytes as f64 / artefact_bytes(&artefact_path).max(1.0),
+        built.bytes as f64 / 1_048_576.0,
+        built.bytes as f64 / artefact_bytes(&artefact_path).max(1.0),
         artefact_bytes(&artefact_path) / 1_048_576.0
     );
     println!(
         "  build            {:.0}s  ({:.0} vectors/s)",
-        report.seconds,
-        report.vectors as f64 / report.seconds
+        built.seconds,
+        built.indexed as f64 / built.seconds.max(1e-9)
     );
     println!();
     println!("  Recall is NOT measured here — `cargo run -p eval --release -- vector --report`");

@@ -1978,3 +1978,52 @@ latency    p50 5.6 ms   p95 6.6 ms
 
 **That 10/10 is what proves the `Layout` refactor changed no shipped bytes** — documents
 re-derived through the new builder quantise to exactly the published vectors.
+
+### D44/D45 fixed, and the fix measured on the real catalogue (session 16)
+
+`cargo run -p sinephile-ingest --release -- vector-index`, 2026-09-22, against the real
+`embeddings-v2` artefact and a catalogue that had already drifted 2,467 titles past it —
+the exact condition that made the old equality guard refuse:
+
+```
+  vectors          119874 of 855703 considered
+  beyond artefact  2467 core titles the catalogue has gained since — keyword only
+  index size       61 MB  (0.2x the artefact's 313 MB)
+  build            33s  (3651 vectors/s)
+```
+
+The content verification ran first and passed: eight documents re-derived from the live
+catalogue, embedded, quantised, and equal to the artefact's own bytes at those positions.
+
+**No regression against the hand-built index it replaced.** The index built by the new
+path and the one built by hand on 2026-09-07 are equivalent on every recorded metric:
+
+| metric | 2026-09-07 (hand-built) | 2026-09-22 (this path) |
+|---|---|---|
+| recall@10 | 0.9670 | **0.9670** |
+| E2 exact-title top-1 | 43/43 | **43/43** |
+| E3 meaning / filter | 0.1188 / 1.0000 | **0.1188 / 1.0000** |
+| index size | 61 MB | 61 MB |
+
+`cargo run -p eval --release -- vector --report` and `-- search --report`. E1 read
+23.7 ms p95 against 16.1–17.5 ms earlier in the session; the spread across three runs on
+an unquiesced machine is larger than the difference, and all three sit far under the
+80 ms budget.
+
+And the application agrees. Launching the release-path binary logs:
+
+```
+sin_e_phile_lib::commands::assets: search: hybrid
+cold_start_ms=485
+```
+
+which is the whole point of the fix: before it, a machine that had opened the app twice
+could never build an index again, so that line read `keyword only (no index)` and the
+313 MB sat unread.
+
+#### Seen to fail
+
+`verify_prefix`'s byte comparison was disabled (`if false && …`) and
+`a_title_promoted_into_the_middle_of_the_core_tier_is_refused` failed, as it must — that
+test promotes one title into the middle of the core tier, which is the shift a length
+check cannot distinguish from a harmless append. Restored; 6 of 6 pass.

@@ -33,9 +33,20 @@
 //!
 //! The index ends the coupling rather than inheriting it. Positions are resolved to
 //! `media_items.id` **once, at build time**, and stored as usearch keys, so a search
-//! returns catalogue ids and no caller ever computes an offset. [`VectorIndex::build`]
-//! refuses when the id list and the artefact disagree on length, which is the one
-//! moment that mismatch is still visible.
+//! returns catalogue ids and no caller ever computes an offset.
+//!
+//! Build time is the one moment that mapping is still checkable, and it is checked in
+//! two places because one check cannot do it. [`VectorIndex::build`] refuses a catalogue
+//! with **fewer** ids than the artefact has vectors — that means titles were removed and
+//! everything after the gap has shifted. It permits **more**, because the catalogue
+//! refreshes itself (ADR-0030) and the artefact is a published snapshot, so the artefact
+//! is a prefix of the catalogue by construction and the surplus is simply not in the
+//! graph yet.
+//!
+//! What length cannot see — and never could — is a title promoted into the core tier in
+//! the *middle* of the sequence: positions shift and the count still goes up.
+//! `sinephile_catalogue::index::verify_prefix` catches that by re-deriving documents at
+//! sampled positions and requiring them to quantise to the artefact's own bytes.
 
 use std::path::Path;
 use std::time::Instant;
@@ -95,11 +106,11 @@ pub const EXPANSION_SEARCH: usize = 192;
 #[derive(Debug, thiserror::Error)]
 pub enum VectorIndexError {
     #[error(
-        "the artefact holds {vectors} vectors but the catalogue offered {ids} core ids — \
-         they must line up position for position, so either the artefact is stale or the \
-         catalogue moved under it"
+        "the artefact holds {vectors} vectors but the catalogue offered only {ids} core \
+         ids — titles have been REMOVED, so every position after the first gap points at \
+         a different title and nothing positional can be trusted"
     )]
-    CountMismatch { vectors: u64, ids: usize },
+    CatalogueShorterThanArtefact { vectors: u64, ids: usize },
     #[error("catalogue id {0} cannot be an index key — keys are positive")]
     NonPositiveId(i64),
     #[error("the index holds {index}-dimensional vectors, the query has {query}")]
@@ -170,12 +181,34 @@ impl VectorIndex {
         path: &Path,
         mut progress: impl FnMut(usize),
     ) -> Result<BuildReport, VectorIndexError> {
-        if artefact.header.count != ids.len() as u64 {
-            return Err(VectorIndexError::CountMismatch {
+        // THE ARTEFACT IS A PREFIX OF THE CATALOGUE, NOT A COPY OF IT.
+        //
+        // This demanded equality until 2026-09-22, which was right when the catalogue
+        // only changed during an ingest the author ran. Subtask 5.7 made it refresh
+        // itself on every launch (ADR-0030), so it outgrows the published artefact
+        // continuously — 2,467 titles in the first week — and equality meant the index
+        // could never be built again on any machine that had been opened twice. That
+        // made the whole 313 MB download inert (D44/D45).
+        //
+        // Extra ids at the TAIL are harmless: position n still names the same title, and
+        // the new titles are simply not in the graph until the next artefact — BM25 and
+        // the exact-title tier already cover them. FEWER ids is a different thing
+        // entirely: something was removed, every position after the gap has shifted, and
+        // no amount of care downstream can recover which title a vector belongs to.
+        //
+        // What this check CANNOT see is a title promoted into the core tier in the
+        // MIDDLE of the sequence, which shifts positions while leaving the count larger.
+        // Length was never able to distinguish that from an append, so this is not a
+        // protection being given up. It is checked where it can actually be checked —
+        // by content, against the artefact's own vectors, in
+        // `sinephile_catalogue::index::verify_prefix`.
+        if (ids.len() as u64) < artefact.header.count {
+            return Err(VectorIndexError::CatalogueShorterThanArtefact {
                 vectors: artefact.header.count,
                 ids: ids.len(),
             });
         }
+        let ids = &ids[..artefact.header.count as usize];
 
         let started = Instant::now();
         let index = Index::new(&IndexOptions {
@@ -366,26 +399,51 @@ mod tests {
     }
 
     #[test]
-    fn a_stale_artefact_is_refused_rather_than_indexed_against_the_wrong_titles() {
-        // The failure this check exists for: the catalogue gained a core title after the
-        // artefact was built, so position 40,000 is now a different film. Silent if
-        // unchecked, because every offset still reads a valid vector.
+    fn a_catalogue_that_lost_titles_is_refused_rather_than_indexed_against_the_wrong_ones() {
+        // Fewer ids than vectors means something was REMOVED. Every position after the
+        // gap now names a different title, and no offset arithmetic can recover which.
+        // Silent if unchecked, because every offset still reads a valid vector.
         let dir = tempfile::tempdir().expect("tempdir");
         let artefact = artefact_of(circle(16));
-        let ids: Vec<Option<i64>> = (1..=17).map(Some).collect();
+        let ids: Vec<Option<i64>> = (1..=15).map(Some).collect();
 
         let err = VectorIndex::build(&artefact, &ids, &dir.path().join("i.usearch"), |_| {})
             .expect_err("must refuse");
         assert!(
             matches!(
                 err,
-                VectorIndexError::CountMismatch {
+                VectorIndexError::CatalogueShorterThanArtefact {
                     vectors: 16,
-                    ids: 17
+                    ids: 15
                 }
             ),
             "{err}"
         );
+    }
+
+    #[test]
+    fn a_catalogue_that_grew_past_the_artefact_indexes_the_prefix_and_ignores_the_rest() {
+        // The ordinary case since subtask 5.7: the catalogue refreshes itself and runs
+        // ahead of a published artefact. The surplus titles are not in the graph — BM25
+        // covers them — and the ones that ARE indexed must still answer by their own id.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("index.usearch");
+        let vectors = circle(16);
+        let artefact = artefact_of(vectors.clone());
+        let ids: Vec<Option<i64>> = (1..=40).map(|i| Some(100 + i)).collect();
+
+        let report = VectorIndex::build(&artefact, &ids, &path, |_| {}).expect("build");
+        assert_eq!(
+            report.vectors, 16,
+            "indexed the surplus as well as the prefix"
+        );
+
+        let index = VectorIndex::view(&path).expect("view");
+        assert_eq!(index.len(), 16);
+
+        // Position 10 must still be the id at position 10, not at some shifted offset.
+        let hits = index.search(&vectors[10], 1).expect("search");
+        assert_eq!(hits[0].media_item_id, ids[10].expect("indexed"));
     }
 
     #[test]
