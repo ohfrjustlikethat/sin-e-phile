@@ -2,6 +2,13 @@
 #
 # FORMAT:  kind <TAB> query <TAB> imdb_id <TAB> grade <TAB> why
 #   kind    "meaning" or "filter" — SCORED SEPARATELY, never averaged together.
+#           A kind may carry a sub-kind after a slash: "meaning/known-item".
+#           A KNOWN-ITEM query describes ONE film rather than a topic, so nDCG over its
+#           two graded answers scores 0.0000 the moment that film lands at rank 11 — and
+#           says nothing about whether it came 11th or 11,000th. It is still a meaning
+#           query and is still counted in E3 exactly as before; the sub-kind only lets
+#           the report show reciprocal rank beside the number (D40). Marked when the
+#           tension was NOTICED, not after it disappointed.
 #   grade   2 = an obvious answer, the one a person would name
 #           1 = defensible, would not be wrong to see on the page
 #           (anything unlisted scores 0, which is what nDCG needs)
@@ -52,16 +59,16 @@ meaning	films about grief that aren't depressing	tt19887550	2	Good Grief — a c
 meaning	films about grief that aren't depressing	tt0103129	2	Truly Madly Deeply — grief as warmth and comedy, not despair
 meaning	films about grief that aren't depressing	tt3416532	1	A Monster Calls — grief, fantastical rather than bleak
 meaning	films about grief that aren't depressing	tt4034228	1	Manchester by the Sea — the canonical grief film, though undeniably heavy
-meaning	a man returns to his hometown to care for his nephew after a death	tt4034228	2	Manchester by the Sea — this is literally its plot
-meaning	a man returns to his hometown to care for his nephew after a death	tt0081283	1	Ordinary People — family, bereavement, a house that cannot absorb it
+meaning/known-item	a man returns to his hometown to care for his nephew after a death	tt4034228	2	Manchester by the Sea — this is literally its plot
+meaning/known-item	a man returns to his hometown to care for his nephew after a death	tt0081283	1	Ordinary People — family, bereavement, a house that cannot absorb it
 meaning	like Wong Kar-wai but Korean	tt0140825	2	Christmas in August — the closest Korean analogue: still, romantic, elegiac
 meaning	like Wong Kar-wai but Korean	tt7282468	2	Burning — Lee Chang-dong; longing and drift, photographed like a mood
 meaning	like Wong Kar-wai but Korean	tt4016934	1	The Handmaiden — Korean and sumptuous, more baroque than melancholy
 meaning	like Wong Kar-wai but Korean	tt0109424	1	Chungking Express — Wong Kar-wai himself; not what was asked, not wrong to offer
-meaning	slow science fiction about memory	tt0069293	2	Solaris — memory made physical, and slow by design
-meaning	slow science fiction about memory	tt0338013	2	Eternal Sunshine of the Spotless Mind — memory is the entire mechanism
-meaning	slow science fiction about memory	tt0079944	1	Stalker — slow and science fiction; desire rather than memory
-meaning	slow science fiction about memory	tt1856101	1	Blade Runner 2049 — implanted memory, and unhurried
+meaning/known-item	slow science fiction about memory	tt0069293	2	Solaris — memory made physical, and slow by design
+meaning/known-item	slow science fiction about memory	tt0338013	2	Eternal Sunshine of the Spotless Mind — memory is the entire mechanism
+meaning/known-item	slow science fiction about memory	tt0079944	1	Stalker — slow and science fiction; desire rather than memory
+meaning/known-item	slow science fiction about memory	tt1856101	1	Blade Runner 2049 — implanted memory, and unhurried
 meaning	anime about loneliness in a big city	tt2591814	2	The Garden of Words — Tokyo, rain, two people alone in it
 meaning	anime about loneliness in a big city	tt0983213	2	5 Centimeters per Second — distance and the city that keeps people apart
 meaning	anime about loneliness in a big city	tt0388473	1	Tokyo Godfathers — homelessness in Tokyo, but warm and crowded

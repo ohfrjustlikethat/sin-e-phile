@@ -54,14 +54,64 @@ pub struct Document<'a> {
 /// visible, instead of depending on a tokenizer version.
 const SYNOPSIS_CHARS: usize = 400;
 
+/// The arrangement of a document — what goes in it and in what order.
+///
+/// # Why this is a parameter rather than four edits
+///
+/// D39 asked whether the layout is what costs the ranking, and the honest way to answer
+/// is to embed the alternative and look. Doing that by editing [`SHIPPED`] and rebuilding
+/// costs three hours per hypothesis; doing it by hand-concatenating strings in the
+/// harness costs a minute and answers *a different question*, because a document
+/// assembled by `format!("{document} {synopsis}")` contains the first 400 characters of
+/// the synopsis **twice** and no rebuild would ever produce it.
+///
+/// So the variants are built by the real builder, through this. A priced change is then
+/// a `Layout` literal, and the thing measured is the thing that would ship.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Layout {
+    /// How much of the synopsis survives the cut.
+    pub synopsis_chars: usize,
+    /// Put the synopsis before the metadata rather than after it.
+    ///
+    /// CLS pooling weights the head of the sequence heavily, so what leads the document
+    /// is not a cosmetic choice.
+    pub synopsis_first: bool,
+    /// Whether the billed names appear at all.
+    pub people: bool,
+    /// Drop a Wikipedia-style lead sentence — *"The Return is a 2003 Russian drama film
+    /// directed by…"* — which restates the title and the credits the document already
+    /// carries, and pushes the plot toward the cut.
+    pub strip_lead: bool,
+}
+
+/// What the artefact actually holds. [`build`] is this, and changing it is a re-embed.
+pub const SHIPPED: Layout = Layout {
+    synopsis_chars: SYNOPSIS_CHARS,
+    synopsis_first: false,
+    people: true,
+    strip_lead: false,
+};
+
 /// Build the sentence for one item.
 ///
 /// The output is a plain declarative sentence rather than a bag of fields, because the
 /// model was trained on prose. `"Stalker. 1979. film. Science Fiction."` and
 /// `"Stalker (1979), a science fiction film."` are not equally good inputs to something
 /// trained on natural language, and the second is what this produces.
+///
+/// **[`VERSION`] does not bump for the introduction of [`Layout`]**: this is `build_with`
+/// at [`SHIPPED`], and the output is byte-identical to what it was. What proves that
+/// rather than asserts it is `eval embed --report`, which re-derives documents from the
+/// live catalogue and compares their quantised vectors against the published artefact —
+/// 10 of 10 identical, and it has been seen to fail at 2 of 10 when a tokenizer setting
+/// moved.
 pub fn build(doc: &Document<'_>) -> String {
-    let mut out = String::with_capacity(256);
+    build_with(doc, SHIPPED)
+}
+
+/// Build the sentence under an arbitrary [`Layout`]. See [`build`] for the shipped one.
+pub fn build_with(doc: &Document<'_>, layout: Layout) -> String {
+    let mut metadata = String::with_capacity(256);
 
     // NO TITLE. Version 2 removed it, and the measurement that forced the change is
     // worth keeping: with the title leading the document, "a grieving janitor becomes
@@ -81,28 +131,66 @@ pub fn build(doc: &Document<'_>) -> String {
         Some(year) => format!("({year}) "),
         None => String::new(),
     };
-    out.push_str(&year_prefix);
+    metadata.push_str(&year_prefix);
 
     let descriptor = describe_kind(doc.kind);
     if doc.genres.is_empty() {
-        out.push_str(descriptor);
+        metadata.push_str(descriptor);
     } else {
-        out.push_str(&format!("{} {descriptor}", lowercase_list(doc.genres)));
+        metadata.push_str(&format!("{} {descriptor}", lowercase_list(doc.genres)));
     }
 
-    if !doc.people.is_empty() {
-        out.push_str(", featuring ");
-        out.push_str(&join_prose(doc.people));
+    if layout.people && !doc.people.is_empty() {
+        metadata.push_str(", featuring ");
+        metadata.push_str(&join_prose(doc.people));
     }
 
-    out.push('.');
+    metadata.push('.');
 
-    if let Some(synopsis) = doc.synopsis.map(str::trim).filter(|s| !s.is_empty()) {
-        out.push(' ');
-        out.push_str(&truncate_on_a_boundary(synopsis, SYNOPSIS_CHARS));
+    let synopsis = doc
+        .synopsis
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            let body = if layout.strip_lead { strip_lead(s) } else { s };
+            truncate_on_a_boundary(body, layout.synopsis_chars)
+        });
+
+    // Each part appears exactly once, in one order or the other. That is the whole
+    // reason this is a builder rather than a `format!` in the harness: a variant made by
+    // gluing text onto the shipped document contains its synopsis prefix twice, and no
+    // rebuild would ever produce it — so measuring one answers a question nobody asked.
+    match (synopsis, layout.synopsis_first) {
+        (Some(text), false) => format!("{metadata} {text}"),
+        (Some(text), true) => format!("{text} {metadata}"),
+        (None, _) => metadata,
     }
+}
 
-    out
+/// Drop a Wikipedia-style lead sentence, keeping the rest.
+///
+/// *"The Return is a 2003 Russian drama film directed by Andrey Zvyagintsev."* restates
+/// the title the document deliberately omits and the credits it already carries, and
+/// under CLS pooling it is weighted heavily while the plot behind it falls past the cut.
+///
+/// Conservative on purpose: it fires only on a lead that both reads as a definition and
+/// names a form, because a synopsis whose real first sentence happens to contain "is a"
+/// would otherwise lose its opening.
+fn strip_lead(synopsis: &str) -> &str {
+    let Some(end) = synopsis.find(". ") else {
+        return synopsis;
+    };
+    let lead = &synopsis[..end];
+    let looks_like_boilerplate = lead.contains(" is a ") || lead.contains(" is an ");
+    let names_a_form = ["film", "series", "documentary", "short", "anime", "drama"]
+        .iter()
+        .any(|form| lead.contains(form));
+
+    if looks_like_boilerplate && names_a_form {
+        synopsis[end + 2..].trim()
+    } else {
+        synopsis
+    }
 }
 
 /// `anime_series` reads as "anime series" to a language model, not as an identifier.
@@ -296,6 +384,140 @@ mod tests {
         for _ in 0..50 {
             assert_eq!(build(&doc), once);
         }
+    }
+
+    /// The shipped layout IS `build`. If this ever fails, the artefact and the query
+    /// path have drifted and every vector in the file is stale.
+    #[test]
+    fn build_is_build_with_at_the_shipped_layout() {
+        let doc = Document {
+            title: "Stalker",
+            alternative_titles: &["Сталкер"],
+            year: Some(1979),
+            kind: "film",
+            genres: &["Science Fiction", "Drama"],
+            people: &["Andrei Tarkovsky"],
+            synopsis: Some("A guide leads two men through the Zone."),
+        };
+        assert_eq!(build(&doc), build_with(&doc, SHIPPED));
+    }
+
+    /// The property the harness's old hand-rolled variants did not have.
+    ///
+    /// `format!("{document} {synopsis}")` put the first 400 characters of the synopsis in
+    /// the string twice, so what got embedded was not a document any rebuild could
+    /// produce. A variant is only worth measuring if it is what would ship.
+    #[test]
+    fn a_reordered_layout_does_not_duplicate_anything() {
+        let doc = Document {
+            title: "T",
+            year: Some(2003),
+            kind: "film",
+            genres: &["Drama"],
+            people: &["A Director"],
+            synopsis: Some("Two brothers travel with a father they do not know."),
+            ..Default::default()
+        };
+        let first = build_with(
+            &doc,
+            Layout {
+                synopsis_first: true,
+                ..SHIPPED
+            },
+        );
+
+        assert!(first.starts_with("Two brothers"), "{first}");
+        assert!(first.ends_with("featuring A Director."), "{first}");
+        assert_eq!(first.matches("Two brothers").count(), 1, "{first}");
+        assert_eq!(first.matches("A Director").count(), 1, "{first}");
+
+        // Same ingredients as the shipped order, rearranged — nothing added, nothing lost.
+        let shipped = build(&doc);
+        let mut a: Vec<&str> = shipped.split_whitespace().collect();
+        let mut b: Vec<&str> = first.split_whitespace().collect();
+        a.sort_unstable();
+        b.sort_unstable();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn a_longer_budget_keeps_more_of_the_synopsis_and_no_more() {
+        let synopsis = format!("{}end", "word ".repeat(300));
+        let doc = Document {
+            title: "T",
+            kind: "film",
+            synopsis: Some(&synopsis),
+            ..Default::default()
+        };
+        let short = build(&doc);
+        let long = build_with(
+            &doc,
+            Layout {
+                synopsis_chars: 1_000,
+                ..SHIPPED
+            },
+        );
+        assert!(long.chars().count() > short.chars().count());
+        assert!(long.chars().count() <= 1_000 + 32);
+    }
+
+    #[test]
+    fn people_can_be_left_out_entirely() {
+        let doc = Document {
+            title: "T",
+            kind: "film",
+            people: &["Casey Affleck", "Michelle Williams"],
+            synopsis: Some("A janitor returns home."),
+            ..Default::default()
+        };
+        let without = build_with(
+            &doc,
+            Layout {
+                people: false,
+                ..SHIPPED
+            },
+        );
+        assert!(!without.contains("Casey Affleck"), "{without}");
+        assert!(!without.contains("featuring"), "{without}");
+        assert!(without.contains("A janitor returns home."), "{without}");
+    }
+
+    #[test]
+    fn a_lead_sentence_goes_only_when_it_is_boilerplate() {
+        // Boilerplate: restates the title and the credits the document already carries.
+        let doc = Document {
+            title: "T",
+            kind: "film",
+            synopsis: Some(
+                "The Return is a 2003 Russian drama film directed by Andrey Zvyagintsev. \
+                 Two brothers travel with a father they do not know.",
+            ),
+            ..Default::default()
+        };
+        let stripped = build_with(
+            &doc,
+            Layout {
+                strip_lead: true,
+                ..SHIPPED
+            },
+        );
+        assert!(!stripped.contains("Zvyagintsev"), "{stripped}");
+        assert!(stripped.contains("Two brothers travel"), "{stripped}");
+
+        // Not boilerplate: a real opening that merely contains "is a". Dropping this
+        // would cost the synopsis its first sentence for nothing.
+        let plot = Document {
+            synopsis: Some("Marriage is a battlefield. He leaves at dawn."),
+            ..doc.clone()
+        };
+        let kept = build_with(
+            &plot,
+            Layout {
+                strip_lead: true,
+                ..SHIPPED
+            },
+        );
+        assert!(kept.contains("Marriage is a battlefield."), "{kept}");
     }
 
     #[test]

@@ -28,6 +28,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use sinephile_persistence::repositories::MIN_SYNOPSIS;
 use sinephile_persistence::Db;
 
 use crate::error::EvalError;
@@ -41,6 +42,13 @@ const TARGET: f64 = 0.75;
 /// One query and everything the fixture says about it.
 struct Case {
     kind: String,
+    /// A second axis under `kind`, written `meaning/known-item` in the fixture.
+    ///
+    /// D40: two of the meaning queries describe ONE film rather than a topic, and nDCG
+    /// over a two-answer graded set scores 0 whenever that film lands at rank 11. They
+    /// are still meaning queries and still counted in E3 — this only lets the report say
+    /// which of them they are.
+    subkind: Option<String>,
     query: String,
     /// imdb id → grade. Ordered so the report is stable between runs.
     graded: BTreeMap<String, f64>,
@@ -48,8 +56,20 @@ struct Case {
 
 pub struct Outcome {
     pub kind: String,
+    pub subkind: Option<String>,
     pub query: String,
     pub ndcg: f64,
+    /// The best nDCG@10 this query could possibly score, given that some of its graded
+    /// answers are not in the vector index at all. 1.0 when every answer is reachable.
+    ///
+    /// Without this a query that is scoring as well as it *can* is indistinguishable
+    /// from one that is failing, and the fixture cannot tell you which it is looking at.
+    pub ceiling: f64,
+    /// Graded answers `MIN_SYNOPSIS` keeps out of the vector index, with their grades.
+    pub unreachable: Vec<(String, f64)>,
+    /// 1/rank of the first graded answer in the top 10, else 0 — the metric a known-item
+    /// query should have been scored with.
+    pub reciprocal_rank: f64,
     /// What actually came back, for the report — a number with no examples under it is
     /// not something anyone can act on.
     pub top: Vec<(String, Option<String>, f64)>,
@@ -75,6 +95,10 @@ fn load(path: &Path) -> Result<Vec<Case>, EvalError> {
             ));
         }
         let (kind, query, imdb) = (fields[0], fields[1], fields[2]);
+        let (kind, subkind) = match kind.split_once('/') {
+            Some((k, sub)) => (k, Some(sub.to_string())),
+            None => (kind, None),
+        };
         let grade: f64 = fields[3].parse().map_err(|_| {
             EvalError::Fixture(
                 path.display().to_string(),
@@ -94,6 +118,7 @@ fn load(path: &Path) -> Result<Vec<Case>, EvalError> {
                 graded.insert(imdb.to_string(), grade);
                 cases.push(Case {
                     kind: kind.to_string(),
+                    subkind,
                     query: query.to_string(),
                     graded,
                 });
@@ -129,6 +154,33 @@ fn ndcg(found: &[f64], available: &[f64]) -> f64 {
         return 0.0;
     }
     dcg(found) / best
+}
+
+/// Grades sorted best-first — the order a perfect ranking would return them in.
+fn ideal_order(grades: &[f64]) -> Vec<f64> {
+    let mut sorted = grades.to_vec();
+    sorted.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+    sorted.truncate(K);
+    sorted
+}
+
+/// Is this IMDb id in the vector index at all?
+///
+/// Mirrors `CatalogueRepository::core_ids_for_vectors`: core tier, not an episode, and
+/// enough synopsis to be worth embedding. Written out rather than reusing that method
+/// because this asks about ONE id and that returns eight hundred thousand.
+async fn vector_reachable(db: &Db, imdb: &str) -> Result<bool, EvalError> {
+    let found: Option<i64> = sqlx::query_scalar(&format!(
+        "SELECT 1 FROM external_ids e JOIN media_items m ON m.id = e.media_item_id
+          WHERE e.source = 'imdb' AND e.external_id = ?
+            AND m.in_core = 1 AND m.kind <> 'episode'
+            AND m.synopsis IS NOT NULL
+            AND length(trim(m.synopsis)) >= {MIN_SYNOPSIS}"
+    ))
+    .bind(imdb)
+    .fetch_optional(db.pool())
+    .await?;
+    Ok(found.is_some())
 }
 
 pub async fn run(
@@ -168,10 +220,37 @@ pub async fn run(
         }
 
         let available: Vec<f64> = case.graded.values().copied().collect();
+
+        // What this query could score at best. A graded answer whose synopsis is under
+        // MIN_SYNOPSIS is not in the vector index (see `core_ids_for_vectors`), so the
+        // meaning half CANNOT return it however good it gets — and a fixture that cannot
+        // separate "failing" from "already at its ceiling" is measuring the wrong thing.
+        let mut reachable: Vec<f64> = Vec::new();
+        let mut unreachable: Vec<(String, f64)> = Vec::new();
+        for (imdb, grade) in &case.graded {
+            if vector_reachable(db, imdb).await? {
+                reachable.push(*grade);
+            } else {
+                unreachable.push((imdb.clone(), *grade));
+            }
+        }
+        let ceiling = ndcg(&ideal_order(&reachable), &available);
+
+        // The known-item metric. Rank of the first graded answer, reciprocated.
+        let reciprocal_rank = found
+            .iter()
+            .position(|g| *g > 0.0)
+            .map(|i| 1.0 / (i as f64 + 1.0))
+            .unwrap_or(0.0);
+
         outcomes.push(Outcome {
             kind: case.kind,
+            subkind: case.subkind,
             query: case.query,
             ndcg: ndcg(&found, &available),
+            ceiling,
+            unreachable,
+            reciprocal_rank,
             top,
         });
     }
@@ -198,6 +277,75 @@ pub fn report(outcomes: &[Outcome], verbose: bool) -> bool {
         let Some(score) = mean(kind) else { continue };
         let count = outcomes.iter().filter(|o| o.kind == kind).count();
         println!("     {kind:<8} {score:.4}  over {count} queries   (target {TARGET:.2})");
+    }
+
+    // ── diagnostics ──────────────────────────────────────────────────────────────
+    //
+    // These do NOT move E3. The headline above is the criterion exactly as SPEC.md
+    // Phase 5 words it, over every meaning query, and it stays that way — §10.11 forbids
+    // redefining an exit criterion, and a criterion rewritten after seeing the number it
+    // produced is not a criterion. What follows says what the number is MADE OF, which
+    // is a different thing and the only honest way to act on it.
+    let meaning: Vec<&Outcome> = outcomes.iter().filter(|o| o.kind == "meaning").collect();
+    let known: Vec<&&Outcome> = meaning
+        .iter()
+        .filter(|o| o.subkind.as_deref() == Some("known-item"))
+        .collect();
+    let topical: Vec<&&Outcome> = meaning
+        .iter()
+        .filter(|o| o.subkind.as_deref() != Some("known-item"))
+        .collect();
+
+    if !known.is_empty() {
+        println!();
+        println!("  diagnostics — what that number is made of, not a restatement of it");
+
+        let topical_mean =
+            topical.iter().map(|o| o.ndcg).sum::<f64>() / topical.len().max(1) as f64;
+        println!(
+            "     topical      nDCG@{K} {topical_mean:.4}  over {} queries",
+            topical.len()
+        );
+
+        // D40: a known-item query names ONE film. nDCG over a two-answer graded set
+        // scores 0 the moment it lands at rank 11, which says nothing about how close it
+        // came. Reciprocal rank says that, so it is reported alongside — not instead.
+        let mrr = known.iter().map(|o| o.reciprocal_rank).sum::<f64>() / known.len() as f64;
+        let present = known.iter().filter(|o| o.reciprocal_rank > 0.0).count();
+        println!(
+            "     known-item   MRR {mrr:.4}, found in the top {K}: {present}/{}",
+            known.len()
+        );
+        for outcome in &known {
+            println!("                    {:?}", outcome.query);
+        }
+    }
+
+    // A query whose answers are not in the index cannot reach the target however good
+    // the engine is, and until this printed, nothing distinguished that from failure.
+    let capped: Vec<&Outcome> = outcomes
+        .iter()
+        .filter(|o| o.kind == "meaning" && !o.unreachable.is_empty())
+        .collect();
+    if !capped.is_empty() {
+        println!();
+        println!("  UNREACHABLE ANSWERS — graded films the vector half cannot return at all");
+        println!("     (synopsis under MIN_SYNOPSIS = {MIN_SYNOPSIS}, so not in the index)");
+        for outcome in &capped {
+            println!(
+                "     ceiling {:.4}{}  {:?}",
+                outcome.ceiling,
+                if outcome.ceiling < TARGET {
+                    " — BELOW THE TARGET"
+                } else {
+                    ""
+                },
+                outcome.query
+            );
+            for (imdb, grade) in &outcome.unreachable {
+                println!("                        {imdb}  graded {grade}");
+            }
+        }
     }
 
     if verbose {

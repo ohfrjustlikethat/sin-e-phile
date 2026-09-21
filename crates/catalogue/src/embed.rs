@@ -59,18 +59,29 @@ struct Row {
 
 impl Row {
     fn sentence(&self) -> String {
+        self.sentence_with(document::SHIPPED)
+    }
+
+    /// The same assembly under a different layout — how a document change is priced.
+    ///
+    /// Shares [`Row`] with the producer deliberately: a variant built from its own copy
+    /// of "what a document is" measures that copy, not what would ship.
+    fn sentence_with(&self, layout: document::Layout) -> String {
         let alternatives: Vec<&str> = self.alternative_titles.iter().map(String::as_str).collect();
         let genres: Vec<&str> = self.genres.iter().map(String::as_str).collect();
         let people: Vec<&str> = self.people.iter().map(String::as_str).collect();
-        document::build(&Document {
-            title: &self.title,
-            alternative_titles: &alternatives,
-            year: self.year,
-            kind: &self.kind,
-            genres: &genres,
-            people: &people,
-            synopsis: self.synopsis.as_deref(),
-        })
+        document::build_with(
+            &Document {
+                title: &self.title,
+                alternative_titles: &alternatives,
+                year: self.year,
+                kind: &self.kind,
+                genres: &genres,
+                people: &people,
+                synopsis: self.synopsis.as_deref(),
+            },
+            layout,
+        )
     }
 }
 
@@ -175,6 +186,23 @@ pub async fn document_for(db: &Db, media_item_id: i64) -> Result<Option<String>,
         .into_iter()
         .find(|r| r.id == media_item_id)
         .map(|r| r.sentence()))
+}
+
+/// The document one item *would* have under `layout`, assembled by the real builder.
+///
+/// Exists so `eval embed --compare` can price a document-builder change for the cost of
+/// one command instead of a three-hour re-embed — and, unlike the string concatenation
+/// it replaces, what it returns is exactly what a rebuild at that layout would write.
+pub async fn document_for_layout(
+    db: &Db,
+    media_item_id: i64,
+    layout: document::Layout,
+) -> Result<Option<String>, JobError> {
+    let batch = rows(db, media_item_id - 1, 1).await?;
+    Ok(batch
+        .into_iter()
+        .find(|r| r.id == media_item_id)
+        .map(|r| r.sentence_with(layout)))
 }
 
 /// Produce the artefact.

@@ -49,14 +49,65 @@ const QUERIES: &[&str] = &[
 /// setting that changed does not affect one title in a thousand, it affects all of them.
 const AGREEMENT_SAMPLES: usize = 10;
 
-/// `--compare "<query>" <id>,<id>,…`: cosine between a query and each item's document,
-/// at the shipped synopsis budget and at a longer one.
+/// `--compare "<query>" <id>,<id>,…`: how each item's document would score against a
+/// query under several layouts, and — the part that matters — **in what order**.
 ///
-/// Exists because the alternative was a 75-minute re-embed on a hunch. `SYNOPSIS_CHARS`
-/// truncates at 400, and *Manchester by the Sea*'s lead puts its plot at characters
-/// 280-420 — so the sentence that answers a plot query is cut in half. This measures
-/// whether that is actually what costs the ranking, before anything is rebuilt.
+/// Exists because the alternative was a three-hour re-embed on a hunch.
+///
+/// # Why it reports ranks and not just cosines
+///
+/// D39 priced a layout change here and read a rise of +0.065 on the right answer as
+/// encouraging, until the same +0.065 turned up on the two wrong answers above it. A
+/// cosine that goes up on everything changes nothing a user sees. **Search is ordinal**,
+/// so the question a variant has to answer is whether anything moved past anything else.
+///
+/// # And why the variants are rebuilt rather than concatenated
+///
+/// The three variants this replaces were assembled with `format!` — `"{document}
+/// {synopsis}"` and `"{stripped} {document}"`. Both contain the first 400 characters of
+/// the synopsis **twice**, and the second contains the metadata twice as well, so they
+/// measured documents no rebuild would ever produce. These go through
+/// `document::build_with`, which is the producer's own builder: what is measured here is
+/// what a re-embed would write.
 pub async fn compare(data_dir: &Path, query: &str, ids: &[i64]) -> Result<bool, EvalError> {
+    use sinephile_embedding::document::{Layout, SHIPPED};
+
+    /// The layouts on offer, shipped first.
+    ///
+    /// `1000 chars` because the model reads 256 tokens — roughly a thousand characters —
+    /// against a budget of 400, so a third of what it could read is being thrown away
+    /// before it ever sees it. The rest are D39's untried residue: the document still
+    /// opens with year, genres and up to six cast names, and CLS pooling weights the
+    /// head of the sequence most.
+    const VARIANTS: &[(&str, Layout)] = &[
+        ("shipped", SHIPPED),
+        (
+            "1000 chars",
+            Layout {
+                synopsis_chars: 1_000,
+                ..SHIPPED
+            },
+        ),
+        (
+            "plot first",
+            Layout {
+                synopsis_chars: 1_000,
+                synopsis_first: true,
+                strip_lead: true,
+                ..SHIPPED
+            },
+        ),
+        (
+            "no cast",
+            Layout {
+                synopsis_chars: 1_000,
+                synopsis_first: true,
+                strip_lead: true,
+                people: false,
+            },
+        ),
+    ];
+
     let models = Path::new("models");
     let mut embedder = sinephile_embedder::Embedder::pinned(
         &models.join("bge-small-en-v1.5-int8.onnx"),
@@ -69,78 +120,106 @@ pub async fn compare(data_dir: &Path, query: &str, ids: &[i64]) -> Result<bool, 
         .embed_query(query)
         .map_err(|e| EvalError::Missing(e.to_string()))?;
 
-    println!();
-    println!("  query: {query:?}");
-    println!();
-    println!(
-        "  {:<34} {:>9} {:>9}  {:>5}",
-        "item", "shipped", "longer", "chars"
-    );
+    // [variant][item] cosine, so the ranking can be read down a column afterwards.
+    let mut scores: Vec<Vec<f32>> = vec![Vec::new(); VARIANTS.len()];
+    let mut titles: Vec<String> = Vec::new();
 
     for id in ids {
-        let Some(document) = sinephile_catalogue::embed::document_for(&db, *id)
-            .await
-            .map_err(|e| EvalError::Missing(e.to_string()))?
-        else {
-            println!("  {id}: not in the core tier");
-            continue;
-        };
         let title: String =
             sqlx::query_scalar("SELECT primary_title FROM media_items WHERE id = ?")
                 .bind(id)
                 .fetch_one(db.pool())
                 .await?;
-        let full: Option<String> =
-            sqlx::query_scalar("SELECT synopsis FROM media_items WHERE id = ?")
-                .bind(id)
-                .fetch_one(db.pool())
-                .await?;
 
-        // Three variants, because the harness now has to price a document-builder
-        // change rather than merely report one:
-        //
-        //   shipped   what the artefact actually holds
-        //   longer    the same, given the whole synopsis instead of 400 characters
-        //   plot      the synopsis with its BOILERPLATE LEAD SENTENCE REMOVED, first
-        //
-        // The third exists because every Wikipedia lead opens by restating the title and
-        // the credits — "The Return is a 2003 Russian drama film directed by…" — which is
-        // the metadata the document already carries, plus the title that v2 deliberately
-        // dropped. Under CLS pooling that sentence is weighted heavily, and the plot it
-        // precedes is what gets truncated away.
-        let longer = match &full {
-            Some(text) => format!("{document} {text}"),
-            None => document.clone(),
-        };
-        let plot = match &full {
-            Some(text) => {
-                let body = strip_lead_sentence(text);
-                format!("{body} {document}")
+        let mut row = Vec::with_capacity(VARIANTS.len());
+        for (_, layout) in VARIANTS {
+            let Some(document) = sinephile_catalogue::embed::document_for_layout(&db, *id, *layout)
+                .await
+                .map_err(|e| EvalError::Missing(e.to_string()))?
+            else {
+                println!("  {id}: not in the core tier");
+                break;
+            };
+            let vector = embedder
+                .embed_document(&document)
+                .map_err(|e| EvalError::Missing(e.to_string()))?;
+            row.push(sinephile_embedding::cosine(&query_vector, &vector));
+        }
+
+        if row.len() == VARIANTS.len() {
+            for (column, value) in row.into_iter().enumerate() {
+                scores[column].push(value);
             }
-            None => document.clone(),
-        };
+            titles.push(title);
+        }
+    }
 
-        let a = embedder
-            .embed_document(&document)
-            .map_err(|e| EvalError::Missing(e.to_string()))?;
-        let b = embedder
-            .embed_document(&longer)
-            .map_err(|e| EvalError::Missing(e.to_string()))?;
-        let c = embedder
-            .embed_document(&plot)
-            .map_err(|e| EvalError::Missing(e.to_string()))?;
-
-        println!(
-            "  {:<30} {:>9.4} {:>9.4} {:>9.4} {:>6}",
-            title.chars().take(30).collect::<String>(),
-            sinephile_embedding::cosine(&query_vector, &a),
-            sinephile_embedding::cosine(&query_vector, &b),
-            sinephile_embedding::cosine(&query_vector, &c),
-            full.as_ref().map(|t| t.len()).unwrap_or(0)
-        );
+    println!();
+    println!("  query: {query:?}");
+    println!();
+    print!("  {:<34}", "item");
+    for (name, _) in VARIANTS {
+        print!("{name:>18}");
     }
     println!();
+
+    // Ranked once per variant, not once per cell: `ranking` sorts, and calling it inside
+    // the inner loop re-sorted the same column for every row.
+    let orders: Vec<Vec<usize>> = scores.iter().map(|column| ranking(column)).collect();
+    let shipped_order = &orders[0];
+
+    for (item, title) in titles.iter().enumerate() {
+        print!("  {:<34}", title.chars().take(33).collect::<String>());
+        for (column, order) in scores.iter().zip(&orders) {
+            print!("{:>11.4} #{:<5}", column[item], order[item] + 1);
+        }
+        println!();
+    }
+
+    println!();
+    let mut moved = false;
+    for ((name, _), order) in VARIANTS.iter().zip(&orders).skip(1) {
+        if order == shipped_order {
+            println!("  {name:<12} same order — nothing a user would see changed");
+        } else {
+            moved = true;
+            println!("  {name:<12} REORDERED against shipped:");
+            for (item, title) in titles.iter().enumerate() {
+                if order[item] != shipped_order[item] {
+                    println!(
+                        "                 {:<34} #{} → #{}",
+                        title.chars().take(33).collect::<String>(),
+                        shipped_order[item] + 1,
+                        order[item] + 1
+                    );
+                }
+            }
+        }
+    }
+    println!();
+
+    // A variant that reorders nothing is a re-embed that buys nothing, and saying so is
+    // the entire value of this command. Not an error either way — it is a measurement.
+    if !moved {
+        println!("  No variant changes the ranking. A re-embed on this evidence buys nothing.");
+        println!();
+    }
     Ok(true)
+}
+
+/// Position of each item when sorted by score, descending. `out[i]` is item `i`'s rank.
+fn ranking(scores: &[f32]) -> Vec<usize> {
+    let mut order: Vec<usize> = (0..scores.len()).collect();
+    order.sort_by(|a, b| {
+        scores[*b]
+            .partial_cmp(&scores[*a])
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let mut rank = vec![0usize; scores.len()];
+    for (position, item) in order.into_iter().enumerate() {
+        rank[item] = position;
+    }
+    rank
 }
 
 pub async fn run(data_dir: &Path, report: bool) -> Result<bool, EvalError> {
@@ -192,14 +271,39 @@ pub async fn run(data_dir: &Path, report: bool) -> Result<bool, EvalError> {
     let artefact = Artefact::read(&mut file)?;
 
     let db = Db::open_in(data_dir).await?;
-    let ids = CatalogueRepository::new(&db).core_ids().await?;
-    if ids.len() as u64 != artefact.header.count {
+    let mut ids = CatalogueRepository::new(&db).core_ids().await?;
+
+    // THE CATALOGUE OUTGROWS THE ARTEFACT, and that is by design now.
+    //
+    // Subtask 5.7 made the catalogue refresh itself on every launch (ADR-0030), so the
+    // artefact — a published snapshot — falls behind the moment IMDb republishes. This
+    // check used to demand equality and simply stopped working: 855,703 vectors against
+    // 858,170 core ids, a week after the artefact was cut.
+    //
+    // A catalogue that is a strict PREFIX-superset is fine: ids are assigned in order,
+    // refreshed titles land after every id the artefact covers, and position *n* still
+    // means the same title. So compare over the artefact's length and say plainly how
+    // far ahead the catalogue has run. FEWER ids is a different matter — something was
+    // deleted, positions have shifted, and nothing positional can be trusted.
+    if (ids.len() as u64) < artefact.header.count {
         return Err(EvalError::Missing(format!(
-            "the artefact holds {} vectors and the catalogue offers {} core ids — \
-             they must line up position for position",
+            "the artefact holds {} vectors and the catalogue offers only {} core ids — \
+             items have been REMOVED, so every position after the first gap is wrong",
             artefact.header.count,
             ids.len()
         )));
+    }
+    let behind = ids.len() as u64 - artefact.header.count;
+    if behind > 0 {
+        println!();
+        println!(
+            "  note: the catalogue has grown {behind} core titles past the artefact \
+             ({} vectors, {} ids).",
+            artefact.header.count,
+            ids.len()
+        );
+        println!("        Agreement is checked over the artefact's own range.");
+        ids.truncate(artefact.header.count as usize);
     }
 
     let stride = (ids.len() / AGREEMENT_SAMPLES).max(1);
@@ -269,29 +373,6 @@ pub async fn run(data_dir: &Path, report: bool) -> Result<bool, EvalError> {
     }
 
     Ok(all_identical)
-}
-
-/// Drop a Wikipedia lead's opening sentence when it is the usual boilerplate.
-///
-/// Leads overwhelmingly begin "TITLE is a YEAR NATIONALITY GENRE film directed by NAME."
-/// — the title this project removed from the document on purpose, plus metadata the
-/// document already states. Only removed when the sentence actually looks like that, so
-/// a synopsis that opens with plot keeps every word of it.
-fn strip_lead_sentence(synopsis: &str) -> &str {
-    let Some(end) = synopsis.find(". ") else {
-        return synopsis;
-    };
-    let lead = &synopsis[..end];
-    let looks_like_boilerplate = lead.contains(" is a ") || lead.contains(" is an ");
-    let names_a_form = ["film", "series", "documentary", "short", "anime", "drama"]
-        .iter()
-        .any(|form| lead.contains(form));
-
-    if looks_like_boilerplate && names_a_form {
-        synopsis[end + 2..].trim()
-    } else {
-        synopsis
-    }
 }
 
 fn percentile(sorted: &[f64], fraction: f64) -> f64 {

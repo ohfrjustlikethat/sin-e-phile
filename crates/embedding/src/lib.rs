@@ -52,5 +52,7 @@ pub fn artefact_path(data_dir: &std::path::Path) -> std::path::PathBuf {
 pub const TEXT_SOURCE: &str = "wikipedia";
 
 pub use artefact::{Artefact, ArtefactError, Header, Quantisation};
-pub use document::{build as build_document, Document};
+pub use document::{
+    build as build_document, build_with as build_document_with, Document, Layout, SHIPPED,
+};
 pub use quantise::{cosine, dequantise, quantise, Quantised};
