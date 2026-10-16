@@ -1296,3 +1296,109 @@ outside the project.
 `cargo test --workspace` 47 suites, 0 failures (6 new in `crates/catalogue/tests/index.rs`)
 · `cargo fmt --check` clean · `cargo clippy --workspace --all-targets -- -D warnings` clean
 · `npm test` 9/9 · `npm run lint` and `tsc --noEmit` clean · guard and secret scan clean.
+
+---
+
+## Session 18 — 2026-10-16 — a cold resume, and 42 days of red CI
+
+**Resume keyword: `redline`.** Twenty-four days after session 17, the author returned
+having "completely checked out for two weeks" and asked for the state of the project.
+`last_updated` was 2026-09-22, so `SPEC.md` §10.11's cold-resume ritual applied rather
+than the normal one. No code was written this session; what it produced is an accurate
+state file and three findings nobody had recorded.
+
+### Nothing was lost, and nothing had regressed
+
+Worth saying first, because it is the question the author actually asked. The working
+tree was clean and pushed, and every local gate was green: `cargo test --workspace` 434
+passed / 0 failed / 1 ignored, `npm test` 9/9, `cargo fmt` clean, `npm run lint` clean,
+posture guard clean with 48/48 on its selftest, secret scan clean, `validate_state.py`
+valid, `statecheck` clean, `doctor` all required present.
+
+The eval harnesses were re-run and compared against the recorded numbers per §10.12.
+**E2 43/43, E3 meaning 0.1188, E3 filter 1.0000, recall@10 0.9670 — all identical. E1
+p95 18.6 ms against 22.2 ms recorded.** Two weeks of absence cost the project nothing
+measurable.
+
+### CI had been red for 42 days (B6)
+
+Every run since 2026-09-04 has failed — roughly 26 consecutive runs, spanning both
+`phase/04-metadata-backbone` and `phase/05-search`. `blockers` was `[]` the whole time,
+and every session log in that window recorded "guard and secret scan clean".
+
+**Both of those were true, which is the interesting part.** The local scanner is
+`tools/guard/secretscan.py`, stdlib and tree-only, and it *is* clean. The failing step is
+the **gitleaks full-history scan**, which exists only in CI. It found 2 findings on
+2026-09-04 at 84 commits scanned, and 5 on 2026-09-21 at 141. Nothing in the session-end
+ritual looks at CI, so a check that runs in exactly one place went unobserved for six
+weeks.
+
+**What the 5 findings are is still unknown, and that is a second defect.**
+`.github/workflows/ci.yml:75` runs `gitleaks detect --source . --redact --no-banner
+--exit-code 1` with no `-v` and no `--report-path`, so it prints a count and names
+nothing. A scan that reports a number and refuses to say what it found cannot be acted
+on; fixing that comes before explaining the findings.
+
+The hypothesis is false positives on checksum constants — the count grew as checksums
+were added, and there are exactly five 64-hex assignments in tracked source
+(`MODEL_SHA256`, `TOKENIZER_SHA256`, the two `sha256:` fields in `assets.rs`, and
+`tools/guard/denylist.salt`), which is the shape gitleaks' generic-api-key rule fires on.
+**That hypothesis is recorded and deliberately not acted on.** Rule 14 requires rotating
+a real pushed secret *before* cleaning history, and a convenient explanation arrived at
+without evidence is exactly what that rule exists to prevent. Confirming needs gitleaks
+installed locally, so B6 is `needs_user`.
+
+### Two smaller findings, and the lesson they share with the first
+
+**D46 — a pinned dependency was yanked.** `zip = "=8.6.0"` is yanked from crates.io.
+Builds are unaffected (it is in `Cargo.lock`, and the fresh-clone job was green), but
+`cargo update` now fails workspace-wide, so the drift check the cold-resume ritual asks
+for could not run.
+
+**D47 — the database is 125 MB from R4's trigger, not 341.** E1's evidence records
+3,659 MB with "341 MB of headroom"; it measures 3,875 MB today. Nothing regressed — this
+is subtask 5.7's launch-time refresh adding titles on every launch, working as designed.
+E1 still holds on its wording, but the number in its evidence is now optimistic and the
+gap closes unattended. D29 already measured the fix.
+
+**D48 — nothing reconciles repository facts into the state file.** The same session found
+the `adrs` array recording 23 ADRs while `docs/adr/` held 34; 0024–0034 had been missing,
+some for six weeks. Neither that nor the red CI is a schema violation, so `statecheck` and
+`validate_state.py` were green throughout. The phases table is the one part of this file
+that `build_state.py` reconciles automatically, and it is the one part that never drifted.
+Proposed: a sixth statecheck check covering CI conclusion and ADR presence, broken first
+to prove it fails.
+
+### What changed in the repository
+
+`PROJECT_STATE.json` only: ADRs 0024–0034 added, B6 raised, D46/D47/D48 recorded, the
+`environment` block re-verified (WebView2 moved 151 → 155 unattended), `next_action`
+reordered to put CI ahead of the re-embed, `sessions_completed` 18, `last_updated`
+2026-10-16. `PROGRESS.md` regenerated from it.
+
+### Still the author's, and still waiting
+
+**P14** blocks closing both Phase 4 and Phase 5 and the recommendation is unchanged:
+not yet, re-measure first. The re-embed is still the next real work and still justified by
+D39's reversal — but `eval search --report` now prints a ceiling worth knowing before
+spending three hours on it: both E4 queries have a graded answer `MIN_SYNOPSIS = 300`
+keeps out of the vector index entirely, **capping them at nDCG 0.7468, below E3's 0.75
+target**, however good the embeddings get. The re-embed cannot win E3 on its own.
+
+Also outstanding and author-only: publishing the rebuilt artefact (ADR-0014, a manual
+328 MB upload), and deleting `C:\Users\hashi\Documents\src\lib\ipc.ts`, the stray file
+`tauri-specta` wrote outside the repository in session 17. It is still there.
+
+**R7 is worth naming out loud**, since it is this project's own top-rated risk and its
+trigger is 30 days without a commit: the gap reached 24. Nothing is broken, and a finished
+Tier B beats an abandoned Tier D.
+
+### Verified
+
+Read-only session apart from the state file. `cargo test --workspace` 434 passed / 0
+failed / 1 ignored · `npm test` 9/9 · `cargo fmt --all --check` clean · `npm run lint`
+clean · `guard.py --tree` clean, `--selftest` 48/48 · `secretscan.py --tree` clean ·
+`validate_state.py --check` valid · `statecheck` clean · `doctor.py --no-fix` exit 0 ·
+`eval search --report` and `eval vector --report` re-run and compared against the recorded
+numbers with no regression. **CI is red and remains red — B6, and it is the next thing
+done.**
