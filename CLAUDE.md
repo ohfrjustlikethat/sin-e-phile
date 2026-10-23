@@ -349,7 +349,7 @@ crates/                  extracted, independently testable crates
 tools/guard/             posture guard + secret scanner
 tools/doctor/            prerequisite checks
 tools/state/             state build + schema validation
-tools/statecheck/        five checks that make being lost impossible
+tools/statecheck/        the checks that make being lost impossible
 tools/phasedoc/          generates and maintains docs/phases/
 tools/contrast/          WCAG AA token audit
 tools/uiaudit/           headless-Chrome UI audit (fps, focus, keyboard, motion)

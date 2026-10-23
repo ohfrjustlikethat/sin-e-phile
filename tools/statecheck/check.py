@@ -14,6 +14,9 @@ wrong in this project, silently, and was found by reading rather than by a tool:
   5. Work was finished and the state file was not updated — the failure mode the
      author called out directly: *"it makes 'finished work but forgot to record it'
      mechanically impossible rather than something you have to remember."*
+  6. CI was red for 42 days with an empty blockers array, and the `adrs` array
+     listed 23 ADRs while `docs/adr/` held 34 (D48). Neither was a schema violation,
+     so every other check here stayed green.
 
 Runs in CI and on pre-push. Python 3.12, stdlib only (ADR-0012).
 
@@ -25,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -49,6 +53,13 @@ BOLD, RED, GREEN, DIM, RESET = "\033[1m", "\033[31m", "\033[32m", "\033[2m", "\0
 class Problem:
     def __init__(self, check: str, what: str, fix: str):
         self.check, self.what, self.fix = check, what, fix
+
+
+class Skip:
+    """A check that could not run. Reported, never counted as a failure."""
+
+    def __init__(self, reason: str):
+        self.reason = reason
 
 
 def git(*args: str) -> str:
@@ -271,6 +282,94 @@ def check_state_follows_code(_: dict) -> list[Problem]:
     )]
 
 
+# ---------------------------------------------------------------------------
+# 6 — repository facts the state file must agree with (D48)
+# ---------------------------------------------------------------------------
+
+ADR_DIR = REPO / "docs" / "adr"
+ADR_FILE = re.compile(r"^(\d{4})-.+\.md$")
+# A blocker "records" red CI if its description names CI as a word. Loose on
+# purpose: the failure being caught is an EMPTY blockers array while CI is red,
+# not a blocker worded differently.
+MENTIONS_CI = re.compile(r"\bCI\b")
+
+
+def adr_problems(files: list[str], state: dict) -> list[Problem]:
+    """Every ADR on disk is in the `adrs` array, and every entry has a file."""
+    on_disk = {m.group(1) for f in files if (m := ADR_FILE.match(f))}
+    recorded = {str(a.get("id")) for a in state.get("adrs", [])}
+    problems = []
+    if missing := sorted(on_disk - recorded):
+        problems.append(Problem(
+            "repository facts",
+            f"docs/adr/ holds ADR(s) the adrs array does not: {', '.join(missing)}",
+            "add an {id, title, date} entry to PROJECT_STATE.json adrs for each",
+        ))
+    if orphaned := sorted(recorded - on_disk):
+        problems.append(Problem(
+            "repository facts",
+            f"the adrs array lists ADR(s) with no file in docs/adr/: {', '.join(orphaned)}",
+            "restore the ADR file, or remove the entry if it was never written",
+        ))
+    return problems
+
+
+def ci_problems(runs: list[dict], state: dict) -> list[Problem]:
+    """The latest finished CI run is green, or a blocker says it is not.
+
+    Red CI alone is not a failure here. This runs on pre-push, so failing on red CI
+    would refuse the very push that fixes it. What went wrong in B6 was red CI that
+    nothing in the state file mentioned, so that is what fails.
+    """
+    finished = [r for r in runs if r.get("status") == "completed"]
+    if not finished:
+        return []
+    latest = finished[0]
+    if latest.get("conclusion") == "success":
+        return []
+    if any(MENTIONS_CI.search(b.get("description", "")) for b in state.get("blockers", [])):
+        return []
+    return [Problem(
+        "repository facts",
+        f"the latest CI run is '{latest.get('conclusion')}' and no blocker records it: "
+        f"{latest.get('url', '')}",
+        "fix CI, or raise a blocker naming CI with what is failing and why",
+    )]
+
+
+def check_repository_facts(state: dict) -> list[Problem] | Skip:
+    files = [p.name for p in ADR_DIR.glob("*.md")]
+    problems = adr_problems(files, state)
+
+    # The CI half asks GitHub, so it degrades to a skip, never a failure, when it
+    # cannot ask. Inside CI the latest run is the one still executing this script,
+    # so the question has no answer there.
+    reason = None
+    branch = git("rev-parse", "--abbrev-ref", "HEAD")
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        reason = "CI half skipped inside CI, which cannot judge itself"
+    elif not branch or branch == "HEAD":
+        reason = "CI half skipped: no branch checked out"
+    else:
+        try:
+            result = subprocess.run(
+                ["gh", "run", "list", "--branch", branch, "--workflow", "ci.yml",
+                 "--limit", "10", "--json", "status,conclusion,url"],
+                cwd=REPO, capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=20,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            result = None
+        if result is None or result.returncode != 0:
+            reason = "CI half skipped: gh is absent, offline or unauthenticated"
+        else:
+            problems += ci_problems(json.loads(result.stdout or "[]"), state)
+
+    if reason and not problems:
+        return Skip(f"ADRs ok; {reason}")
+    return problems
+
+
 CHECKS = [
     ("state file is schema-valid", check_schema),
     ("phase document exists and matches", check_phase_doc),
@@ -278,6 +377,7 @@ CHECKS = [
     ("phases behind current are closed", check_phases_closed),
     ("next_action is an instruction", check_next_action),
     ("state follows code", check_state_follows_code),
+    ("repository facts: ADRs and CI", check_repository_facts),
 ]
 
 
@@ -288,6 +388,9 @@ def run() -> int:
     print(f"{BOLD}statecheck{RESET}  {DIM}can a cold session tell where it is?{RESET}\n")
     for label, check in CHECKS:
         found = check(state)
+        if isinstance(found, Skip):
+            print(f"  {DIM}skip{RESET}  {label}  {DIM}({found.reason}){RESET}")
+            continue
         problems += found
         mark = f"{RED}FAIL{RESET}" if found else f"{GREEN}ok  {RESET}"
         print(f"  {mark}  {label}")
@@ -332,20 +435,44 @@ def selftest() -> int:
              {"number": 1, "status": "skipped", "completion_commit": ""}]}),
     ]
 
+    quiet = {"skipped phase is allowed", "red CI recorded by a blocker",
+             "ADRs agree", "green CI", "no finished CI run"}
     for label, check, payload in cases:
-        should_fire = label != "skipped phase is allowed"
         fired = bool(check({**state, **payload}))
-        ok = fired == should_fire
-        print(f"  {GREEN + 'ok  ' + RESET if ok else RED + 'FAIL' + RESET}  {label}"
-              f"  {DIM}({'fires' if should_fire else 'stays quiet'}){RESET}")
-        if not ok:
+        if report(label, fired, label not in quiet):
+            failures.append(label)
+
+    # The D48 halves take repository facts as arguments, so they are fed fake ones.
+    red = [{"status": "completed", "conclusion": "failure", "url": "run/2"}]
+    ci_blocker = {"blockers": [{"description": "CI red: gitleaks finds 5"}]}
+    adrs = {"adrs": [{"id": "0001"}, {"id": "0002"}]}
+    fact_cases = [
+        ("ADR on disk, not in adrs", adr_problems(
+            ["0001-a.md", "0002-b.md", "0003-c.md", "README.md"], adrs)),
+        ("ADR in adrs, not on disk", adr_problems(["0001-a.md"], adrs)),
+        ("ADRs agree", adr_problems(["0001-a.md", "0002-b.md", "README.md"], adrs)),
+        ("red CI, no blocker", ci_problems(red, {"blockers": []})),
+        ("red CI, blocker about something else", ci_problems(
+            red, {"blockers": [{"description": "the zip pin is yanked"}]})),
+        ("red CI recorded by a blocker", ci_problems(red, ci_blocker)),
+        ("green CI", ci_problems(
+            [{"status": "in_progress", "conclusion": ""},
+             {"status": "completed", "conclusion": "success"}], {"blockers": []})),
+        ("no finished CI run", ci_problems(
+            [{"status": "queued", "conclusion": ""}], {"blockers": []})),
+    ]
+    for label, found in fact_cases:
+        if report(label, bool(found), label not in quiet):
             failures.append(label)
 
     # And the real ones, which must be quiet on a healthy tree.
+    real = 0
     for label, check in CHECKS:
         if check in (check_next_action, check_phases_closed):  # covered above
             continue
-        if check(state):
+        real += 1
+        found = check(state)
+        if found and not isinstance(found, Skip):
             failures.append(f"{label} fires on a healthy tree")
             print(f"  {RED}FAIL{RESET}  {label} fires on a healthy tree")
         else:
@@ -354,8 +481,16 @@ def selftest() -> int:
     if failures:
         print(f"\n{RED}statecheck selftest: {len(failures)} failure(s){RESET}", file=sys.stderr)
         return 1
-    print(f"\nstatecheck selftest: all {len(cases) + 3} checks passed\n")
+    print(f"\nstatecheck selftest: all {len(cases) + len(fact_cases) + real} checks passed\n")
     return 0
+
+
+def report(label: str, fired: bool, should_fire: bool) -> bool:
+    """Print one selftest line; return True if it went wrong."""
+    ok = fired == should_fire
+    print(f"  {GREEN + 'ok  ' + RESET if ok else RED + 'FAIL' + RESET}  {label}"
+          f"  {DIM}({'fires' if should_fire else 'stays quiet'}){RESET}")
+    return not ok
 
 
 def main() -> int:

@@ -26,7 +26,7 @@ from.
 
 | Command | Checks |
 |---|---|
-| `python tools/statecheck/check.py` | Can a session that knows nothing pick this up? Five checks; runs in CI and pre-push. |
+| `python tools/statecheck/check.py` | Can a session that knows nothing pick this up? Seven checks, incl. ADRs and CI vs the state file (D48); runs in CI and pre-push. |
 | `python tools/statecheck/check.py --selftest` | Proves each of those checks actually fires. |
 | `python tools/phasedoc/generate.py --open N` | Generate a phase doc from `SPEC.md` §15. |
 | `python tools/phasedoc/generate.py --log N` | Refresh its checklists, append completed subtasks. |
