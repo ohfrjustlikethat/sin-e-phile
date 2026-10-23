@@ -131,7 +131,7 @@ mod tests {
 
     #[test]
     fn a_secret_survives_a_round_trip() {
-        let key = "abcdef0123456789abcdef0123456789";
+        let key = "test-only-not-a-secret";
         let wrapped = wrap(key).expect("DPAPI is available on Windows");
         assert_eq!(unwrap(&wrapped).as_deref(), Some(key));
     }
@@ -140,7 +140,7 @@ mod tests {
     fn the_wrapped_form_does_not_contain_the_secret() {
         // The entire reason this exists: `data/` gets copied, and a grep of the file
         // must not find the key.
-        let key = "abcdef0123456789abcdef0123456789";
+        let key = "test-only-not-a-secret";
         let wrapped = wrap(key).expect("wrap");
         assert!(
             !wrapped.windows(key.len()).any(|w| w == key.as_bytes()),

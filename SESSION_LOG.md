@@ -1402,3 +1402,49 @@ clean · `guard.py --tree` clean, `--selftest` 48/48 · `secretscan.py --tree` c
 `eval search --report` and `eval vector --report` re-run and compared against the recorded
 numbers with no regression. **CI is red and remains red — B6, and it is the next thing
 done.**
+
+## Session 19 — 2026-10-23 — B6 confirmed: five false positives, none of them checksums
+
+The author installed gitleaks (`winget`, 8.30.1, the version CI pins) and deleted the
+stray `C:\Users\hashi\Documents\src\lib\ipc.ts` left over from session 17 (confirmed gone).
+
+**What the five findings are.** The CI command run with `-v` over 142 commits names
+exactly the five that CI only counted. All of them come from the `generic-api-key` rule,
+and none was ever a credential, so rule 14 has nothing to rotate:
+
+- three are a doc comment where the word "tokens" is followed by a comma. The rule reads
+  the comma as an assignment and the next word as the key (`396f256`
+  `crates/embedder/src/lib.rs:118`; `554c50d` and `490fe94` `tools/ingest/src/embed.rs`).
+- two are the DPAPI round-trip test vector in `2358993` `crates/persistence/src/secrets.rs`.
+
+**The hypothesis session 18 recorded was wrong.** It blamed the 64-hex checksum
+constants, and none of those is flagged. Session 18 declined to act on that guess, and
+it was right to.
+
+**Fix — ADR-0035, option A, decided by the author.** The plan was a `.gitleaksignore`
+with commit-pinned fingerprints. The posture guard's pre-commit hook blocked it: each
+fingerprint carries a full 40-hex commit SHA, which is infohash-shaped. The guard was
+right, and exempting the file would widen `STRUCTURAL_EXEMPT` (R10). So the shipped
+mechanism is `.gitleaks.toml`, which keeps the default rules and allowlists the two
+flagged **values**, anchored `^…$` and scoped to `generic-api-key`. That is narrower than
+fingerprints, because a real key cannot equal either value. CI now passes `-v`. The test
+vector is now `"test-only-not-a-secret"`.
+
+**Broken first.** Without the config, the CI command exits 1 with 5 leaks; with it, the
+command exits 0 over 142 commits. A probe file holding a realistic key, the test vector
+plus one character, and `L2-normalise` plus a suffix exits 1 with 3 leaks *with* the
+config, so it hides only the exact values. An earlier probe also caught the first drafts
+of ADR-0035 and of the ignore file quoting the triggering text, which would have been
+**new** findings. Both were reworded before commit.
+
+**A slip, recorded so it is not repeated.** A stray `git checkout -- .` partway through
+discarded the uncommitted edits to tracked files. All of them were this session's own
+scripted changes, so they were re-applied and re-verified, and nothing of the author's
+was lost.
+
+**Not yet done:** B6 stays open, with `needs_user` now false, until the first CI run
+after this push is seen to be green. `docs/adr/README.md` still has no rows for
+0024–0034. That is the same drift D48 describes, and it is left for D48's check to catch.
+
+Verified: secrets tests 4/4 · `secretscan.py --tree` clean · `guard.py --tree` clean ·
+`cargo fmt --all --check` clean · `validate_state.py --check` valid · statecheck clean.
