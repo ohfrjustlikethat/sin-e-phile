@@ -1448,3 +1448,36 @@ after this push is seen to be green. `docs/adr/README.md` still has no rows for
 
 Verified: secrets tests 4/4 · `secretscan.py --tree` clean · `guard.py --tree` clean ·
 `cargo fmt --all --check` clean · `validate_state.py --check` valid · statecheck clean.
+
+### Session 19, continued — CI green, D48 built, D46 closed upstream, D49 raised
+
+**B6 resolved.** Run 39976164613 (`efbeba6`) is green on every job:
+https://github.com/ohfrjustlikethat/sin-e-phile/actions/runs/39976164613. Its "Posture
+guard and secret scan" job passed for the first time since 2026-09-04.
+
+**The 2026-10-16 audit missed a second red job.** The Frontend job also failed that day,
+and B6 blamed everything on gitleaks. Checking 37 runs found 4 Frontend failures, all in
+`tools/uiaudit` and each exactly one dropped frame (worst 783 / 33.4 / 116.7 / 250 ms;
+median 16.7 ms). Some of those runs were on commits that touched only the state file,
+so the code did not cause them. Attempt 1 of 39976164613 failed this way and attempt 2
+passed with 0 dropped frames. This is a flaky check on GitHub's hosted runner, recorded
+as **D49** with options for the author. The 60fps gate was left unchanged, because it
+enforces §2.3. Lesson for the next audit: read every failing job, not just the first.
+
+**D48 built.** statecheck has a seventh check, "repository facts: ADRs and CI". It fails
+when `docs/adr/` and the `adrs` array disagree in either direction. It also fails when
+the latest finished `ci.yml` run on the branch is not green **and no blocker names CI**.
+Failing on red CI alone would make the pre-push hook refuse the push that fixes CI. The
+CI half reports SKIP inside Actions (CI cannot judge itself) and when `gh` cannot be
+reached. Broken first against real data while run 38897021742 was still the latest red
+one: blockers emptied gave a FAIL naming that run, and removing ADR 0035 from `adrs`
+gave a FAIL naming 0035. The state file was restored byte-exact. The selftest is 19/19,
+with 8 new cases that feed the check fake ADR and CI data. Both skip paths were also
+seen to fire.
+
+**D46 closed with no change.** crates.io shows `zip` 8.6.0 un-yanked at 2026-10-16
+16:47Z, about five hours after the audit recorded it as yanked, and
+`cargo update --dry-run` exits 0 again. Re-pinning now would be an upgrade for its own
+sake (rule 15), so the pin stays where it is.
+
+`next_action` is now the re-embed, unchanged.
