@@ -308,8 +308,14 @@ pub async fn produce(
     };
     let vectors = std::fs::read(&part)
         .map_err(|e| JobError::step("embed", format!("{}: {e}", part.display())))?;
-    let mut out = std::fs::File::create(artefact_path)
-        .map_err(|e| JobError::step("embed", format!("{}: {e}", artefact_path.display())))?;
+    // Write beside the artefact, then rename over it (D52). Written in place, a kill
+    // during assembly once left a 43 MB fragment where a good 330 MB artefact had been:
+    // refused at load by its checksum, but the previous artefact was gone. A rename on
+    // the same volume replaces the file in one step, so the real path only ever holds a
+    // complete artefact, old or new.
+    let staging = artefact_path.with_extension("bin.assembling");
+    let mut out = std::fs::File::create(&staging)
+        .map_err(|e| JobError::step("embed", format!("{}: {e}", staging.display())))?;
 
     let checksum = artefact::write(
         &mut out,
@@ -321,6 +327,11 @@ pub async fn produce(
     .map_err(|e| JobError::step("embed", e.to_string()))?;
     out.flush()
         .map_err(|e| JobError::step("embed", e.to_string()))?;
+    out.sync_all()
+        .map_err(|e| JobError::step("embed", e.to_string()))?;
+    drop(out);
+    std::fs::rename(&staging, artefact_path)
+        .map_err(|e| JobError::step("embed", format!("{}: {e}", artefact_path.display())))?;
     let _ = std::fs::remove_file(&part);
 
     let bytes = std::fs::metadata(artefact_path)

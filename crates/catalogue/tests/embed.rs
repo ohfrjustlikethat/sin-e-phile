@@ -107,6 +107,31 @@ async fn produce(
 }
 
 #[tokio::test]
+async fn a_failed_assembly_leaves_the_previous_artefact_untouched() {
+    // D52: assembly once wrote in place, and a kill mid-write replaced a good artefact
+    // with a 43 MB fragment. The real path must only ever hold a complete artefact.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let db = Db::open_in(dir.path()).await.expect("open");
+    catalogue(&db, 5).await;
+
+    let path = dir.path().join("embeddings.bin");
+    std::fs::write(&path, b"the previous, good artefact").expect("previous");
+
+    // A directory where the staging file must go makes assembly fail partway, after
+    // every vector is embedded, which is exactly when the in-place write did damage.
+    std::fs::create_dir(dir.path().join("embeddings.bin.assembling")).expect("block");
+    produce(&db, &mut Fake::new(8), &path)
+        .await
+        .expect_err("assembly cannot write its staging file");
+
+    assert_eq!(
+        std::fs::read(&path).expect("still there"),
+        b"the previous, good artefact",
+        "a failed assembly must not touch the artefact it would replace"
+    );
+}
+
+#[tokio::test]
 async fn an_artefact_is_produced_and_reads_back() {
     let dir = tempfile::tempdir().expect("tempdir");
     let db = Db::open_in(dir.path()).await.expect("open");
