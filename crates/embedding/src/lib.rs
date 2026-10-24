@@ -51,7 +51,7 @@ pub fn artefact_path(data_dir: &std::path::Path) -> std::path::PathBuf {
 /// write without a format change.
 pub const TEXT_SOURCE: &str = "wikipedia";
 
-pub use artefact::{Artefact, ArtefactError, Header, Quantisation};
+pub use artefact::{id_digest, Artefact, ArtefactError, Header, Quantisation};
 pub use document::{
     build as build_document, build_with as build_document_with, Document, Layout, SHIPPED,
 };

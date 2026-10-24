@@ -36,7 +36,13 @@ pub const MAGIC: [u8; 8] = *b"SINEEMB\0";
 /// indistinguishable, and searching the wrong one is simply worse with nothing to point
 /// at. A v1 artefact — everything published before the catalogue had any synopses — is
 /// now refused rather than quietly used.
-pub const FORMAT_VERSION: u16 = 2;
+///
+/// **3 adds the covered ids** — `watermark` and `id_digest` (D45). The artefact is
+/// positional and nothing in a v2 file said which titles its positions were, so a
+/// catalogue that had shifted could only be caught by re-embedding samples. Now the
+/// question "does this artefact describe this catalogue" has an exact answer that needs
+/// no model at all.
+pub const FORMAT_VERSION: u16 = 3;
 
 /// Bytes of header before the vectors begin.
 const HEADER_BYTES: usize = 256;
@@ -84,6 +90,26 @@ pub struct Header {
     /// unidentifiable.
     pub text_source: String,
     pub count: u64,
+    /// The catalogue id at the LAST position — the highest id the artefact covers.
+    /// Says *where* a catalogue and an artefact part ways; [`Header::id_digest`] is what
+    /// says *whether* they do.
+    pub watermark: i64,
+    /// SHA-256 over every covered id, in position order (see [`id_digest`]).
+    ///
+    /// The watermark alone is not enough, and D45 first assumed it was: a title leaving
+    /// the core tier and another entering, both below the watermark, keeps the count and
+    /// the last id the same while shifting every position between them.
+    pub id_digest: [u8; 32],
+}
+
+/// The digest [`Header::id_digest`] holds: SHA-256 over each id as 8 little-endian
+/// bytes, in position order.
+pub fn id_digest(ids: &[i64]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    for id in ids {
+        hasher.update(id.to_le_bytes());
+    }
+    hasher.finalize().into()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -164,7 +190,9 @@ impl Header {
         write_string(&mut out[25..89], &self.model, "model")?;
         write_string(&mut out[89..105], &self.snapshot_date, "snapshot_date")?;
         write_string(&mut out[105..137], &self.text_source, "text_source")?;
-        // 137..256 is reserved and stays zero, so an older reader that ignores it and
+        out[137..145].copy_from_slice(&self.watermark.to_le_bytes());
+        out[145..177].copy_from_slice(&self.id_digest);
+        // 177..256 is reserved and stays zero, so an older reader that ignores it and
         // a newer one that uses it produce the same bytes for the same content today.
         Ok(out)
     }
@@ -210,6 +238,8 @@ impl Header {
             snapshot_date: read_string(&bytes[89..105])?,
             text_source: read_string(&bytes[105..137])?,
             count,
+            watermark: i64::from_le_bytes(bytes[137..145].try_into().expect("8 bytes")),
+            id_digest: bytes[145..177].try_into().expect("32 bytes"),
         })
     }
 }
@@ -355,6 +385,8 @@ mod tests {
             snapshot_date: "2026-09-05".into(),
             text_source: "wikipedia".into(),
             count,
+            watermark: count as i64,
+            id_digest: id_digest(&(1..=count as i64).collect::<Vec<_>>()),
         }
     }
 
@@ -383,6 +415,33 @@ mod tests {
             None,
             "past the end is None, not a panic"
         );
+    }
+
+    #[test]
+    fn the_covered_ids_round_trip_and_tell_shifted_catalogues_apart() {
+        // D45: the header says WHICH titles its positions are, exactly.
+        let artefact = Artefact::read(&mut built(3).as_slice()).expect("read");
+        assert_eq!(artefact.header.watermark, 3);
+        assert_eq!(artefact.header.id_digest, id_digest(&[1, 2, 3]));
+
+        // Same count, same last id, different set: a title left (2) and another entered
+        // (0) below the watermark. The case a watermark alone cannot see.
+        assert_ne!(id_digest(&[1, 2, 3]), id_digest(&[0, 1, 3]));
+        // Order is part of it, because order is position.
+        assert_ne!(id_digest(&[1, 2, 3]), id_digest(&[2, 1, 3]));
+    }
+
+    #[test]
+    fn a_format_2_artefact_is_refused_rather_than_read_without_its_ids() {
+        let mut bytes = built(1);
+        bytes[8..10].copy_from_slice(&2u16.to_le_bytes());
+        assert!(matches!(
+            Artefact::read(&mut bytes.as_slice()),
+            Err(ArtefactError::FormatVersion {
+                found: 2,
+                expected: 3
+            })
+        ));
     }
 
     #[test]
@@ -432,7 +491,7 @@ mod tests {
         match Artefact::read(&mut bytes.as_slice()) {
             Err(ArtefactError::FormatVersion {
                 found: 1,
-                expected: 2,
+                expected: FORMAT_VERSION,
             }) => {}
             Err(other) => panic!("wrong error: {other}"),
             Ok(_) => panic!("a v1 artefact must be refused, not read"),

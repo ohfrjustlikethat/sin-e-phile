@@ -22,7 +22,12 @@
 /// **2 removed the title and the alternative titles.** See the comment in [`build`]:
 /// they are names rather than descriptions, and they were dominating the embedding to
 /// the point that a plot query returned films whose titles shared a word with it.
-pub const VERSION: u32 = 2;
+///
+/// **3 is the plot-first layout** (D39, reversed). 1,000 characters of synopsis rather
+/// than 400, the synopsis BEFORE the metadata, and a Wikipedia-style lead sentence
+/// stripped. Priced as "plot first" by `eval embed --compare` before it shipped; see
+/// `docs/eval-results.md`, "D39 was answered with the wrong documents".
+pub const VERSION: u32 = 3;
 
 /// What the builder is given about one catalogue item.
 ///
@@ -48,11 +53,16 @@ pub struct Document<'a> {
 
 /// How much of a synopsis to keep.
 ///
-/// The model truncates at 256 tokens anyway, and a long synopsis crowds out the title
-/// and the names — which are the parts a search is most often actually about. Cutting
-/// here rather than letting the tokenizer do it means the cut is deterministic and
-/// visible, instead of depending on a tokenizer version.
-const SYNOPSIS_CHARS: usize = 400;
+/// The model reads 256 tokens, roughly a thousand characters. Cutting here rather than
+/// letting the tokenizer do it keeps the cut deterministic and visible instead of
+/// dependent on a tokenizer version. It was 400 until v3, which threw away more than
+/// half of what the model could read.
+///
+/// Since v3 puts the synopsis first, a synopsis near this length leaves little room
+/// for the metadata after it, and the tokenizer cuts that tail. That was true of the
+/// layout as measured, too: the comparison ran through this builder and the real
+/// tokenizer.
+const SYNOPSIS_CHARS: usize = 1_000;
 
 /// The arrangement of a document — what goes in it and in what order.
 ///
@@ -87,9 +97,9 @@ pub struct Layout {
 /// What the artefact actually holds. [`build`] is this, and changing it is a re-embed.
 pub const SHIPPED: Layout = Layout {
     synopsis_chars: SYNOPSIS_CHARS,
-    synopsis_first: false,
+    synopsis_first: true,
     people: true,
-    strip_lead: false,
+    strip_lead: true,
 };
 
 /// Build the sentence for one item.
@@ -267,11 +277,12 @@ mod tests {
         };
         // No title and no alternative titles — see `build`. What survives describes the
         // work rather than naming it, which is the only thing an embedding is good at.
+        // v3: the plot leads, because CLS pooling weights the head of the sequence.
         assert_eq!(
             build(&doc),
-            "(1979) science fiction drama film, \
-             featuring Andrei Tarkovsky and Alexander Kaidanovsky. \
-             A guide leads two men through the Zone."
+            "A guide leads two men through the Zone. \
+             (1979) science fiction drama film, \
+             featuring Andrei Tarkovsky and Alexander Kaidanovsky."
         );
     }
 
@@ -339,7 +350,7 @@ mod tests {
     fn a_long_synopsis_is_cut_at_a_character_boundary() {
         // Slicing a &str by byte index panics mid-character, and synopses are full of
         // accents and non-Latin scripts.
-        let synopsis = "é".repeat(1_000);
+        let synopsis = "é".repeat(SYNOPSIS_CHARS * 2);
         let doc = Document {
             title: "T",
             kind: "film",
@@ -347,13 +358,14 @@ mod tests {
             ..Default::default()
         };
         let built = build(&doc);
-        assert!(built.ends_with('…'));
-        assert!(built.chars().count() < 500);
+        // The synopsis leads since v3, so the cut is mid-document, not at its end.
+        assert!(built.contains('…'));
+        assert!(built.chars().count() < SYNOPSIS_CHARS + 100);
     }
 
     #[test]
     fn a_synopsis_is_cut_at_a_word_where_one_is_near() {
-        let synopsis = format!("{} and then something else entirely", "word ".repeat(120));
+        let synopsis = format!("{} and then something else entirely", "word ".repeat(300));
         let doc = Document {
             title: "T",
             kind: "film",
@@ -361,7 +373,7 @@ mod tests {
             ..Default::default()
         };
         let built = build(&doc);
-        assert!(built.ends_with('…'));
+        assert!(built.contains('…'));
         assert!(
             !built.contains("wor…"),
             "cut mid-word rather than at the nearby space: {built}"
@@ -449,14 +461,15 @@ mod tests {
             synopsis: Some(&synopsis),
             ..Default::default()
         };
-        let short = build(&doc);
-        let long = build_with(
+        // v2's budget against the shipped one.
+        let short = build_with(
             &doc,
             Layout {
-                synopsis_chars: 1_000,
+                synopsis_chars: 400,
                 ..SHIPPED
             },
         );
+        let long = build(&doc);
         assert!(long.chars().count() > short.chars().count());
         assert!(long.chars().count() <= 1_000 + 32);
     }

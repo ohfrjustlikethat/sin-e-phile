@@ -248,6 +248,8 @@ mod tests {
             snapshot_date: "2026-09-14".into(),
             text_source: "wikipedia".into(),
             count: 1,
+            watermark: 0,
+            id_digest: [0; 32],
         };
         let mut bytes = Vec::new();
         artefact::write(&mut bytes, &header, vec![vec![1i8, 2, 3, 4]]).expect("write");

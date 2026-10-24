@@ -21,6 +21,7 @@ use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
 use sinephile_embedding::{artefact, document, quantise, Document, Header, Quantisation};
+use sinephile_persistence::repositories::CatalogueRepository;
 use sinephile_persistence::Db;
 
 use crate::job::{Job, JobError};
@@ -269,6 +270,29 @@ pub async fn produce(
     }
     drop(file);
 
+    // Which titles the positions are (D45). Read once, from the definition the consumer
+    // also uses, rather than collected in the loop: a resumed run never saw the ids an
+    // earlier run embedded. The last covered id must be the last row embedded, or the
+    // catalogue changed during the run and the vectors no longer line up with it.
+    let covered: Vec<i64> = CatalogueRepository::new(db)
+        .core_ids()
+        .await?
+        .into_iter()
+        .take(written as usize)
+        .collect();
+    let watermark = covered.last().copied().unwrap_or(0);
+    if covered.len() != written as usize || (written > 0 && watermark != after) {
+        return Err(JobError::step(
+            "embed",
+            format!(
+                "the catalogue changed during the run: {written} vectors were embedded up to \
+                 id {after}, but the core tier's first {written} ids now end at {watermark}. \
+                 Delete {} and embed again.",
+                part.display()
+            ),
+        ));
+    }
+
     // Assemble. The checksum is computed here, over the finished file, so an
     // interrupted run never leaves something that looks complete.
     let header = Header {
@@ -279,6 +303,8 @@ pub async fn produce(
         snapshot_date: snapshot_date.to_string(),
         text_source: text_source.to_string(),
         count: written as u64,
+        watermark,
+        id_digest: sinephile_embedding::id_digest(&covered),
     };
     let vectors = std::fs::read(&part)
         .map_err(|e| JobError::step("embed", format!("{}: {e}", part.display())))?;
@@ -385,7 +411,8 @@ pub fn verify_sha256(path: &Path, expected: &str) -> Result<(), JobError> {
         return Err(JobError::step(
             "embed",
             format!(
-                "{} has sha256 {actual}, expected {expected} — refusing to embed with                  a model that is not the one pinned",
+                "{} has sha256 {actual}, expected {expected} — refusing to embed with \
+                 a model that is not the one pinned",
                 path.display()
             ),
         ));

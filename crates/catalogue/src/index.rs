@@ -106,6 +106,34 @@ pub async fn verify_prefix(
         ));
     }
 
+    // Exact, and needs no model (D45): are the first `count` core ids the ones the
+    // artefact was built from? The sampled re-embed below then answers a different
+    // question — whether a covered title's TEXT has changed under the same id.
+    let header = &artefact.header;
+    if sinephile_embedding::id_digest(&ids[..count]) != header.id_digest {
+        let at_end = ids[..count].last().copied().unwrap_or(0);
+        let detail = if at_end != header.watermark {
+            format!(
+                "the artefact ends at catalogue id {} and position {} is now id {at_end}",
+                header.watermark,
+                count.saturating_sub(1)
+            )
+        } else {
+            format!(
+                "both end at catalogue id {at_end}, so a title left the core tier and \
+                 another entered before it",
+            )
+        };
+        return Err(JobError::step(
+            "vector-index",
+            format!(
+                "the artefact's {count} positions are not this catalogue's first {count} core \
+                 titles: {detail}. Every vector after the change belongs to a different film. \
+                 Rebuild the artefact, or fetch one built from this catalogue."
+            ),
+        ));
+    }
+
     for position in sample_positions(count, VERIFY_SAMPLES) {
         let id = ids[position];
         let Some(document) = crate::embed::document_for(db, id).await? else {

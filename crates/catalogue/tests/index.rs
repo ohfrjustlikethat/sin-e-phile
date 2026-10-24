@@ -37,10 +37,17 @@ impl DocumentEmbedder for Fake {
             hash ^= *byte as u64;
             hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
         }
+        // splitmix64 per dimension, so every dimension depends on the whole hash. The
+        // first version multiplied `hash + i` by a 32-bit constant and kept the top bits,
+        // which came out the same for every text: every vector was [127; 8], and the
+        // sampled re-embed in `verify_prefix` could never fail in these tests.
         let raw: Vec<f32> = (0..self.dimension)
             .map(|i| {
-                let n = hash.wrapping_add(i as u64).wrapping_mul(2654435761);
-                ((n >> 33) as f32 / (1u64 << 30) as f32) - 1.0
+                let mut z = hash ^ (u64::from(i) + 1).wrapping_mul(0x9e37_79b9_7f4a_7c15);
+                z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+                z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+                z ^= z >> 31;
+                (z >> 11) as f32 / (1u64 << 53) as f32 * 2.0 - 1.0
             })
             .collect();
         let norm = raw.iter().map(|v| v * v).sum::<f32>().sqrt().max(1e-12);
@@ -183,6 +190,83 @@ async fn a_title_promoted_into_the_middle_of_the_core_tier_is_refused() {
     let err = index::verify_prefix(&db, &mut Fake { dimension: 8 }, &artefact, &ids)
         .await
         .expect_err("a shifted catalogue must be refused");
+    let message = err.to_string();
+    assert!(
+        message.contains("are not this catalogue's first"),
+        "refused for the wrong reason: {message}"
+    );
+}
+
+#[tokio::test]
+async fn a_title_leaving_and_another_entering_below_the_watermark_is_refused() {
+    // D45 first proposed a watermark alone, and this is what it misses: one title leaves
+    // the core tier, another enters, both below the last position. The count and the
+    // last id are unchanged; every position between the two names a different film.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let db = Db::open_in(dir.path()).await.expect("open");
+    let spares = catalogue(&db, 20, 10).await;
+
+    let path = sinephile_embedding::artefact_path(dir.path());
+    produce(&db, &mut Fake { dimension: 8 }, &path).await;
+    let artefact = artefact_at(&path);
+
+    let before = CatalogueRepository::new(&db).core_ids().await.expect("ids");
+    let leaving = before[1];
+    let entering = spares[0];
+    assert!(
+        entering < artefact.header.watermark,
+        "the swap must sit below the watermark"
+    );
+    for (id, in_core) in [(leaving, 0), (entering, 1)] {
+        sqlx::query("UPDATE media_items SET in_core = ? WHERE id = ?")
+            .bind(in_core)
+            .bind(id)
+            .execute(db.pool())
+            .await
+            .expect("swap");
+    }
+
+    let ids = CatalogueRepository::new(&db).core_ids().await.expect("ids");
+    let count = artefact.header.count as usize;
+    assert_eq!(ids.len(), before.len(), "same length");
+    assert_eq!(ids[count - 1], artefact.header.watermark, "same last id");
+
+    let err = index::verify_prefix(&db, &mut Fake { dimension: 8 }, &artefact, &ids)
+        .await
+        .expect_err("a swap below the watermark must be refused");
+    let message = err.to_string();
+    assert!(
+        message.contains("a title left the core tier and another entered"),
+        "refused for the wrong reason: {message}"
+    );
+}
+
+#[tokio::test]
+async fn a_covered_title_whose_text_changed_is_refused_by_the_sampled_re_embed() {
+    // The same ids, so the exact check passes, but the sentence behind the last position
+    // is different. That is what the sampled re-embed is still for.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let db = Db::open_in(dir.path()).await.expect("open");
+    catalogue(&db, 20, 0).await;
+
+    let path = sinephile_embedding::artefact_path(dir.path());
+    produce(&db, &mut Fake { dimension: 8 }, &path).await;
+    let artefact = artefact_at(&path);
+
+    sqlx::query("UPDATE media_items SET synopsis = ? WHERE id = ?")
+        .bind(format!(
+            "A different film entirely. {}",
+            "Other. ".repeat(60)
+        ))
+        .bind(artefact.header.watermark)
+        .execute(db.pool())
+        .await
+        .expect("rewrite");
+
+    let ids = CatalogueRepository::new(&db).core_ids().await.expect("ids");
+    let err = index::verify_prefix(&db, &mut Fake { dimension: 8 }, &artefact, &ids)
+        .await
+        .expect_err("changed text under the same id must be refused");
     let message = err.to_string();
     assert!(
         message.contains("does not match the artefact"),

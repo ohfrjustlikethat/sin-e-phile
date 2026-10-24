@@ -74,18 +74,29 @@ pub async fn compare(data_dir: &Path, query: &str, ids: &[i64]) -> Result<bool, 
 
     /// The layouts on offer, shipped first.
     ///
-    /// `1000 chars` because the model reads 256 tokens — roughly a thousand characters —
-    /// against a budget of 400, so a third of what it could read is being thrown away
-    /// before it ever sees it. The rest are D39's untried residue: the document still
-    /// opens with year, genres and up to six cast names, and CLS pooling weights the
-    /// head of the sequence most.
+    /// Spelled out in full rather than as `..SHIPPED`, so that each label still names the
+    /// same layout after `SHIPPED` moves. It moved at `document::VERSION` 3, to what is
+    /// labelled "plot first" here. `v2` is what shipped before that: 400 characters,
+    /// metadata first. `1000 chars` keeps the v2 order with the longer synopsis, which
+    /// separates the two halves of the change.
     const VARIANTS: &[(&str, Layout)] = &[
         ("shipped", SHIPPED),
+        (
+            "v2",
+            Layout {
+                synopsis_chars: 400,
+                synopsis_first: false,
+                people: true,
+                strip_lead: false,
+            },
+        ),
         (
             "1000 chars",
             Layout {
                 synopsis_chars: 1_000,
-                ..SHIPPED
+                synopsis_first: false,
+                people: true,
+                strip_lead: false,
             },
         ),
         (
@@ -93,8 +104,8 @@ pub async fn compare(data_dir: &Path, query: &str, ids: &[i64]) -> Result<bool, 
             Layout {
                 synopsis_chars: 1_000,
                 synopsis_first: true,
+                people: true,
                 strip_lead: true,
-                ..SHIPPED
             },
         ),
         (
