@@ -321,7 +321,10 @@ def ci_problems(runs: list[dict], state: dict) -> list[Problem]:
     would refuse the very push that fixes it. What went wrong in B6 was red CI that
     nothing in the state file mentioned, so that is what fails.
     """
-    finished = [r for r in runs if r.get("status") == "completed"]
+    # A cancelled run was superseded (ci.yml sets cancel-in-progress), so it says
+    # nothing about the code: judge the latest run that actually finished.
+    finished = [r for r in runs
+                if r.get("status") == "completed" and r.get("conclusion") != "cancelled"]
     if not finished:
         return []
     latest = finished[0]
@@ -436,7 +439,8 @@ def selftest() -> int:
     ]
 
     quiet = {"skipped phase is allowed", "red CI recorded by a blocker",
-             "ADRs agree", "green CI", "no finished CI run"}
+             "ADRs agree", "green CI", "no finished CI run",
+             "cancelled run is skipped, green one behind it judged"}
     for label, check, payload in cases:
         fired = bool(check({**state, **payload}))
         if report(label, fired, label not in quiet):
@@ -457,6 +461,11 @@ def selftest() -> int:
         ("red CI recorded by a blocker", ci_problems(red, ci_blocker)),
         ("green CI", ci_problems(
             [{"status": "in_progress", "conclusion": ""},
+             {"status": "completed", "conclusion": "success"}], {"blockers": []})),
+        ("cancelled run is skipped, red one behind it judged", ci_problems(
+            [{"status": "completed", "conclusion": "cancelled"}] + red, {"blockers": []})),
+        ("cancelled run is skipped, green one behind it judged", ci_problems(
+            [{"status": "completed", "conclusion": "cancelled"},
              {"status": "completed", "conclusion": "success"}], {"blockers": []})),
         ("no finished CI run", ci_problems(
             [{"status": "queued", "conclusion": ""}], {"blockers": []})),

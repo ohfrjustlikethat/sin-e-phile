@@ -1481,3 +1481,25 @@ seen to fire.
 sake (rule 15), so the pin stays where it is.
 
 `next_action` is now the re-embed, unchanged.
+
+### Session 19, continued (2026-10-24/25) — D49 fixed and proven in CI, D50 raised
+
+**D49, option (a), author: "your call".** In `--ci`, a frame-timing breach in
+`tools/uiaudit/run.mjs` now triggers one re-measure, and the second attempt is judged.
+The budget is still zero dropped frames, and local runs never retry. The proof was done
+in CI, through a new `workflow_dispatch` input that forces a stall. A stall on attempt 1
+retried and **passed** (run 40126478347); a stall on both attempts **failed** (run
+40126915788).
+
+**Two things the proof runs taught.** First, CI's `cancel-in-progress` means that
+starting two dispatch runs cancels the earlier one. A dispatch that was cancelled while
+still pending had already claimed the concurrency slot, and it cancelled the real push
+run. Second, that exposed a flaw in D48's check: it judged a *cancelled* run as red. It
+now skips cancelled runs, reads only `push` runs, and the selftest is 21/21. A check
+that was green in its own tests was still wrong against real CI behaviour.
+
+**D50 — uiaudit is dead on this machine, unrelated to D49.** The HEAD version fails the
+same way. The gallery page stays blank, with no errors, in both Chrome and Edge. The
+Chromium-156 hypothesis was disproved within the hour, because CI passes on 156 too.
+After three attempts the work stopped (§10.9) and the problem was recorded instead. It
+blocks nothing, since CI is the authoritative gate.
