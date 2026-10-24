@@ -9,6 +9,11 @@ on:
     branches: ["**"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      uiaudit_inject_stall:
+        description: "Prove the D49 retry: stall the rail on attempt 1, or 1,2. Empty on every push."
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -182,6 +187,8 @@ jobs:
       # written, which is the argument for running it on every push.
       - name: UI audit (60fps · focus · keyboard · reduced motion)
         if: steps.detect.outputs.present == 'true'
+        env:
+          UIAUDIT_INJECT_STALL: ${{ inputs.uiaudit_inject_stall }}
         run: node tools/uiaudit/run.mjs --ci
 
   # ───────────────────────────────────────────────────────────────────────────

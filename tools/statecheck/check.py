@@ -353,7 +353,7 @@ def check_repository_facts(state: dict) -> list[Problem] | Skip:
     else:
         try:
             result = subprocess.run(
-                ["gh", "run", "list", "--branch", branch, "--workflow", "ci.yml",
+                ["gh", "run", "list", "--branch", branch, "--workflow", "ci.yml", "--event", "push",
                  "--limit", "10", "--json", "status,conclusion,url"],
                 cwd=REPO, capture_output=True, text=True, encoding="utf-8",
                 errors="replace", timeout=20,
