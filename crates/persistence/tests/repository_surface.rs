@@ -688,6 +688,15 @@ async fn db_surface() {
     db.backup_to(&backup).await.expect("backup_to");
     assert!(backup.is_file());
 
+    // compact — on a file database, so both sizes are real and VACUUM is meaningful
+    let compacted = db.compact().await.expect("compact");
+    assert!(compacted.before > 0, "measured a real file");
+    assert!(
+        compacted.after <= compacted.before,
+        "VACUUM never grows the file"
+    );
+    assert!(db.schema_version().await.expect("still open").is_some());
+
     // migrate_with_backup — the no-op path, already at the latest version
     assert!(db
         .migrate_with_backup(dir.path())

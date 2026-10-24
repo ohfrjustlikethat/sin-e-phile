@@ -36,6 +36,19 @@ pub struct Db {
     path: PathBuf,
 }
 
+/// What [`Db::compact`] did, in bytes on disk.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Compacted {
+    pub before: u64,
+    pub after: u64,
+}
+
+impl Compacted {
+    pub fn recovered(&self) -> u64 {
+        self.before.saturating_sub(self.after)
+    }
+}
+
 impl std::fmt::Debug for Db {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // The pool has no useful Debug and the path is the identifying fact.
@@ -191,6 +204,31 @@ impl Db {
         std::fs::copy(&self.path, destination)
             .map_err(|e| DbError::Backup(destination.to_path_buf(), e))?;
         Ok(())
+    }
+
+    /// Rewrite the database without the slack that incremental writes leave behind.
+    ///
+    /// D29 measured 354 MB of it after Phase 4's nine ingestion jobs. D47 measured
+    /// 112 MiB more after later ones, on a database 63 MB over R4's 4 GB trigger, where
+    /// that slack was the difference between over and under. Exclusive, and about 30 s
+    /// on the real catalogue, so it belongs at the end of an ingestion command and
+    /// never at app launch.
+    pub async fn compact(&self) -> Result<Compacted, DbError> {
+        let size = || std::fs::metadata(&self.path).map(|m| m.len()).unwrap_or(0);
+        // Checkpoint either side, so both sizes are of the whole database rather than
+        // a main file with recent writes still sitting in the WAL.
+        sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)")
+            .execute(&self.pool)
+            .await?;
+        let before = size();
+        sqlx::query("VACUUM").execute(&self.pool).await?;
+        sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)")
+            .execute(&self.pool)
+            .await?;
+        Ok(Compacted {
+            before,
+            after: size(),
+        })
     }
 
     /// Migrate, taking a backup first if the schema is actually going to change.

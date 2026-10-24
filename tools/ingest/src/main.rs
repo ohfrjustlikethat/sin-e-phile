@@ -70,6 +70,10 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
   ingest verify-anime      check the catalogue against
                            fixtures/anime/e5-hand-checked.tsv — exit criterion
                            E5's evidence. Exits non-zero on any mismatch.
+  ingest compact           VACUUM the database and report what it recovered. Also
+                           runs on its own after every command that writes the
+                           catalogue (imdb through search-index), so the database
+                           never keeps their slack (D29, D47). --no-compact skips it.
   ingest status            show every job and its steps
   ingest reset <name>      discard a job's progress so the next run starts clean
 
@@ -110,8 +114,10 @@ async fn main() -> Result<(), JobError> {
             .map_err(|e| JobError::step("startup", e.to_string()))?,
     };
     let db = Db::open_in(&dir).await?;
+    let compact_after =
+        COMPACT_AFTER.contains(&command) && !args.iter().any(|a| a == "--no-compact");
 
-    match command {
+    let outcome = match command {
         "measure" => {
             // Deliberately does not touch the database it was handed — a
             // measurement that mutates state cannot be re-run to check itself.
@@ -187,6 +193,7 @@ async fn main() -> Result<(), JobError> {
             .await
         }
         "vector-index" => vector_index(&db, &dir).await,
+        "compact" => compact(&db).await,
         "verify-embeddings" => verify_embeddings(&dir),
         "verify-anime" => verify_anime(&db).await,
         "status" => status(&db).await,
@@ -206,7 +213,46 @@ async fn main() -> Result<(), JobError> {
             print!("{USAGE}");
             std::process::exit(2);
         }
+    };
+    outcome?;
+    if compact_after {
+        compact(&db).await?;
     }
+    Ok(())
+}
+
+/// The commands that write enough to leave slack worth a VACUUM (D29, D47).
+///
+/// Not `embed` or `vector-index`, which write files beside the database rather than
+/// into it, and not the read-only ones.
+const COMPACT_AFTER: &[&str] = &[
+    "imdb",
+    "credits",
+    "akas",
+    "normalise",
+    "anime",
+    "episodes",
+    "movielens",
+    "repair-variants",
+    "refresh",
+    "wikipedia",
+    "search-index",
+];
+
+/// VACUUM, and say what it bought. About 30 s on the real catalogue.
+async fn compact(db: &Db) -> Result<(), JobError> {
+    let started = std::time::Instant::now();
+    let compacted = db.compact().await?;
+    println!(
+        "  compacted {} -> {} bytes ({:.3} -> {:.3} GB), recovered {} MiB in {:.0}s",
+        compacted.before,
+        compacted.after,
+        compacted.before as f64 / 1e9,
+        compacted.after as f64 / 1e9,
+        compacted.recovered() / 1_048_576,
+        started.elapsed().as_secs_f64()
+    );
+    Ok(())
 }
 
 /// Download and load the IMDb catalogue.
