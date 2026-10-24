@@ -61,9 +61,9 @@ impl DocumentEmbedder for Fake {
             hash ^= *byte as u64;
             hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
         }
-        // splitmix64 per dimension. The first version came out the same for every text
-        // (every vector was all 127s), which is the failure the comment above warns of —
-        // see the same fix in tests/index.rs.
+        // splitmix64 per dimension. The first version gave every text one of two vectors
+        // ([127; 8] or [-127; 8]), so half of all pairs of sentences DID produce the same
+        // vector, which is the failure the comment above warns of. See tests/index.rs.
         let raw: Vec<f32> = (0..self.dimension)
             .map(|i| {
                 let mut z = hash ^ (u64::from(i) + 1).wrapping_mul(0x9e37_79b9_7f4a_7c15);

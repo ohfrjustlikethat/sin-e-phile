@@ -39,8 +39,9 @@ impl DocumentEmbedder for Fake {
         }
         // splitmix64 per dimension, so every dimension depends on the whole hash. The
         // first version multiplied `hash + i` by a 32-bit constant and kept the top bits,
-        // which came out the same for every text: every vector was [127; 8], and the
-        // sampled re-embed in `verify_prefix` could never fail in these tests.
+        // so the dimensions differed only below the precision that survives: every
+        // vector was [127; 8] or [-127; 8]. The sampled re-embed in `verify_prefix` then
+        // caught a changed document only when the change happened to flip that sign.
         let raw: Vec<f32> = (0..self.dimension)
             .map(|i| {
                 let mut z = hash ^ (u64::from(i) + 1).wrapping_mul(0x9e37_79b9_7f4a_7c15);
