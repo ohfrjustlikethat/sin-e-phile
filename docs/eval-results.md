@@ -2027,3 +2027,105 @@ could never build an index again, so that line read `keyword only (no index)` an
 `a_title_promoted_into_the_middle_of_the_core_tier_is_refused` failed, as it must — that
 test promotes one title into the middle of the core tier, which is the shift a length
 check cannot distinguish from a harmless append. Restored; 6 of 6 pass.
+
+## Session 19 — 2026-10-25 — R4 re-measured, the v3 artefact, and its evals
+
+### The database against R4's 4 GB, read as SI (D47, author's option 1)
+
+R4 says "4 GB". Phase 4's "341 MB of headroom" read that as 4,000 MiB; the author chose
+the SI reading (4,000,000,000 bytes), so every figure below is in SI units unless it
+says MiB.
+
+| when | bytes | GB (SI) | against 4 GB | command |
+|---|---|---|---|---|
+| 2026-09-07, Phase 4 E1 | 3,836,723,200 | 3.837 | 163 MB under | `ls -la data/sinephile.db` |
+| 2026-10-25, before compaction | 4,062,978,048 | 4.063 | **63 MB over** | `ls -l data/sinephile.db` |
+| 2026-10-25, after compaction | 3,945,598,976 | **3.946** | **54 MB under** | `./target/release/ingest.exe compact` |
+
+Compaction recovered 111 MiB in 34 s (`compacted 4062978048 -> 3945598976 bytes`), at
+commit `814fc41`. Every ingestion command that writes the catalogue now compacts after
+itself (`df3ca35`) unless it's run with `--no-compact`. The app's own launch-time
+refresh does NOT compact (VACUUM is exclusive and slow), so each launch that adds titles
+eats into the 54 MB until the next ingestion command runs.
+
+### The v3 artefact (D48, D45)
+
+```
+./target/release/ingest.exe embed     (resume; reassembly only)
+  858170 vectors
+  314 MB · 7s
+  sha256 106f3de1644fe5a5d928a65495fea62b2a4412f132c794d5c737b918ae404229
+```
+
+329,537,568 bytes = 256 header + 858,170 × 384 + 32 trailer. Document layout v3
+(plot first, 1,000-char synopsis), artefact format 3 (watermark + id digest). Commit
+`814fc41`.
+
+### The v3 index and search evals — E3 meaning REGRESSED
+
+```
+./target/release/ingest.exe vector-index
+  vectors          119874 of 858170 considered
+  index size       61 MB  (0.2x the artefact's 314 MB)
+  build            22s  (5566 vectors/s)
+```
+
+| metric | v2 (2026-09-22) | **v3 (2026-10-25)** | command |
+|---|---|---|---|
+| recall@10 | 0.9670 | **0.9760** (164/200 perfect, worst 0.70) | `cargo run --release -p eval -- vector --report` |
+| index latency | — | p50 0.96 ms, p95 1.41 ms | same |
+| E2 exact-title top-1 | 43/43 | **43/43** | `cargo run --release -p eval -- search --report` |
+| E1 hybrid p95 | 23.7 ms | **15.2 ms** (p50 6.4, max 69.6) | same |
+| E3 meaning | 0.1188 | **0.0472** — regression | same |
+| E3 filter | 1.0000 | **1.0000** | same |
+| topical nDCG@10 | — | 0.0629 over 6 | same |
+| known-item MRR | — | 0.0000, 0/2 in top 10 | same |
+
+Commit `814fc41`. Per-query meaning nDCG@10: grief 0.1505, hometown/nephew 0.0000,
+Wong Kar-wai/Korean 0.0752, slow SF memory 0.0000, anime loneliness 0.0000, heist
+0.0000, mountain documentaries 0.1518, Italian neorealism 0.0000.
+
+**This is a regression on a recorded metric, so it blocks the merge (CLAUDE.md rule
+13).** v3 was chosen on `eval embed`'s ranking; that ranking and this number disagree,
+and finding out why comes next.
+
+#### v2 against v3, per query, on the same database
+
+The pre-v3 code (`5a4b01c`, built in a scratch worktree) was run against the intact v2
+artefact (`embeddings-…v2-backup.bin`) and today's compacted database. It reproduces
+v2's recorded headline exactly, so the comparison holds: the only variable is the
+artefact.
+
+| query | v2 nDCG@10 | v3 nDCG@10 |
+|---|---|---|
+| films about grief that aren't depressing | 0.4770 | **0.1505** |
+| a man returns to his hometown… nephew… | 0.0000 | 0.0000 |
+| like Wong Kar-wai but Korean | 0.2385 | **0.0752** |
+| slow science fiction about memory | 0.0000 | 0.0000 |
+| anime about loneliness in a big city | 0.0000 | 0.0000 |
+| heist films where the plan goes wrong | 0.0000 | 0.0000 |
+| documentaries about mountain climbing | 0.0000 | **0.1518** |
+| post-war Italian neorealism | 0.2346 | **0.0000** |
+| **meaning** | **0.1188** | **0.0472** |
+| topical (6) | 0.1584 | 0.0629 |
+| filter | 1.0000 | 1.0000 |
+| E2 | 43/43 | 43/43 |
+| E1 p95 | 14.8 ms | 15.2 ms |
+
+`SINEPHILE_DATA_DIR=<scratch> <5a4b01c>/eval search --report`, 2026-10-25.
+
+**What moved.** v2's layout led with the title, and its three wins were partly titles that
+contain the query's own words: *Good Grief* at #1 for "grief", and *Chungking Express*
+at #1 for "Wong Kar-wai". Under v3's plot-first layout *Good Grief* falls to #8 and
+*Chungking Express* to #8. The neorealism query lost *Rome, Open City* (#3 → absent).
+The mountain documentary query gained *Meru* at #6.
+
+**An observation, NOT a correction:** v3's neorealism top 10 holds *Stromboli* and
+*Germany Year Zero*, Rossellini films from the period, and neither is graded. The
+fixture's grades are sparse. Regrading after seeing which layout wins would be
+redefining the criterion to fit the result, so the 0.0472 stands as measured.
+
+**What D39's probe did and did not predict.** It showed plot-first *reorders* the
+six or seven contested items in a probe set, and said explicitly that it did not
+predict nDCG@10 over the catalogue. Over the catalogue, the reordering also let
+858,170 other plots compete, and the graded answers lost.

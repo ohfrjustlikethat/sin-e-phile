@@ -518,3 +518,47 @@ E1's merits rather than E3's.
 
 Leave P14 open, fix D44/D45, spend the re-embed, re-measure — and bring this back with
 numbers rather than with a schema change.
+
+### Back with numbers — 2026-10-25
+
+The default was taken: D44/D45 fixed, the re-embed spent (858,170 vectors, layout v3,
+`814fc41`), everything re-measured. `docs/eval-results.md`, Session 19.
+
+| criterion | target | v2 | v3 | met? |
+|---|---|---|---|---|
+| E1 hybrid p95 | < 80 ms on **Tier 0** | 14.8 ms | 15.2 ms | unmeasurable here (P8 → Phase 21) |
+| E2 exact title | 43/43 | 43/43 | 43/43 | **yes** |
+| E3 meaning nDCG@10 | > 0.75 | 0.1188 | **0.0472** | no, and capped at 0.7468 on two queries |
+| E4 two named queries | defensible, screenshotted | — | — | not yet documented |
+
+**The lever P14 was waiting on came back negative.** The rebuild reordered the probe set
+the way D39 measured, and lowered the metric over the catalogue. No cheap lever on E3 is
+left. What remains is the model, the fusion, or the fixture's grades, and each of those
+is a phase's worth of work, not a session's.
+
+### The decision, restated
+
+Amend Appendix B so a built phase can close with a criterion carried to a named later
+phase, or keep Phase 5 open until E1, E3 and E4 are all met.
+
+### Options, re-costed
+
+1. **Amend (ADR + schema + validator).** Close Phase 5 with E1 carried to Phase 21 and E3
+   carried to a named retrieval-quality phase. *Cost:* unchanged, a permanent escape
+   hatch on Appendix B that nothing but the author can police.
+2. **Keep Phase 5 open.** *Cost:* E1 can't be met without Tier 0 hardware. E3 has no
+   known lever, so "open until met" means open indefinitely, with every later phase
+   stacked on an unmerged branch (R7).
+3. **Amend narrowly** (carry only to a phase that already names the measurement).
+   *Cost:* fits E1 but not E3, so Phase 5 stays open anyway. It buys nothing here.
+
+### Recommendation
+
+**Option 1**, as this entry said it would be if the re-embed landed and E3 stayed far off.
+The rule it bends is Appendix B, never §10.8: every carried criterion keeps its measured
+evidence (0.0472, not "deferred").
+
+### The default if the answer is "your call" (2026-10-25)
+
+Write the ADR and the schema/validator change as a **proposal**, uncommitted to `main`.
+SPEC.md is not amended until you approve (§2.8), so Phase 5 stays open meanwhile.
