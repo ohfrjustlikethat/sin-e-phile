@@ -50,21 +50,21 @@
       },
       {
         "id": "4.7",
-        "text": "Per-profile TMDB key from settings, never shipped (ADR-0027), DPAPI-wrapped at rest; every TMDB-dependent surface degrades to the typographic state. Storage and the degradation contract are done; the settings UI is Phase 14.",
-        "status": "in_progress",
-        "commit": null
+        "text": "Per-profile TMDB key from settings, never shipped (ADR-0027), DPAPI-wrapped at rest; every TMDB-dependent surface degrades to the typographic state. Storage and the degradation contract are done; the settings UI is Phase 14. CLOSED with Phase 4: the Phase 4 part (storage, DPAPI, degradation contract) is done; the settings UI is Phase 14's deliverable.",
+        "status": "complete",
+        "commit": "2358993"
       },
       {
         "id": "4.8",
-        "text": "Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding (42.1% measured on real stills), blurhash placeholders. crates/artwork is done; wiring it to a TMDB image client is Phase 11.",
-        "status": "in_progress",
-        "commit": null
+        "text": "Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding (42.1% measured on real stills), blurhash placeholders. crates/artwork is done; wiring it to a TMDB image client is Phase 11. CLOSED with Phase 4: crates/artwork is done; wiring it to a TMDB image client is Phase 11's deliverable.",
+        "status": "complete",
+        "commit": "5840b99"
       },
       {
         "id": "4.9",
-        "text": "First-run flow: usable during the background build, searching what is ingested so far. CatalogueRepository::readiness is the backend surface (Empty/Building/Interrupted/Ready, each carrying the searchable count); the progress UI itself is Phase 14.",
-        "status": "in_progress",
-        "commit": null
+        "text": "First-run flow: usable during the background build, searching what is ingested so far. CatalogueRepository::readiness is the backend surface (Empty/Building/Interrupted/Ready, each carrying the searchable count); the progress UI itself is Phase 14. CLOSED with Phase 4: the readiness surface is done; the progress UI is Phase 14's deliverable.",
+        "status": "complete",
+        "commit": "624b76f"
       },
       {
         "id": "4.10",
@@ -728,21 +728,21 @@
         },
         {
           "id": "4.7",
-          "text": "Per-profile TMDB key from settings, never shipped (ADR-0027), DPAPI-wrapped at rest; every TMDB-dependent surface degrades to the typographic state. Storage and the degradation contract are done; the settings UI is Phase 14.",
-          "status": "in_progress",
-          "commit": null
+          "text": "Per-profile TMDB key from settings, never shipped (ADR-0027), DPAPI-wrapped at rest; every TMDB-dependent surface degrades to the typographic state. Storage and the degradation contract are done; the settings UI is Phase 14. CLOSED with Phase 4: the Phase 4 part (storage, DPAPI, degradation contract) is done; the settings UI is Phase 14's deliverable.",
+          "status": "complete",
+          "commit": "2358993"
         },
         {
           "id": "4.8",
-          "text": "Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding (42.1% measured on real stills), blurhash placeholders. crates/artwork is done; wiring it to a TMDB image client is Phase 11.",
-          "status": "in_progress",
-          "commit": null
+          "text": "Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding (42.1% measured on real stills), blurhash placeholders. crates/artwork is done; wiring it to a TMDB image client is Phase 11. CLOSED with Phase 4: crates/artwork is done; wiring it to a TMDB image client is Phase 11's deliverable.",
+          "status": "complete",
+          "commit": "5840b99"
         },
         {
           "id": "4.9",
-          "text": "First-run flow: usable during the background build, searching what is ingested so far. CatalogueRepository::readiness is the backend surface (Empty/Building/Interrupted/Ready, each carrying the searchable count); the progress UI itself is Phase 14.",
-          "status": "in_progress",
-          "commit": null
+          "text": "First-run flow: usable during the background build, searching what is ingested so far. CatalogueRepository::readiness is the backend surface (Empty/Building/Interrupted/Ready, each carrying the searchable count); the progress UI itself is Phase 14. CLOSED with Phase 4: the readiness surface is done; the progress UI is Phase 14's deliverable.",
+          "status": "complete",
+          "commit": "624b76f"
         },
         {
           "id": "4.10",
@@ -783,7 +783,9 @@
           "id": "E1",
           "text": "p95 keystroke-to-results < 80 ms over the full catalogue.",
           "met": false,
-          "evidence": "MEASURED, NOT MET. `cargo run -p eval --release -- search --report` -> hybrid p95 22.2 ms warm (p50 7.5, max 78.7), 2026-09-07, over the real catalogue INCLUDING query embedding, BM25, vector search and fusion. Under 80 ms, but SPEC.md 2.3 enforces against TIER 0 and this is a Tier 2 machine; at P8's 3-4x penalty the warm case lands at 67-89 ms, which straddles the budget. Not claimed until measured on Tier 0 hardware or a constrained VM."
+          "evidence": "MEASURED 2026-10-25, carried (ADR-0036): `cargo run --release -p eval -- search --report` -> hybrid p95 15.2 ms (p50 6.4, max 69.6) over the real catalogue including query embedding, BM25, vectors and fusion, at 814fc41, on Tier 2. The search screen's byline lookup adds p95 10.3 ms for 20 ids (docs/eval-results.md). Under 80 ms here; unmeasured on Tier 0.",
+          "carried_to_phase": 21,
+          "carried_reason": "SPEC.md 2.3 enforces the 80 ms budget against Tier 0 hardware, and this is a Tier 2 dev machine; P8 already schedules the Tier 0 measurement for Phase 21."
         },
         {
           "id": "E2",
@@ -795,13 +797,17 @@
           "id": "E3",
           "text": "nDCG@10 > 0.75 on the semantic query set.",
           "met": false,
-          "evidence": "MEASURED, NOT MET. `cargo run -p eval --release -- search --report` 2026-09-13 over fixtures/search/semantic-queries.tsv: FILTER half nDCG@10 = 1.0000 over 2 queries, MEANING half = 0.1188 over 8, against a 0.75 target. The structured half of search is exactly right; the meaning half still matches query words in TITLES even though titles were removed from documents in document::VERSION 2 - Wikipedia leads restate the title and credits in their opening sentence, which CLS pooling weights heavily and which pushes the plot past the 400-character budget. D39's proposed fix was PRICED with `eval embed --compare` and rejected: stripping the boilerplate lead lifts the correct answer 0.4884 -> 0.5539 and lifts the wrong answers by as much, leaving the order unchanged. Part of the 0.1188 is the fixture being narrower than the truth - two of the eight queries are known-item queries and some ungraded results are defensible. See docs/eval-results.md."
+          "evidence": "MEASURED 2026-10-25, carried (ADR-0036): `cargo run --release -p eval -- search --report` at 814fc41 -> meaning nDCG@10 0.0472 over 8 queries (v2 layout: 0.1188, accepted regression, B7), filter 1.0000 over 2. Two queries are capped at 0.7468 because a graded answer is outside the vector index. docs/eval-results.md Session 19; docs/case-study/search.md.",
+          "carried_to_phase": 16,
+          "carried_reason": "Five distinct attempts failed to reach 0.75, the last lowering it; Phase 16's content-based layer works in the same embedding space and is the next place retrieval quality can be changed."
         },
         {
           "id": "E4",
           "text": "\"films about grief that aren't depressing\" and \"like Wong Kar-wai but Korean\" both return defensible results — documented with screenshots in the case study.",
           "met": false,
-          "evidence": "NOT MET, AND NOW DOCUMENTED RATHER THAN ASSERTED. Screenshots of the release build on the real catalogue are in docs/case-study/shots/ and the case study is docs/case-study/search.md (2026-09-14). 'films about grief that aren't depressing' returns thematically coherent results led by Good Grief (2023), a comedy about bereavement - defensible - but the clause 'that aren't depressing' has no effect at all. 'like Wong Kar-wai but Korean' returns his own filmography (Chungking Express, Days of Being Wild, As Tears Go By, In the Mood for Love, found from his NAME with no credit lookup) and, separately, Korean drama: it understood both halves and composed neither. The criterion asks for defensible results for BOTH queries; one is defensible-in-part and the other answers a different question. E3's 0.1188 says the same thing with a number."
+          "evidence": "DOCUMENTED, NOT MET, carried (ADR-0036): docs/case-study/search.md with screenshots docs/case-study/shots/01-grief.png and 02-wong-kar-wai.png of the release build at 21d0b23. The grief page ranks the graded answer #8 and ignores 'aren't depressing'; the Wong Kar-wai page finds his films and Hong Kong cinema, not Korean films like his. nDCG 0.1505 and 0.0752.",
+          "carried_to_phase": 16,
+          "carried_reason": "Neither named query returns a defensible page; the cause is the same retrieval quality as E3, so it moves with E3 to Phase 16's content-based layer."
         },
         {
           "id": "E5",

@@ -16,7 +16,7 @@
 
 > The catalogue. Three constraints carry in: ADR-0013 and ADR-0027 mean the app must be complete and good-looking with NO TMDB key and no key ever ships; ADR-0026 means SQL is runtime-checked, so every new repository method needs a line in crates/persistence/tests/repository_surface.rs; and R4 (ingestion larger or slower than expected) is this phase's named risk — measure before committing to a shape, and scope by a popularity threshold rather than ingesting everything.
 
-### Subtasks — 10/13 complete
+### Subtasks — 13/13 complete
 
 - [x] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts · `4a78d64`
 - [x] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres · `048180a`
@@ -24,9 +24,9 @@
 - [x] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, and seasonal episode numbering into episode_numbering. Absolute numbering is NULL by ADR-0031 - no free source publishes one. · `a170532`
 - [x] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules · `f67d939`
 - [x] **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline · `38d75d7`
-- [~] **4.7** Per-profile TMDB key from settings, never shipped (ADR-0027), DPAPI-wrapped at rest; every TMDB-dependent surface degrades to the typographic state. Storage and the degradation contract are done; the settings UI is Phase 14.
-- [~] **4.8** Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding (42.1% measured on real stills), blurhash placeholders. crates/artwork is done; wiring it to a TMDB image client is Phase 11.
-- [~] **4.9** First-run flow: usable during the background build, searching what is ingested so far. CatalogueRepository::readiness is the backend surface (Empty/Building/Interrupted/Ready, each carrying the searchable count); the progress UI itself is Phase 14.
+- [x] **4.7** Per-profile TMDB key from settings, never shipped (ADR-0027), DPAPI-wrapped at rest; every TMDB-dependent surface degrades to the typographic state. Storage and the degradation contract are done; the settings UI is Phase 14. CLOSED with Phase 4: the Phase 4 part (storage, DPAPI, degradation contract) is done; the settings UI is Phase 14's deliverable. · `2358993`
+- [x] **4.8** Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding (42.1% measured on real stills), blurhash placeholders. crates/artwork is done; wiring it to a TMDB image client is Phase 11. CLOSED with Phase 4: crates/artwork is done; wiring it to a TMDB image client is Phase 11's deliverable. · `5840b99`
+- [x] **4.9** First-run flow: usable during the background build, searching what is ingested so far. CatalogueRepository::readiness is the backend surface (Empty/Building/Interrupted/Ready, each carrying the searchable count); the progress UI itself is Phase 14. CLOSED with Phase 4: the readiness surface is done; the progress UI is Phase 14's deliverable. · `624b76f`
 - [x] **4.10** The embedding artefact producer (ADR-0014). crates/embedding holds the document builder, int8 quantisation and the checksummed format; tools/ingest/src/embed.rs is the resumable producer, model and tokenizer checksum-pinned; format specified in docs/specs/embedding-artefact.md. PRODUCED: 855,703 vectors, 313 MB, sha256 3fce6f06..., verified by `ingest verify-embeddings`. Publishing it is blocker B3. · `4f302d5`
 - [x] **4.11** 50-title anime fixture for E5: fixtures/anime/e5-hand-checked.tsv, 64 rows, checked by `ingest verify-anime` which exits non-zero on any mismatch · `f19ddda`
 - [x] **4.12** Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits · `38d75d7`

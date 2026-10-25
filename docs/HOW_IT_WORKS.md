@@ -108,7 +108,7 @@ own on-screen display never appears.
 
 ## The subsystems
 
-### The catalogue — knowing what films exist `⬜ Phase 4`
+### The catalogue — knowing what films exist `✅ Phase 4`
 
 The app ships knowing about hundreds of thousands of films and shows, and works with
 no API key and no network (ADR-0013). This comes from free bulk datasets — IMDb for
@@ -122,7 +122,7 @@ for a film-focused app, is arguably a better look anyway.
 **The analogy:** a library that owns a complete card catalogue but not the book
 covers. It can still tell you everything about every book.
 
-### Search — finding things by name *and* by meaning `⬜ Phase 5`
+### Search — finding things by name *and* by meaning `✅ Phase 5 (meaning half below target)`
 
 Two searches run at once over the same query.
 
@@ -265,6 +265,16 @@ search simply getting worse and nothing to point at.
 
 **TMDB remains entirely optional.** No key ships, ever; each user supplies their own,
 per profile, and it is encrypted at rest. Everything above was built without one.
+
+### Search ✅ `Phase 5`
+
+Three tiers in a fixed order: an **exact title** bypasses ranking and is always first;
+then **keyword** (BM25) and **meaning** (bge-small embeddings over 119,874 documents
+with real synopses, in an HNSW index) are fused by rank; then **fuzzy** matching, only
+when the rest found almost nothing. Phrases like "from the 1950s" or "directed by" are
+parsed into filters before any of it, because models are bad at numbers. Exact titles
+and filters work very well; searching by meaning works poorly (nDCG 0.047 against
+0.75), and [`docs/case-study/search.md`](case-study/search.md) explains why.
 
 ### The posture guard ✅ `Phase 0`
 

@@ -40,7 +40,11 @@ use crate::job::JobError;
 /// A versioned GitHub Release asset (ADR-0014): not a server this project operates, the
 /// same category as the model download and the IMDb datasets, and nothing that can fail
 /// in a way that degrades a running installation.
-pub const ARTEFACT_RELEASE: &str = "embeddings-v2";
+///
+/// **Bump this with every artefact format or document-layout change.** v3 (format 3,
+/// layout v3) can't be read as v2 and v2 can't be read by this code, so pointing at the
+/// old release would download 330 MB only to refuse it at load.
+pub const ARTEFACT_RELEASE: &str = "embeddings-v3";
 
 /// One optional download.
 #[derive(Debug, Clone)]
@@ -91,7 +95,7 @@ pub fn optional_assets(data_dir: &Path) -> Vec<Asset> {
                 "https://github.com/ohfrjustlikethat/sin-e-phile/releases/download/{ARTEFACT_RELEASE}/embeddings-{MODEL}.bin"
             ),
             path: sinephile_embedding::artefact_path(data_dir),
-            bytes: 328_590_240,
+            bytes: 329_537_568,
             // See the field's note: the artefact verifies itself, header and vectors.
             sha256: None,
         },

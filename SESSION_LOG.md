@@ -1592,3 +1592,33 @@ enact P14 too").
 
 No code changed in this step. The masthead may be built ahead of Phase 18 if the author
 asks.
+
+### Phase 4 and Phase 5 retrospective (closed together, 2026-10-25)
+
+Both phases lived on `phase/05-search` (Phase 4's branch is contained in it) and close
+with one `--no-ff` merge. Phase 4 met all seven criteria. Phase 5 met E2 and E5 and
+carries three criteria under Appendix B (ADR-0036): E1 to Phase 21, and E3/E4 to
+Phase 16, each with its measured number.
+
+**What went well.** The evidence rules held under pressure. The R4 unit mix-up
+(MiB read as GB) and E3's regression were both found by re-measuring, not by
+remembering. Checks that were seen to fail caught real bugs: D45's watermark gap, D52's
+in-place write, and invisible keyboard focus. The exact-title guarantee (43/43) and the
+filter path (1.000) are solid.
+
+**What went badly.**
+- **Phase 5 took about eight sessions, chasing E3.** Each step was locally reasonable,
+  and the sum was too long. The P13 escalation came after the third attempt, as
+  §10.9 asks, but the fourth and fifth still ran.
+- **CI was red for 42 days (B6)** because a failing step printed only a count. The lesson,
+  now encoded in statecheck: a red check nobody can read is the same as no check.
+- **The artefact was replaced locally while the downloader still pointed at the old
+  release.** It was caught only at closing, by reading E7's evidence against the code.
+  It's fixed: the downloader now points at `embeddings-v3`.
+
+**Carry forward.**
+- The v3 artefact must be published as release `embeddings-v3` before the meaning
+  download works for anyone. That is the author's job (ADR-0014).
+- R4's 54 MB margin.
+- The case-study screenshots need retaking while the machine is idle.
+- 35-odd known debts, most owned by later phases.

@@ -4,10 +4,11 @@
 local film library behind one semantic search engine and a discovery-first
 recommender.**
 
-> **Status: Phase 4 of 28 — the shell, the design system, the data layer, and the
-> metadata backbone.** The catalogue is real: 2.7 million titles ingested offline from
-> public datasets, with no API key of any kind.
-> There is no product UI yet. This README describes what is being built and is updated at
+> **Status: Phases 0–5 of 28 closed — the shell, the design system, the data layer,
+> the metadata backbone, and hybrid search.** The catalogue is real: 2.7 million titles
+> ingested offline from public datasets, with no API key of any kind, and searchable by
+> title, person, filter and meaning. Nothing plays yet; that's Phases 6–8.
+> This README describes what is being built and is updated at
 > the end of every phase that changes what the app can do. It is never allowed to
 > over-claim; the [feature list](#what-actually-works-today) below says exactly what
 > exists.
@@ -122,7 +123,7 @@ phase's metric, which is the kind of rot that otherwise goes unnoticed.
 |---|---|---|
 | Filename identification | top-1 accuracy · false-confident rate | > 95% · **< 1%** |
 | Subtitle alignment | within 150 ms | > 90% |
-| Search relevance | nDCG@10 · exact-title top-1 | > 0.75 · **100%** |
+| Search relevance | nDCG@10 · exact-title top-1 | > 0.75 · **100%** (measured: meaning **0.047, not met**; filters 1.000; exact title **43/43**) |
 | Recommender quality | Recall@20 vs popularity baseline · catalogue coverage | **+40% relative** · > 15% |
 
 The false-confident rate matters more than the accuracy number. Being wrong while
@@ -217,8 +218,8 @@ off means the pause overlay shows the full cast list, beautifully.
 
 ## What actually works today
 
-**Phases 0–2 — the shell and the design system. There is no product UI yet.**
-Honestly:
+**Phases 0–5 — the shell, the design system, the catalogue, and search.** Nothing
+plays yet. Honestly:
 
 - ✅ Posture guard, secret scanner, and prerequisite doctor — all three verified by
   deliberately planted failures
@@ -240,6 +241,18 @@ Honestly:
   Indexed lookup over 500,000 rows measured at 0.179 ms p99 against a 100 ms budget —
   and the benchmark caught an index that was silently full-scanning at 26.7 ms
   while still passing the criterion
+- ✅ A real catalogue, built offline with no key: 2,702,737 titles, 10 million credits,
+  episodes for 4,529 series, and 61,912 films matched to MovieLens ratings. Ingestion
+  survives being killed mid-run and resumes without repeating a row. The database is
+  3.946 GB, 54 MB under its 4 GB budget after compaction.
+- ✅ Hybrid search: an exact title is always first (**43/43** on a deliberately awkward
+  fixture), keyword and meaning are fused by reciprocal rank, and "films directed by
+  Alfred Hitchcock from the 1950s" is parsed into filters (**nDCG 1.000**). p95 is
+  15.2 ms on the dev machine, including embedding the query locally.
+- ❌ **Searching by meaning is not good enough.** nDCG@10 is **0.047** against a 0.75
+  target, after five attempts; the last one, a full re-embed, made it worse. The
+  [case study](docs/case-study/search.md) shows the failures with screenshots and
+  explains them. This criterion is carried to Phase 16, not hidden.
 - ⬜ Everything else described above this section
 
 ---
