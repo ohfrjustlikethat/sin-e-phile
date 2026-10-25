@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **1.9.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **2.0.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -269,6 +269,11 @@ typographic treatment rather than breaking.
 
 ## Hard constraints
 
+- **Design is audited, not admired** (§9.0). Every screen must pass "would this pass as a
+  MUBI or Criterion screen?". Navigation is the **top masthead** with a labelled Search
+  button (ADR-0037); never reintroduce a sidebar. A default install has no artwork, so
+  design the artwork-free state first. Phase 18 ends with a full overhaul and the
+  author's sign-off on a screenshot set.
 - **Windows only.** Use Windows APIs directly where they give a better result.
 - **Portable by default.** All data in `./data/` next to the executable. Installed
   mode using `%APPDATA%` is an opt-in, never the default.
@@ -395,8 +400,10 @@ cargo run -p eval -- all   # evaluation harnesses (from the phase they exist)
 
 ## Definition of done for a phase
 
-Every exit criterion met **with evidence** (§10.8) recorded in `PROJECT_STATE.json` ·
-full test suite and all eval harnesses pass with no regression against the previous
+Every exit criterion met **with evidence** (§10.8) recorded in `PROJECT_STATE.json`,
+**or carried** to a named later phase with its measured state and a reason (Appendix B,
+ADR-0036; the receiving phase must meet it or carry it again, and carrying is never a
+way to skip work that could be done now) · full test suite and all eval harnesses pass with no regression against the previous
 phase · lints clean · posture guard and secret scan pass · learning note written with
 its five questions · `HOW_IT_WORKS.md` and `README.md` updated · retrospective folded
 into the `SESSION_LOG.md` entry · the phase record written back into the `phases`

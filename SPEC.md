@@ -105,7 +105,8 @@ If Claude Code finds itself thinking "the spec says X but Y is obviously better 
 
 ### 3.1 Navigation
 
-Five top-level surfaces, permanently in the left rail:
+Five top-level surfaces, permanently present as tabs in the **masthead**, the single bar
+across the top of the window that is both title bar and navigation (§9.4, ADR-0037):
 
 1. **Home** — the taste engine's canvas. Continue Watching first, then adaptive rails.
 2. **Films** — browsable film catalogue, with Continue Watching scoped to films.
@@ -113,7 +114,10 @@ Five top-level surfaces, permanently in the left rail:
 4. **Watchlist** — saved items, with sub-organisation (lists, priority, "available now" vs "hard to find").
 5. **Live Channels** — added in Phase 24; the tab exists from Phase 18 with an honest empty state.
 
-A universal search field is always reachable (`Ctrl+K` opens a command palette that searches media, actions, and settings).
+**Search is always visible and always one action away**: a labelled **Search** button in
+the masthead, `/` or `Ctrl+F` from anywhere, and `Ctrl+K` for a command palette that
+searches media, actions, and settings. The masthead's right side also holds Downloads
+(with live progress), Settings, and the profile avatar once profiles exist.
 
 ### 3.2 The core loop
 
@@ -505,7 +509,15 @@ grotesque; Circular), so the equivalents here must be **free and self-hostable**
 - Rails: 24px gutters, cards 200×300 (film) / 320×180 (episode, landscape) as the
   *base* sizes, with featured items larger.
 - Content max-width 1680px, centred, with rails bleeding to the viewport edge.
-- Left nav rail: 72px collapsed (icons), 240px expanded, remembers state.
+- **The masthead** (ADR-0037), replacing the left nav rail: one 56px bar, `--void`, 1px
+  `--line-subtle` rule beneath, solid always (no transparency, no blur). It is the title
+  bar too; its empty space is the drag region. Left: the wordmark. Then the five
+  destinations as **words, not icons**, in Inter 13px `--ink-muted`; the active one is
+  `--ink` with a 2px `--oxblood-bright` underline on the bar's rule. Right: a labelled
+  **Search** button with its `/` hint, Downloads, Settings, profile, window controls. It
+  must fit at the 1024×640 minimum window with nothing collapsed.
+- **The 96px index column** (ADR-0024) runs down the left of every content surface. With
+  no sidebar, it is the page's left edge: spine numbers and a hairline rule.
 - **Generous vertical rhythm.** Breathing room is the MUBI signal and the easiest
   thing to lose to density. When in doubt, more space.
 - Every interactive element has a visible `--oxblood-bright` focus ring. Full keyboard
@@ -1172,7 +1184,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 **Goal.** Downloading is first-class, and the app tells you honestly which is the better choice.
 
-**Deliverables.** A download manager: queue with priorities, pause/resume/cancel, per-download and global bandwidth limits, scheduling (start after midnight), completion notifications, and automatic filing into the local library so a completed download is indistinguishable from a file you already had. **A Downloads tab** — its own surface in the sidebar, showing the queue, per-item progress, speed, seeds/peers, ETA and the reason each item was queued, with the same design language as every other screen. The manager without a surface was an inconsistency in this document: §7's feature list omitted it entirely. **A pluggable download backend** (ADR-0029): librqbit by default, and a user's own **qBittorrent over its Web API** when one is configured — detected, never bundled, never required, and falling back to librqbit if it is not running. The queue is backend-agnostic, so an item files into the library identically whichever moved the bytes. **qBittorrent is a transport only**: its search plugins, RSS feeds and tracker lists are never read, which would be a §2.1 violation arriving by the back door. **The advisor**, combining all four signals the author asked for: (1) measured swarm health versus the bitrate the file requires, producing a stall-probability estimate; (2) free disk space and existing local availability; (3) learned network conditions by time of day, suggesting overnight downloads for large files; (4) taste-model input — something predicted to be a favourite and a likely rewatch is worth the disk, something being sampled is not. Presented as a single clear recommendation with a one-line reason, not a wall of statistics, with the other option always one click away. Storage management: a library size budget, a "cleanup" view showing watched downloads by size and age, and per-item keep/delete decisions.
+**Deliverables.** A download manager: queue with priorities, pause/resume/cancel, per-download and global bandwidth limits, scheduling (start after midnight), completion notifications, and automatic filing into the local library so a completed download is indistinguishable from a file you already had. **A Downloads page** — its own surface, reached from the masthead's Downloads button, which shows live progress and the count of active items (ADR-0037), showing the queue, per-item progress, speed, seeds/peers, ETA and the reason each item was queued, with the same design language as every other screen. The manager without a surface was an inconsistency in this document: §7's feature list omitted it entirely. **A pluggable download backend** (ADR-0029): librqbit by default, and a user's own **qBittorrent over its Web API** when one is configured — detected, never bundled, never required, and falling back to librqbit if it is not running. The queue is backend-agnostic, so an item files into the library identically whichever moved the bytes. **qBittorrent is a transport only**: its search plugins, RSS feeds and tracker lists are never read, which would be a §2.1 violation arriving by the back door. **The advisor**, combining all four signals the author asked for: (1) measured swarm health versus the bitrate the file requires, producing a stall-probability estimate; (2) free disk space and existing local availability; (3) learned network conditions by time of day, suggesting overnight downloads for large files; (4) taste-model input — something predicted to be a favourite and a likely rewatch is worth the disk, something being sampled is not. Presented as a single clear recommendation with a one-line reason, not a wall of statistics, with the other option always one click away. Storage management: a library size budget, a "cleanup" view showing watched downloads by size and age, and per-item keep/delete decisions.
 
 **Exit criteria.**
 - [ ] The advisor's recommendation is correct (matches what actually happens) in at least 8 of 10 manual trials across varied swarm conditions.
@@ -1264,20 +1276,33 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 ---
 
 ### Phase 18 — Browsing Surfaces
-**Depends on:** 17. **Sessions:** 2–3.
+**Depends on:** 17. **Sessions:** 4–5.
 
-**Goal.** Home, Films, and TV Shows become the beautiful, navigable front of the whole system.
+**Goal.** Home, Films, and TV Shows become the beautiful, navigable front of the whole system, and the whole app is brought to one design standard before the phase closes.
 
 **Deliverables.** **Home**: Continue Watching first (with progress, next episode, and a remove option), then adaptive rails generated by the discovery engine, ordered by predicted engagement, with an optional hero for a single strong recommendation. **Films** and **TV Shows**: Continue Watching scoped to that kind, then browsable structure — by genre, decade, country, language, director, movement, collection, awards, and curated lists — with real filtering and sorting. **Every rail has a "see all"** that opens a proper browsable grid with filters, honouring the anti-pattern rule that nothing is more than three interactions from Home. Detail pages: hero artwork, synopsis, cast and crew with links, ratings, availability badges (local / streamable / downloadable, with quality and language), episode lists with progress for series, related and "more like this", and a prominent play button with the language and quality selectors from Phase 9. Hover previews: muted, 400 ms dwell, still-frame-then-motion, disableable. A Live Channels tab with an honest, well-designed empty state pointing to Phase 24. Everything virtualised, everything keyboard-navigable, everything at 60 fps.
+
+**The final design overhaul** (ADR-0037). The phase ends by bringing **every** surface to one standard: Home, Films, TV Shows, Watchlist, Live, Search, Settings, Downloads, the detail page, and every empty, loading and error state. In order:
+1. **The masthead** (§9.4), if it has not already been built ahead of the phase: tabs on top, a labelled Search button, the left rail and its collapse state removed.
+2. **Mockups before code** (ADR-0023's rule): static HTML with real catalogue data, two interpretations of the masthead, Home, Films and a detail page, each shown **with no artwork first** and with artwork second. The author chooses before any surface is built.
+3. **The artwork-free state is the primary state.** A default install has no TMDB key and so no artwork (ADR-0013). The typographic card must hold a whole page, with sizes varied by editorial weight, and every page is judged in that state first.
+4. **No placeholder survives.** The "PHASE NN" pill screens are removed; an honest empty state is still a designed one.
+5. **A design lint in CI** that fails on what §9.0 bans and code can detect: shadow utilities, radii other than 0 and 2px, `backdrop-blur`, decorative gradient utilities, Tailwind's default palette names, and colour classes that resolve to no token.
+6. **Motion as a finish**: 180ms page changes, an active-tab underline that moves rather than jumps, and an opacity-only fallback under `prefers-reduced-motion`.
+7. **A screenshot review set**: `tools/shots` captures every surface at 1024×640 and 1920×1080, with and without artwork, and the author reviews it against §9.0's test.
 
 **Exit criteria.**
 - [ ] Home renders in < 800 ms on Tier 0 with 20 rails.
 - [ ] Anything in the catalogue is reachable in ≤ 3 interactions from Home.
 - [ ] Every rail's "see all" goes somewhere genuinely useful.
-- [ ] Full keyboard navigation across all browsing surfaces.
-- [ ] Screenshots of Home, Films, and a detail page are good enough for the README.
+- [ ] Full keyboard navigation across all browsing surfaces, including the masthead's tab order: wordmark, destinations, Search, Downloads, Settings, then content.
+- [ ] The masthead fits at the 1024×640 minimum window with every destination, Search, Downloads and Settings visible, measured by `tools/uiaudit`.
+- [ ] Search is reachable from every surface by the visible Search button and by `/`.
+- [ ] No destination or state shows a placeholder screen.
+- [ ] The design lint passes in CI, and each of its rules has been seen to fail.
+- [ ] The author signs off the screenshot review set (every surface, both sizes, with and without artwork) against §9.0's test: `manual: <what they reviewed and said>`. This set supplies the README's screenshots.
 
-**Learning note.** Virtualised rendering; how rail ordering is itself a ranking problem; why hover previews are a performance trap; information architecture.
+**Learning note.** Virtualised rendering; how rail ordering is itself a ranking problem; why hover previews are a performance trap; information architecture; why a design lint can catch the banned list but never the §9.0 test.
 
 ---
 
@@ -1497,9 +1522,11 @@ Phases 9–13 can be reordered if a session's energy suits one better. Phases 22
 
 ### B. What "done" means
 
-A phase is complete when: every exit criterion is met with evidence recorded in `PROJECT_STATE.json`; all tests and lints pass; the phase retrospective is written; the learning note is written and the author has confirmed they understand it; `HOW_IT_WORKS.md` and the README reflect the new capability; and the branch is merged and tagged.
+A phase is complete when: every exit criterion is met with evidence recorded in `PROJECT_STATE.json`, **or carried to a named later phase** (below); all tests and lints pass; the phase retrospective is written; the learning note is written and the author has confirmed they understand it; `HOW_IT_WORKS.md` and the README reflect the new capability; and the branch is merged and tagged.
 
 **The author confirming they understand the learning note is a hard gate.** If they don't, the phase is not done — rewrite the note or simplify the code.
+
+**Carrying a criterion** (ADR-0036). A built phase may close with a criterion unmet only if that criterion records `carried_to_phase` (a later phase that is neither complete nor skipped), `carried_reason` (why it can't be met here, at least 40 characters) and its **measured** state as `evidence`. "Deferred" is not evidence; "nDCG@10 0.0472, `eval search --report`, 21d0b23" is. §10.8 is unchanged: every criterion, met or carried, carries an artefact. The receiving phase must meet it or carry it again with a new reason, and a criterion carried twice is a warning the author should see. The schema and `tools/state/validate_state.py` enforce the shape; only the author can judge whether a reason is honest.
 
 ### C. Standing rules for every session
 
@@ -1559,6 +1586,19 @@ Face recognition, live TV, manga and comics, casting and watch-together. Fully i
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 2.0.0 — 2026-10-25 (the masthead, the overhaul, and carried criteria)
+
+Major, because A25 reverses a stated decision: §3.1 said the destinations were "permanently in the left rail".
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A25 | §3.1, §9.4 | **Navigation moves to a top masthead**, at the author's request: one 56px bar that is both title bar and navigation, the five destinations as words, and a **labelled Search button**. Search had been reachable only by keyboard shortcuts that appear nowhere on screen. The left rail and its collapse state are removed. Take B's type, spine numbers, 96px index column and 74vh hero all stand. | [0037](docs/adr/0037-masthead-navigation-and-final-design-overhaul.md) |
+| A26 | Phase 13 | The Downloads surface is reached from the masthead's Downloads button, which shows live progress, rather than living "in the sidebar". | [0037](docs/adr/0037-masthead-navigation-and-final-design-overhaul.md) |
+| A27 | Phase 18 | **A final design overhaul** is added to Phase 18, which grows from 2–3 to 4–5 sessions. It has a process: mockups before code, the artwork-free state designed as primary, no placeholder surviving, a design lint in CI, motion, and a screenshot review set the author signs off. There are four new exit criteria, and the README-screenshot criterion becomes that sign-off. The author, 2026-10-25: "the design still isn't amazing". | [0037](docs/adr/0037-masthead-navigation-and-final-design-overhaul.md) |
+| A28 | Appendix B | **A built phase may close with a criterion carried to a named later phase**, keeping its measured evidence, with a destination and a reason. Raised as P14, when Phase 5's E1 (unmeasurable without Tier 0 hardware) and E3/E4 (five attempts, the last of which lowered the score) would otherwise hold the phase open indefinitely. Approved by the author. | [0036](docs/adr/0036-carry-an-unmet-criterion-to-a-named-phase.md) |
+
+---
 
 ### spec_version 1.9.0 — 2026-09-04 (how the files are actually sorted)
 

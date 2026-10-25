@@ -450,6 +450,8 @@ E3 and E4 and nothing else.
 
 ## P14 — A built phase cannot close with an unmet exit criterion, and Phase 5 has three
 
+> **RESOLVED 2026-10-25.** The author approved option 1 ("yes, enact P14"). ADR-0036 is Accepted, SPEC.md Appendix B is amended (spec_version 2.0.0, A28), and the schema and validator enforce the carried-criterion shape. Phase 5 can now close with E1 carried to Phase 21 and E3/E4 carried with their measured evidence.
+
 **Raised:** 2026-09-22 (Phase 5) · **Blocks:** closing Phases 4 and 5 · **Decide by:** Phase 6
 
 ### The decision

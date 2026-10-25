@@ -1569,3 +1569,26 @@ strings for the third time this session. The tests still passed, so only reading
 file caught it. Use the Edit tool for anything with a backslash. And a harness that
 drives real input is a harness that can act on the wrong target. It needs a precondition
 check, just as a destructive command does.
+
+### Session 19, continued (2026-10-25) — spec_version 2.0.0
+
+**Author:** "update spec, and anything else, the design still isn't amazing, i want the
+home, film, tv show etc tabs to be on top, i want a search button too… update phase 18
+tasks to include a final overhaul of the design." P14 was confirmed separately ("yes,
+enact P14 too").
+
+- **A28 / ADR-0036 Accepted:** Appendix B now allows carrying a criterion to a named
+  later phase. The proposal branch is merged (`96231b0`).
+- **A25 / ADR-0037:** navigation moves to a top masthead with a labelled Search button,
+  and the left rail goes. The ADR opens with a five-point diagnosis of why the UI falls
+  short: a dashboard silhouette, invisible search, placeholder pages, no designed
+  artwork-free state, and no enforcement of the banned list.
+- **A26:** Downloads is reached from the masthead.
+- **A27:** Phase 18 gains the final design overhaul and grows to 4–5 sessions. It
+  starts with mockups before code and ends with an author-signed screenshot review set.
+  It has four new exit criteria; `build_state --write` regenerated the table (159 → 163).
+- CLAUDE.md is resynced to 2.0.0, with a design line under Hard constraints. D53 is
+  rescoped into Phase 18, and P14 is removed from `decisions_pending`.
+
+No code changed in this step. The masthead may be built ahead of Phase 18 if the author
+asks.

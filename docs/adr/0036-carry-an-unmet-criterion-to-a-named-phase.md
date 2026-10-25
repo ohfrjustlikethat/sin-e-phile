@@ -1,6 +1,6 @@
 # 0036 — A built phase may carry an unmet criterion to a named later phase
 
-- **Status:** Proposed. **Not in force until the author approves** (SPEC.md §2.8).
+- **Status:** Accepted 2026-10-25 by the author ("yes, enact P14"). In force from spec_version 2.0.0.
 - **Date:** 2026-10-25
 - **Phase:** 5
 - **Resolves:** P14 (`docs/DECISIONS_PENDING.md`)
