@@ -1,0 +1,28 @@
+# gitleaks configuration — ADR-0035.
+#
+# The default rules, unchanged, plus one allowlist of values confirmed NOT to be
+# secrets. Every entry needs an ADR, exactly as tools/guard/allowlist.txt does
+# (ADR-0010). Never add a value that was a real credential: rotate it first
+# (CLAUDE.md rule 14), then clean history.
+#
+# Entries match the whole flagged value (anchored ^...$) for one rule only, so a
+# real key can never be hidden by them. Commit-pinned fingerprints were the first
+# choice, but they need full commit SHAs, which the posture guard correctly reads
+# as infohash-shaped (SPEC.md §2.1).
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Confirmed false positives (ADR-0035)"
+targetRules = ["generic-api-key"]
+regexTarget = "secret"
+regexes = [
+  # A doc comment where the word "tokens" is followed by a comma: the rule reads
+  # the comma as an assignment and the next step's name as a key.
+  # crates/embedder/src/lib.rs, tools/ingest/src/embed.rs (history).
+  '''^L2-normalise\.?$''',
+  # The DPAPI round-trip test vector in crates/persistence/src/secrets.rs
+  # (history; the tree now uses an obviously fake value).
+  '''^abcdef0123456789abcdef0123456789$''',
+]

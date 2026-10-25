@@ -1,0 +1,84 @@
+# Exit criterion E2 — exact-title top-1 must be 100%.
+#
+# "Typing a film's name and not getting that film first" is the failure a search engine
+# is not allowed to have. E2 sets the bar at 100%, not "high", which is why the
+# implementation short-circuits ranking entirely for an exact match rather than trusting
+# BM25 to put it first.
+#
+# EVERY EXPECTED ID IS WRITTEN FROM INDEPENDENT KNOWLEDGE of what the film is, not by
+# running the search and recording its answer. A fixture generated from the code it
+# tests cannot fail. The E5 anime fixture was wrong four times on its first run and the
+# matcher was wrong none — so a disagreement here is worth investigating in both
+# directions before assuming the code is at fault.
+#
+# The queries are deliberately awkward. A corpus of clean titles would pass on the day
+# it was written and catch nothing afterwards.
+#
+# HONESTLY: the first run scored 38/44, and FOUR of the six failures were this file
+# being wrong rather than the code. Where several works share an exact title, search
+# returns the most popular one — and I had asserted the version I think of as canonical:
+#
+#   and then there were none   code: 2015 (49,811 votes)   I said: 1945 (18,802)
+#   monster                    code: 2022 (226,103)        I said: 2004 anime (74,880)
+#   hunter x hunter            code: 2011 (204,023)        I said: 1999 (12,528)
+#   fullmetal alchemist        code: Brotherhood (257,061) I said: 2003 (87,114)
+#
+# The code is right. For a ranking, the most popular work bearing the exact title is
+# what someone typing it most likely means, and E2's intent is "you get a film with that
+# title", not "you get the one I would have picked". Corrected below, with the reasoning
+# kept so the next person does not quietly re-assert my preferences.
+#
+# A fifth failure — "Am*lie" — was a query I invented to test an FTS5 wildcard. Nobody
+# types an asterisk expecting Amélie, and a fixture entry that tests nothing real is
+# worse than no entry. Removed.
+#
+# The sixth was a genuine bug: `normalise` folded punctuation but not diacritics, while
+# the FTS5 index folded both. The two halves of the same search disagreed about what a
+# title is, so "Nausicaa" missed "Nausicaä". Both now fold via NFD.
+#
+# Run:  cargo run -p eval --release -- search --report
+#
+query	expect_imdb	why_this_one
+Seven Samurai	tt0047478	baseline
+Solaris	tt0069293	a documentary about it also carries the word
+Stalker	tt0079944	single common word, many namesakes
+Akira	tt0094625	single word, also a given name
+Persona	tt0060827	common noun
+Alien	tt0078748	common noun with many sequels
+Heat	tt0113277	common noun, extremely short
+M	tt0022100	a ONE-LETTER title
+Up	tt1049413	two letters
+Mission: Impossible	tt0117060	a colon, which is FTS5 syntax
+Face/Off	tt0119094	a slash
+And Then There Were None	tt3581932	AND and NONE are FTS5 operators; 2015 outranks 1945 on votes
+Amelie	tt0211915	the accent dropped, which is how people type it
+Amélie	tt0211915	the accent present
+Nausicaa of the Valley of the Wind	tt0087544	diacritic dropped from Nausicaä
+WALL-E	tt0910970	a hyphen where the title has an interpunct
+Se7en	tt0114369	a digit substituted for a letter
+8 1/2	tt0056801	a fraction written as ASCII
+Fullmetal Alchemist: Brotherhood	tt1355642	the harder half of the hardest anime pair
+Fullmetal Alchemist	tt1355642	Brotherhood carries this as an alternative title and outranks 2003
+Sen to Chihiro no Kamikakushi	tt0245429	the romaji title of Spirited Away
+Spirited Away	tt0245429	and its English one, same film
+Kimi no Na wa.	tt5311514	a trailing full stop
+Your Name.	tt5311514	the English title, also with a full stop
+Shichinin no samurai	tt0047478	romaji for Seven Samurai
+Rashomon	tt0042876	commonly spelled without the macron
+Ikiru	tt0044741	short romaji title
+The Good, the Bad and the Ugly	tt0060196	commas, and a leading article
+Dr. Strangelove	tt0057012	an abbreviation with a full stop
+2001: A Space Odyssey	tt0062622	leading digits and a colon
+12 Angry Men	tt0050083	leading digits
+Cowboy Bebop	tt0213338	a series rather than a film
+Attack on Titan	tt2560140	a series with four AniList seasons
+Death Note	tt0877057	six catalogue entries share this normalised title
+Monster	tt13207736	one of the commonest words; the 2022 film outranks the 2004 anime
+Berserk	tt0318871	the 1997 series, not the 2016 one
+Hunter x Hunter	tt2098220	the 2011 remake outranks the 1999 series on votes
+Neon Genesis Evangelion	tt0112159	English title entirely unlike the romaji
+Grave of the Fireflies	tt0095327	Ghibli
+Princess Mononoke	tt0119698	Ghibli
+My Neighbor Totoro	tt0096283	American spelling of Neighbour
+Perfect Blue	tt0156887	two common words
+Paprika	tt0851578	a single common noun

@@ -7,7 +7,8 @@
 # all (ADR-0022).
 [workspace]
 resolver = "2"
-members = ["src-tauri", "crates/tiers", "crates/persistence"]
+members = ["src-tauri", "crates/tiers", "crates/artwork", "crates/embedding", "crates/embedder",
+    "crates/persistence", "crates/catalogue", "crates/vector-index", "crates/search-engine", "crates/metadata-api", "tools/ingest", "tools/eval"]
 
 [workspace.package]
 edition = "2021"

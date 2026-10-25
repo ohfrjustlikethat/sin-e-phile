@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **1.6.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **2.0.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -181,6 +181,9 @@ then build.
 3. Plan before implementing. Wait for approval.
 4. Small commits, conventional messages, always-buildable `main`.
 5. **No content source URLs, indexer names, scrapers, or catalogues. Ever. Anywhere**
+   — and when the qBittorrent backend lands, **it is a transport only**: its search
+   plugins, RSS feeds and tracker lists are never read, which would be this same
+   violation arriving by the back door (ADR-0029).
    — not in code, config, tests, docs, or commit history. See `SPEC.md` §2.1. This is
    not negotiable and there is no convenient exception. `tools/guard` enforces this in
    CI and pre-commit, scanning history as well as the working tree. **Never suppress
@@ -223,7 +226,7 @@ Do not revisit without an ADR explaining what changed.
 | Backend | Rust (stable) |
 | Frontend | React 18+ / TypeScript strict / Vite / Tailwind |
 | State | Zustand (client) + TanStack Query (server) |
-| Torrent | librqbit, in-process |
+| Torrent | librqbit in-process — required, and the **only streaming path**. A user's own qBittorrent optionally as a bulk-download backend, **never bundled** (ADR-0029) |
 | Player | libmpv, embedded, custom UI over it |
 | Database | SQLite via `sqlx`, WAL, portable `./data/` |
 | Text search | SQLite FTS5 (BM25) |
@@ -237,6 +240,25 @@ Do not revisit without an ADR explaining what changed.
 critical path, no server component of any kind, no Docker, no cross-platform
 abstractions.
 
+**IMDb's dataset files sort as TEXT, not as numbers** (ADR-0032): `"tt10001008" <
+"tt1000101"`, and the last row of `title.basics` is `tt9916880`, which is not the
+largest id. Never assume a dataset's ordering — check it, in four lines, before
+building on it.
+
+**The catalogue refreshes in layers** (ADR-0030, `docs/specs/catalogue-freshness.md`).
+The IMDb datasets are a snapshot, so: incremental refresh past the highest id already
+stored, AniList airing schedules (no key), **search-triggered backfill** when a miss
+finds a source anyway, and full re-ingest. Backfill is the one that stops an
+out-of-date catalogue being a dead end.
+
+**No free source publishes an absolute episode number** (ADR-0031). AniList publishes
+per-entry numbering and an entry is one cour, so its numbers restart each season where
+IMDb's do. `absolute_number` is NULL by design, and **must never be derived by
+cumulating episode counts across seasons** — that arithmetic is wrong for exactly the
+long-running series the feature exists for, and a confidently wrong number is worse
+than a NULL. AniList also paginates only to 5,000 entries, so its catalogue is swept
+per `seasonYear`.
+
 **TMDB is optional, and no key ever ships** (ADR-0013, ADR-0027). The app is fully
 functional on the offline IMDb + MovieLens catalogue with no key. Each user supplies
 their **own** key, per profile, in settings, under their own acceptance of TMDB's
@@ -247,6 +269,11 @@ typographic treatment rather than breaking.
 
 ## Hard constraints
 
+- **Design is audited, not admired** (§9.0). Every screen must pass "would this pass as a
+  MUBI or Criterion screen?". Navigation is the **top masthead** with a labelled Search
+  button (ADR-0037); never reintroduce a sidebar. A default install has no artwork, so
+  design the artwork-free state first. Phase 18 ends with a full overhaul and the
+  author's sign-off on a screenshot set.
 - **Windows only.** Use Windows APIs directly where they give a better result.
 - **Portable by default.** All data in `./data/` next to the executable. Installed
   mode using `%APPDATA%` is an opt-in, never the default.
@@ -320,13 +347,14 @@ src-tauri/src/           Rust application — thin
   persistence/           re-exports of crates/persistence — nothing else
 src/                     React frontend
   design-system/         tokens and primitives
-  features/              home, films, tv, watchlist, live, player, search, settings
+  features/              home, films, tv, watchlist, live, player, search,
+                         downloads, settings
 crates/                  extracted, independently testable crates
   tiers/  persistence/  filename-parser/  subtitle-align/  source-protocol/
 tools/guard/             posture guard + secret scanner
 tools/doctor/            prerequisite checks
 tools/state/             state build + schema validation
-tools/statecheck/        five checks that make being lost impossible
+tools/statecheck/        the checks that make being lost impossible
 tools/phasedoc/          generates and maintains docs/phases/
 tools/contrast/          WCAG AA token audit
 tools/uiaudit/           headless-Chrome UI audit (fps, focus, keyboard, motion)
@@ -372,8 +400,10 @@ cargo run -p eval -- all   # evaluation harnesses (from the phase they exist)
 
 ## Definition of done for a phase
 
-Every exit criterion met **with evidence** (§10.8) recorded in `PROJECT_STATE.json` ·
-full test suite and all eval harnesses pass with no regression against the previous
+Every exit criterion met **with evidence** (§10.8) recorded in `PROJECT_STATE.json`,
+**or carried** to a named later phase with its measured state and a reason (Appendix B,
+ADR-0036; the receiving phase must meet it or carry it again, and carrying is never a
+way to skip work that could be done now) · full test suite and all eval harnesses pass with no regression against the previous
 phase · lints clean · posture guard and secret scan pass · learning note written with
 its five questions · `HOW_IT_WORKS.md` and `README.md` updated · retrospective folded
 into the `SESSION_LOG.md` entry · the phase record written back into the `phases`

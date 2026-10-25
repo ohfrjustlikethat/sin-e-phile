@@ -105,7 +105,8 @@ If Claude Code finds itself thinking "the spec says X but Y is obviously better 
 
 ### 3.1 Navigation
 
-Five top-level surfaces, permanently in the left rail:
+Five top-level surfaces, permanently present as tabs in the **masthead**, the single bar
+across the top of the window that is both title bar and navigation (§9.4, ADR-0037):
 
 1. **Home** — the taste engine's canvas. Continue Watching first, then adaptive rails.
 2. **Films** — browsable film catalogue, with Continue Watching scoped to films.
@@ -113,7 +114,10 @@ Five top-level surfaces, permanently in the left rail:
 4. **Watchlist** — saved items, with sub-organisation (lists, priority, "available now" vs "hard to find").
 5. **Live Channels** — added in Phase 24; the tab exists from Phase 18 with an honest empty state.
 
-A universal search field is always reachable (`Ctrl+K` opens a command palette that searches media, actions, and settings).
+**Search is always visible and always one action away**: a labelled **Search** button in
+the masthead, `/` or `Ctrl+F` from anywhere, and `Ctrl+K` for a command palette that
+searches media, actions, and settings. The masthead's right side also holds Downloads
+(with live progress), Settings, and the profile avatar once profiles exist.
 
 ### 3.2 The core loop
 
@@ -160,7 +164,7 @@ Do not revisit these without writing an ADR that explains what changed. They wer
 | Build (FE) | **Vite** | Fast HMR, minimal config. |
 | Styling | **Tailwind CSS + CSS custom properties for design tokens** | Tokens in CSS variables so theming and the design system stay honest; Tailwind for velocity. |
 | State (FE) | **Zustand** for client state, **TanStack Query** for backend-derived state | Avoids Redux ceremony; Query handles caching/invalidation correctly, which matters enormously here. |
-| Torrent engine | **librqbit** (in-process Rust) | Sequential download and streaming support built in; no external process; full control over piece prioritisation, which is what makes instant playback possible. |
+| Torrent engine | **librqbit** (in-process Rust), required and the **only streaming path**; a user's own **qBittorrent** optionally available as a bulk-download backend, **never bundled** (ADR-0029) | Sequential download and streaming support built in; no external process; full control over piece prioritisation, which is what makes instant playback possible. qBittorrent's sequential mode is not precise enough for the Phase 7 scheduler, so streaming cannot be delegated — but bulk throughput is a different bar, and talking to a client the user already runs converts a fight into a choice. Writing the client in Rust is also the safer option: a torrent client parses hostile input from untrusted peers, and memory-safety bugs there are remotely exploitable. |
 | Player core | **libmpv** (embedded, custom UI drawn over it) | Plays everything, hardware decode (D3D11VA/NVDEC/QSV), frame-accurate seek, first-class ASS/SSA rendering, per-track audio and subtitle delay control. Used by Jellyfin and Stremio for the same reasons. |
 | Database | **SQLite** via `sqlx`, WAL mode | Single file, portable, fast, zero setup — the whole database is one file you can copy, which is what makes §2.4's portability promise true. `sqlx` is a mature async Rust driver with a good migration story. **Not** chosen for its compile-time `query!` macros, which this project does not use (ADR-0026): SQLite gives them too little nullability information, so most columns would need hand-written `as "col!"` assertions, and dynamic SQL cannot use them at all. Schema drift is caught instead by a test that exercises every repository method against a freshly migrated database. |
 | Full-text search | **SQLite FTS5** (BM25) | Built in, no extra dependency. |
@@ -242,6 +246,8 @@ One canonical `MediaItem` type from Phase 3, generic enough to represent a film,
 
 Anime specifically requires: absolute vs seasonal episode numbering reconciliation, romaji/English/native title variants, and sub/dub track awareness. Design for this in Phase 3 rather than patching it in Phase 12.
 
+**On absolute numbering, specifically.** The schema stores both a seasonal and an absolute number per episode, and a per-source reconciliation table. **No free source publishes an absolute number** (ADR-0031): AniList publishes per-entry episode numbers, and an AniList entry is one cour, so its numbering restarts each season exactly where IMDb's does. Phase 4 therefore populates the seasonal numbering and leaves `absolute_number` NULL. It is filled in when a source that publishes one is added, or when Phase 12 makes each AniList season carry its own numbering rows — which turns the absolute number into something derivable from stored facts rather than computed from guesses. **It is never to be derived by cumulating episode counts across seasons**: cours split unevenly, recaps are numbered by some sources and not others, and specials interleave, so that arithmetic is wrong for exactly the long-running series the feature exists for. A confidently wrong number is worse than a NULL, because nothing downstream can tell it is wrong.
+
 ---
 
 ## 7. Repository Layout
@@ -295,7 +301,8 @@ sin-e-phile/
 │     └─ tiers.rs                # hardware capability detection
 ├─ src/                          # React
 │  ├─ design-system/             # tokens, primitives, Storybook-ish gallery
-│  ├─ features/                  # home, films, tv, watchlist, live, player, search, settings
+│  ├─ features/                  # home, films, tv, watchlist, live, player, search,
+│  │                             # downloads, settings
 │  ├─ lib/                       # ipc client (typed), hooks, utils
 │  └─ app/
 ├─ crates/                       # extracted reusable crates
@@ -502,7 +509,15 @@ grotesque; Circular), so the equivalents here must be **free and self-hostable**
 - Rails: 24px gutters, cards 200×300 (film) / 320×180 (episode, landscape) as the
   *base* sizes, with featured items larger.
 - Content max-width 1680px, centred, with rails bleeding to the viewport edge.
-- Left nav rail: 72px collapsed (icons), 240px expanded, remembers state.
+- **The masthead** (ADR-0037), replacing the left nav rail: one 56px bar, `--void`, 1px
+  `--line-subtle` rule beneath, solid always (no transparency, no blur). It is the title
+  bar too; its empty space is the drag region. Left: the wordmark. Then the five
+  destinations as **words, not icons**, in Inter 13px `--ink-muted`; the active one is
+  `--ink` with a 2px `--oxblood-bright` underline on the bar's rule. Right: a labelled
+  **Search** button with its `/` hint, Downloads, Settings, profile, window controls. It
+  must fit at the 1024×640 minimum window with nothing collapsed.
+- **The 96px index column** (ADR-0024) runs down the left of every content surface. With
+  no sidebar, it is the page's left edge: spine numbers and a hairline rule.
 - **Generous vertical rhythm.** Breathing room is the MUBI signal and the easiest
   thing to lose to density. When in doubt, more space.
 - Every interactive element has a visible `--oxblood-bright` focus ring. Full keyboard
@@ -863,7 +878,7 @@ All free. Phase 0 verifies current terms for each and records them in `docs/SETU
 | Service | Needed for | Cost | Notes |
 |---|---|---|---|
 | **TMDB** | Artwork, rich detail, cast headshots | **The user's own free key**, instant, non-commercial | Register at themoviedb.org → Settings → API. **Optional** — offered in onboarding as ~30 seconds of work, with a "later" that is not a dead end (ADR-0013). **No key ever ships with the application** (ADR-0027): each user supplies their own, per profile, in settings, under their own acceptance of TMDB's terms, and may remove it at any time. Every TMDB-dependent surface degrades to the §9.4 typographic treatment rather than breaking. |
-| **AniList** | Anime metadata, relations, absolute/seasonal numbering | Free, public GraphQL, no key | Required for anime. |
+| **AniList** | Anime metadata, relations, **per-entry** episode numbering and airing schedules | Free, public GraphQL, no key | Required for anime. **Publishes no absolute episode number** (ADR-0031) — an entry is one cour, so its numbering restarts each season. Paginates only to 5,000 entries, so the catalogue is swept per `seasonYear`. |
 | **Jikan** | MyAnimeList mirror, supplementary anime data | Free, no key, rate-limited | Optional fallback. |
 | **IMDb datasets** | Offline title/rating/crew index | Free download, no account | `datasets.imdbws.com`. Non-commercial use. |
 | **MovieLens** | Item-item collaborative filtering signal | Free download, no account | GroupLens; use the largest set the machine can ingest. |
@@ -1004,6 +1019,8 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 - [ ] **The catalogue is fully usable with no TMDB key** (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.
 - [ ] **The embedding artefact is produced and published** (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.
 
+**Catalogue freshness** (ADR-0030, `docs/specs/catalogue-freshness.md`). The datasets are a snapshot and IMDb republishes daily, so the catalogue is stale the moment it is built. **Incremental refresh**: re-download, scan, and insert only titles whose numeric id is above the highest already held. **IMDb's files sort as TEXT, not as numbers** (ADR-0032) — `"tt10001008" < "tt1000101"` — so a newly issued id lands mid-file and there is no position to seek to. The saving is real regardless: the expensive half is the 2.7-million-row insert, not the read. Measured at **71 s** against 219 s for a full re-ingest. `title.episode` refreshes daily on its own. **AniList airing schedules**, which are public and need no key, give exact air times for anime.
+
 **Learning note.** ETL pipelines; why offline-first beats API-first here; rate limiting and backoff; caching strategy and TTL choice; the anime metadata problem specifically.
 
 ---
@@ -1033,6 +1050,8 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 **Deliverables.** The `SourceBackend` trait (§6.1) and its types: `MediaQuery`, `SourceCandidate` (with quality, language, codec, size, health, provenance), `PlayableStream`, `BackendCapabilities`. A resolver that queries backends concurrently with per-backend timeouts, deduplicates, and merges results. Backend registry with enable/disable, ordering, and per-backend health tracking. **The addon manifest format**: a declarative TOML/JSON schema describing a source, published as `crates/source-protocol` with a JSON Schema and a specification document in `docs/specs/addon-protocol.md`. Three reference backends: `LocalFileBackend` (stub until Phase 12), `InternetArchiveBackend` (real, working, legal), `DirectHttpBackend` (user-supplied URLs). An addon installation UI: paste a manifest URL, see what it declares, confirm, enable — with plain-language explanations and no raw JSON in the primary path. A catalogue browser that fetches a user-supplied catalogue URL; **no default URL ships**.
 
+**Search-triggered catalogue backfill** (ADR-0030). When a search misses and the resolver finds a candidate anyway, create the catalogue entry from what the resolver learned — Phase 12's filename parser already yields a title, a year and often a season and episode, which is enough for a minimal row. This is what stops an out-of-date catalogue being a dead end: a miss becomes self-healing rather than permanent. Backfilled rows are **marked as such**, so a later bulk refresh reconciles rather than duplicating, and a row that later matches a real IMDb id is merged. It runs after results are shown and must never block a search.
+
 **Exit criteria.**
 - [ ] Adding a new backend requires implementing one trait and registering it — no changes elsewhere.
 - [ ] The Internet Archive backend returns real, playable results.
@@ -1050,7 +1069,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 **Goal.** Torrents that stream, not torrents that download. This is the hardest engineering in the project.
 
-**Deliverables.** `librqbit` integrated in-process. Magnet and `.torrent` parsing, DHT, peer discovery, trackers. **The streaming scheduler** — the heart of it: a deadline-driven piece prioritisation window that keeps the pieces just ahead of the playhead at highest priority, maintains a rarest-first background fetch for the rest, and re-prioritises within 2 s when the user seeks to an unbuffered region. A local HTTP server exposing an in-progress torrent as a seekable stream with correct HTTP range support, so libmpv can treat it as an ordinary file. File selection within multi-file torrents (pick the episode, ignore the sample and the readme). Swarm health probing: measure achievable throughput on the first pieces and expose it. Bandwidth limits, connection limits, and seeding policy, all user-configurable with sane defaults. Session persistence across restarts. Per-torrent state and progress events streamed to the frontend.
+**Deliverables.** `librqbit` integrated in-process. Magnet and `.torrent` parsing, DHT, peer discovery, trackers. **The streaming scheduler** — the heart of it: a deadline-driven piece prioritisation window that keeps the pieces just ahead of the playhead at highest priority, maintains a rarest-first background fetch for the rest, and re-prioritises within 2 s when the user seeks to an unbuffered region. A local HTTP server exposing an in-progress torrent as a seekable stream with correct HTTP range support, so libmpv can treat it as an ordinary file. File selection within multi-file torrents (pick the episode, ignore the sample and the readme). Swarm health probing: measure achievable throughput on the first pieces and expose it. Bandwidth limits, connection limits, and seeding policy, all user-configurable with sane defaults — **seeding stops at completion by default**, because seeding is uploading and uploading is distribution, and that is the side enforcement actually targets. **Network interface binding**: the engine binds to a chosen adapter so that if a VPN drops, torrent traffic stops rather than silently falling back to the real connection. This is the single highest-value user-safety feature in the phase and qBittorrent has it for the same reason. Session persistence across restarts. Per-torrent state and progress events streamed to the frontend.
 
 **Exit criteria.**
 - [ ] Playback begins in < 8 s on a healthy swarm (measured against a legal, well-seeded Internet Archive or Linux ISO torrent).
@@ -1058,6 +1077,8 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 - [ ] Sequential mode never starves — the buffer ahead of the playhead is maintained under a documented bandwidth floor.
 - [ ] Correct behaviour on a dead swarm: clear, fast failure, not an indefinite hang.
 - [ ] Range requests are byte-correct — verified by streaming a file and comparing its hash to a full download.
+- [ ] **Measured against qBittorrent on both axes** and both numbers published: time-to-first-frame on a healthy swarm, and sustained bulk throughput on the same torrent. Losing on bulk is a finding, not a failure — ADR-0029 exists so the project does not have to win that comparison — but the comparison must be made rather than left implicit.
+- [ ] Binding to a specific network interface works, verified by disabling that adapter mid-download and confirming traffic stops rather than falling back.
 - [ ] `docs/specs/streaming-scheduler.md` explains the algorithm with a diagram.
 
 **Learning note.** How BitTorrent works — pieces, swarms, DHT, rarest-first; why sequential download conflicts with swarm health and how the scheduler balances them; HTTP range requests; async Rust and `tokio`; backpressure.
@@ -1126,7 +1147,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 **Goal.** The player becomes better than the commercial ones.
 
-**Deliverables.** **The pause overlay** — the signature feature. On pause, a Prime-X-Ray-inspired panel slides in over a dimmed, blurred frame: full cast with headshots, director and key crew, ratings (IMDb, TMDB, and AniList for anime — **not** Rotten Tomatoes, which has no free API and whose scraping would violate its terms), runtime remaining, the current chapter, trivia and goofs, soundtrack, and "more like this". Clicking a cast member opens their filmography. It must be beautiful — this is the screenshot people will remember. (Face recognition arrives in Phase 22; until then it shows the full cast list, well-designed.) Next-episode handling with a countdown and a preview card. Episode navigation within the player. Chapter markers on the scrub bar. Thumbnail previews on scrub-bar hover, generated in the background via FFmpeg and cached. Picture-in-picture. Audio delay control. Video filter controls (brightness, contrast, saturation) for badly-encoded sources. Statistics-for-nerds overlay showing decode path, dropped frames, bitrate, and swarm state.
+**Deliverables.** **Airing awareness** (ADR-0030): a series page must be able to show "S03E07 airs Thursday" **without an episode row existing**, because AniList knows an episode is scheduled before IMDb lists it. Next-episode UI reads from the schedule as well as the catalogue. **The pause overlay** — the signature feature. On pause, a Prime-X-Ray-inspired panel slides in over a dimmed, blurred frame: full cast with headshots, director and key crew, ratings (IMDb, TMDB, and AniList for anime — **not** Rotten Tomatoes, which has no free API and whose scraping would violate its terms), runtime remaining, the current chapter, trivia and goofs, soundtrack, and "more like this". Clicking a cast member opens their filmography. It must be beautiful — this is the screenshot people will remember. (Face recognition arrives in Phase 22; until then it shows the full cast list, well-designed.) Next-episode handling with a countdown and a preview card. Episode navigation within the player. Chapter markers on the scrub bar. Thumbnail previews on scrub-bar hover, generated in the background via FFmpeg and cached. Picture-in-picture. Audio delay control. Video filter controls (brightness, contrast, saturation) for badly-encoded sources. Statistics-for-nerds overlay showing decode path, dropped frames, bitrate, and swarm state.
 
 **Exit criteria.**
 - [ ] The pause overlay is visually excellent and appears in < 200 ms.
@@ -1163,10 +1184,13 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 **Goal.** Downloading is first-class, and the app tells you honestly which is the better choice.
 
-**Deliverables.** A download manager: queue with priorities, pause/resume/cancel, per-download and global bandwidth limits, scheduling (start after midnight), completion notifications, and automatic filing into the local library so a completed download is indistinguishable from a file you already had. **The advisor**, combining all four signals the author asked for: (1) measured swarm health versus the bitrate the file requires, producing a stall-probability estimate; (2) free disk space and existing local availability; (3) learned network conditions by time of day, suggesting overnight downloads for large files; (4) taste-model input — something predicted to be a favourite and a likely rewatch is worth the disk, something being sampled is not. Presented as a single clear recommendation with a one-line reason, not a wall of statistics, with the other option always one click away. Storage management: a library size budget, a "cleanup" view showing watched downloads by size and age, and per-item keep/delete decisions.
+**Deliverables.** A download manager: queue with priorities, pause/resume/cancel, per-download and global bandwidth limits, scheduling (start after midnight), completion notifications, and automatic filing into the local library so a completed download is indistinguishable from a file you already had. **A Downloads page** — its own surface, reached from the masthead's Downloads button, which shows live progress and the count of active items (ADR-0037), showing the queue, per-item progress, speed, seeds/peers, ETA and the reason each item was queued, with the same design language as every other screen. The manager without a surface was an inconsistency in this document: §7's feature list omitted it entirely. **A pluggable download backend** (ADR-0029): librqbit by default, and a user's own **qBittorrent over its Web API** when one is configured — detected, never bundled, never required, and falling back to librqbit if it is not running. The queue is backend-agnostic, so an item files into the library identically whichever moved the bytes. **qBittorrent is a transport only**: its search plugins, RSS feeds and tracker lists are never read, which would be a §2.1 violation arriving by the back door. **The advisor**, combining all four signals the author asked for: (1) measured swarm health versus the bitrate the file requires, producing a stall-probability estimate; (2) free disk space and existing local availability; (3) learned network conditions by time of day, suggesting overnight downloads for large files; (4) taste-model input — something predicted to be a favourite and a likely rewatch is worth the disk, something being sampled is not. Presented as a single clear recommendation with a one-line reason, not a wall of statistics, with the other option always one click away. Storage management: a library size budget, a "cleanup" view showing watched downloads by size and age, and per-item keep/delete decisions.
 
 **Exit criteria.**
 - [ ] The advisor's recommendation is correct (matches what actually happens) in at least 8 of 10 manual trials across varied swarm conditions.
+- [ ] A download completed through the qBittorrent backend files into the library identically to one completed through librqbit, verified by comparing the resulting rows.
+- [ ] With qBittorrent configured but not running, a queued download falls back to librqbit rather than failing.
+- [ ] `tools/guard` rejects any code path that reads qBittorrent's search plugins, RSS feeds or tracker configuration.
 - [ ] Downloads survive an app restart and resume.
 - [ ] A completed download is automatically matched and appears in the local library with no user action.
 - [ ] Bandwidth limits are actually respected, verified by measurement.
@@ -1252,20 +1276,33 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 ---
 
 ### Phase 18 — Browsing Surfaces
-**Depends on:** 17. **Sessions:** 2–3.
+**Depends on:** 17. **Sessions:** 4–5.
 
-**Goal.** Home, Films, and TV Shows become the beautiful, navigable front of the whole system.
+**Goal.** Home, Films, and TV Shows become the beautiful, navigable front of the whole system, and the whole app is brought to one design standard before the phase closes.
 
 **Deliverables.** **Home**: Continue Watching first (with progress, next episode, and a remove option), then adaptive rails generated by the discovery engine, ordered by predicted engagement, with an optional hero for a single strong recommendation. **Films** and **TV Shows**: Continue Watching scoped to that kind, then browsable structure — by genre, decade, country, language, director, movement, collection, awards, and curated lists — with real filtering and sorting. **Every rail has a "see all"** that opens a proper browsable grid with filters, honouring the anti-pattern rule that nothing is more than three interactions from Home. Detail pages: hero artwork, synopsis, cast and crew with links, ratings, availability badges (local / streamable / downloadable, with quality and language), episode lists with progress for series, related and "more like this", and a prominent play button with the language and quality selectors from Phase 9. Hover previews: muted, 400 ms dwell, still-frame-then-motion, disableable. A Live Channels tab with an honest, well-designed empty state pointing to Phase 24. Everything virtualised, everything keyboard-navigable, everything at 60 fps.
+
+**The final design overhaul** (ADR-0037). The phase ends by bringing **every** surface to one standard: Home, Films, TV Shows, Watchlist, Live, Search, Settings, Downloads, the detail page, and every empty, loading and error state. In order:
+1. **The masthead** (§9.4), if it has not already been built ahead of the phase: tabs on top, a labelled Search button, the left rail and its collapse state removed.
+2. **Mockups before code** (ADR-0023's rule): static HTML with real catalogue data, two interpretations of the masthead, Home, Films and a detail page, each shown **with no artwork first** and with artwork second. The author chooses before any surface is built.
+3. **The artwork-free state is the primary state.** A default install has no TMDB key and so no artwork (ADR-0013). The typographic card must hold a whole page, with sizes varied by editorial weight, and every page is judged in that state first.
+4. **No placeholder survives.** The "PHASE NN" pill screens are removed; an honest empty state is still a designed one.
+5. **A design lint in CI** that fails on what §9.0 bans and code can detect: shadow utilities, radii other than 0 and 2px, `backdrop-blur`, decorative gradient utilities, Tailwind's default palette names, and colour classes that resolve to no token.
+6. **Motion as a finish**: 180ms page changes, an active-tab underline that moves rather than jumps, and an opacity-only fallback under `prefers-reduced-motion`.
+7. **A screenshot review set**: `tools/shots` captures every surface at 1024×640 and 1920×1080, with and without artwork, and the author reviews it against §9.0's test.
 
 **Exit criteria.**
 - [ ] Home renders in < 800 ms on Tier 0 with 20 rails.
 - [ ] Anything in the catalogue is reachable in ≤ 3 interactions from Home.
 - [ ] Every rail's "see all" goes somewhere genuinely useful.
-- [ ] Full keyboard navigation across all browsing surfaces.
-- [ ] Screenshots of Home, Films, and a detail page are good enough for the README.
+- [ ] Full keyboard navigation across all browsing surfaces, including the masthead's tab order: wordmark, destinations, Search, Downloads, Settings, then content.
+- [ ] The masthead fits at the 1024×640 minimum window with every destination, Search, Downloads and Settings visible, measured by `tools/uiaudit`.
+- [ ] Search is reachable from every surface by the visible Search button and by `/`.
+- [ ] No destination or state shows a placeholder screen.
+- [ ] The design lint passes in CI, and each of its rules has been seen to fail.
+- [ ] The author signs off the screenshot review set (every surface, both sizes, with and without artwork) against §9.0's test: `manual: <what they reviewed and said>`. This set supplies the README's screenshots.
 
-**Learning note.** Virtualised rendering; how rail ordering is itself a ranking problem; why hover previews are a performance trap; information architecture.
+**Learning note.** Virtualised rendering; how rail ordering is itself a ranking problem; why hover previews are a performance trap; information architecture; why a design lint can catch the banned list but never the §9.0 test.
 
 ---
 
@@ -1485,9 +1522,11 @@ Phases 9–13 can be reordered if a session's energy suits one better. Phases 22
 
 ### B. What "done" means
 
-A phase is complete when: every exit criterion is met with evidence recorded in `PROJECT_STATE.json`; all tests and lints pass; the phase retrospective is written; the learning note is written and the author has confirmed they understand it; `HOW_IT_WORKS.md` and the README reflect the new capability; and the branch is merged and tagged.
+A phase is complete when: every exit criterion is met with evidence recorded in `PROJECT_STATE.json`, **or carried to a named later phase** (below); all tests and lints pass; the phase retrospective is written; the learning note is written and the author has confirmed they understand it; `HOW_IT_WORKS.md` and the README reflect the new capability; and the branch is merged and tagged.
 
 **The author confirming they understand the learning note is a hard gate.** If they don't, the phase is not done — rewrite the note or simplify the code.
+
+**Carrying a criterion** (ADR-0036). A built phase may close with a criterion unmet only if that criterion records `carried_to_phase` (a later phase that is neither complete nor skipped), `carried_reason` (why it can't be met here, at least 40 characters) and its **measured** state as `evidence`. "Deferred" is not evidence; "nDCG@10 0.0472, `eval search --report`, 21d0b23" is. §10.8 is unchanged: every criterion, met or carried, carries an artefact. The receiving phase must meet it or carry it again with a new reason, and a criterion carried twice is a warning the author should see. The schema and `tools/state/validate_state.py` enforce the shape; only the author can judge whether a reason is honest.
 
 ### C. Standing rules for every session
 
@@ -1547,6 +1586,47 @@ Face recognition, live TV, manga and comics, casting and watch-together. Fully i
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 2.0.0 — 2026-10-25 (the masthead, the overhaul, and carried criteria)
+
+Major, because A25 reverses a stated decision: §3.1 said the destinations were "permanently in the left rail".
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A25 | §3.1, §9.4 | **Navigation moves to a top masthead**, at the author's request: one 56px bar that is both title bar and navigation, the five destinations as words, and a **labelled Search button**. Search had been reachable only by keyboard shortcuts that appear nowhere on screen. The left rail and its collapse state are removed. Take B's type, spine numbers, 96px index column and 74vh hero all stand. | [0037](docs/adr/0037-masthead-navigation-and-final-design-overhaul.md) |
+| A26 | Phase 13 | The Downloads surface is reached from the masthead's Downloads button, which shows live progress, rather than living "in the sidebar". | [0037](docs/adr/0037-masthead-navigation-and-final-design-overhaul.md) |
+| A27 | Phase 18 | **A final design overhaul** is added to Phase 18, which grows from 2–3 to 4–5 sessions. It has a process: mockups before code, the artwork-free state designed as primary, no placeholder surviving, a design lint in CI, motion, and a screenshot review set the author signs off. There are four new exit criteria, and the README-screenshot criterion becomes that sign-off. The author, 2026-10-25: "the design still isn't amazing". | [0037](docs/adr/0037-masthead-navigation-and-final-design-overhaul.md) |
+| A28 | Appendix B | **A built phase may close with a criterion carried to a named later phase**, keeping its measured evidence, with a destination and a reason. Raised as P14, when Phase 5's E1 (unmeasurable without Tier 0 hardware) and E3/E4 (five attempts, the last of which lowered the score) would otherwise hold the phase open indefinitely. Approved by the author. | [0036](docs/adr/0036-carry-an-unmet-criterion-to-a-named-phase.md) |
+
+---
+
+### spec_version 1.9.0 — 2026-09-04 (how the files are actually sorted)
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A24 | §15 Phase 4 | **The incremental refresh cannot use `seek_past`, because IMDb's files are sorted lexicographically rather than numerically.** A21 and ADR-0030 both stated the premise "sorted by id and new titles get higher ids"; measured over the real 12,761,311-row file, numeric order first breaks at row 967,458 (`tt10001008` → `tt1000101`) and the last row is `tt9916880`, which is not the largest id. A newly issued `tt45000000` therefore lands mid-file, and seeking past our maximum walked into rows already held and died on a UNIQUE violation. The refresh now **filters by numeric id** instead. ADR-0030's decision and layers 2–4 stand unchanged; only layer 1's mechanism was wrong. Measured: 1,542 titles added, 1,086,185 ratings re-applied, **71 s**. | [0032](docs/adr/0032-imdb-ids-do-not-sort-numerically.md) |
+
+---
+
+### spec_version 1.8.0 — 2026-09-04 (what the sources actually publish)
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A22 | §6.2, §11 | **No free source publishes an absolute episode number**, so Phase 4 loads the seasonal numbering and leaves `absolute_number` NULL. §11 claimed AniList provided "absolute/seasonal numbering"; it provides per-entry numbering, and an entry is one cour, so its numbers restart each season exactly where IMDb's do. §6.2 now states this and **forbids deriving the number by cumulating counts across seasons** — the arithmetic migration 0003 was written to prevent, wrong for precisely the long-running series the feature exists for. The columns and reconciliation table are unchanged: holding nothing for a number no source states is the schema working, not a gap in it. Recorded against Phase 12, where it bites. | [0031](docs/adr/0031-absolute-episode-numbering-is-not-published.md) |
+| A23 | §11 | **AniList paginates only to 5,000 entries** — every request past that depth is a `400`, and `pageInfo.total` reports exactly `5000` for any query rather than warning you. The catalogue is therefore swept per `seasonYear`, id-ordered. Found by a full run failing; recorded so the next source integration checks its own depth limit first. | — |
+
+---
+
+### spec_version 1.7.0 — 2026-09-01 (downloads, freshness, safety)
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A18 | §7 | **A Downloads tab is added to the feature list.** Phase 13 specified a full download manager and §7 gave it no surface — an inconsistency in this document, not a new feature. | [0029](docs/adr/0029-qbittorrent-as-optional-download-backend.md) |
+| A19 | §2 (technology), Phase 13 | **A user's own qBittorrent may be used as a bulk-download backend**, over its Web API, detected and never bundled — §2's non-choice against *bundling* stands. librqbit remains required and is the **only streaming path**, because qBittorrent's sequential mode is not precise enough for the Phase 7 scheduler. This converts "rival qBittorrent on throughput" from a fight the project must win into a choice the user already has. Writing the client in Rust is also the safer option: a torrent client parses hostile input from untrusted peers. **qBittorrent is a transport only** — its search plugins, RSS feeds and tracker lists are never read, and the guard enforces it. | [0029](docs/adr/0029-qbittorrent-as-optional-download-backend.md) |
+| A20 | Phase 7 | **Network interface binding**, so torrent traffic stops rather than falling back to the real connection when a VPN drops — the highest-value user-safety feature in the phase. **Seeding stops at completion by default**, because seeding is uploading and uploading is what enforcement targets. Phase 7 must also **measure against qBittorrent on both axes** and publish both numbers; losing on bulk throughput is a finding, not a failure. | [0029](docs/adr/0029-qbittorrent-as-optional-download-backend.md) |
+| A21 | Phase 4, Phase 6, Phase 11 | **Catalogue freshness in four layers.** Incremental bulk refresh reusing `seek_past` (Phase 4); AniList airing schedules, which need no key (Phase 4); **search-triggered backfill** (Phase 6) — the layer that stops an outdated catalogue being a dead end, and the one nothing here covered; full re-ingest, measured at 219 s. Phase 11 must show an episode as airing **before an episode row exists**. | [0030](docs/adr/0030-catalogue-freshness.md) |
+
+---
 
 ### spec_version 1.6.0 — 2026-09-01 (the navigation system)
 

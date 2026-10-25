@@ -75,3 +75,13 @@ imdb.com
 #              built (ADR-0010), each with its own justification line and ADR.
 #              Not added in advance; this file describes what ships today.
 # ─────────────────────────────────────────────────────────────────────────────
+
+# Wikidata and English Wikipedia — the embedding text source (ADR-0033).
+# Wikidata supplies the IMDb-id -> article mapping through property P345, an exact
+# join rather than a title guess; Wikipedia supplies the lead extract that tells the
+# embedding what a film is ABOUT. Neither indexes, locates or links to content: they
+# are metadata in the ADR-0010 sense, the same category as the IMDb datasets above.
+# No key, no account. Text is CC BY-SA — see ADR-0033 for the attribution obligation
+# that creates if the UI ever displays an abstract.
+wikidata.org
+wikipedia.org

@@ -50,9 +50,66 @@ export const commands = {
 	 *  than a measurement of window creation.
 	 */
 	frontendReady: () => __TAURI_INVOKE<number>("frontend_ready"),
+	/**
+	 *  Search the catalogue.
+	 * 
+	 *  `limit` is `i32` rather than `i64`: it is clamped to 1..=100, and a function
+	 *  parameter cannot carry the specta annotation a struct field can.
+	 */
+	search: (query: string, limit: number | null) => typedError<SearchResponse, string>(__TAURI_INVOKE("search", { query, limit })),
+	/**  What the semantic half needs that is not here yet. */
+	optionalAssets: () => __TAURI_INVOKE<AssetPlan>("optional_assets"),
+	/**
+	 *  Download everything that is missing, having been given permission — then make it
+	 *  usable.
+	 * 
+	 *  **Only ever called from an explicit action.** Nothing here runs on launch: ADR-0014's
+	 *  requirement is consent first, with the size shown, and the shape of this API is what
+	 *  enforces that — there is no path that fetches without someone having invoked it.
+	 * 
+	 *  # The download is not the deliverable
+	 * 
+	 *  Until 2026-09-22 this stopped after the last byte, and that was the whole bug (D44):
+	 *  ADR-0014 publishes *vectors*, and the graph over them is derived on the machine, so a
+	 *  downloaded artefact with no index is 313 MB that nothing reads. Search stayed
+	 *  keyword-only, permanently, on every machine but the one where the index had been built
+	 *  by hand. So the build is part of this command, and the engine is reinstalled at the end
+	 *  — without it the user would have to restart the app to use what they just fetched.
+	 */
+	downloadOptionalAssets: () => typedError<null, string>(__TAURI_INVOKE("download_optional_assets")),
 };
 
 /* Types */
+/**
+ *  What is missing, and what agreeing would cost.
+ * 
+ *  ADR-0014 requires the size to be shown **before** the download, so it is stated here
+ *  from pinned values rather than discovered by starting one.
+ */
+export type AssetPlan = {
+	assets: OptionalAsset[],
+	/**  Total bytes still to fetch — what the person is actually agreeing to. */
+	outstanding_bytes: number,
+	/**  Is the semantic half already working? If so there is nothing to consent to. */
+	complete: boolean,
+};
+
+/**  Progress, emitted as it happens. One event per asset per chunk. */
+export type AssetProgress = {
+	name: string,
+	/**
+	 *  `downloading` or `building`.
+	 * 
+	 *  The two stages count different things — bytes off the network, then titles into a
+	 *  graph — and the screen has to be told which. A bar labelled in megabytes that sits
+	 *  still for half a minute reads as a hang, and inferring the stage from a zero total
+	 *  would be guessing at something the backend already knows.
+	 */
+	phase: string,
+	done_bytes: number,
+	total_bytes: number,
+};
+
 /**  What a tier permits. Features ask about a `Capability`, never about hardware. */
 export type Capability = 
 /**
@@ -103,6 +160,75 @@ export type HardwareProfile = {
 	overridden: boolean,
 };
 
+/**  One optional download, as the consent screen needs it. */
+export type OptionalAsset = {
+	name: string,
+	purpose: string,
+	/**  Bytes, so the UI can format them in its own locale rather than parse a string. */
+	bytes: number,
+	/**  `absent`, `present`, or a reason it cannot be used. */
+	state: string,
+	unusable_reason: string | null,
+};
+
+/**
+ *  One result, as the UI needs it.
+ * 
+ *  A DTO rather than re-exporting the engine's `Hit`: the engine's type carries a BM25
+ *  score whose scale is meaningless outside the ranker, and a UI that received it would
+ *  eventually display it.
+ *  # Why the numbers are annotated
+ * 
+ *  **Specta refuses to export `i64`, and it is right to.** A JavaScript number is a
+ *  double, so anything past 2^53 arrives silently wrong — the failure would be the wrong
+ *  film opening, with no error anywhere. The objection is answered rather than
+ *  suppressed: catalogue ids are SQLite rowids over 2.7 million titles, nine orders of
+ *  magnitude below that ceiling, and years are four digits.
+ * 
+ *  If an id could ever exceed 2^53 these must become strings.
+ */
+export type SearchHit = {
+	id: number,
+	title: string,
+	year: number | null,
+	kind: string,
+	/**  Why this is on the page — the "why this matched" hint §15 asks for. */
+	why: Why,
+	/**  Director, or a series' creator; up to two names. */
+	made_by: string | null,
+	runtime_minutes: number | null,
+	/**  The synopsis without its encyclopedia lead, cut to a couple of lines. */
+	excerpt: string | null,
+};
+
+/**
+ *  What a search returned, **and what the catalogue is**.
+ * 
+ *  # Why readiness travels with the results
+ * 
+ *  "No results" means something entirely different at 3% ingested than at 100%, and a
+ *  screen that cannot tell the difference will confidently inform someone their film
+ *  does not exist. Rather than trust every caller to remember to ask, the answer carries
+ *  its own context — the UI cannot render the lie because it never holds the data alone.
+ */
+export type SearchResponse = {
+	hits: SearchHit[],
+	/**  Titles searchable right now. */
+	searchable_titles: number,
+	/**  Is the catalogue still being built? If so, "nothing found" is not an answer. */
+	catalogue_partial: boolean,
+	/**
+	 *  Is the semantic half available? Without it, a query like "films about grief"
+	 *  matches words rather than meaning, and the UI should not imply otherwise.
+	 */
+	semantic: boolean,
+	/**
+	 *  Not ready yet — the database or the model is still loading. Distinct from
+	 *  "found nothing", and the two must never render the same.
+	 */
+	ready: boolean,
+};
+
 /**  The three tiers from §8. */
 export type Tier = 
 /**  < 8 GB RAM, or no hardware decode, or <= 2 physical cores. */
@@ -111,4 +237,34 @@ export type Tier =
 "standard" | 
 /**  >= 16 GB RAM, discrete GPU or strong iGPU, >= 6 cores. */
 "capable";
+
+/**
+ *  The engine's [`MatchReason`], in the words a person would use.
+ * 
+ *  Translated here rather than in the UI because the mapping is a product decision, not
+ *  a rendering one, and a second copy of it in TypeScript would drift.
+ */
+export type Why = 
+/**  The query is this title. */
+"exact_title" | 
+/**  The words matched. */
+"keyword" | 
+/**  Matched after typo tolerance. */
+"fuzzy" | 
+/**  Close in meaning, possibly sharing no words at all. */
+"semantic" | 
+/**  Both halves found it — the strongest signal the engine has. */
+"both" | 
+/**  Retrieved because it satisfies a filter the query asked for. */
+"filter";
+
+/* Tauri Specta runtime */
+async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
+    try {
+        return { status: "ok", data: await result };
+    } catch (e) {
+        if (e instanceof Error) throw e;
+        return { status: "error", error: e as any };
+    }
+}
 

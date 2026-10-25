@@ -108,7 +108,7 @@ own on-screen display never appears.
 
 ## The subsystems
 
-### The catalogue — knowing what films exist `⬜ Phase 4`
+### The catalogue — knowing what films exist `✅ Phase 4`
 
 The app ships knowing about hundreds of thousands of films and shows, and works with
 no API key and no network (ADR-0013). This comes from free bulk datasets — IMDb for
@@ -122,7 +122,7 @@ for a film-focused app, is arguably a better look anyway.
 **The analogy:** a library that owns a complete card catalogue but not the book
 covers. It can still tell you everything about every book.
 
-### Search — finding things by name *and* by meaning `⬜ Phase 5`
+### Search — finding things by name *and* by meaning `✅ Phase 5 (meaning half below target)`
 
 Two searches run at once over the same query.
 
@@ -220,6 +220,61 @@ me." And who notices when you did not like it.
 ---
 
 ## The parts that exist today
+
+### The catalogue ✅ `Phase 4`
+
+**2,702,737 titles**, ingested from the IMDb datasets and AniList on this machine, with
+**no API key of any kind** — 855,703 of them in a "core tier" that also carries cast,
+crew and alternative titles, plus 539,817 episodes and 7,391 anime cross-mapped to
+AniList and MyAnimeList.
+
+The interesting part is not the size, it is what the pipeline refuses to do.
+
+**It refuses to guess.** Matching AniList to IMDb has no shared identifier — only
+titles and years — and the catalogue contains 568 items called `home` and 486 called
+`alone`. So when two candidates are equally good the matcher **reports the ambiguity
+rather than picking one**: a missed anime is a mildly worse listing, but a wrong one
+attaches *Fullmetal Alchemist*'s episodes to *Brotherhood* and nothing downstream ever
+notices. 187 entries are refused on those grounds and every refusal is written to a
+file for a human to check.
+
+**It refuses to be interrupted destructively.** Every stage is resumable, and a
+checkpoint is committed *in the same transaction as the work it describes* — so a
+process killed mid-run resumes exactly, never duplicating and never skipping.
+
+**Every scope decision was measured rather than predicted.** Four size predictions
+early in the phase were wrong in both directions, so the practice changed: load a
+sample, weigh it, then decide. Episodes cost 410 bytes each (measured three times,
+within 2%), so they are loaded for all anime plus any series with 5,000+ votes.
+
+Full numbers, including what each decision cost: [`eval-results.md`](eval-results.md).
+
+### Artwork and search infrastructure ✅ `Phase 4`
+
+Posters are re-encoded to lossy WebP — **42.1% smaller, measured on real film stills**
+rather than on a synthetic gradient — and cached under a size budget that evicts
+least-recently-*used*, not least-recently-written. Each image carries a **blurhash**: a
+~30-character string that renders as a blurred version of the actual poster, so a
+loading rail is never a grid of grey rectangles.
+
+The semantic-search embeddings are produced by a separate, resumable job into a
+**checksummed artefact that records the model it was built with** — and the application
+refuses to load one whose model does not match. That refusal matters more than the
+checksum: a corrupt file fails loudly, but a *mismatched* one fails silently, with
+search simply getting worse and nothing to point at.
+
+**TMDB remains entirely optional.** No key ships, ever; each user supplies their own,
+per profile, and it is encrypted at rest. Everything above was built without one.
+
+### Search ✅ `Phase 5`
+
+Three tiers in a fixed order: an **exact title** bypasses ranking and is always first;
+then **keyword** (BM25) and **meaning** (bge-small embeddings over 119,874 documents
+with real synopses, in an HNSW index) are fused by rank; then **fuzzy** matching, only
+when the rest found almost nothing. Phrases like "from the 1950s" or "directed by" are
+parsed into filters before any of it, because models are bad at numbers. Exact titles
+and filters work very well; searching by meaning works poorly (nDCG 0.047 against
+0.75), and [`docs/case-study/search.md`](case-study/search.md) explains why.
 
 ### The posture guard ✅ `Phase 0`
 

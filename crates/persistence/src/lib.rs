@@ -13,9 +13,10 @@ pub mod db;
 pub mod model;
 pub mod paths;
 pub mod repositories;
+pub mod secrets;
 
 pub use archive::{ArchiveError, Archiver, ImportSummary, ProfileArchive};
-pub use db::{Db, DbError, SqlitePool};
+pub use db::{Compacted, Db, DbError, SqlitePool};
 pub use model::{
     EpisodeNumbering, IdSource, MediaItem, MediaKind, NewMediaItem, Title, TitleVariant,
 };

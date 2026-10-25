@@ -1,120 +1,138 @@
 {
-  "spec_version": "1.6.0",
+  "spec_version": "2.0.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-08-31T15:27:56Z",
-  "sessions_completed": 5,
+  "last_updated": "2026-10-25",
+  "sessions_completed": 19,
   "current_phase": {
-    "number": 3,
-    "slug": "data-layer",
-    "title": "Data Layer and Portable Storage",
-    "branch": "phase/03-data-layer",
-    "started_at": "2026-08-31T14:39:21Z",
-    "status": "complete",
-    "note": "The schema everything else depends on, designed once. Two constraints carry over: ADR-0022 puts all SQL in crates/persistence with src-tauri/src/persistence/ as re-exports only (guard-enforced), and SPEC.md 6.2 requires anime's absolute-vs-seasonal numbering and title variants designed NOW rather than patched in Phase 12. media_kind carries all eight values from the start so Phases 24-25 need no migration.",
+    "number": 4,
+    "slug": "metadata-backbone",
+    "title": "Metadata Backbone",
+    "branch": "phase/04-metadata-backbone",
+    "started_at": "2026-08-31T18:43:02Z",
+    "status": "in_progress",
+    "note": "The catalogue. Three constraints carry in: ADR-0013 and ADR-0027 mean the app must be complete and good-looking with NO TMDB key and no key ever ships; ADR-0026 means SQL is runtime-checked, so every new repository method needs a line in crates/persistence/tests/repository_surface.rs; and R4 (ingestion larger or slower than expected) is this phase's named risk — measure before committing to a shape, and scope by a popularity threshold rather than ingesting everything.",
     "subtasks": [
       {
-        "id": "3.1",
-        "text": "crates/persistence: sqlx + SQLite with WAL, pinned versions; runtime-checked queries with tests/repository_surface.rs as the compensating control (ADR-0026); src-tauri/src/persistence/ re-exports only, guard-enforced (ADR-0022)",
+        "id": "4.1",
+        "text": "tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts",
         "status": "complete",
-        "commit": "593fcc8"
+        "commit": "4a78d64"
       },
       {
-        "id": "3.2",
-        "text": "Path resolution: portable ./data/ next to the executable by default, %APPDATA% installed-mode as an opt-in; override and detection",
+        "id": "4.2",
+        "text": "IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres",
         "status": "complete",
-        "commit": "593fcc8"
+        "commit": "048180a"
       },
       {
-        "id": "3.3",
-        "text": "Migration system: forward and backward migrations, with backup-on-migrate",
+        "id": "4.3",
+        "text": "MovieLens join for ratings and popularity (ADR-0019, on-device)",
         "status": "complete",
-        "commit": "593fcc8"
+        "commit": "42177d6"
       },
       {
-        "id": "3.4",
-        "text": "Schema - identity: media_items with the eight-value media_kind discriminator, external_ids, titles (romaji/native/english variants)",
+        "id": "4.4",
+        "text": "AniList ingestion: anime catalogue, romaji/native/english titles, and seasonal episode numbering into episode_numbering. Absolute numbering is NULL by ADR-0031 - no free source publishes one.",
         "status": "complete",
-        "commit": "593fcc8"
+        "commit": "a170532"
       },
       {
-        "id": "3.5",
-        "text": "Schema - people and taxonomy: people, credits, genres, keywords",
+        "id": "4.5",
+        "text": "External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules",
         "status": "complete",
-        "commit": "593fcc8"
+        "commit": "f67d939"
       },
       {
-        "id": "3.6",
-        "text": "Schema - series: series, seasons, episodes with BOTH seasonal and absolute numbering, plus the reconciliation table (SPEC.md 6.2 - designed now, not patched in Phase 12)",
+        "id": "4.6",
+        "text": "Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline",
         "status": "complete",
-        "commit": "593fcc8"
+        "commit": "38d75d7"
       },
       {
-        "id": "3.7",
-        "text": "Schema - user and config: profiles, watch_events, playback_positions, watchlist_items, collections, local_files, local_file_matches, sources_config, settings",
+        "id": "4.7",
+        "text": "Per-profile TMDB key from settings, never shipped (ADR-0027), DPAPI-wrapped at rest; every TMDB-dependent surface degrades to the typographic state. Storage and the degradation contract are done; the settings UI is Phase 14. CLOSED with Phase 4: the Phase 4 part (storage, DPAPI, degradation contract) is done; the settings UI is Phase 14's deliverable.",
         "status": "complete",
-        "commit": "593fcc8"
+        "commit": "2358993"
       },
       {
-        "id": "3.8",
-        "text": "Repository-pattern access layer over the whole schema",
+        "id": "4.8",
+        "text": "Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding (42.1% measured on real stills), blurhash placeholders. crates/artwork is done; wiring it to a TMDB image client is Phase 11. CLOSED with Phase 4: crates/artwork is done; wiring it to a TMDB image client is Phase 11's deliverable.",
         "status": "complete",
-        "commit": "593fcc8"
+        "commit": "5840b99"
       },
       {
-        "id": "3.9",
-        "text": "Export/import of a whole profile as a portable archive",
+        "id": "4.9",
+        "text": "First-run flow: usable during the background build, searching what is ingested so far. CatalogueRepository::readiness is the backend surface (Empty/Building/Interrupted/Ready, each carrying the searchable count); the progress UI itself is Phase 14. CLOSED with Phase 4: the readiness surface is done; the progress UI is Phase 14's deliverable.",
         "status": "complete",
-        "commit": "593fcc8"
+        "commit": "624b76f"
       },
       {
-        "id": "3.10",
-        "text": "Migration round-trip integration tests: forward and backward against a populated database (E1)",
+        "id": "4.10",
+        "text": "The embedding artefact producer (ADR-0014). crates/embedding holds the document builder, int8 quantisation and the checksummed format; tools/ingest/src/embed.rs is the resumable producer, model and tokenizer checksum-pinned; format specified in docs/specs/embedding-artefact.md. PRODUCED: 855,703 vectors, 313 MB, sha256 3fce6f06..., verified by `ingest verify-embeddings`. Publishing it is blocker B3.",
         "status": "complete",
-        "commit": "593fcc8"
+        "commit": "4f302d5"
       },
       {
-        "id": "3.11",
-        "text": "500,000 synthetic media items; indexed lookup under 100 ms, insertion timed separately (amendment 15); numbers into docs/PERFORMANCE.md and docs/eval-results.md",
+        "id": "4.11",
+        "text": "50-title anime fixture for E5: fixtures/anime/e5-hand-checked.tsv, 64 rows, checked by `ingest verify-anime` which exits non-zero on any mismatch",
         "status": "complete",
-        "commit": "593fcc8"
+        "commit": "f19ddda"
       },
       {
-        "id": "3.12",
-        "text": "ER diagram in docs/ARCHITECTURE.md (E2), and an ADR recording why the schema is generic over media kind (E5)",
+        "id": "4.12",
+        "text": "Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits",
         "status": "complete",
-        "commit": "593fcc8"
+        "commit": "38d75d7"
+      },
+      {
+        "id": "4.13",
+        "text": "Incremental catalogue refresh (ADR-0030): re-fetch title.basics/ratings/episode and insert only the tail past the highest id already stored, reusing TsvReader::seek_past. Plus AniList airing schedules, which need no key. See docs/specs/catalogue-freshness.md.",
+        "status": "complete",
+        "commit": "47e7353"
       }
     ],
     "exit_criteria": [
       {
         "id": "E1",
-        "text": "All migrations run forward and backward cleanly against a populated database.",
+        "text": "Full ingestion completes on the dev machine and the resulting database is under a documented size budget.",
         "met": true,
-        "evidence": "crates/persistence/tests/migrations.rs - 9 tests. `migrations_roll_back_against_a_populated_database` populates a FILE database across all four migrations then rolls back one at a time to 0 and asserts no tables survive; `the_ladder_can_be_climbed_twice` re-applies afterwards, which is what catches a down script that drops a table but forgets its indexes. Command: cargo test -p sinephile-persistence."
+        "evidence": "Re-confirmed 2026-10-25 under the SI reading of R4's 4 GB (author's D47 option 1). RESULTING DATABASE 3,945,598,976 bytes = 3.946 GB, 54 MB under 4 GB, after `./target/release/ingest.exe compact` at 814fc41 (4,062,978,048 -> 3,945,598,976 bytes, 111 MiB recovered, 34 s; recorded in docs/eval-results.md Session 19). Every ingestion command now compacts after itself (df3ca35). Margin is thin: the app's launch-time refresh does not compact, so it erodes the 54 MB (docs/RISKS.md R4). Ingestion completeness unchanged from 2026-09-07: title.basics 2,701,195, title.principals 10,092,368, name.basics 2,736,235, title.akas 5,908,381, episodes 132,845 rows / 5,862 seasons / 4,529 series, MovieLens 61,912 of 62,423 films matched (99.2%). The artefact and index live outside the database and are counted separately (D33)."
       },
       {
         "id": "E2",
-        "text": "Schema documented with an entity-relationship diagram in `docs/ARCHITECTURE.md`.",
+        "text": "Ingestion killed mid-run resumes correctly.",
         "met": true,
-        "evidence": "docs/ARCHITECTURE.md - mermaid ER diagram covering all 19 tables plus episode_numbering, with the four design decisions and the load-bearing PRAGMA configuration."
+        "evidence": "`cargo test -p sinephile-ingest --test resume` -> 10 passing, 2026-09-05. a_killed_run_resumes_and_repeats_nothing asserts 50 items exist EXACTLY once after a kill at item 20; progress_survives_a_restart; a_step_that_does_not_advance_its_cursor_is_stopped; and an_interrupted_run_resumes_at_the_next_page in tests/anime.rs. Demonstrated for real as well: the AniList sweep was interrupted and resumed during development, and a_crash_mid_step_reports_that_it_is_resuming was corrected after `is_resuming` was found reporting a fresh run on every real resume."
       },
       {
         "id": "E3",
-        "text": "A database populated with 500,000 synthetic media items answers indexed lookups in under 100 ms. (The 100 ms budget is the lookup alone; bulk insertion of the 500,000 rows has no time budget and is measured and recorded separately in `docs/PERFORMANCE.md`.)",
+        "text": "Catalogue lookups work with the network disconnected.",
         "met": true,
-        "evidence": "cargo test -p sinephile-persistence --release --test benchmark -- --ignored --nocapture, 500,000 synthetic rows: by_id p99 0.098ms, by_exact_title p99 0.179ms, by_external_id p99 0.120ms against a 100ms budget. Bulk insert 43.7s (11,440 rows/sec), database 145.4 MB, timed separately per amendment 15. Recorded in docs/eval-results.md and docs/PERFORMANCE.md. The benchmark found idx_titles_text silently full-scanning (26.679ms -> 0.081ms p50, 330x) because its collation did not match the query's."
+        "evidence": "STRUCTURAL: crates/persistence has no HTTP client in its dependency tree - sqlx is configured sqlite-only with no postgres/mysql feature, and the rest is serde, thiserror, time, tracing, windows-sys. The catalogue layer is incapable of a network call, so lookups cannot depend on one. Exercised by 72 passing tests in `cargo test -p sinephile-persistence`, including the 500,000-row indexed-lookup benchmark, none of which touch a network."
       },
       {
         "id": "E4",
-        "text": "Copying the app folder to another location and launching it preserves all data.",
+        "text": "Rate limits are never exceeded under a stress test of 1,000 rapid lookups.",
         "met": true,
-        "evidence": "crates/persistence/tests/portability.rs - 5 tests. `a_copied_data_folder_keeps_everything` writes a populated installation, checkpoints the WAL, copies the whole data folder to another path with a directory-tree copy, opens it there and asserts catalogue, watch history, resume position and settings all survive; `nothing_in_the_database_records_where_it_lives` introspects the schema and fails if any new path-shaped column appears. Found a real bug: open_in probed writability before creating the directory, which failed on every fresh portable install."
+        "evidence": "`cargo test -p sinephile-metadata-api` -> limiter::tests::a_thousand_rapid_requests_never_exceed_the_limit, 2026-09-05. 1,000 acquisitions against a 40-per-10-seconds limit must take at least (1000-40)/4 = 240 simulated seconds; the test fails if they are faster. Uses tokio's paused clock, so it measures the limiter rather than the wall."
       },
       {
         "id": "E5",
-        "text": "An ADR records why the schema is generic over media kind.",
+        "text": "Anime titles resolve across AniList and TMDB with correct ID mapping for a hand-checked set of 50 titles including tricky cases (long-running shonen, split-cour seasons, films tied to series).",
         "met": true,
-        "evidence": "docs/adr/0025-generic-media-schema.md, verified by tests/migrations.rs::all_eight_media_kinds_are_accepted."
+        "evidence": "`./target/release/ingest verify-anime` -> 64/64 pass, 2026-09-04. Fixture fixtures/anime/e5-hand-checked.tsv covers long-running shonen, split-cour seasons and films tied to series, plus 3 expected REFUSALS and 2 season claims. Numbers and the four fixture errors the first run exposed are in docs/eval-results.md. TMDB half of E5 is not covered - no key ships (ADR-0027), so it is verified per-user in subtask 4.7."
+      },
+      {
+        "id": "E6",
+        "text": "The catalogue is fully usable with no TMDB key (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.",
+        "met": true,
+        "evidence": "MEASURED on the real catalogue, 2026-09-05, with NO TMDB key ever supplied: 0 rows in external_ids with source='tmdb' and 0 TMDB responses in http_cache. The catalogue nonetheless holds 2,702,737 titles, 855,703 core-tier, 10,079,841 credits, 6,176,950 title rows, 4,450,735 genre links, 1,086,210 ratings, 2,008,183 runtimes and 539,817 episodes - all from IMDb and AniList alone. ADR-0027's per-profile key surface exists (crates/persistence/src/repositories/credentials.rs) and defaults to TmdbAccess::Absent."
+      },
+      {
+        "id": "E7",
+        "text": "The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.",
+        "met": true,
+        "evidence": "MET 2026-09-15. PRODUCED: 855,703 vectors, 313 MB, deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version, snapshot date and text source (format v2). PUBLISHED: release embeddings-v2 on github.com/ohfrjustlikethat/sin-e-phile, asset embeddings-bge-small-en-v1.5-int8.bin, 328,590,240 bytes, confirmed by `gh release view` and by the URL returning HTTP 200 at that exact length. DOWNLOADED AND VERIFIED end to end through the application's own code path (`assets::download` then `assets::verify`): internal checksum, model identity and document-builder version all pass - see docs/eval-results.md. THE REFUSAL IS EVIDENCED TOO: the superseded embeddings-v1 artefact is refused by name, 'artefact was built for model \"all-MiniLM-L6-v2-int8\", this build has \"bge-small-en-v1.5-int8\"'. DEGRADES to FTS5-only when absent: Engine::keyword_only, selected by the app at launch and surfaced in the UI."
       }
     ]
   },
@@ -177,7 +195,6 @@
           "evidence": "docs/RISKS.md covers all ten Appendix D risks plus a new R11 (third-party API terms change), each with owner, likelihood, impact, mitigation and at least one CONCRETE trigger. Examples: R3 fires if Spike C query-embedding p95 exceeds ~30 ms; R7 fires at 30 days without a commit; R10 fires if tools/guard/allowlist.txt gains a line without an ADR. R3's impact was raised to Moderate/Severe by ADR-0015."
         }
       ],
-      "note": "Split into 0a (rails), 0b (documents) and 0c (lean-profile amendments, rulings on the open items, and E1). spec_version 1.2.0 shifts the project to the lean documentation profile of ADR-0016: shipping is the priority, learning is deferred.",
       "subtasks": [
         {
           "id": "0.1",
@@ -281,7 +298,8 @@
           "status": "complete",
           "commit": "cc6a89e"
         }
-      ]
+      ],
+      "note": "Split into 0a (rails), 0b (documents) and 0c (lean-profile amendments, rulings on the open items, and E1). spec_version 1.2.0 shifts the project to the lean documentation profile of ADR-0016: shipping is the priority, learning is deferred."
     },
     {
       "number": 1,
@@ -407,7 +425,38 @@
       "sessions": "1–2",
       "status": "complete",
       "completion_commit": "3c2077f",
-      "note": "Phase 2 builds the visual language BEFORE any product UI. Two constraints carry over from Phase 1: ADR-0020 removed the gradient scrim under player chrome, so the design system must produce a solid opaque panel; and ADR-0013 requires every artwork-bearing surface to have a designed artwork-free state, so PosterCard needs a typographic fallback rather than a grey rectangle.",
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "Every primitive renders correctly in the gallery, in all states.",
+          "met": true,
+          "evidence": "Rendered headless at 1500px across all four gallery tabs with 0 page errors; screenshots in tools/uiaudit/out/. Every primitive shown in loading, disabled, error and empty states; PosterCard shown in both ADR-0013 states side by side."
+        },
+        {
+          "id": "E2",
+          "text": "The entire gallery is navigable by keyboard alone with visible focus at every step.",
+          "met": true,
+          "evidence": "node tools/uiaudit/run.mjs: 45 Tab stops walked, 0 without a visible focus ring, 0 off-screen. Rail exposes exactly 1 tab stop; ArrowRight/End reach card 499 of 500 (roving tabindex)."
+        },
+        {
+          "id": "E3",
+          "text": "Contrast audit passes.",
+          "met": true,
+          "evidence": "python tools/contrast/audit.py -> \"29 enforced pairs pass WCAG AA (3 decorative recorded, not enforced)\"; runs in CI."
+        },
+        {
+          "id": "E4",
+          "text": "A rail of 500 poster cards scrolls at 60 fps with no dropped frames.",
+          "met": true,
+          "evidence": "node tools/uiaudit/run.mjs -> 200 sampled frames flicking 500 cards: median 16.7ms, p95 16.7ms, worst 16.8ms, 0 frames over 33.3ms, 14/500 cards mounted. Harness verified to fail on a reintroduced regression."
+        },
+        {
+          "id": "E5",
+          "text": "`docs/specs/design-system.md` documents every token and component with usage rules.",
+          "met": true,
+          "evidence": "docs/specs/design-system.md - tokens, layout invariants, all 21 components, Rail virtualisation + keyboard contract, motion, measured numbers, and rules for extending it."
+        }
+      ],
       "subtasks": [
         {
           "id": "2.0",
@@ -470,38 +519,7 @@
           "commit": "aebbd7f"
         }
       ],
-      "exit_criteria": [
-        {
-          "id": "E1",
-          "text": "Every primitive renders correctly in the gallery, in all states.",
-          "met": true,
-          "evidence": "Rendered headless at 1500px across all four gallery tabs with 0 page errors; screenshots in tools/uiaudit/out/. Every primitive shown in loading, disabled, error and empty states; PosterCard shown in both ADR-0013 states side by side."
-        },
-        {
-          "id": "E2",
-          "text": "The entire gallery is navigable by keyboard alone with visible focus at every step.",
-          "met": true,
-          "evidence": "node tools/uiaudit/run.mjs: 45 Tab stops walked, 0 without a visible focus ring, 0 off-screen. Rail exposes exactly 1 tab stop; ArrowRight/End reach card 499 of 500 (roving tabindex)."
-        },
-        {
-          "id": "E3",
-          "text": "Contrast audit passes.",
-          "met": true,
-          "evidence": "python tools/contrast/audit.py -> \"29 enforced pairs pass WCAG AA (3 decorative recorded, not enforced)\"; runs in CI."
-        },
-        {
-          "id": "E4",
-          "text": "A rail of 500 poster cards scrolls at 60 fps with no dropped frames.",
-          "met": true,
-          "evidence": "node tools/uiaudit/run.mjs -> 200 sampled frames flicking 500 cards: median 16.7ms, p95 16.7ms, worst 16.8ms, 0 frames over 33.3ms, 14/500 cards mounted. Harness verified to fail on a reintroduced regression."
-        },
-        {
-          "id": "E5",
-          "text": "`docs/specs/design-system.md` documents every token and component with usage rules.",
-          "met": true,
-          "evidence": "docs/specs/design-system.md - tokens, layout invariants, all 21 components, Rail virtualisation + keyboard contract, motion, measured numbers, and rules for extending it."
-        }
-      ]
+      "note": "Phase 2 builds the visual language BEFORE any product UI. Two constraints carry over from Phase 1: ADR-0020 removed the gradient scrim under player chrome, so the design system must produce a solid opaque panel; and ADR-0013 requires every artwork-bearing surface to have a designed artwork-free state, so PosterCard needs a typographic fallback rather than a grey rectangle."
     },
     {
       "number": 3,
@@ -510,7 +528,39 @@
       "depends_on": "1",
       "sessions": "1–2",
       "status": "complete",
-      "note": "The schema everything else depends on, designed once. Two constraints carry over: ADR-0022 puts all SQL in crates/persistence with src-tauri/src/persistence/ as re-exports only (guard-enforced), and SPEC.md 6.2 requires anime's absolute-vs-seasonal numbering and title variants designed NOW rather than patched in Phase 12. media_kind carries all eight values from the start so Phases 24-25 need no migration.",
+      "completion_commit": "65f5147",
+      "exit_criteria": [
+        {
+          "id": "E1",
+          "text": "All migrations run forward and backward cleanly against a populated database.",
+          "met": true,
+          "evidence": "crates/persistence/tests/migrations.rs - 9 tests. `migrations_roll_back_against_a_populated_database` populates a FILE database across all four migrations then rolls back one at a time to 0 and asserts no tables survive; `the_ladder_can_be_climbed_twice` re-applies afterwards, which is what catches a down script that drops a table but forgets its indexes. Command: cargo test -p sinephile-persistence."
+        },
+        {
+          "id": "E2",
+          "text": "Schema documented with an entity-relationship diagram in `docs/ARCHITECTURE.md`.",
+          "met": true,
+          "evidence": "docs/ARCHITECTURE.md - mermaid ER diagram covering all 19 tables plus episode_numbering, with the four design decisions and the load-bearing PRAGMA configuration."
+        },
+        {
+          "id": "E3",
+          "text": "A database populated with 500,000 synthetic media items answers indexed lookups in under 100 ms. (The 100 ms budget is the lookup alone; bulk insertion of the 500,000 rows has no time budget and is measured and recorded separately in `docs/PERFORMANCE.md`.)",
+          "met": true,
+          "evidence": "cargo test -p sinephile-persistence --release --test benchmark -- --ignored --nocapture, 500,000 synthetic rows: by_id p99 0.098ms, by_exact_title p99 0.179ms, by_external_id p99 0.120ms against a 100ms budget. Bulk insert 43.7s (11,440 rows/sec), database 145.4 MB, timed separately per amendment 15. Recorded in docs/eval-results.md and docs/PERFORMANCE.md. The benchmark found idx_titles_text silently full-scanning (26.679ms -> 0.081ms p50, 330x) because its collation did not match the query's."
+        },
+        {
+          "id": "E4",
+          "text": "Copying the app folder to another location and launching it preserves all data.",
+          "met": true,
+          "evidence": "crates/persistence/tests/portability.rs - 5 tests. `a_copied_data_folder_keeps_everything` writes a populated installation, checkpoints the WAL, copies the whole data folder to another path with a directory-tree copy, opens it there and asserts catalogue, watch history, resume position and settings all survive; `nothing_in_the_database_records_where_it_lives` introspects the schema and fails if any new path-shaped column appears. Found a real bug: open_in probed writability before creating the directory, which failed on every fresh portable install."
+        },
+        {
+          "id": "E5",
+          "text": "An ADR records why the schema is generic over media kind.",
+          "met": true,
+          "evidence": "docs/adr/0025-generic-media-schema.md, verified by tests/migrations.rs::all_eight_media_kinds_are_accepted."
+        }
+      ],
       "subtasks": [
         {
           "id": "3.1",
@@ -585,39 +635,7 @@
           "commit": "593fcc8"
         }
       ],
-      "exit_criteria": [
-        {
-          "id": "E1",
-          "text": "All migrations run forward and backward cleanly against a populated database.",
-          "met": true,
-          "evidence": "crates/persistence/tests/migrations.rs - 9 tests. `migrations_roll_back_against_a_populated_database` populates a FILE database across all four migrations then rolls back one at a time to 0 and asserts no tables survive; `the_ladder_can_be_climbed_twice` re-applies afterwards, which is what catches a down script that drops a table but forgets its indexes. Command: cargo test -p sinephile-persistence."
-        },
-        {
-          "id": "E2",
-          "text": "Schema documented with an entity-relationship diagram in `docs/ARCHITECTURE.md`.",
-          "met": true,
-          "evidence": "docs/ARCHITECTURE.md - mermaid ER diagram covering all 19 tables plus episode_numbering, with the four design decisions and the load-bearing PRAGMA configuration."
-        },
-        {
-          "id": "E3",
-          "text": "A database populated with 500,000 synthetic media items answers indexed lookups in under 100 ms. (The 100 ms budget is the lookup alone; bulk insertion of the 500,000 rows has no time budget and is measured and recorded separately in `docs/PERFORMANCE.md`.)",
-          "met": true,
-          "evidence": "cargo test -p sinephile-persistence --release --test benchmark -- --ignored --nocapture, 500,000 synthetic rows: by_id p99 0.098ms, by_exact_title p99 0.179ms, by_external_id p99 0.120ms against a 100ms budget. Bulk insert 43.7s (11,440 rows/sec), database 145.4 MB, timed separately per amendment 15. Recorded in docs/eval-results.md and docs/PERFORMANCE.md. The benchmark found idx_titles_text silently full-scanning (26.679ms -> 0.081ms p50, 330x) because its collation did not match the query's."
-        },
-        {
-          "id": "E4",
-          "text": "Copying the app folder to another location and launching it preserves all data.",
-          "met": true,
-          "evidence": "crates/persistence/tests/portability.rs - 5 tests. `a_copied_data_folder_keeps_everything` writes a populated installation, checkpoints the WAL, copies the whole data folder to another path with a directory-tree copy, opens it there and asserts catalogue, watch history, resume position and settings all survive; `nothing_in_the_database_records_where_it_lives` introspects the schema and fails if any new path-shaped column appears. Found a real bug: open_in probed writability before creating the directory, which failed on every fresh portable install."
-        },
-        {
-          "id": "E5",
-          "text": "An ADR records why the schema is generic over media kind.",
-          "met": true,
-          "evidence": "docs/adr/0025-generic-media-schema.md, verified by tests/migrations.rs::all_eight_media_kinds_are_accepted."
-        }
-      ],
-      "completion_commit": "65f5147"
+      "note": "The schema everything else depends on, designed once. Two constraints carry over: ADR-0022 puts all SQL in crates/persistence with src-tauri/src/persistence/ as re-exports only (guard-enforced), and SPEC.md 6.2 requires anime's absolute-vs-seasonal numbering and title variants designed NOW rather than patched in Phase 12. media_kind carries all eight values from the start so Phases 24-25 need no migration."
     },
     {
       "number": 4,
@@ -625,50 +643,130 @@
       "title": "Metadata Backbone",
       "depends_on": "3",
       "sessions": "2–3",
-      "status": "not_started",
+      "status": "in_progress",
       "completion_commit": null,
       "exit_criteria": [
         {
           "id": "E1",
           "text": "Full ingestion completes on the dev machine and the resulting database is under a documented size budget.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "Re-confirmed 2026-10-25 under the SI reading of R4's 4 GB (author's D47 option 1). RESULTING DATABASE 3,945,598,976 bytes = 3.946 GB, 54 MB under 4 GB, after `./target/release/ingest.exe compact` at 814fc41 (4,062,978,048 -> 3,945,598,976 bytes, 111 MiB recovered, 34 s; recorded in docs/eval-results.md Session 19). Every ingestion command now compacts after itself (df3ca35). Margin is thin: the app's launch-time refresh does not compact, so it erodes the 54 MB (docs/RISKS.md R4). Ingestion completeness unchanged from 2026-09-07: title.basics 2,701,195, title.principals 10,092,368, name.basics 2,736,235, title.akas 5,908,381, episodes 132,845 rows / 5,862 seasons / 4,529 series, MovieLens 61,912 of 62,423 films matched (99.2%). The artefact and index live outside the database and are counted separately (D33)."
         },
         {
           "id": "E2",
           "text": "Ingestion killed mid-run resumes correctly.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "`cargo test -p sinephile-ingest --test resume` -> 10 passing, 2026-09-05. a_killed_run_resumes_and_repeats_nothing asserts 50 items exist EXACTLY once after a kill at item 20; progress_survives_a_restart; a_step_that_does_not_advance_its_cursor_is_stopped; and an_interrupted_run_resumes_at_the_next_page in tests/anime.rs. Demonstrated for real as well: the AniList sweep was interrupted and resumed during development, and a_crash_mid_step_reports_that_it_is_resuming was corrected after `is_resuming` was found reporting a fresh run on every real resume."
         },
         {
           "id": "E3",
           "text": "Catalogue lookups work with the network disconnected.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "STRUCTURAL: crates/persistence has no HTTP client in its dependency tree - sqlx is configured sqlite-only with no postgres/mysql feature, and the rest is serde, thiserror, time, tracing, windows-sys. The catalogue layer is incapable of a network call, so lookups cannot depend on one. Exercised by 72 passing tests in `cargo test -p sinephile-persistence`, including the 500,000-row indexed-lookup benchmark, none of which touch a network."
         },
         {
           "id": "E4",
           "text": "Rate limits are never exceeded under a stress test of 1,000 rapid lookups.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "`cargo test -p sinephile-metadata-api` -> limiter::tests::a_thousand_rapid_requests_never_exceed_the_limit, 2026-09-05. 1,000 acquisitions against a 40-per-10-seconds limit must take at least (1000-40)/4 = 240 simulated seconds; the test fails if they are faster. Uses tokio's paused clock, so it measures the limiter rather than the wall."
         },
         {
           "id": "E5",
           "text": "Anime titles resolve across AniList and TMDB with correct ID mapping for a hand-checked set of 50 titles including tricky cases (long-running shonen, split-cour seasons, films tied to series).",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "`./target/release/ingest verify-anime` -> 64/64 pass, 2026-09-04. Fixture fixtures/anime/e5-hand-checked.tsv covers long-running shonen, split-cour seasons and films tied to series, plus 3 expected REFUSALS and 2 season claims. Numbers and the four fixture errors the first run exposed are in docs/eval-results.md. TMDB half of E5 is not covered - no key ships (ADR-0027), so it is verified per-user in subtask 4.7."
         },
         {
           "id": "E6",
           "text": "The catalogue is fully usable with no TMDB key (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "MEASURED on the real catalogue, 2026-09-05, with NO TMDB key ever supplied: 0 rows in external_ids with source='tmdb' and 0 TMDB responses in http_cache. The catalogue nonetheless holds 2,702,737 titles, 855,703 core-tier, 10,079,841 credits, 6,176,950 title rows, 4,450,735 genre links, 1,086,210 ratings, 2,008,183 runtimes and 539,817 episodes - all from IMDb and AniList alone. ADR-0027's per-profile key surface exists (crates/persistence/src/repositories/credentials.rs) and defaults to TmdbAccess::Absent."
         },
         {
           "id": "E7",
           "text": "The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "MET 2026-09-15. PRODUCED: 855,703 vectors, 313 MB, deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version, snapshot date and text source (format v2). PUBLISHED: release embeddings-v2 on github.com/ohfrjustlikethat/sin-e-phile, asset embeddings-bge-small-en-v1.5-int8.bin, 328,590,240 bytes, confirmed by `gh release view` and by the URL returning HTTP 200 at that exact length. DOWNLOADED AND VERIFIED end to end through the application's own code path (`assets::download` then `assets::verify`): internal checksum, model identity and document-builder version all pass - see docs/eval-results.md. THE REFUSAL IS EVIDENCED TOO: the superseded embeddings-v1 artefact is refused by name, 'artefact was built for model \"all-MiniLM-L6-v2-int8\", this build has \"bge-small-en-v1.5-int8\"'. DEGRADES to FTS5-only when absent: Engine::keyword_only, selected by the app at launch and surfaced in the UI."
+        }
+      ],
+      "subtasks": [
+        {
+          "id": "4.1",
+          "text": "tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts",
+          "status": "complete",
+          "commit": "4a78d64"
+        },
+        {
+          "id": "4.2",
+          "text": "IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres",
+          "status": "complete",
+          "commit": "048180a"
+        },
+        {
+          "id": "4.3",
+          "text": "MovieLens join for ratings and popularity (ADR-0019, on-device)",
+          "status": "complete",
+          "commit": "42177d6"
+        },
+        {
+          "id": "4.4",
+          "text": "AniList ingestion: anime catalogue, romaji/native/english titles, and seasonal episode numbering into episode_numbering. Absolute numbering is NULL by ADR-0031 - no free source publishes one.",
+          "status": "complete",
+          "commit": "a170532"
+        },
+        {
+          "id": "4.5",
+          "text": "External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules",
+          "status": "complete",
+          "commit": "f67d939"
+        },
+        {
+          "id": "4.6",
+          "text": "Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline",
+          "status": "complete",
+          "commit": "38d75d7"
+        },
+        {
+          "id": "4.7",
+          "text": "Per-profile TMDB key from settings, never shipped (ADR-0027), DPAPI-wrapped at rest; every TMDB-dependent surface degrades to the typographic state. Storage and the degradation contract are done; the settings UI is Phase 14. CLOSED with Phase 4: the Phase 4 part (storage, DPAPI, degradation contract) is done; the settings UI is Phase 14's deliverable.",
+          "status": "complete",
+          "commit": "2358993"
+        },
+        {
+          "id": "4.8",
+          "text": "Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding (42.1% measured on real stills), blurhash placeholders. crates/artwork is done; wiring it to a TMDB image client is Phase 11. CLOSED with Phase 4: crates/artwork is done; wiring it to a TMDB image client is Phase 11's deliverable.",
+          "status": "complete",
+          "commit": "5840b99"
+        },
+        {
+          "id": "4.9",
+          "text": "First-run flow: usable during the background build, searching what is ingested so far. CatalogueRepository::readiness is the backend surface (Empty/Building/Interrupted/Ready, each carrying the searchable count); the progress UI itself is Phase 14. CLOSED with Phase 4: the readiness surface is done; the progress UI is Phase 14's deliverable.",
+          "status": "complete",
+          "commit": "624b76f"
+        },
+        {
+          "id": "4.10",
+          "text": "The embedding artefact producer (ADR-0014). crates/embedding holds the document builder, int8 quantisation and the checksummed format; tools/ingest/src/embed.rs is the resumable producer, model and tokenizer checksum-pinned; format specified in docs/specs/embedding-artefact.md. PRODUCED: 855,703 vectors, 313 MB, sha256 3fce6f06..., verified by `ingest verify-embeddings`. Publishing it is blocker B3.",
+          "status": "complete",
+          "commit": "4f302d5"
+        },
+        {
+          "id": "4.11",
+          "text": "50-title anime fixture for E5: fixtures/anime/e5-hand-checked.tsv, 64 rows, checked by `ingest verify-anime` which exits non-zero on any mismatch",
+          "status": "complete",
+          "commit": "f19ddda"
+        },
+        {
+          "id": "4.12",
+          "text": "Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits",
+          "status": "complete",
+          "commit": "38d75d7"
+        },
+        {
+          "id": "4.13",
+          "text": "Incremental catalogue refresh (ADR-0030): re-fetch title.basics/ratings/episode and insert only the tail past the highest id already stored, reusing TsvReader::seek_past. Plus AniList airing schedules, which need no key. See docs/specs/catalogue-freshness.md.",
+          "status": "complete",
+          "commit": "47e7353"
         }
       ]
     },
@@ -678,38 +776,106 @@
       "title": "Semantic Search Engine",
       "depends_on": "4",
       "sessions": "2",
-      "status": "not_started",
+      "status": "in_progress",
       "completion_commit": null,
       "exit_criteria": [
         {
           "id": "E1",
           "text": "p95 keystroke-to-results < 80 ms over the full catalogue.",
           "met": false,
-          "evidence": null
+          "evidence": "MEASURED 2026-10-25, carried (ADR-0036): `cargo run --release -p eval -- search --report` -> hybrid p95 15.2 ms (p50 6.4, max 69.6) over the real catalogue including query embedding, BM25, vectors and fusion, at 814fc41, on Tier 2. The search screen's byline lookup adds p95 10.3 ms for 20 ids (docs/eval-results.md). Under 80 ms here; unmeasured on Tier 0.",
+          "carried_to_phase": 21,
+          "carried_reason": "SPEC.md 2.3 enforces the 80 ms budget against Tier 0 hardware, and this is a Tier 2 dev machine; P8 already schedules the Tier 0 measurement for Phase 21."
         },
         {
           "id": "E2",
           "text": "Exact-title top-1 rate is 100% on the fixture corpus.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "`cargo run -p eval --release -- search --report` -> 43/43 = 100%, 2026-09-06, over fixtures/search/exact-titles.tsv against the real 2,702,737-title catalogue. Queries chosen to be awkward: one-letter titles, FTS5 syntax (Face/Off, Mission: Impossible, And Then There Were None), dropped diacritics, romaji forms, and titles several works share. The harness exits non-zero on any miss, so it gates rather than informs."
         },
         {
           "id": "E3",
           "text": "nDCG@10 > 0.75 on the semantic query set.",
           "met": false,
-          "evidence": null
+          "evidence": "MEASURED 2026-10-25, carried (ADR-0036): `cargo run --release -p eval -- search --report` at 814fc41 -> meaning nDCG@10 0.0472 over 8 queries (v2 layout: 0.1188, accepted regression, B7), filter 1.0000 over 2. Two queries are capped at 0.7468 because a graded answer is outside the vector index. docs/eval-results.md Session 19; docs/case-study/search.md.",
+          "carried_to_phase": 16,
+          "carried_reason": "Five distinct attempts failed to reach 0.75, the last lowering it; Phase 16's content-based layer works in the same embedding space and is the next place retrieval quality can be changed."
         },
         {
           "id": "E4",
           "text": "\"films about grief that aren't depressing\" and \"like Wong Kar-wai but Korean\" both return defensible results — documented with screenshots in the case study.",
           "met": false,
-          "evidence": null
+          "evidence": "DOCUMENTED, NOT MET, carried (ADR-0036): docs/case-study/search.md with screenshots docs/case-study/shots/01-grief.png and 02-wong-kar-wai.png of the release build at 21d0b23. The grief page ranks the graded answer #8 and ignores 'aren't depressing'; the Wong Kar-wai page finds his films and Hong Kong cinema, not Korean films like his. nDCG 0.1505 and 0.0752.",
+          "carried_to_phase": 16,
+          "carried_reason": "Neither named query returns a defensible page; the cause is the same retrieval quality as E3, so it moves with E3 to Phase 16's content-based layer."
         },
         {
           "id": "E5",
           "text": "Works fully offline.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "STRUCTURAL PLUS MEASURED. The search path touches the network nowhere: sinephile_search_engine::Engine::search reads SQLite and a memory-mapped HNSW index and embeds the query locally through ONNX Runtime - no HTTP client is in the dependency tree of crates/search-engine, crates/vector-index or crates/embedder. Demonstrated 2026-09-14 in the release app: every screenshot in docs/case-study/shots/ is a real search over 2,702,737 titles, and the only network call the application makes on launch is the catalogue freshness HEAD (crates/catalogue/src/freshness.rs), which resolves to Freshness::Unknown when offline and never blocks or fails - with a test asserting exactly that (being_offline_is_not_an_error_and_is_not_a_refresh)."
+        }
+      ],
+      "subtasks": [
+        {
+          "id": "5.1",
+          "text": "FTS5 index over titles, alternative titles, people and keywords, with BM25 ranking. Migration; unicode61 with diacritic folding, plus a trigram index for typo tolerance. Verified available: SQLite 3.46.0 bundled with sqlx supports fts5, trigram, unicode61 and bm25().",
+          "status": "complete",
+          "commit": "9d4123a"
+        },
+        {
+          "id": "5.2",
+          "text": "The exact-title short-circuit. E2 demands a 100% top-1 rate, so a literal title match must bypass ranking entirely rather than merely score highly. titles.normalised (migration 0009) already exists for this.",
+          "status": "complete",
+          "commit": "9d4123a"
+        },
+        {
+          "id": "5.3",
+          "text": "HNSW over the 855,703-vector artefact, persisted and memory-mapped. P11 resolved: usearch, chosen because Index::view() mmaps rather than loads - a 313 MB index in RAM breaks the SPEC.md 2.3 Tier 0 budget of 250 MB, which is the tier the artefact exists to serve. Recall must be measured against brute force before any relevance number is reported.",
+          "status": "complete",
+          "commit": "554c50d"
+        },
+        {
+          "id": "5.4",
+          "text": "Reciprocal rank fusion of BM25 and vector results, with the exact-title short-circuit above both. Built as crates/search-engine, NOT in crates/persistence: fusion needs usearch and ONNX Runtime, and those in the persistence crate would make a native model runtime a dependency of repository_surface.rs. RRF k=60 is the literature default and is NOT yet measured - nothing exists to measure it against until 5.6's semantic fixture.",
+          "status": "complete",
+          "commit": "bdbd560"
+        },
+        {
+          "id": "5.5",
+          "text": "Query understanding: crates/search-engine/src/query.rs extracts year ranges, runtime bounds and 'directed by' as structured FILTERS, applied in SQL. LANGUAGE IS NOT IMPLEMENTABLE: media_items.original_language is NULL on all 2,702,737 rows because the IMDb datasets do not publish it (D38). Filters both narrow candidates and retrieve, after 'directed by Akira Kurosawa' returned nothing at all.",
+          "status": "complete",
+          "commit": "1e71579"
+        },
+        {
+          "id": "5.6",
+          "text": "fixtures/search/ and the relevance harness. exact-titles.tsv (43 queries), semantic-queries.tsv (10 queries, 37 graded answers, meaning and filter scored SEPARATELY), plus `eval vector` (recall, with a --prove control), `eval embed` (byte-identical agreement, and --compare to price a document change before spending a re-embed on it). nDCG@10 is now reported next to E1 and E2 and gates the exit code.",
+          "status": "complete",
+          "commit": "8c04085"
+        },
+        {
+          "id": "5.7",
+          "text": "The application opens the database (D26) and refreshes the catalogue on launch (D37). Both on a background task, so cold start is unchanged: 328-522 ms against Phase 1's 515/660. The catalogue pipeline moved from tools/ingest to crates/catalogue to make the second possible at all. Measured end to end: a launch added 4,604 titles nobody asked for, and a launch with nothing to do reports AlreadyCurrent 260 ms after the frontend paints.",
+          "status": "complete",
+          "commit": "b89bbe2"
+        },
+        {
+          "id": "5.8",
+          "text": "Search UI: results as you type (120 ms debounce, sequence-numbered so a slow old query cannot overwrite a fast new one), grouped by kind, keyboard navigable, with a 'why this matched' hint. Reached by '/' or Ctrl+F rather than joining the nav rail, because SPEC.md 3.1 names five top-level surfaces and the navigation shape must not change under the user. SearchResponse carries readiness, so the screen CANNOT say 'no results' while the catalogue is still building. tools/shots/capture.ps1 drives the real binary and captures the window; docs/case-study/search.md is written from those shots.",
+          "status": "complete",
+          "commit": "e774497"
+        },
+        {
+          "id": "5.9",
+          "text": "Tier 0 artefact download with consent and the size shown (ADR-0014, D27). crates/catalogue/src/assets.rs states what is missing and what it costs from PINNED values before any download; Tauri commands and a consent screen naming each file separately. VERIFIED END TO END 2026-09-15 against the real published release embeddings-v2: 346 MB across three files, each fetched and verified - the artefact by its own internal checksum plus model identity and document-builder version, the model and tokenizer by pinned file sha256. Degradation when absent is Engine::keyword_only, the Tier 0 floor, and the UI says so.",
+          "status": "complete",
+          "commit": "b664e27"
+        },
+        {
+          "id": "5.10",
+          "text": "crates/embedder: lift the ONNX sentence-transformer out of tools/ingest so the application can embed a query (ADR-0015 embeds queries on every tier). One implementation shared by producer and query path, because tokenizer settings, truncation, pooling and normalisation each fail SILENTLY when they differ. `eval embed --report` proves agreement byte-identically against the artefact and was seen to fail (2/10) when MAX_TOKENS was changed.",
+          "status": "complete",
+          "commit": "396f256"
         }
       ]
     },
@@ -801,6 +967,18 @@
         },
         {
           "id": "E6",
+          "text": "Measured against qBittorrent on both axes and both numbers published: time-to-first-frame on a healthy swarm, and sustained bulk throughput on the same torrent. Losing on bulk is a finding, not a failure — ADR-0029 exists so the project does not have to win that comparison — but the comparison must be made rather than left implicit.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E7",
+          "text": "Binding to a specific network interface works, verified by disabling that adapter mid-download and confirming traffic stops rather than falling back.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E8",
           "text": "`docs/specs/streaming-scheduler.md` explains the algorithm with a diagram.",
           "met": false,
           "evidence": null
@@ -1053,24 +1231,42 @@
         },
         {
           "id": "E2",
-          "text": "Downloads survive an app restart and resume.",
+          "text": "A download completed through the qBittorrent backend files into the library identically to one completed through librqbit, verified by comparing the resulting rows.",
           "met": false,
           "evidence": null
         },
         {
           "id": "E3",
-          "text": "A completed download is automatically matched and appears in the local library with no user action.",
+          "text": "With qBittorrent configured but not running, a queued download falls back to librqbit rather than failing.",
           "met": false,
           "evidence": null
         },
         {
           "id": "E4",
-          "text": "Bandwidth limits are actually respected, verified by measurement.",
+          "text": "`tools/guard` rejects any code path that reads qBittorrent's search plugins, RSS feeds or tracker configuration.",
           "met": false,
           "evidence": null
         },
         {
           "id": "E5",
+          "text": "Downloads survive an app restart and resume.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E6",
+          "text": "A completed download is automatically matched and appears in the local library with no user action.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E7",
+          "text": "Bandwidth limits are actually respected, verified by measurement.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E8",
           "text": "The recommendation reason is a single readable sentence.",
           "met": false,
           "evidence": null
@@ -1264,7 +1460,7 @@
       "slug": "browsing-surfaces",
       "title": "Browsing Surfaces",
       "depends_on": "17",
-      "sessions": "2–3",
+      "sessions": "4–5",
       "status": "not_started",
       "completion_commit": null,
       "exit_criteria": [
@@ -1288,13 +1484,37 @@
         },
         {
           "id": "E4",
-          "text": "Full keyboard navigation across all browsing surfaces.",
+          "text": "Full keyboard navigation across all browsing surfaces, including the masthead's tab order: wordmark, destinations, Search, Downloads, Settings, then content.",
           "met": false,
           "evidence": null
         },
         {
           "id": "E5",
-          "text": "Screenshots of Home, Films, and a detail page are good enough for the README.",
+          "text": "The masthead fits at the 1024×640 minimum window with every destination, Search, Downloads and Settings visible, measured by `tools/uiaudit`.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E6",
+          "text": "Search is reachable from every surface by the visible Search button and by `/`.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E7",
+          "text": "No destination or state shows a placeholder screen.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E8",
+          "text": "The design lint passes in CI, and each of its rules has been seen to fail.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E9",
+          "text": "The author signs off the screenshot review set (every surface, both sizes, with and without artwork) against §9.0's test: `manual: <what they reviewed and said>`. This set supplies the README's screenshots.",
           "met": false,
           "evidence": null
         }
@@ -1658,7 +1878,7 @@
       ]
     }
   ],
-  "next_action": "Finish the navigation system on chore/navigation-system: write the six skills under .claude/skills/<name>/SKILL.md (status, next, finish, closephase, unstuck, decide), docs/COMMANDS.md as the cheat sheet, and CLAUDE.md's fifth protocol on how to ask for a decision. Then generate the Phase 4 doc with `python tools/phasedoc/generate.py --open 4` and start Phase 4 from SPEC.md 15.",
+  "next_action": "spec_version 2.0.0 is in force: P14 enacted (ADR-0036, Appendix B) and the masthead plus Phase 18 overhaul specified (ADR-0037). The author will direct what comes next. The open threads, in the order they unblock things: (1) Close Phase 4. Its record is current_phase; run /closephase 4, checking every criterion against evidence, carrying any that are genuinely unmeetable under Appendix B. (2) Close Phase 5 the same way: E1 carried to Phase 21 (Tier 0 measurement, P8), E3/E4 carried with evidence 'meaning 0.0472, eval search --report, 21d0b23' and the case-study screenshots; first retake those screenshots with the machine idle (`powershell -ExecutionPolicy Bypass -File tools/shots/capture.ps1 -SettleMs 9000 -QueryMs 3500`). (3) Optionally, if the author asks, build the masthead ahead of Phase 18 (SPEC.md §9.4): replace src/app/NavRail.tsx and src/app/TitleBar.tsx with one Masthead component, remove railExpanded from src/lib/store.ts, and extend tools/uiaudit's keyboard-reach check to the masthead's tab order. (4) Phase 6, source-resolver.",
   "blockers": [],
   "decisions_pending": [
     {
@@ -1684,6 +1904,18 @@
       "text": "Spike C measured query-embedding latency on the Tier 2 dev machine only. ADR-0015 also asked for a constrained VM approximating Tier 0. Unpadded headroom is ~18x so this does not block Phase 5, but the padded worst case with a 3-4x Tier 0 penalty lands at 24-33 ms, close to the 30 ms trigger. Measure before Phase 21 signs off the 80 ms search budget.",
       "raised": "2026-08-31",
       "decide_by_phase": 21
+    },
+    {
+      "id": "P12",
+      "text": "DECIDED 2026-09-07 BY THE AUTHOR: option 2, Wikidata/Wikipedia abstracts. The author has no TMDB key and does not want one as a build dependency, which also removes ADR-0018's licensing question from the published artefact entirely. Remaining work: a Wikidata abstract loader joined on IMDb id (property P345), a re-embed, and an index rebuild, then re-measure E4's two queries with `eval search --query`. P12 stays open only until that measurement says whether coverage is enough; if it is not, the fallback is a per-user TMDB key enriching live rather than a rebuilt artefact. Original options in docs/DECISIONS_PENDING.md.",
+      "raised": "2026-09-07",
+      "decide_by_phase": 5
+    },
+    {
+      "id": "P13",
+      "text": "DECIDED 2026-09-07 BY THE AUTHOR: swap to bge-small-en-v1.5 (ADR-0034). Done and measured. E4's two named queries improved markedly - 'like Wong Kar-wai but Korean' now returns Chungking Express first, his signature film, which MiniLM never found. E1 p95 31.3 ms, E2 43/43, recall 0.9670, agreement 10/10. STILL OPEN only for the residue: a harder plot query does not surface Manchester by the Sea, and the evidence points at DOCUMENT LAYOUT rather than the model - its document opens with five cast names before any plot, inside a 400-character budget (D39). Next measurable step is synopsis-first plus a larger SYNOPSIS_CHARS, priced with `eval embed --compare` before another re-embed is spent.",
+      "raised": "2026-09-07",
+      "decide_by_phase": 5
     }
   ],
   "adrs": [
@@ -1801,6 +2033,76 @@
       "id": "0023",
       "title": "Visual direction: editorial, near-black, and not AI-generated",
       "date": "2026-09-01"
+    },
+    {
+      "id": "0024",
+      "title": "The design system is Take B, with Take A's hero",
+      "date": "2026-08-31"
+    },
+    {
+      "id": "0025",
+      "title": "The schema is generic over media kind",
+      "date": "2026-08-31"
+    },
+    {
+      "id": "0026",
+      "title": "Runtime-checked SQL, and the test that compensates for it",
+      "date": "2026-09-01"
+    },
+    {
+      "id": "0027",
+      "title": "TMDB runs on the user's own key, and no key ever ships",
+      "date": "2026-09-01"
+    },
+    {
+      "id": "0028",
+      "title": "The navigation system: phase docs, commands, and statecheck",
+      "date": "2026-09-01"
+    },
+    {
+      "id": "0029",
+      "title": "qBittorrent as an optional download backend",
+      "date": "2026-09-01"
+    },
+    {
+      "id": "0030",
+      "title": "The catalogue refreshes in layers",
+      "date": "2026-09-01"
+    },
+    {
+      "id": "0031",
+      "title": "Absolute episode numbering is not published by any free source",
+      "date": "2026-09-04"
+    },
+    {
+      "id": "0032",
+      "title": "IMDb's files sort as text, so the refresh filters rather than seeks",
+      "date": "2026-09-04"
+    },
+    {
+      "id": "0033",
+      "title": "Wikipedia abstracts are the embedding text source",
+      "date": "2026-09-07"
+    },
+    {
+      "id": "0034",
+      "title": "bge-small-en-v1.5 replaces all-MiniLM-L6-v2",
+      "date": "2026-09-07"
+    },
+    {
+      "id": "0035",
+      "title": "gitleaks false positives are allowlisted by exact value, and only with an ADR",
+      "date": "2026-10-23"
+    },
+    {
+      "id": "0036",
+      "title": "A built phase may carry an unmet criterion to a named later phase",
+      "date": "2026-10-25"
+    },
+    {
+      "id": "0037",
+      "title": "Navigation moves to a top masthead, and Phase 18 ends with a design overhaul",
+      "date": "2026-10-25"
     }
   ],
   "environment": {
@@ -1811,10 +2113,10 @@
     "python_version": "3.12.10",
     "msvc_version": "14.50.35717 (VS Enterprise 2026 Insiders — vswhere needs -prerelease to find it)",
     "windows_sdk": "10.0.26100",
-    "webview2": "151.0.4129.107",
+    "webview2": "155.0.4283.45",
     "ffmpeg_version": "9.0",
-    "verified_at": "2026-08-30T13:10:00Z",
-    "verified_how": "tools/doctor/doctor.py exit 0, plus a real cargo new/build/run round trip",
+    "verified_at": "2026-10-16T00:00:00Z",
+    "verified_how": "tools/doctor/doctor.py --no-fix exit 0, all required present, 2026-10-16. WebView2 moved 151.0.4129.107 -> 155.0.4283.45 while the author was away and nothing depended on the old version. gitleaks is still absent (optional), which is what makes B6 unconfirmable locally.",
     "configured_services": []
   },
   "known_debt": [
@@ -1872,6 +2174,216 @@
       "id": "D11",
       "phase_raised": 3,
       "text": "The data layer uses runtime-checked sqlx::query() rather than the compile-time-checked query! macros. SPEC.md's tech table gives compile-time checking as the REASON sqlx was chosen ('valuable for a learner'), so this is a deviation the author should rule on. Cost of converting: query! needs literal SQL, so archive.rs's dynamically-built preference query cannot use it at all; SQLite nullability inference is weak, so most columns need `as \"col!\"` annotations; and it adds sqlx-cli plus a `cargo sqlx prepare` step after every schema change. Benefit: SQL typos fail the build instead of a test. Raised at the end of Phase 3, not decided."
+    },
+    {
+      "id": "D12",
+      "phase_raised": 4,
+      "text": "A title released AFTER the last ingestion run is not in the catalogue at all: the IMDb datasets are a snapshot and IMDb refreshes daily. With a TMDB key, subtask 4.6's live clients can fill the gap on demand; with no key - which ADR-0027 makes the default - nothing currently covers it. Surfaced by the author asking whether new releases would be available. Owner: subtask 4.9's first-run flow."
+    },
+    {
+      "id": "D13",
+      "phase_raised": 4,
+      "text": "WEEKLY TV EPISODE FRESHNESS has no owner. The author asked whether a newly-aired episode would be available seamlessly, the way a streaming app manages it. Finding a SOURCE is Phases 6/7/9 and needs nothing special - a new episode resolves like any other title. KNOWING THE EPISODE EXISTS is the gap: title.episode is a snapshot, IMDb refreshes daily and we do not. For anime, AniList publishes airing schedules through a public API with no key, so subtask 4.4 can solve it properly. For general TV it needs either the user's TMDB key or a periodic re-fetch of title.episode (one of the smaller files). Neither is currently specified. Owner: propose a mechanism before Phase 11, which is where next-episode handling lands."
+    },
+    {
+      "id": "D14",
+      "phase_raised": 4,
+      "text": "EXPECTATION TO MANAGE, not a defect: the author asked whether the bittorrent client will rival qBittorrent for seamless downloads. SPEC.md Phase 7's stated goal is 'torrents that stream, not torrents that download'. For STREAMING a purpose-built deadline scheduler should beat qBittorrent, which is not optimised for sequential playback. For BULK DOWNLOAD THROUGHPUT, matching a decade of tuned peer selection and disk I/O is a much harder bar and is not a stated goal - R2 already rates librqbit's streaming control as a live risk. Phase 7 should measure against qBittorrent on both axes and report honestly rather than let the comparison stay implicit."
+    },
+    {
+      "id": "D15",
+      "phase_raised": 4,
+      "text": "RESOLVED by migration 0007 on data-quality grounds, not the stated ones. The 2,250,937 redundant title rows are gone and a search no longer matches the same film six times. The 270 MB saving I predicted did not happen: the new unique index carries the title TEXT where the old one carried two short codes, so the index grew by more than the table shrank. Net -23 MB. See docs/eval-results.md."
+    },
+    {
+      "id": "D16",
+      "phase_raised": 4,
+      "text": "RESOLVED. The >= 10 core vote threshold survives. The embedding artefact is 313 MB for 855,703 core titles at 384 int8 dimensions - arithmetic over the fixed format in crates/embedding/src/artefact.rs, not a prediction - against 452 MB of R4 headroom, and it lives outside the database anyway. See docs/eval-results.md."
+    },
+    {
+      "id": "D17",
+      "phase_raised": 4,
+      "text": "titles.variant calls a title 'native' whenever its script is non-Latin, regardless of whether that language has anything to do with the work. 93,900 rows are marked native with a language other than Japanese - a Greek or Ukrainian release title of a Japanese film is an ALTERNATIVE title, not a native one. Fixing it properly needs media_items.original_language plumbed into tools/ingest/src/akas.rs::variant and a repair pass like tools/ingest/src/repair.rs::english_variants. Not urgent: nothing reads 'native' as 'the original title' yet, and Phase 5 searches every variant."
+    },
+    {
+      "id": "D18",
+      "phase_raised": 4,
+      "text": "AniList refuses to paginate past 5,000 entries, so the catalogue is swept per seasonYear. Entries with NO seasonYear are reachable only through the unfiltered popularity pass, which hits the same 5,000 cap - so an undated AniList entry outside the 5,000 most popular is never ingested. Acceptable because the matcher needs a year as half its evidence, but it is a real coverage gap and should be stated rather than discovered later."
+    },
+    {
+      "id": "D19",
+      "phase_raised": 4,
+      "text": "crates/metadata-api/src/anilist.rs::default_limit is hard-coded to AniList's documented 90 requests/minute, but the service has been enforcing something lower for a long time. The backoff absorbs the 429s correctly, so nothing fails - it just spends a request to rediscover the limit each time. AniList returns X-RateLimit-Limit and X-RateLimit-Remaining; reading those and reconfiguring the limiter would honour whatever the server actually allows."
+    },
+    {
+      "id": "D20",
+      "phase_raised": 4,
+      "text": "data/sinephile.db holds the UNION of three AniList sweeps - 7,383 items carry an anilist id where a single clean sweep produces 7,328. Every mapping was made by the same matcher under the same rules, so none is wrong, but the database is not byte-reproducible from one run. Clearing the anilist/mal rows in external_ids and reverting anime_* kinds before a final sweep would fix it; not worth 13 minutes until the catalogue is being frozen for Phase 27."
+    },
+    {
+      "id": "D21",
+      "phase_raised": 4,
+      "text": "Episodes are loaded for all anime plus non-anime series with >=5,000 votes: 539,817 episodes, 21,218 seasons. The threshold is one constant, passed as `ingest episodes --min-votes N`, and the loader skips what it already holds so widening is safe. Measured cost is 410 bytes per episode across three independent runs. Dropping to >=1,000 costs 344 MB and would leave 117 MB, which is less than ADR-0014's own rate for the embedding artefact - so this cannot widen until embeddings and MovieLens are measured."
+    },
+    {
+      "id": "D22",
+      "phase_raised": 4,
+      "text": "PHASE 12 INHERITS THIS. episode_numbering.absolute_number is NULL on all 539,817 episodes and no free source publishes one (ADR-0031). A filename reading 'Series - 59' cannot be resolved from the catalogue for anime, so Phase 12's matcher must route it to the review queue rather than assume a lookup succeeds - a correct outcome, not a wrong answer, so the <1% false-confident budget is unaffected. The fix, when Phase 12 wants it: stop collapsing AniList seasons onto one catalogue item, give each its own episode_numbering rows, and the absolute number becomes derivable from stored facts instead of computed from guesses. NEVER derive it by cumulating counts across seasons."
+    },
+    {
+      "id": "D23",
+      "phase_raised": 4,
+      "text": "RESOLVED. tools/state/validate_state.py now refuses when current_phase and its phases[] entry disagree on any criterion's met/evidence or any subtask's status/commit. Recorded as debt the first time it bit (E5); fixed the second time (E7), because a class of error that recurs inside one session will not be prevented by remembering."
+    },
+    {
+      "id": "D24",
+      "phase_raised": 4,
+      "text": "RESOLVED, and it decided a design. `ingest refresh` re-downloaded title.basics (216 MB) every run because gzip cannot be seeked and IMDb publishes no changelog; this entry guessed that conditional requests would fix it. MEASURED 2026-09-07: IMDb serves ETag and Last-Modified, and a GET carrying If-None-Match returns HTTP 304 with 0 BYTES. So a launch-time refresh check costs one round trip when nothing has changed, and IMDb republishes daily so at most one real download a day. That is what makes the author's 'refresh every time the app opens' shippable rather than a 216 MB tax per launch. See docs/eval-results.md."
+    },
+    {
+      "id": "D25",
+      "phase_raised": 4,
+      "text": "The TMDB key is DPAPI-wrapped, so it is bound to the Windows user account and a copied ./data/ folder cannot decrypt it. That is deliberate (crates/persistence/src/secrets.rs) and degrades to TmdbAccess::Absent, but it means the PORTABLE promise of ADR-0008 has one documented exception: move the folder to another machine or account and the key must be re-entered. Everything else in the folder still works. Worth a line in the settings UI when Phase 14 builds it, so the user is told rather than surprised."
+    },
+    {
+      "id": "D26",
+      "phase_raised": 4,
+      "text": "RESOLVED 2026-09-13 (subtask 5.7). AppState now holds a Db, opened on a background task and installed when ready, so nothing on the path to the first painted frame waits for a disk. Cold start re-measured at 328-522 ms across five launches against Phase 1's 515/660 baseline - no regression. Callers that arrive before the open completes get None rather than a stall."
+    },
+    {
+      "id": "D27",
+      "phase_raised": 4,
+      "text": "The embedding artefact is PRODUCED but not PUBLISHED. ADR-0014 says it ships as a versioned GitHub Release asset with its checksum, downloaded on consent with the size shown. Producing it is automated; uploading a 313 MB file to a Release is a manual step the author takes, and the download-with-consent flow is Phase 5's, since nothing reads the artefact until search does. sha256 3fce6f062c25220a80425cce7e9f83a3b80412af3b34fe4e9071d3b80645a2b0."
+    },
+    {
+      "id": "D28",
+      "phase_raised": 5,
+      "text": "`ingest search-index` rebuilds from scratch on every run: Job::begin starts a NEW job when the previous one completed, so its steps are fresh and every one of 2.7M items is re-indexed. It is idempotent (delete-then-insert) so nothing corrupts, and it cost 49 MB of churn plus 150 s the one time it happened. The fix is to skip items already in search_indexed at the current generation - the column exists for exactly this and is unused."
+    },
+    {
+      "id": "D29",
+      "phase_raised": 5,
+      "text": "VACUUM recovered ~354 MB of fragmentation from incremental ingestion (4,023 -> 3,486 MB, 46 s), on top of 183 MB from the dead index. Nine ingestion jobs writing and rewriting leave a tenth of the database as slack. Ingestion should VACUUM when it finishes, and the first-run flow should say so rather than leaving the user with a database a tenth larger than it needs to be."
+    },
+    {
+      "id": "D30",
+      "phase_raised": 5,
+      "text": "THE FUZZY PATH MISSES E1's 80 ms BUDGET: 256-390 ms measured on the real 2.7M-row trigram index, because OR-ing ~10 trigrams touches a large part of it. Options, none yet measured: restrict the trigram index to the core tier (855,703, roughly 3x less work, and it already fits either way); require a minimum number of matching trigrams instead of a pure OR; or run fuzzy only when the keyword tier returns nothing strong. MEASURE BEFORE CHOOSING - the last three size questions in this project were all answered wrongly by intuition and correctly by measurement."
+    },
+    {
+      "id": "D31",
+      "phase_raised": 5,
+      "text": "A WEAK KEYWORD HIT BLOCKS A GOOD FUZZY ONE. `kurosowa` returns 'Margazhi Raagam' because the keyword tier matched something irrelevant, filled the result limit and fuzzy never ran. SearchRepository::search should discount weak keyword hits by BM25 score before deciding whether to fall through, rather than counting them. Needs a threshold chosen from the fixture corpus in subtask 5.6, not guessed."
+    },
+    {
+      "id": "D32",
+      "text": "ONE QUERY IN 200 LOSES 8 OF ITS 10 TRUE NEIGHBOURS, at every expansion_search value from 64 to 384 — so it is not the recall/latency dial. Both benign explanations were measured and both are false: 1 vector ties for last place, and 12 lie within 1% of the 10th distance, so it is neither a tie set nor a crowded band. Artefact position 697,314 has a real neighbourhood (nearest 0.0000, tenth 0.4009) and HNSW misses most of it: a poorly-connected node. The mean 0.9670 clears the 0.95 gate so this does not block 5.3, but a bad candidate set for one query becomes a bad result page for that query, and 5.4's fusion is where that shows. Look again when E3 has real embedded queries rather than artefact vectors.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D33",
+      "text": "THE INDEX COSTS 435 MB ON DISK, 1.4x the 313 MB artefact it indexes — the HNSW graph is 122 MB of that. It is DERIVED, so it is not a download and `ingest vector-index` rebuilds it from a checksummed file, but it is disk sitting outside the database next to the artefact. Together they are 748 MB of ./data/ that the R4 budget did not name. Phase 5 subtask 5.9 shows the artefact's size before consent; it should show this one too, or the user consents to 313 MB and receives 748 MB.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D34",
+      "text": "SEARCH IS FOUR TIMES SLOWER COLD. Measured the same day on the same fixture: warm p95 7.1-7.4 ms (three consecutive runs), cold p95 36.8 ms with a max of 131.9 ms, taken straight after 750 MB of index I/O evicted SQLite's page cache. Not a regression - the warm numbers reproduce - but the cold column is what a user meets on the first search after launch, and its MAX already exceeds E1's 80 ms budget on a single query. E1 is a p95 criterion so it survives; it must eventually be measured cold. Phase 21 owns the budget, and subtask 5.7's cold-start re-measurement is the natural place to take the number.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D35",
+      "text": "EXACT-TITLE QUERIES PAY FOR THE SEMANTIC HALF THEY DO NOT NEED. The engine runs fusion whenever the exact tier did not fill the page, so typing a film's exact name still costs a query embedding (2.4 ms) plus a vector search (4.2 ms) plus a 50-candidate BM25 scan. That is most of the rise from 7.3 ms to 15.0 ms p95. Deliberate for now - the rest of the page is genuinely useful 'more like this' - but it is the first thing to cut if Tier 0 misses E1. Measure before cutting: the same page is what Phase 18's browsing surfaces will want.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D36",
+      "text": "RRF's k=60 IS AN UNMEASURED LITERATURE DEFAULT. crates/search-engine::RRF_K. It cannot be swept yet: E2's fixture is exact titles, which never reach fusion, so every value of k produces identical numbers. The sweep belongs with 5.6's semantic fixture, and this phase has already caught one library default (usearch's ef=64) being wrong for this corpus.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D37",
+      "text": "RESOLVED 2026-09-13 (subtask 5.7). The pipeline moved from tools/ingest to crates/catalogue, which is what made it reachable from the application at all, and freshness::refresh_if_stale runs on launch - automatic and silent, by the author's decision. Measured: one launch added 4,604 titles, and a launch with nothing to do reports AlreadyCurrent 260 ms after the frontend paints, costing one HEAD request. TWO BUGS WERE FOUND BY RUNNING IT: the first check is stale without a request so it carried no validator and every launch re-downloaded 216 MB; and recording the validator at the END did not fix it either, because the app exits when its window closes and a refresh takes a minute. It is now recorded after the download and before the load - the only boundary that is wrong in neither direction.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D38",
+      "text": "THE LANGUAGE FILTER SPEC.md PHASE 5 NAMES CANNOT BE BUILT. media_items.original_language is NULL on all 2,702,737 rows: the IMDb datasets do not publish it and nothing has ever written the column. So 'in Japanese' is parsed by nothing, and 'like Wong Kar-wai but Korean' cannot constrain by language - it has to hope the embedding carries it. Three sources could fill it: title.akas carries a language per alternative-title row and could be aggregated (free, imprecise; D17 already notes akas language handling is wrong in a related way); AniList publishes it for anime; TMDB publishes original_language for everything but needs the per-user key. Recorded rather than shipped, because a filter that silently matches nothing is worse than an absent one.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D39",
+      "text": "REOPENED AND REVERSED 2026-09-22. The 'no reordering' answer was measured with variants built by string concatenation - `format!(\"{document} {synopsis}\")` puts the first 400 characters of the synopsis in the document TWICE, and the plot-first variant duplicated the metadata as well - so every variant kept the metadata head in place and merely added text, which is why everything rose together. document::build_with(doc, Layout) now assembles variants through the PRODUCER'S OWN builder, each part appearing once. Re-measured on two fixture queries: 'plot first' (synopsis_chars 1000, synopsis_first, strip_lead) moves Manchester by the Sea #6 -> #1 on the grief query and #5 -> #3 on the nephew query, lifts A Monster Calls #7 -> #5, and drops every ungraded title. THE ORDER CHANGES, which is the trigger D39 itself set for spending a re-embed. `1000 chars` alone does NOT reorder, so it is the position of the metadata rather than the synopsis budget that does the work. Numbers and the caveat - six-item probes over the contested set, not the catalogue - in docs/eval-results.md.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D40",
+      "text": "PARTLY ADDRESSED 2026-09-22. The fixture now carries a sub-kind - 'meaning/known-item' - and `eval search --report` prints MRR and top-10 presence for those two queries BESIDE the headline, which is unchanged at 0.1188 over 8 meaning queries. No graded set was widened and no grade was touched: SPEC.md 10.11 forbids redefining an exit criterion, and a criterion rewritten after seeing its own number is not one. What the split shows: topical six = 0.1584, known-item MRR 0.0000 with 0 of 2 reaching the top 10 - so MRR AGREES with nDCG here rather than rescuing it, and the known-item objection, while correct in principle, is not what is costing E3. Still open: whether to widen the two graded sets, which must only ever be done with films that would have been listed on their merits.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D41",
+      "text": "THE REFRESH WATERMARK IS A 13.7-SECOND FULL SCAN. `SELECT MAX(CAST(SUBSTR(e.external_id, 3) AS INTEGER)) FROM external_ids e JOIN media_items m ...` computes the highest IMDb id already held, and the cast defeats every index: 13.68 s over 3.2 million rows, logged as a slow statement on every launch that refreshes. It runs on the background task so it costs no user-visible time today. The fix is to store the watermark rather than derive it - the refresh already knows the highest id it inserted - or to add a generated column carrying the numeric id, which ADR-0032 makes tempting anyway since IMDb ids sort as text.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D42",
+      "text": "TWO APP INSTANCES CAN BOTH REFRESH. Nothing configures Tauri's single-instance plugin, so two copies can run, and both will check freshness and both may download. Observed while measuring: an instance that checked before another had committed its validator logged `Refreshed { titles_added: 0 }` immediately after a sibling logged `AlreadyCurrent`. Harmless today - `Job` serialises the load through the database and the second refresh inserts nothing - but it is 216 MB of wasted download and it will matter more when Phase 7 adds a torrent session that genuinely cannot run twice. Single-instance is the one-line fix; it belongs with Phase 20's platform integration, or sooner if anything else needs exclusivity.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D43",
+      "text": "A SCREENSHOT CAUGHT A HINT THAT WAS LYING, AND THE CLI COULD NOT HAVE. Every result on 'films directed by Alfred Hitchcock from the 1950s' was labelled 'matched words'. They had not matched words - they came from SearchRepository::by_filters, which reused MatchReason::Keyword because there was no better variant. Fixed by adding MatchReason::Filter and a 'matched your filters' label. The general lesson is recorded here rather than only in the case study: eval prints titles, the UI prints EXPLANATIONS, and an explanation can be wrong while every title is right. Anything else that renders a reason to a user needs looking at the same way.",
+      "phase_raised": 5
+    },
+    {
+      "id": "D44",
+      "phase_raised": 5,
+      "text": "RESOLVED 2026-09-22. crates/catalogue/src/index.rs derives the HNSW index from the downloaded artefact, and download_optional_assets now calls it and reinstalls the engine, so search becomes hybrid without a restart. tools/ingest routes through the SAME function rather than keeping its own copy. VERIFIED on the real catalogue: `ingest vector-index` built 119,874 vectors of 855,703 considered in 33 s, and the release binary then logged 'search: hybrid' with cold_start_ms=485. No regression - recall@10 0.9670, E2 43/43 and E3 0.1188/1.0000 all identical to the hand-built index this replaces (docs/eval-results.md). STILL OPEN, smaller: the consent screen's stated 346 MB does not mention that a ~33 s build follows; the progress bar now says so via a `phase` field, but the pre-consent copy does not."
+    },
+    {
+      "id": "D45",
+      "phase_raised": 5,
+      "text": "RESOLVED 2026-10-25: artefact format 3 records a watermark AND an id digest, and verify_prefix refuses a mismatch exactly (7249a42, tests seen to fail); the v3 artefact (858,170 vectors) was produced with it. Original record: DURABLE FIX DONE 2026-10-25 in 7249a42, with a correction: a watermark ALONE is not exact, because a title leaving and another entering below it keeps both the count and the last id. FORMAT_VERSION 3 therefore records the watermark AND a SHA-256 over every covered id. verify_prefix checks the digest exactly, with no model, then still runs the sampled re-embed for changed text under the same id (see D51). Tests: a_title_leaving_and_another_entering_below_the_watermark_is_refused, a_covered_title_whose_text_changed_is_refused_by_the_sampled_re_embed. RESOLVED 2026-09-22, and the invariant was wrong in a way worth recording. VectorIndex::build now refuses only a catalogue with FEWER ids than the artefact has vectors (titles removed, positions shifted) and indexes the first header.count positions otherwise. BUT the prefix property is NOT structural: media_items.in_core is a function of vote count (imdb::Scope::in_core) and the ratings refresh updates rating_votes WITHOUT recomputing membership - so today no existing row is ever promoted, and the artefact is a strict prefix BY OMISSION rather than by design. The day that omission is fixed, a title crossing the popularity threshold enters the sequence in the middle, every position after it names a different film, and the count merely goes up - which a length check cannot distinguish from an append and never could. So the shift is now checked by CONTENT: sinephile_catalogue::index::verify_prefix re-derives documents at 8 sampled positions (always including the last, which is the one that catches any mid-sequence insertion), embeds them and requires byte-identity with the artefact. Seen to fail. THE DURABLE FIX, for whenever the artefact format next changes: record a watermark - the highest catalogue id the artefact covers - so the check is exact rather than sampled. It rides along with the VERSION 3 re-embed at no extra cost."
+    },
+    {
+      "id": "D46",
+      "phase_raised": 5,
+      "text": "RESOLVED 2026-10-23, upstream and with no change here: crates.io shows zip 8.6.0 UN-YANKED at 2026-10-16T16:47Z, hours after this was recorded, and `cargo update --dry-run` exits 0 workspace-wide again. The pin stays at =8.6.0, because moving it now would be an upgrade for its own sake (rule 15). Original: A PINNED DEPENDENCY WAS YANKED. crates/catalogue/Cargo.toml pins zip = \"=8.6.0\" and 8.6.0 is now yanked from crates.io. Builds are unaffected because the version is in Cargo.lock and a yanked crate still downloads - the fresh-clone CI job was green on 2026-09-21 - but `cargo update` now fails for the WHOLE workspace with 'failed to select a version for the requirement zip = \"=8.6.0\", version 8.6.0 is yanked', so the dependency-drift check the cold-resume ritual asks for cannot run at all. Standing rule 15 says dependencies are pinned and never upgraded mid-phase for their own sake, so this is recorded rather than bumped: re-pin to the nearest unyanked 8.x when Phase 5 closes, and say in the commit WHY the pin moved."
+    },
+    {
+      "id": "D47",
+      "phase_raised": 5,
+      "text": "RESOLVED 2026-10-25, author's option 1 (SI reading of R4's 4 GB, plus VACUUM after ingestion, df3ca35). `ingest compact` took the database from 4.063 GB to 3.946 GB, 54 MB under; Phase 4 E1 is re-evidenced. The margin is thin and the launch-time refresh erodes it (docs/RISKS.md R4). Original record: RE-MEASURED 2026-10-25, and THE DECISION IS THE AUTHOR'S (see SESSION_LOG.md session 19). data/sinephile.db is 4,062,978,048 bytes, UNCHANGED since 2026-09-22: it grows only when the app launches and refreshes, and it was not launched in 33 days. freelist_count 0. `VACUUM INTO` a scratch copy: 3,945,598,976 bytes, recovering 117,379,072 B = 112 MiB (2.9%) in 30 s, quick_check ok. That is a third of D29's 354 MB, because D29's VACUUM was applied in Phase 4 (4,023 -> 3,486 MB) and the database has since regrown by 389 MiB, mostly real data. R4's trigger reads 'exceeds 4 GB' and the unit decides everything: SI 4,000,000,000 B is ALREADY EXCEEDED by 63 MB; D47's and E1's reading, 4,000 MiB, leaves 125 MiB; GiB, 4,294,967,296 B, leaves 221 MiB. After a VACUUM the SI reading has 54 MB of headroom. A per-table breakdown was not obtainable: neither Python's sqlite3 nor any installed CLI has dbstat. Original: THE DATABASE IS DRIFTING TOWARD R4's TRIGGER AND E1's EVIDENCE IS NOW OPTIMISTIC. Phase 4 E1 records 3,659 MB (3,836,723,200 bytes) with '341 MB of headroom' against the 4,000 MB budget in docs/RISKS.md R4. Measured 2026-10-16: 4,062,978,048 bytes = 3,875 MB, so headroom is 125 MB, not 341. Nothing regressed - this is subtask 5.7's launch-time refresh doing exactly what it was built to do, adding titles on every launch (one measured launch added 4,604). E1's wording is 'under a documented size budget' and that still holds, so the criterion is not invalidated; but it is now 125 MB from a NAMED RISK TRIGGER and it grows unattended. D29 already measured the remedy: VACUUM recovers ~354 MB of fragmentation in 46 s, and D29's own recommendation - that ingestion should VACUUM when it finishes - would hold this flat instead of letting a launch-time feature walk the database into R4. Re-measure with the VERSION 3 re-embed."
+    },
+    {
+      "id": "D48",
+      "phase_raised": 5,
+      "text": "RESOLVED 2026-10-23: tools/statecheck/check.py check 'repository facts: ADRs and CI' fails when an ADR file and the adrs array disagree, or when the latest finished ci.yml run on the branch is not success and no blocker names CI. It reports SKIP inside GitHub Actions or when gh is absent. Broken first against real data: blockers emptied while the latest finished run was red -> FAIL naming actions/runs/38897021742; ADR 0035 removed from adrs -> FAIL '...the adrs array does not: 0035'; state restored byte-exact. `check.py --selftest` 19/19 with 8 new fact cases. Original: NOTHING RECONCILES REPOSITORY FACTS INTO THE STATE FILE, which is the shape of B6 and of the ADR drift found alongside it. This file recorded 23 ADRs while docs/adr/ held 34 - 0024 through 0034 missing, some for six weeks - and recorded no blocker while CI had been red for 42 days. Neither is a schema violation, so validate_state.py and statecheck were both green throughout: the state file only knows what a session thinks to WRITE into it, and the phases table is the one part build_state.py reconciles automatically. Proposed fix, deliberately small: a sixth check in tools/statecheck/check.py asserting (a) the latest CI conclusion on the current branch is success via `gh run list`, degrading to a SKIP rather than a failure when gh is absent or unauthenticated, and (b) every docs/adr/NNNN-*.md appears in the adrs array. Per CLAUDE.md's evidence protocol, break both before trusting either - a check that has never been seen to fail is not evidence."
+    },
+    {
+      "id": "D49",
+      "phase_raised": 5,
+      "text": "RESOLVED 2026-10-24, option (a), author: 'your call'. In --ci, tools/uiaudit/run.mjs re-measures the rail once after a frame-timing breach and judges the second attempt; the zero-drop budget is unchanged, local runs never retry, and both attempts go to results.json as railAttempts. Commit 2633910. Proven in CI with the workflow_dispatch input uiaudit_inject_stall: stall on attempt 1 -> attempt 1 worst 966.7ms/2 dropped, attempt 2 0 dropped -> PASS (actions/runs/40126478347); stall on 1,2 -> attempt 2 worst 50ms/1 dropped -> FAIL (actions/runs/40126915788). statecheck now reads only push runs and skips cancelled ones (a superseded run says nothing about the code; selftest 21/21). Original: THE 60FPS RAIL GATE IS FLAKY ON GITHUB'S HOSTED RUNNER, and the 2026-10-16 audit missed it because it blamed all of B6's red CI on gitleaks. tools/uiaudit/run.mjs --ci fails on ANY dropped frame, and windows-latest occasionally stalls a single frame: 4 failures in 37 runs (the 2026-09-06 '5.4 and 5.10' run, worst 783ms; '5.8 complete' 2026-09-13, 33.4ms; 2026-10-16, 116.7ms; 2026-10-23 run 39976164613 attempt 1, 250ms). Each time exactly 1 frame dropped with median 16.7ms and p95 <=16.8ms, and attempt 2 of 39976164613 passed with 0 dropped and worst 16.8ms - on commits that touched only the state file, so no code caused them. Options for the AUTHOR, because this gate enforces the SPEC.md §2.3 60fps budget: (a) retry the rail measurement once in --ci mode and fail only if both attempts drop a frame - keeps the zero-drop budget and stops one-off stalls failing CI; (b) allow <=1 dropped frame in CI only - simpler, but weakens the gate permanently; (c) leave it and rerun the job by hand - free now, but it is how B6's 42 days happened. Recommendation (a). Default if 'your call': (a), implemented in tools/uiaudit/run.mjs with both attempts written to results.json."
+    },
+    {
+      "id": "D50",
+      "phase_raised": 5,
+      "text": "TOOLS/UIAUDIT CANNOT RUN ON THE AUTHOR'S MACHINE, and it is not the change that found it: the unmodified HEAD version fails identically. Vite starts and serves /src/main.tsx (200, 349ms), headless Chrome opens the gallery, and document.body stays EMPTY with no page error and no browser log until the 45s waitFor at run.mjs:240 times out. Same result with Edge via CHROME_PATH. `npm run build` succeeds. The first hypothesis, that a Chromium 156 change broke the harness, is WRONG: CI passes on Chrome/156.0.8078.48 and local is Chrome/156.0.8078.47. Three distinct attempts made (as-is, Edge, direct module fetch), so stopped per SPEC.md §10.9. CI is unaffected and authoritative for this gate, so this blocks nothing, but `npm run audit:ui` is listed as a local command in CLAUDE.md and does not work. Next step if picked up: compare the local Vite/node_modules against CI's `npm ci` (delete node_modules/.vite and rerun), since the module graph is the remaining difference."
+    },
+    {
+      "id": "D51",
+      "phase_raised": 5,
+      "text": "RESOLVED 2026-10-25 in 7249a42, recorded because it weakens earlier evidence. Both test fake embedders (crates/catalogue/tests/index.rs and tests/embed.rs) returned one of only TWO vectors, [127; 8] or [-127; 8]: they multiplied `hash + i` by a 32-bit constant and kept the top bits, so the 8 dimensions differed only below the precision that survives, and one sign was all the text decided. So the sampled re-embed in index::verify_prefix caught a changed document only when the change flipped that sign, about half the time, and D45's 'seen to fail' rested on a fixture that carried one bit of the text. The old promotion test passed because its pair of documents happened to land on opposite signs. Found when a new test changed a covered title's synopsis and verify_prefix still returned Ok. Fixed with splitmix64 per dimension. The test a_covered_title_whose_text_changed_is_refused_by_the_sampled_re_embed failed before the fix and passes after it. Also fixed: three error messages in crates/catalogue (one from before this session) whose line continuations had been lost, so they printed runs of spaces."
+    },
+    {
+      "id": "D52",
+      "phase_raised": 5,
+      "text": "RESOLVED 2026-10-25: the embed producer wrote the artefact IN PLACE. The v3 run was reaped by Claude Code's memory monitor (a 13.5-14.9 GB game was running) during assembly, after all 858,170 vectors were in the .part file, and left a 43,504,000-byte fragment at data/embeddings-bge-small-en-v1.5-int8.bin where the good v2 artefact had been. The checksum would have refused it at load, so it could never be silently used, but the previous artefact was destroyed (the v2 backup made earlier this session is intact). Fix in crates/catalogue/src/embed.rs: assemble to <artefact>.bin.assembling, sync_all, then rename over the real path. Test a_failed_assembly_leaves_the_previous_artefact_untouched was seen to fail with the staging path set back to the real path."
+    },
+    {
+      "id": "D53",
+      "phase_raised": 5,
+      "text": "RESCOPED 2026-10-25 into SPEC.md Phase 18 (spec_version 2.0.0, A25/A27, ADR-0037). The author: 'the design still isn't amazing, i want the home, film, tv show etc tabs to be on top, i want a search button too'. Done in Phase 5 (cff9cdb): the search screen uses the Phase 2 type system, with bylines from SearchRepository::details, a lead excerpt, visible keyboard focus and display-order numbering. Owned by Phase 18 now: the masthead (tabs on top, a labelled Search button, the left rail removed; it may be built earlier as a standalone task when the author asks), mockups before code, the artwork-free state as primary, no placeholder screens, a design lint in CI, motion, and an author-signed screenshot review set. Still open from Phase 5: the case-study screenshots need retaking with the machine idle (tools/shots/capture.ps1 refuses to type unless the app is in front)."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

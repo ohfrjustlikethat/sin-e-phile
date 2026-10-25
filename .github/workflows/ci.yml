@@ -9,6 +9,11 @@ on:
     branches: ["**"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      uiaudit_inject_stall:
+        description: "Prove the D49 retry: stall the rail on attempt 1, or 1,2. Empty on every push."
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -72,7 +77,7 @@ jobs:
           echo $dest | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Secret scan — full history (authoritative)
-        run: gitleaks detect --source . --redact --no-banner --exit-code 1
+        run: gitleaks detect --source . --redact --no-banner --exit-code 1 -v
 
       - name: Secret scan — regex fallback (verifies the pre-commit path works)
         run: python tools/guard/secretscan.py --tree
@@ -182,6 +187,8 @@ jobs:
       # written, which is the argument for running it on every push.
       - name: UI audit (60fps · focus · keyboard · reduced motion)
         if: steps.detect.outputs.present == 'true'
+        env:
+          UIAUDIT_INJECT_STALL: ${{ inputs.uiaudit_inject_stall }}
         run: node tools/uiaudit/run.mjs --ci
 
   # ───────────────────────────────────────────────────────────────────────────

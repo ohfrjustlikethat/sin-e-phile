@@ -299,6 +299,15 @@ vote/popularity threshold rather than ingesting everything.
 - The embedding artefact exceeds the ADR-0014 budget of ~77 MB per 200k titles by
   more than 50%.
 
+**Where it stands (2026-10-25, D47).** "4 GB" is read as SI, 4,000,000,000 bytes (the
+author's decision). The database reached 4.063 GB, **over** the trigger, from the slack
+that incremental writes leave behind. A `VACUUM` brought it to **3.946 GB, 54 MB under**.
+Every ingestion command now compacts after itself, but the app's launch-time refresh
+does not, so each launch that adds titles eats into that margin until the next
+`ingest` run. This trigger is effectively *at* its limit: the next schema or
+enrichment addition that grows the database has to be priced against 54 MB, not
+against "about 4 GB".
+
 **Fallback.** Tiered catalogue: ship a core index of ~200k well-known titles, fetch
 the long tail live on demand and cache. The "vastest library" promise is met by the
 source layer, not by the local index.

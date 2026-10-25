@@ -1,0 +1,24 @@
+[package]
+name = "sinephile-embedding"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "The embedding artefact: document builder, quantisation, file format (ADR-0014)."
+
+# Shared by the PRODUCER (tools/ingest) and the CONSUMER (the application), which is
+# why it is a crate rather than a module in either. A format only one side can read is
+# not a format.
+#
+# Deliberately does NOT depend on `ort`. Producing embeddings needs a model; reading,
+# verifying and quantising them does not, and the application must be able to reject a
+# mismatched artefact without loading a 22 MB model to do it.
+
+[dependencies]
+# Already in the tree via Tauri. Used for the artefact checksum, which is published
+# alongside a release asset and is what a user checks a download against.
+sha2 = "=0.10.9"
+thiserror = "2"
+
+[dev-dependencies]
+tempfile = "3"

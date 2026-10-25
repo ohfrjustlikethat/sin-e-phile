@@ -85,18 +85,36 @@ def sessions(section: str) -> str:
     return match.group(1).strip() if match else "?"
 
 
-def risks_for(section: str) -> list[str]:
-    """Risk ids named in the phase text, with their one-line summary."""
-    ids = sorted(set(re.findall(r"\bR\d+\b", section)), key=lambda r: int(r[1:]))
-    if not ids or not RISKS.exists():
+def risks_for(section: str, number: int) -> list[str]:
+    """Risks this phase carries, looked up in BOTH directions.
+
+    A phase entry naming R3 is the obvious case. The important one is the reverse:
+    R4's owner row says "Phase 4" and the Phase 4 entry never mentions R4 at all.
+    Scanning only the phase text produced an empty Risks section for the phase whose
+    named risk is the entire reason to measure before committing to a shape.
+    """
+    if not RISKS.exists():
         return []
     risk_text = RISKS.read_text(encoding="utf-8")
-    out = []
-    for rid in ids:
-        row = re.search(rf"\|\s*\*\*{rid}\*\*\s*\|\s*(.+?)\s*\|", risk_text)
-        summary = " ".join(row.group(1).split())[:110] if row else "see docs/RISKS.md"
-        out.append(f"- **{rid}** — {summary}")
-    return out
+
+    # `## R4 — Catalogue ingestion is far larger or slower than expected`, followed
+    # by a small table whose Owner row names the phases that carry it.
+    blocks = re.split(r"^## (R\d+) — ", risk_text, flags=re.M)
+    titles: dict[str, str] = {}
+    owners: dict[str, str] = {}
+    for i in range(1, len(blocks), 2):
+        rid, body = blocks[i], blocks[i + 1]
+        titles[rid] = body.splitlines()[0].strip()
+        owner = re.search(r"\|\s*\*\*Owner\*\*\s*\|\s*(.+?)\s*\|", body)
+        owners[rid] = owner.group(1) if owner else ""
+
+    ids = {r for r in re.findall(r"\bR\d+\b", section) if r in titles}
+    ids |= {r for r, owner in owners.items() if re.search(rf"\bPhase {number}\b", owner)}
+
+    return [
+        f"- **{rid}** — {titles[rid]}"
+        for rid in sorted(ids, key=lambda r: int(r[1:]))
+    ]
 
 
 def doc_path(phase: dict) -> Path:
@@ -110,7 +128,7 @@ def doc_path(phase: dict) -> Path:
 def render_open(phase: dict) -> str:
     number = phase["number"]
     section = spec_section(number)
-    risks = risks_for(section)
+    risks = risks_for(section, number)
 
     lines = [
         f"# Phase {number} — {phase['title']}",

@@ -14,6 +14,9 @@ wrong in this project, silently, and was found by reading rather than by a tool:
   5. Work was finished and the state file was not updated — the failure mode the
      author called out directly: *"it makes 'finished work but forgot to record it'
      mechanically impossible rather than something you have to remember."*
+  6. CI was red for 42 days with an empty blockers array, and the `adrs` array
+     listed 23 ADRs while `docs/adr/` held 34 (D48). Neither was a schema violation,
+     so every other check here stayed green.
 
 Runs in CI and on pre-push. Python 3.12, stdlib only (ADR-0012).
 
@@ -25,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -36,7 +40,12 @@ PROGRESS = REPO / "PROGRESS.md"
 PHASEDOC = REPO / "tools" / "phasedoc" / "generate.py"
 VALIDATE = REPO / "tools" / "state" / "validate_state.py"
 
-CODE_PATHS = ("src-tauri/", "src/", "crates/")
+CODE_PATHS = ("src-tauri/", "src/", "crates/", "tools/ingest/")
+
+# How far back "keeps pace" looks. Five is enough to catch a session that built
+# something and never recorded it, and loose enough that a trailing comment fix does
+# not demand its own state edit — see check_state_follows_code.
+WINDOW = 5
 
 BOLD, RED, GREEN, DIM, RESET = "\033[1m", "\033[31m", "\033[32m", "\033[2m", "\033[0m"
 
@@ -44,6 +53,13 @@ BOLD, RED, GREEN, DIM, RESET = "\033[1m", "\033[31m", "\033[32m", "\033[2m", "\0
 class Problem:
     def __init__(self, check: str, what: str, fix: str):
         self.check, self.what, self.fix = check, what, fix
+
+
+class Skip:
+    """A check that could not run. Reported, never counted as a failure."""
+
+    def __init__(self, reason: str):
+        self.reason = reason
 
 
 def git(*args: str) -> str:
@@ -56,6 +72,35 @@ def git(*args: str) -> str:
 
 def load() -> dict:
     return json.loads(STATE.read_text(encoding="utf-8"))
+
+
+# ---------------------------------------------------------------------------
+# 0 — the state file is valid at all
+# ---------------------------------------------------------------------------
+
+def check_schema(_: dict) -> list[Problem]:
+    """Run the schema and evidence validator.
+
+    statecheck did not do this, so a subtask marked complete with a null commit
+    reached CI and failed there instead of at pre-push. Pre-push is meant to be the
+    stricter gate, not the looser one — anything CI checks about the state file
+    should fail here first.
+    """
+    result = subprocess.run(
+        [sys.executable, str(VALIDATE), "--check"],
+        cwd=REPO, capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    if result.returncode == 0:
+        return []
+    detail = [
+        line.strip() for line in (result.stderr or "").splitlines()
+        if line.strip().startswith("$.")
+    ]
+    return [Problem(
+        "state file schema",
+        "; ".join(detail[:3]) or "validate_state --check failed",
+        "python tools/state/validate_state.py --check",
+    )]
 
 
 # ---------------------------------------------------------------------------
@@ -88,14 +133,28 @@ def check_progress(_: dict) -> list[Problem]:
     exists to report, so the original is restored either way and the fix is left
     to the caller.
     """
-    before = PROGRESS.read_text(encoding="utf-8") if PROGRESS.exists() else ""
+    # Compare NORMALISED, restore EXACT. The two halves are different problems and
+    # the first version got both wrong in the same line.
+    #
+    # Restore must be byte-exact: `write_text` translates newlines to the platform
+    # default, so the original silently rewrote PROGRESS.md from LF to CRLF on every
+    # run, while comparing normalised text — blind to the damage it was doing.
+    #
+    # Comparison must ignore newlines: git checks out with `core.autocrlf` on the
+    # Windows CI runner, so the working tree is CRLF while the generator writes LF.
+    # A byte comparison there fails on every run for a file whose content is
+    # identical, which is a check that cries wolf until it is deleted.
+    def normalise(raw: bytes) -> bytes:
+        return raw.replace(b"\r\n", b"\n")
+
+    before = PROGRESS.read_bytes() if PROGRESS.exists() else b""
     subprocess.run(
         [sys.executable, str(VALIDATE), "--progress"],
         cwd=REPO, capture_output=True, text=True,
     )
-    after = PROGRESS.read_text(encoding="utf-8") if PROGRESS.exists() else ""
-    if after != before:
-        PROGRESS.write_text(before, encoding="utf-8")
+    after = PROGRESS.read_bytes() if PROGRESS.exists() else b""
+    PROGRESS.write_bytes(before)
+    if normalise(after) != normalise(before):
         return [Problem(
             "PROGRESS.md",
             "is out of sync with PROJECT_STATE.json",
@@ -182,51 +241,146 @@ def check_next_action(state: dict) -> list[Problem]:
 # ---------------------------------------------------------------------------
 
 def check_state_follows_code(_: dict) -> list[Problem]:
-    """The most recent code commit must be reflected in PROJECT_STATE.json.
+    """State must keep pace with code: no run of commits changes code in silence.
 
     The author's framing: this makes "finished work but forgot to record it"
     mechanically impossible rather than something to remember.
 
-    Satisfied by the code commit itself touching the state file, OR by any commit
-    since it doing so — recording state in a following commit is a normal and honest
-    workflow, and forbidding it would only encourage bundling unrelated changes into
-    one commit, which standing rule 4 argues against.
+    The rule is a WINDOW, not a strict ordering, and that is a deliberate weakening
+    made after the first version fired on real work. Requiring the most recent code
+    commit specifically to touch the state file meant a trailing comment fix in a
+    migration — work that was already fully recorded one commit earlier — was
+    refused at push. A rule that demands a meaningless state edit to get past it is
+    a rule that gets `--no-verify`'d within a week, and then protects nothing.
+
+    So: if any of the last WINDOW commits changed code, at least one of them must
+    have touched PROJECT_STATE.json. A session cannot build for a whole run of
+    commits without recording it, and a fixup does not need its own ceremony.
     """
-    recent = git("log", "-40", "--format=%H").splitlines()
-    if not recent:
+    window = git("log", f"-{WINDOW}", "--format=%H").splitlines()
+    if not window:
         return []
 
-    code_commit = None
-    for sha in recent:
-        files = git("show", "--name-only", "--format=", sha).splitlines()
-        if any(f.startswith(CODE_PATHS) for f in files if f):
-            code_commit = sha
-            break
-    if not code_commit:
-        return []
-
-    # Commits from the code commit onward, newest first, including it.
-    window = recent[: recent.index(code_commit) + 1]
+    touched_code: list[str] = []
+    touched_state = False
     for sha in window:
-        files = git("show", "--name-only", "--format=", sha).splitlines()
+        files = [f for f in git("show", "--name-only", "--format=", sha).splitlines() if f]
+        if any(f.startswith(CODE_PATHS) for f in files):
+            touched_code.append(sha)
         if "PROJECT_STATE.json" in files:
-            return []
+            touched_state = True
 
-    subject = git("log", "-1", "--format=%s", code_commit)
+    if not touched_code or touched_state:
+        return []
+
+    subjects = [git("log", "-1", "--format=%s", sha)[:44] for sha in touched_code[:3]]
     return [Problem(
         "state follows code",
-        f"the most recent code commit ({code_commit[:7]} {subject[:48]!r}) is not "
-        f"recorded in PROJECT_STATE.json, and neither is any commit since",
+        f"{len(touched_code)} of the last {WINDOW} commits changed code and none "
+        f"touched PROJECT_STATE.json: " + "; ".join(f"{s!r}" for s in subjects),
         "update subtask status, evidence and next_action, then commit the state file",
     )]
 
 
+# ---------------------------------------------------------------------------
+# 6 — repository facts the state file must agree with (D48)
+# ---------------------------------------------------------------------------
+
+ADR_DIR = REPO / "docs" / "adr"
+ADR_FILE = re.compile(r"^(\d{4})-.+\.md$")
+# A blocker "records" red CI if its description names CI as a word. Loose on
+# purpose: the failure being caught is an EMPTY blockers array while CI is red,
+# not a blocker worded differently.
+MENTIONS_CI = re.compile(r"\bCI\b")
+
+
+def adr_problems(files: list[str], state: dict) -> list[Problem]:
+    """Every ADR on disk is in the `adrs` array, and every entry has a file."""
+    on_disk = {m.group(1) for f in files if (m := ADR_FILE.match(f))}
+    recorded = {str(a.get("id")) for a in state.get("adrs", [])}
+    problems = []
+    if missing := sorted(on_disk - recorded):
+        problems.append(Problem(
+            "repository facts",
+            f"docs/adr/ holds ADR(s) the adrs array does not: {', '.join(missing)}",
+            "add an {id, title, date} entry to PROJECT_STATE.json adrs for each",
+        ))
+    if orphaned := sorted(recorded - on_disk):
+        problems.append(Problem(
+            "repository facts",
+            f"the adrs array lists ADR(s) with no file in docs/adr/: {', '.join(orphaned)}",
+            "restore the ADR file, or remove the entry if it was never written",
+        ))
+    return problems
+
+
+def ci_problems(runs: list[dict], state: dict) -> list[Problem]:
+    """The latest finished CI run is green, or a blocker says it is not.
+
+    Red CI alone is not a failure here. This runs on pre-push, so failing on red CI
+    would refuse the very push that fixes it. What went wrong in B6 was red CI that
+    nothing in the state file mentioned, so that is what fails.
+    """
+    # A cancelled run was superseded (ci.yml sets cancel-in-progress), so it says
+    # nothing about the code: judge the latest run that actually finished.
+    finished = [r for r in runs
+                if r.get("status") == "completed" and r.get("conclusion") != "cancelled"]
+    if not finished:
+        return []
+    latest = finished[0]
+    if latest.get("conclusion") == "success":
+        return []
+    if any(MENTIONS_CI.search(b.get("description", "")) for b in state.get("blockers", [])):
+        return []
+    return [Problem(
+        "repository facts",
+        f"the latest CI run is '{latest.get('conclusion')}' and no blocker records it: "
+        f"{latest.get('url', '')}",
+        "fix CI, or raise a blocker naming CI with what is failing and why",
+    )]
+
+
+def check_repository_facts(state: dict) -> list[Problem] | Skip:
+    files = [p.name for p in ADR_DIR.glob("*.md")]
+    problems = adr_problems(files, state)
+
+    # The CI half asks GitHub, so it degrades to a skip, never a failure, when it
+    # cannot ask. Inside CI the latest run is the one still executing this script,
+    # so the question has no answer there.
+    reason = None
+    branch = git("rev-parse", "--abbrev-ref", "HEAD")
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        reason = "CI half skipped inside CI, which cannot judge itself"
+    elif not branch or branch == "HEAD":
+        reason = "CI half skipped: no branch checked out"
+    else:
+        try:
+            result = subprocess.run(
+                ["gh", "run", "list", "--branch", branch, "--workflow", "ci.yml", "--event", "push",
+                 "--limit", "10", "--json", "status,conclusion,url"],
+                cwd=REPO, capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=20,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            result = None
+        if result is None or result.returncode != 0:
+            reason = "CI half skipped: gh is absent, offline or unauthenticated"
+        else:
+            problems += ci_problems(json.loads(result.stdout or "[]"), state)
+
+    if reason and not problems:
+        return Skip(f"ADRs ok; {reason}")
+    return problems
+
+
 CHECKS = [
+    ("state file is schema-valid", check_schema),
     ("phase document exists and matches", check_phase_doc),
     ("PROGRESS.md in sync", check_progress),
     ("phases behind current are closed", check_phases_closed),
     ("next_action is an instruction", check_next_action),
     ("state follows code", check_state_follows_code),
+    ("repository facts: ADRs and CI", check_repository_facts),
 ]
 
 
@@ -237,6 +391,9 @@ def run() -> int:
     print(f"{BOLD}statecheck{RESET}  {DIM}can a cold session tell where it is?{RESET}\n")
     for label, check in CHECKS:
         found = check(state)
+        if isinstance(found, Skip):
+            print(f"  {DIM}skip{RESET}  {label}  {DIM}({found.reason}){RESET}")
+            continue
         problems += found
         mark = f"{RED}FAIL{RESET}" if found else f"{GREEN}ok  {RESET}"
         print(f"  {mark}  {label}")
@@ -281,20 +438,50 @@ def selftest() -> int:
              {"number": 1, "status": "skipped", "completion_commit": ""}]}),
     ]
 
+    quiet = {"skipped phase is allowed", "red CI recorded by a blocker",
+             "ADRs agree", "green CI", "no finished CI run",
+             "cancelled run is skipped, green one behind it judged"}
     for label, check, payload in cases:
-        should_fire = label != "skipped phase is allowed"
         fired = bool(check({**state, **payload}))
-        ok = fired == should_fire
-        print(f"  {GREEN + 'ok  ' + RESET if ok else RED + 'FAIL' + RESET}  {label}"
-              f"  {DIM}({'fires' if should_fire else 'stays quiet'}){RESET}")
-        if not ok:
+        if report(label, fired, label not in quiet):
+            failures.append(label)
+
+    # The D48 halves take repository facts as arguments, so they are fed fake ones.
+    red = [{"status": "completed", "conclusion": "failure", "url": "run/2"}]
+    ci_blocker = {"blockers": [{"description": "CI red: gitleaks finds 5"}]}
+    adrs = {"adrs": [{"id": "0001"}, {"id": "0002"}]}
+    fact_cases = [
+        ("ADR on disk, not in adrs", adr_problems(
+            ["0001-a.md", "0002-b.md", "0003-c.md", "README.md"], adrs)),
+        ("ADR in adrs, not on disk", adr_problems(["0001-a.md"], adrs)),
+        ("ADRs agree", adr_problems(["0001-a.md", "0002-b.md", "README.md"], adrs)),
+        ("red CI, no blocker", ci_problems(red, {"blockers": []})),
+        ("red CI, blocker about something else", ci_problems(
+            red, {"blockers": [{"description": "the zip pin is yanked"}]})),
+        ("red CI recorded by a blocker", ci_problems(red, ci_blocker)),
+        ("green CI", ci_problems(
+            [{"status": "in_progress", "conclusion": ""},
+             {"status": "completed", "conclusion": "success"}], {"blockers": []})),
+        ("cancelled run is skipped, red one behind it judged", ci_problems(
+            [{"status": "completed", "conclusion": "cancelled"}] + red, {"blockers": []})),
+        ("cancelled run is skipped, green one behind it judged", ci_problems(
+            [{"status": "completed", "conclusion": "cancelled"},
+             {"status": "completed", "conclusion": "success"}], {"blockers": []})),
+        ("no finished CI run", ci_problems(
+            [{"status": "queued", "conclusion": ""}], {"blockers": []})),
+    ]
+    for label, found in fact_cases:
+        if report(label, bool(found), label not in quiet):
             failures.append(label)
 
     # And the real ones, which must be quiet on a healthy tree.
+    real = 0
     for label, check in CHECKS:
-        if check in (check_next_action, check_phases_closed):
+        if check in (check_next_action, check_phases_closed):  # covered above
             continue
-        if check(state):
+        real += 1
+        found = check(state)
+        if found and not isinstance(found, Skip):
             failures.append(f"{label} fires on a healthy tree")
             print(f"  {RED}FAIL{RESET}  {label} fires on a healthy tree")
         else:
@@ -303,8 +490,16 @@ def selftest() -> int:
     if failures:
         print(f"\n{RED}statecheck selftest: {len(failures)} failure(s){RESET}", file=sys.stderr)
         return 1
-    print(f"\nstatecheck selftest: all {len(cases) + 3} checks passed\n")
+    print(f"\nstatecheck selftest: all {len(cases) + len(fact_cases) + real} checks passed\n")
     return 0
+
+
+def report(label: str, fired: bool, should_fire: bool) -> bool:
+    """Print one selftest line; return True if it went wrong."""
+    ok = fired == should_fire
+    print(f"  {GREEN + 'ok  ' + RESET if ok else RED + 'FAIL' + RESET}  {label}"
+          f"  {DIM}({'fires' if should_fire else 'stays quiet'}){RESET}")
+    return not ok
 
 
 def main() -> int:

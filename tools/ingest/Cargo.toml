@@ -1,0 +1,30 @@
+[package]
+name = "sinephile-ingest"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "The command line over the catalogue pipeline (SPEC.md §7)."
+
+# A CLI and nothing else. Everything it drives lives in `crates/catalogue`, because the
+# application needs the same pipeline to refresh the catalogue on launch and cannot
+# depend on a tool (D37).
+
+[[bin]]
+name = "ingest"
+path = "src/main.rs"
+
+[dependencies]
+sinephile-catalogue = { path = "../../crates/catalogue" }
+sinephile-persistence = { path = "../../crates/persistence" }
+sinephile-embedding = { path = "../../crates/embedding" }
+sinephile-vector-index = { path = "../../crates/vector-index" }
+# The CLI constructs the HTTP clients it hands to the pipeline — which transport and
+# which rate limit is a caller's decision, not the pipeline's.
+sinephile-metadata-api = { path = "../../crates/metadata-api" }
+sqlx = { version = "=0.8.6", default-features = false, features = [
+    "runtime-tokio", "sqlite", "macros",
+] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

@@ -23,7 +23,7 @@ Targets from `SPEC.md` §12.2.
 | Harness | Metric | Target | Value | Date | Commit | Command |
 |---|---|---|---|---|---|---|
 | *(Phase 5)* Search relevance | nDCG@10 | > 0.75 | — | — | — | `cargo run -p eval -- search --report` |
-| *(Phase 5)* Search relevance | exact-title top-1 | 100% | — | — | — | `cargo run -p eval -- search --report` |
+| *(Phase 5)* Search relevance | exact-title top-1 | 100% | **100% (43/43)** | 2026-09-06 | `c7214f4` | `cargo run -p eval --release -- search --report` |
 | *(Phase 10)* Subtitle alignment | within 150 ms | > 90% | — | — | — | `cargo run -p eval -- subtitles --report` |
 | *(Phase 12)* Filename identification | top-1 accuracy | > 95% | — | — | — | `cargo run -p eval -- filenames --report` |
 | *(Phase 12)* Filename identification | false-confident rate | **< 1%** | — | — | — | `cargo run -p eval -- filenames --report` |
@@ -44,8 +44,8 @@ Tier 2 and are labelled as such.
 | *(Phase 1, Spike B)* Time to first usable bytes | escalate if > 20 s | — | — | — | — | spike harness |
 | *(Phase 1)* Cold start to interactive | < 4 s (T0) / < 2 s (T2) | — | — | — | — | — |
 | *(Phase 1)* Idle RAM | < 250 MB (T0) / < 200 MB (T2) | — | — | — | — | — |
-| *(Phase 3)* Indexed lookup, 500k rows | < 100 ms | — | — | — | — | — |
-| *(Phase 5)* Keystroke → results p95 | < 80 ms *incl. embedding* | 0 | — | — | — | — |
+| *(Phase 3)* Indexed lookup, 500k rows | < 100 ms | 2 | **0.141 ms** p95 (worst of three) | 2026-09-06 | `4f302d5` | `cargo test -p sinephile-persistence --test benchmark --release -- --ignored` |
+| *(Phase 5)* Keystroke → results p95 | < 80 ms *incl. embedding* | 2 | **7.3 ms** (keyword path; no embedding yet) | 2026-09-06 | `c7214f4` | `cargo run -p eval --release -- search --report` |
 | *(Phase 7)* Play → first frame, healthy swarm | < 8 s | — | — | — | — | — |
 | *(Phase 8)* Play → first frame, local | < 500 ms | — | — | — | — | — |
 | *(Phase 16)* Rank 1,000 candidates | < 150 ms | 0 | — | — | — | — |
@@ -318,3 +318,1827 @@ Both numbers pass the Phase 3 criterion, which is the point worth recording: the
 criterion would have been met with the scan in place, and the failure would have
 surfaced in Phase 5, whose 80 ms p95 search budget sits on top of this lookup against
 a catalogue an order of magnitude larger than this fixture.
+
+## Phase 4 — IMDb catalogue shape (R4 measurement)
+
+`cargo build -p sinephile-ingest --release && ./target/release/ingest measure`
+
+Measured against the live IMDb datasets on 2026-09-01, commit `f7907fd`. This is the
+measurement **R4's mitigation requires before committing to a shape**. It writes
+nothing to the database.
+
+| Metric | Value |
+|---|---|
+| Titles in `title.basics` | 12,754,307 |
+| Of a type this catalogue would keep | 2,832,564 |
+| `tvEpisode` rows (excluded — they arrive via `title.episode`) | 9,860,692 (77%) |
+| Rated titles in `title.ratings` | 1,711,804 |
+| Kept-type titles with **no** votes at all | 2,023,574 (71% of kept) |
+| Archives | 224.0 MB compressed, 1,084.2 MB raw |
+| Download | 25 s (9.3 MB/s) |
+| Scan, both files, release build | 8 s |
+
+**Titles kept by vote threshold**, and the projected database for that many rows
+(2.4x SQLite overhead, the ratio measured in Phase 3 — 500,000 synthetic rows
+produced 145.4 MB):
+
+| Threshold | Titles | Projected |
+|---|---|---|
+| everything of a kept type | 2,832,564 | 471 MB |
+| >= 0 votes (rated only) | 808,990 | 135 MB |
+| >= 10 | 700,529 | 117 MB |
+| >= 50 | 330,344 | 55 MB |
+| >= 100 | 236,438 | 39 MB |
+| >= 500 | 103,060 | 17 MB |
+| >= 1,000 | 69,304 | 12 MB |
+| >= 10,000 | 15,855 | 3 MB |
+
+**R4's triggers are 2 hours of ingestion or a 4 GB database.** On `title.basics`
+alone, neither is close: the whole kept set projects to 471 MB and the scan takes 8
+seconds. Excluding `tvEpisode` removes 77% of IMDb before any threshold is applied.
+
+**This does not clear R4.** It measures one of six datasets. `title.principals`
+(cast and crew) is the largest by a wide margin and has roughly 90 million rows, and
+both it and `title.akas` scale with the number of titles kept — so the threshold
+chosen here multiplies through them. Measuring those is the next thing, and the
+threshold should not be treated as settled until it is.
+
+### The two-tier scope, measured against all four large datasets
+
+`./target/release/ingest measure` (full, not `--quick`), 2026-09-01, commit `6d9e429`.
+Author's ruling: **A for the index, C for enrichment** — every kept-type title enters
+the catalogue; only the popular core gets cast, crew, akas and embeddings.
+
+| Tier | Rule | Titles |
+|---|---|---|
+| index | any kept type, non-adult | 2,701,195 |
+| core | >= 10 votes, **or** unrated and released within 2 years | 854,752 |
+
+| Dataset | Rows total | Rows for core titles | Kept |
+|---|---|---|---|
+| `title.principals` | 101,540,407 | 10,493,168 | 10.3% |
+| `title.akas` | 59,142,985 | 5,910,737 | 10.0% |
+
+**Projected database**
+
+| | Size |
+|---|---|
+| titles (index tier) | 450 MB |
+| credits (core tier) | 1,921 MB |
+| alternative titles (core tier) | 812 MB |
+| **total** | **3.11 GB** |
+| the same load **without** the core tier | **26.53 GB** |
+
+**R4's fear was justified, and the two-tier scope is what answers it.** Ingesting
+credits and akas for every title would produce a **26.53 GB** database — six and a
+half times over R4's 4 GB trigger. Restricting enrichment to the core tier is an
+**8.5x reduction** and brings it to 3.11 GB.
+
+Full scan of all four datasets: **174 seconds**. R4's other trigger is two hours, so
+time is not close to being a problem — size was always the real risk.
+
+**Headroom is thin and should not be treated as settled.** 3.11 GB is 78% of the 4 GB
+trigger, and AniList, MovieLens and the embedding artefact all still have to fit
+inside it. Credits alone are 62% of the projected total. The lever, if it is needed,
+is the core vote threshold: >= 50 votes cuts the core from 854,752 titles to roughly
+330,000. That would not reduce credits proportionally — popular titles have larger
+casts — but it is the largest single reduction available.
+
+### Correction: the size projection was wrong by roughly half
+
+The table above projected **450 MB** for the index tier. The real load passed
+**900 MB before it had finished**, and the projection method was the reason.
+
+The 2.4x multiplier came from the Phase 3 benchmark, where 500,000 synthetic rows
+produced a 145.4 MB database. That benchmark inserted into `media_items` and `titles`
+and nothing else. A real load also writes `external_ids` with its UNIQUE index,
+`media_genres`, and a second `titles` row wherever the original title differs — none
+of which the multiplier could capture, because none of them existed in the fixture it
+was derived from.
+
+**A multiplier is only valid for the shape it was measured on.** Reusing it across a
+different set of tables is not a projection; it is a guess wearing a number's
+clothes. The measurement was real and the arithmetic on top of it was not.
+
+This matters for R4: if titles are roughly 2x the projection, the 3.11 GB total is
+closer to 5-6 GB, which is **over** the 4 GB trigger rather than comfortably under
+it. The measured index-tier figure below replaces the projection, and the credits and
+akas projections are still unverified and should be treated as suspect for the same
+reason.
+
+### The index tier, actually loaded
+
+`./target/release/ingest imdb` against the live IMDb datasets, 2026-09-01,
+commit `048180a`. Release build, dev machine.
+
+| Metric | Value |
+|---|---|
+| Titles indexed | **2,701,195** |
+| In the core tier | **854,752** |
+| `titles` rows | 2,870,270 |
+| `external_ids` rows | 2,701,195 |
+| `media_genres` rows | 4,448,436 |
+| Distinct genres | 28 |
+| **Database** | **1,153 MB** (+46 MB WAL) |
+| **Load time** | **219 s** |
+
+Counts matched the measurement exactly — 2,701,195 and 854,752 were both predicted —
+because the scope logic is the same code. **The size was not:** projected 450 MB,
+actual 1,153 MB, **2.56x low**. The multiplier is corrected to 6.2 and is now derived
+from this load rather than from the Phase 3 fixture.
+
+Integrity, checked rather than assumed: no null or empty titles, no literal `\N`
+leaking through as a value, every rating within 0-100, no duplicate IMDb ids, no
+media item without a title row, no media item without an external id.
+
+Resumability was demonstrated on real data, not fixtures. The first run was killed at
+2,350,000 items; restarting picked up from that checkpoint and finished, with no
+duplicate and no gap.
+
+**Load time is 219 s against R4's two-hour trigger.** Time was never the risk.
+
+### R4, reopened
+
+The two-tier scope was accepted on a projection of **3.11 GB**. That projection is
+now known to be low by 2.56x on the one component that has been measured:
+
+| Component | Projected | Measured |
+|---|---|---|
+| titles (index tier) | 450 MB | **1,153 MB** |
+| credits (core tier) | 1,921 MB | not yet loaded |
+| alternative titles (core tier) | 812 MB | not yet loaded |
+
+Taking the two unmeasured figures at face value gives **3.9 GB**, which is at R4's
+4 GB trigger rather than under it. If they are wrong in the same direction and by a
+similar factor — and they were produced by the same kind of reasoning — the total is
+closer to **7 GB**, well over.
+
+**R4 is open again, and the >= 10 core threshold should be treated as provisional
+until credits are actually loaded and measured.** That is the next measurement, and
+it should happen before AniList rather than after.
+
+### Credits, actually loaded — and the projections were wrong in both directions
+
+`./target/release/ingest credits`, 2026-09-01, commit `afc5408`. Release build.
+
+| Metric | Value |
+|---|---|
+| People loaded | 2,736,235 |
+| Credits loaded | **10,079,841** |
+| Core titles with at least one credit | 838,133 of 854,752 (98%) |
+| Mean credits per title | 12.0 |
+| People dropped (absent from `name.basics`) | 1,604 |
+| **Database** | **2,427 MB** (+1,069 MB for people and credits) |
+| **Load time** | **2,234 s** for the resumed portion |
+
+Integrity, checked: zero credits pointing at a missing person, zero pointing at a
+missing title, zero attached to a non-core title, and only roles the migration 0002
+`CHECK` constraint allows.
+
+**The projections were wrong in BOTH directions, which is the useful finding:**
+
+| Component | Projected | Measured | Error |
+|---|---|---|---|
+| titles | 450 MB | 1,153 MB | **2.6x under** |
+| people + credits | 1,921 MB | 1,069 MB | **1.8x over** |
+
+A method that is 2.6x low on one component and 1.8x high on the next is not biased —
+it is **unreliable**, and no correction factor fixes that. The multiplier was
+corrected once already, from 2.4 to 6.2, and this shows that was treating a symptom.
+Projections are now labelled as projections wherever they are printed, and the R4
+position is stated from measurements only.
+
+### R4 position, on measured data
+
+| Component | Status |
+|---|---|
+| titles (index tier) | **1,153 MB measured** |
+| people + credits (core tier) | **1,069 MB measured** |
+| alternative titles (core tier) | not yet loaded |
+| embedding artefact | not yet built (~330 MB at ADR-0014's rate for 854,752 core titles) |
+| AniList, MovieLens | not yet loaded |
+
+**Measured so far: 2,427 MB of a 4 GB trigger.** Roughly 1.6 GB of headroom for four
+components, one of which is projected at 812 MB by a method now known to be
+unreliable.
+
+**Time is now a live concern too, and was not before.** Titles 219 s plus credits
+2,234 s plus the failed first attempt is roughly 45 minutes of a two-hour budget,
+with `title.akas`, AniList, MovieLens and the embedding build still to run.
+
+**Both of R4's triggers are in play.** Neither is breached; neither is comfortably
+clear.
+
+### Alternative titles loaded — every R4 component is now measured
+
+`./target/release/ingest akas`, 2026-09-01, commit `f67d939`.
+
+| Metric | Value |
+|---|---|
+| Title rows | 8,435,215 |
+| **Database** | **3,110 MB** (+683 MB) |
+| **Load time** | **860 s** |
+
+Variant distribution: primary 2,701,195 · english 2,671,786 · alternative 1,697,466 ·
+original 909,292 · **native 380,185** · **romaji 75,291**. The script heuristic
+produces plausible counts, and no title rows are orphaned or attached to a non-core
+item beyond its primary.
+
+### R4, every component measured
+
+| Component | Projected | **Measured** | Projection error |
+|---|---|---|---|
+| titles (index tier) | 450 MB | **1,153 MB** | 2.6x under |
+| people + credits (core) | 1,921 MB | **1,069 MB** | 1.8x over |
+| alternative titles (core) | 812 MB | **683 MB** | 1.2x over |
+| | | **3,110 MB total** | |
+
+**3,110 MB of the 4,096 MB trigger — 76%.** Ingestion time so far is roughly 65
+minutes of the two-hour budget.
+
+Still to fit: the embedding artefact (~330 MB at ADR-0014's rate for 854,752 core
+titles), AniList, and MovieLens. Estimating those at ~600 MB puts the final figure
+near **3.7 GB, or 91% of the trigger** — under it, with no margin.
+
+The projections were wrong in all three cases and in both directions. They are
+retained above only to show that.
+
+### A defect the variant distribution exposed
+
+`Seven Samurai` has **six identical `english` rows**, differing only by region.
+`idx_titles_unique` is `(media_item_id, variant, language, region)`, so the same
+text under `en/US`, `en/GB`, `en/CA` and a null region are four distinct keys and
+all were inserted.
+
+| Uniqueness | Rows | Redundant |
+|---|---|---|
+| as stored | 8,435,215 | — |
+| distinct (item, variant, text) | 6,184,278 | **2,250,937 (27%)** |
+| distinct (item, text) | 4,370,081 | 4,065,134 (48%) |
+
+At roughly 120 bytes per row, deduplicating on **(item, variant, text)** recovers
+about **270 MB** — and costs nothing, because it removes duplicate rows rather than
+information. A genuinely different regional title is still a different row.
+
+**This matters more than the vote threshold.** Deduplication buys ~270 MB for no loss
+at all; tightening the core to `>= 50` buys perhaps 750 MB but takes the cast list
+away from roughly 370,000 films. The cheap fix should be taken before the expensive
+one is considered.
+
+### The deduplication worked, and saved nothing. Third projection error.
+
+Migration 0007, applied to the real 3,110 MB catalogue in **32 seconds**.
+
+| | Before | After |
+|---|---|---|
+| `titles` rows | 8,435,215 | **6,184,278** |
+| Database | 3,110 MB | **3,133 MB** |
+
+The row count fell by exactly the 2,250,937 predicted. **The file grew by 23 MB.**
+
+**Why.** The old index was `(media_item_id, variant, language, region)` — two short
+codes. The new one is `(media_item_id, variant, title)`, and an index carries the
+values it is keyed on, so it now stores **the full title text of every row**. The
+table got smaller and the index got wider by more than the table saved. `freelist_count`
+is 0, so there is nothing for `VACUUM` to reclaim either.
+
+I estimated 270 MB of savings. The actual result was **-23 MB**. That is the third
+storage estimate in this phase to be wrong:
+
+| Estimate | Predicted | Actual |
+|---|---|---|
+| titles | 450 MB | 1,153 MB |
+| credits | 1,921 MB | 1,069 MB |
+| akas | 812 MB | 683 MB |
+| dedupe saving | +270 MB | **-23 MB** |
+
+**The pattern is the finding.** Every one of these was an arithmetic argument about
+storage that sounded reasonable and was wrong — twice high, twice low. Storage in
+SQLite depends on page packing, index width and B-tree fill factor, none of which a
+back-of-envelope multiplier models. **The rule from here: report measurements, and do
+not present storage arithmetic as a prediction at all.**
+
+**Was the migration still worth applying?** On data quality, yes and it stays: a
+search for "Seven Samurai" no longer matches the same film six times, and 2.25 million
+rows carrying no information are gone. On disk, it is break-even. It was sold on the
+disk saving, and that part did not happen.
+
+### R4, after deduplication
+
+**3,133 MB of the 4,096 MB trigger.** Unchanged in substance: roughly 960 MB of
+headroom for the embedding artefact, AniList and MovieLens — and no reliable way to
+predict what those will cost, which is precisely why they will be measured as they
+land rather than estimated now.
+
+### Normalised titles backfilled (migration 0009)
+
+`./target/release/ingest normalise`, 2026-09-02, commit `3155e6b`.
+
+| Metric | Value |
+|---|---|
+| Titles normalised | **6,184,278** (all of them) |
+| Distinct normalised forms | 3,453,809 |
+| Empty forms (punctuation-only titles) | 126 |
+| **Time** | **197 s** |
+| **Database** | 3,133 MB → **3,399 MB** (+266 MB) |
+
+Spot-checked: `Fullmetal Alchemist: Brotherhood` → `fullmetal alchemist brotherhood`,
+and `8½` survives as `8½` because `½` is a numeric character rather than punctuation.
+
+**The ambiguity the matcher refuses is real and large.** 568 catalogue items share the
+normalised title `home`; 486 share `alone`; 330 share `broken`. Any matcher that
+resolved ties by picking the first would be wrong hundreds of times and would record
+each one as a fact. That is the case
+`two_equally_good_candidates_are_refused_rather_than_guessed` exists for, and it is
+not a hypothetical.
+
+The 126 empty forms are titles made entirely of punctuation. They can never match,
+which is correct — there is nothing to match on.
+
+### R4 after migration 0009
+
+**3,399 MB of the 4,096 MB trigger — 83%. Headroom is 697 MB.**
+
+Still to fit: the embedding artefact, AniList and MovieLens. ADR-0014 states ~77 MB
+per 200,000 titles, which for 854,752 core titles is around 330 MB — that is the
+ADR's own rate, not an estimate of mine, and this document has already recorded four
+storage estimates that were wrong in both directions.
+
+**Headroom is now thin enough that the `>= 10` core threshold is a live question
+again.** It should be settled once the remaining three components are measured, which
+is the same discipline that has been applied throughout: no fifth prediction.
+
+### Tuning the AniList matcher (subtask 4.4)
+
+`./target/release/ingest anime --pages 5` — the same 250 most-popular AniList entries
+against the full catalogue, re-run after each change. Pages come most-popular-first,
+so this sample is deliberately the hardest one: long-running franchises with many
+IMDb entries sharing a title.
+
+| | v1 | + collapse by item | + evidence narrowing |
+|---|---|---|---|
+| **Matched** | 101 (40.4%) | 171 (68.4%) | **184 (73.6%)** |
+| Ambiguous (refused) | **97** | 23 | **9** |
+| Already claimed | 11 | 16 | 17 |
+| Not in catalogue | 27 | 27 | 27 |
+| Year conflict | 14 | 13 | 13 |
+
+**v1 refused Death Note, One Piece, Naruto and Attack on Titan** — the four most
+recognisable titles in the sample. Every one of them was ambiguous *against itself*.
+The catalogue stores one `titles` row per spelling, so `Death Note`, `DEATH NOTE` and
+`Death note` all normalise to the same key and came back as three rival candidates for
+one item. The matcher counted rows where it should have counted items. That single bug
+was 97 of the 250 outcomes, and it was invisible in unit tests because a fixture never
+has three spellings of one title.
+
+Two narrowing rules then took ambiguity from 23 to 9. Both use evidence already held
+rather than preference, and neither can create a match or reject the last candidate
+standing:
+
+1. **A known, agreeing year beats no year at all.** `years_agree` is permissive about a
+   missing year — correctly, since absence is not evidence *against* a match. But it is
+   not evidence *for* one either, and treating the two as equal let a year-less
+   catalogue stub veto a match an exactly-dated entry had earned. This is what refused
+   Death Note (a 2006 series sitting beside an undated one), Sword Art Online and
+   Steins;Gate.
+2. **AniList states whether an entry is a film or a series.** `Naruto` is one series and
+   two unrelated undated films; the format setting resolves it. It is applied only when
+   several candidates are already tied, and only when it leaves exactly one.
+
+**What is still refused is refused correctly.** The remaining 9 are cases where two
+catalogue entries of the same kind share a title and a compatible year — nothing
+distinguishes them, so nothing may choose. Ranking by vote count would resolve most of
+them and would be wrong: popularity is evidence about a title, not about its identity.
+
+`already_claimed` counts an AniList entry that resolved to the right catalogue item but
+found it already mapped by an earlier one — nearly always a later season, since AniList
+lists seasons separately and IMDb lists one series dated by its first year. Counting
+those as matches gives (184 + 17) / 250 = **80.4% resolved**; the headline 73.6% is the
+pessimistic reading, and E5 reads the counts rather than either rate.
+
+### Japanese long-vowel folding: measured, and rejected
+
+**The idea.** `Obake no Q-tarou` came back `not in catalogue`, and it is in the
+catalogue — as `Q-Taro the Ghost`, reachable under `obake no q taro`. Japanese long
+vowels romanise inconsistently (`ou` / `oo` / `ō` / `o`, `uu` / `ū` / `u`), so folding
+them before comparison would recover titles like that one.
+
+**The measurement.** `scratchpad/measure_vowels.py` over the real catalogue and the
+5,997 `not in catalogue` entries from the full sweep:
+
+| Metric | Value |
+|---|---|
+| Unmatched that folding would give a candidate | **200 of 5,997 — 3.3%** |
+| Distinct normalised titles | 3,459,678 |
+| Distinct titles **after** folding | 3,432,608 |
+| **Collisions folding creates** | **27,070** |
+
+**Rejected.** It would manufacture roughly 27,000 new ambiguities across the catalogue
+to recover 200 matches — a bad trade by two orders of magnitude, and every one of those
+ambiguities lands in a matcher whose entire design is that ambiguity must be refused.
+Folding is also unsafe in general: it does not know a title is Japanese, so `Book`
+becomes `Bok` and `Moon` becomes `Mon`.
+
+The one example that prompted the question was real and unrepresentative. The spread
+sample shows what the bucket actually contains: TV specials, OVAs, promotional shorts
+and collaboration films that IMDb does not list as separate titles at all —
+`Ore no Imouto ... Short Specials`, `Odekake Kozame Kurashiki-shi Collab Movie`. Those
+are genuinely absent, and no normalisation reaches them.
+
+### Offset pagination over a popularity ordering is lossy
+
+Three full sweeps of the same catalogue:
+
+| Run | Ordering within a year | Entries seen |
+|---|---|---|
+| 1 | `POPULARITY_DESC` | 14,737 |
+| 2 | `POPULARITY_DESC` | **14,344** |
+| 3 | `ID` | 14,737 |
+
+Run 2 lost 393 entries — 2.7% — with **no code change** between it and run 1. Offset
+pagination is complete only while the ordering holds still, and popularity does not: an
+entry whose rank rises between page 4 being read and page 5 being requested moves onto
+page 4 and is never seen.
+
+**What this does and does not establish.** It does not prove drift caused run 2's
+shortfall: a 10-second control sweep of one year showed no reordering under either sort,
+and proving the mechanism would take repeated long runs. What it does establish is that
+14,737 is the complete set, since two independent runs reached it and one fell short.
+The switch to `sort: ID` rests on the property rather than the measurement — an
+immutable key cannot reorder under a sweep, a popularity ranking can — and the id-ordered
+run reaching 14,737 is consistent with that.
+
+Ascending year and ascending id both mean *earlier first*, so the change also settles
+the first-claim-wins rule: a series keeps season one's mapping rather than whichever
+season was more popular on the day.
+
+The unfiltered pass keeps `POPULARITY_DESC`, because it is capped at 5,000 entries and
+there the question is *which* 5,000 rather than whether the sweep is complete.
+
+### The full AniList catalogue, ingested
+
+`./target/release/ingest anime`, 2026-09-04, commit `31aa603`. Id-ordered, year-swept.
+
+| Outcome | Count | Share |
+|---|---|---|
+| **Seen** | **14,737** | |
+| Matched | **7,328** | 49.7% |
+| — exact title and year | 7,224 | |
+| — title only, year unknown | 104 | |
+| — season-aware | **0** | |
+| Already claimed by an earlier entry | 409 | 2.8% |
+| Not in catalogue | 6,238 | 42.3% |
+| Year conflict | 510 | 3.5% |
+| Ambiguous (refused) | 252 | 1.7% |
+| **Time** | **809 s** | |
+
+Resulting catalogue state: **5,917 `anime_series` and 1,466 `anime_film`**, 7,383
+carrying an AniList id and 7,343 also a MAL id — the union of three sweeps; a single
+clean sweep produces 7,328. Confidence spread: 7,226 at 1.0, 157 at 0.8, none at 0.6.
+
+**Zero season-aware matches, and that is the design working rather than failing.**
+Season-stripping still fires constantly; under id ordering season one always claims the
+series first, so a later season now resolves into `already_claimed` instead of creating
+a second mapping. The machinery's output moved from the `matched` column to the
+`already_claimed` one, which is precisely where it belongs.
+
+**42.3% not in catalogue is dominated by things IMDb does not list**, not by matching
+failure — TV specials, OVAs, promotional shorts and collaboration films. See the
+long-vowel measurement above for why no normalisation reaches them. All 7,409 unmatched
+entries are written to `data/anilist-unmatched.tsv`, which is the list E5's 50
+hand-checked titles get chosen from.
+
+### Mislabelled title variants repaired
+
+`./target/release/ingest repair-variants`, 2026-09-04.
+
+**41,193 rows repaired, 0 still mislabelled, 39 s.** Spot-checked: *Spirited Away* now
+carries exactly one `english` title, and `El viaje de Chihiro` and `Le voyage de
+Chihiro` are `alternative` where they belong.
+
+Database after the anime ingestion and the repair: **3,426 MB** — up 27 MB from 3,399,
+which leaves **670 MB of R4 headroom**.
+
+### Episodes: the scope chosen from a measured cost
+
+`./target/release/ingest episodes --measure`, 2026-09-04. `title.episode` holds
+**9,866,106 rows**, of which 6,868,550 (69.6%) hang off a core-tier series. At the core
+tier's own 10-vote rule that is far more than R4 allows, so episodes needed their own,
+tighter threshold — and this is the curve it was chosen from.
+
+| parent series votes ≥ | episodes | series |
+|---|---|---|
+| 10 (the core tier's rule) | 6,759,802 | 111,134 |
+| 100 | 3,490,720 | 42,151 |
+| 1,000 | 1,265,318 | 12,787 |
+| 5,000 | 426,043 | 4,724 |
+| 10,000 | 216,121 | 2,832 |
+| 50,000 | 52,453 | 715 |
+
+**Cost per episode was measured, not predicted.** Anime was loaded first — 132,845
+episodes for **+51 MB, 405 bytes each**. Widening to 10,000 votes then added 203,754
+episodes at **402 bytes**, and to 5,000 votes another 203,218 at **410 bytes**. Three
+independent measurements inside 2% of each other, which is the first time in this phase
+a storage number has been trustworthy — because it was weighed rather than guessed.
+
+| Scope | Episodes | Cost at 410 B | Database | Headroom left |
+|---|---|---|---|---|
+| anime only | 132,845 | 51 MB | 3,477 MB | 619 MB |
+| + votes ≥ 10,000 | 336,599 | +78 MB | 3,555 MB | 541 MB |
+| **+ votes ≥ 5,000 (chosen)** | **539,817** | **+79 MB** | **3,635 MB** | **461 MB** |
+| + votes ≥ 1,000 | 1,378,000 | +344 MB | 3,979 MB | 117 MB |
+
+**≥ 5,000 is where it stops**, because the next step down costs 344 MB and ADR-0014's
+own rate puts the embedding artefact at roughly 330 MB. Widening past this point would
+buy episode lists for mid-tier series at the price of the search engine.
+
+Anime is exempt from the threshold entirely: `SPEC.md` §6.2 requires its numbering, and
+the whole anime catalogue is 132,880 episodes — small enough that a threshold would cost
+more in missing data than it saves in bytes.
+
+Result: **539,817 episodes and 21,218 seasons.** Spot-checked against reality —
+*Breaking Bad* 7/13/13/13/16, *Attack on Titan* 25/12/22/30, *Cowboy Bebop* a single
+26-episode season. 15,691 episodes (2.9%) carry no season or episode number because
+IMDb has none for them; they are stored as NULL rather than given an invented 0.
+
+**The scope can be widened later without corrupting anything.** `episodes` has no
+natural key, so a second pass would happily insert every episode again — the skip set
+built from `external_ids` is the only thing preventing it, and
+`widening_the_scope_adds_episodes_without_duplicating_the_first_pass` was watched
+failing (4 rows instead of 2) with that skip removed before being trusted.
+
+### E5 — hand-checked anime mappings
+
+`./target/release/ingest verify-anime`, 2026-09-04, commit pending.
+Fixture: `fixtures/anime/e5-hand-checked.tsv`, **64 rows** where E5 asks for 50.
+
+| | |
+|---|---|
+| **Pass** | **64 / 64** |
+| Expected matches | 60 |
+| Expected refusals (ambiguous) | 2 |
+| Expected refusals (year conflict) | 1 |
+| Expected season claims | 2 |
+
+Coverage of the categories E5 names: long-running shonen (One Piece, Naruto, Bleach,
+Detective Conan, Dragon Ball Z, Gintama, Rurouni Kenshin), split-cour seasons (Attack on
+Titan, Jujutsu Kaisen, Demon Slayer, Vinland Saga, Kaguya-sama, Haikyu), and films tied
+to series (Mugen Train, Jujutsu Kaisen 0, Cowboy Bebop: The Movie, Made in Abyss).
+
+**The first run failed 4 of 62, and all four were errors in the fixture rather than in
+the matcher.** Two were IMDb ids I recalled wrongly — `tt1710308` is *Regular Show*, not
+*Nichijou*. Two were refusals asserted on a false premise: Re:Zero is resolved by a later
+title form, and IMDb does hold a separate (sparse, undated) record for *Attack on Titan
+Season 2* rather than only the one series. All four are recorded in the fixture header,
+because a fixture whose failures are quietly edited away until it passes is worth
+nothing.
+
+### A later title form can rescue an ambiguous earlier one
+
+Building the fixture surfaced a real bug. AniList's romaji for *Great Teacher Onizuka*
+is the three letters `GTO`, which several unrelated works share, so the matcher hit
+ambiguity and **returned immediately** — never trying the English form `GTO: Great
+Teacher Onizuka`, which exactly one catalogue entry has. The year-conflict path had
+always remembered-and-continued. The asymmetry was the bug.
+
+Measured over the full catalogue, before and after:
+
+| | before | after |
+|---|---|---|
+| Matched | 7,328 | **7,391** |
+| Ambiguous (refused) | 252 | **187** |
+| Seen | 14,737 | 14,737 |
+
+`seen` landing on 14,737 for the third consecutive id-ordered run is the evidence that
+sweep is reproducible, which the popularity-ordered runs were not.
+
+### Incremental catalogue refresh (ADR-0030 layer 1, corrected by ADR-0032)
+
+`./target/release/ingest refresh`, 2026-09-04.
+
+| Metric | Value |
+|---|---|
+| Titles added | **1,542** |
+| Ratings re-applied | **1,086,185** |
+| **Time** | **71 s** |
+| Full re-ingest, for comparison | 219 s |
+
+**ADR-0030's stated mechanism does not work, and the file says so.** It specified
+`seek_past(highest id we have)` on the premise that IMDb's files are "sorted by id and
+new titles get higher ids". Measured over the real 12,761,311-row `title.basics`:
+
+```text
+sorted lexicographically: true
+sorted numerically      : false
+first numeric decrease at row 967,458:   tt10001008 -> tt1000101
+last id in the file:                     tt9916880   (not the largest)
+```
+
+`"tt10001008" < "tt1000101"` as text, so a newly issued `tt45000000` lands roughly half
+way through the file rather than at the end. Seeking past the catalogue's maximum
+(`tt44917931`) walked into the `tt5…`–`tt9…` rows already held and died on
+`UNIQUE constraint failed: external_ids.source, external_ids.external_id`.
+
+The refresh now filters by numeric id instead. **The saving ADR-0030 was after
+survives**, because it was never the seek: the expensive half is inserting 2.7 million
+rows, and nothing already held is inserted or even parsed into one. Three-fold on a
+weekly job.
+
+**Every fixture had used ids short enough for the two orderings to agree**, which is why
+seven passing tests said nothing about it. The regression test now uses the exact
+transition from row 967,458 of the real file.
+
+### Artwork: WebP re-encoding measured on real photographs
+
+`cargo test -p sinephile-artwork --test real_images -- --nocapture`, 2026-09-04.
+Source: the 24 public-domain film stills in `dist/stills/` — *Battleship Potemkin*,
+*Detour*, *Beat the Devil*, *His Girl Friday*.
+
+| Metric | Value |
+|---|---|
+| JPEG in | 2,580 KB |
+| Lossy WebP out (q80) | **1,493 KB** |
+| **Saved overall** | **42.1%** |
+| Worst single image | 27.8% (*his-girl-friday-1.jpg*) |
+
+**Measured on photographs, not on gradients.** A synthetic test image compresses
+nothing like a film still, so a saving measured on one says nothing about the other —
+and this number is the entire justification for taking a C dependency (`webp`, wrapping
+libwebp) rather than using `image`'s pure-Rust encoder. `image` supports WebP decoding
+and **lossless** encoding only, and lossless WebP on a photograph is routinely *larger*
+than the JPEG it came from, which would have made the cache worse while appearing to
+satisfy the requirement.
+
+The test asserts a floor of 10% rather than the measured figure, so it fails if the
+dependency ever stops earning its place, without breaking every time libwebp changes a
+heuristic.
+
+### Blurhash
+
+Implemented in `crates/artwork/src/blurhash.rs` rather than taken as a dependency —
+about a hundred lines, and it is the interesting part of the subtask. 4×3 components,
+28 characters per image, computed from a 64px thumbnail rather than the full poster
+(the transform is O(pixels × components) and only the lowest frequencies survive
+anyway).
+
+Two bugs the tests caught, both of which would have shipped silently:
+
+- **Averaging in sRGB rather than linear light.** Half black and half white averages to
+  128 if the stored bytes are averaged directly and to ~188 done correctly. Every
+  placeholder in the app would have been visibly too dark. This is the classic bug in
+  reimplementations, and `the_average_is_computed_in_linear_light_not_in_srgb` is the
+  test for it.
+- **`&hash[2..6]` panics on a UTF-8 boundary.** These values come out of a database, so
+  one corrupt row would have taken the process down. Indexed as bytes now.
+
+### The embedding artefact: R4 answered by arithmetic on a measured format
+
+`cargo test -p sinephile-embedding`, 2026-09-05. 24 passing.
+
+ADR-0014 budgets INT8 at 384 dimensions, ~77 MB per 200,000 titles. The artefact format
+is now written down rather than estimated, so the size is a calculation over a real
+layout — a 256-byte header, one int8 per dimension per title, a 32-byte SHA-256:
+
+| | |
+|---|---|
+| Core-tier titles to embed | 855,703 |
+| Dimensions | 384 |
+| **Artefact size** | **313 MB** (`the_expected_size_can_be_shown_before_a_download`) |
+| R4 headroom before it | 452 MB (3,644 of 4,096 MB) |
+| **Headroom after** | **139 MB** |
+
+**It fits, and the `>= 10` core threshold survives.** That question has been open since
+migration 0009 and is now answerable: at 855,703 core titles the artefact costs 313 MB
+against 452 MB available. The number is arithmetic over a fixed format, not a
+prediction, which is why it can be trusted where the earlier storage estimates could
+not — and the artefact lives outside the database in any case, so R4's trigger is not
+what bounds it. It is recorded here because ADR-0014 says catalogue growth must not
+inflate it unnoticed.
+
+**Quantisation was checked for the thing that would make it useless**: int8 must not
+change the *order* of results. Over 384-dimension unit vectors, cosine similarity moves
+by less than 0.005, and a vector's similarity to its own round trip is above 0.9999.
+
+Two guards were broken deliberately to confirm they fail:
+
+- `-128` is never produced. Its negation does not fit in an i8, so a dot product that
+  negates a component overflows on exactly one value in 256 — a bug that surfaces once
+  in a million comparisons and never reproduces. Raising the clamp to 128 makes
+  `minus_128_is_never_produced` fail on the first seed.
+- A mismatched model identity is refused. Disabling the check makes
+  `a_mismatched_model_is_refused` fail. This is the more important of the two: a corrupt
+  download fails loudly, but a *mismatched* artefact fails silently — vectors from one
+  model compared against queries from another, with search simply getting worse and
+  nothing to point at.
+
+### The embedding artefact, produced
+
+`./target/release/ingest embed`, 2026-09-06. Verified with `ingest verify-embeddings`.
+
+| | |
+|---|---|
+| Vectors | **855,703** |
+| Dimensions | 384, int8 |
+| **Size** | **313 MB** (328,590,240 bytes) |
+| **Time** | **4,293 s** (71.5 min) |
+| Rate | 199 vectors/second |
+| SHA-256 | `3fce6f062c25220a80425cce7e9f83a3b80412af3b34fe4e9071d3b80645a2b0` |
+| Model | `all-MiniLM-L6-v2-int8`, sha256 `afdb6f1a…`, 22,972,370 bytes |
+| Catalogue snapshot | 2026-09-04 |
+
+**The size is exactly what the format predicted**: `256 + 855,703 × 384 + 32 =
+328,590,240` bytes, to the byte. That was computed before the run from the layout in
+`crates/embedding/src/artefact.rs`, which is the difference between arithmetic and an
+estimate — and the reason it can be relied on for the next catalogue.
+
+**71.5 minutes is inside ADR-0019's two-hour trigger, and not by much.** This is a
+first-run cost on a Tier 2 machine (24 cores); ADR-0014 puts it on the author's machine
+precisely so it is not paid on Tier 0, where it would be far worse. The artefact is
+downloaded there instead.
+
+`verify-embeddings` checks what actually matters — not "is the file intact" but "would
+loading it produce meaningful results on this build": checksum, then model identity,
+then document-builder version, then that the **last** vector is present and non-empty.
+The last one is where an off-by-one in the layout shows up and nowhere else.
+
+### No regression in earlier phases
+
+Required before closing a phase (§10.12). Phase 3's indexed-lookup benchmark, re-run on
+2026-09-06 after the catalogue grew from a fixture to 2.7 million real titles:
+
+| Lookup | p50 | p95 | p99 | worst |
+|---|---|---|---|---|
+| by id | 0.031 ms | 0.067 ms | 0.121 ms | 0.722 ms |
+| by exact title | 0.074 ms | 0.141 ms | 0.257 ms | 0.404 ms |
+| by external id | 0.062 ms | 0.119 ms | 0.176 ms | 0.666 ms |
+
+Against a 100 ms budget. Three orders of magnitude of headroom, unchanged.
+
+## Phase 5 — Semantic search
+
+### The FTS5 index, and 537 MB that were not doing anything
+
+`./target/release/ingest search-index`, 2026-09-06.
+
+| | Items | dbstat | Time |
+|---|---|---|---|
+| Main index (word) | 2,702,737 | **266 MB** | 213 s |
+| Trigram index, core tier only | 855,703 | **61 MB** | — |
+
+At that point the database was **4,023 MB against R4's 4,096 MB trigger** — 73 MB of
+headroom, and a full-catalogue trigram index would have needed ~192 MB. The obvious move
+was to cut scope. Measuring first found something better.
+
+**`titles` is a 444 MB table carrying 882 MB of indexes.** Broken down with `dbstat`:
+
+| | |
+|---|---|
+| `idx_titles_unique` (media_item_id, variant, title) | 265 MB |
+| `idx_titles_text` (title COLLATE NOCASE) | 247 MB |
+| `idx_titles_normalised` (normalised) | 187 MB |
+| **`idx_titles_item`** (media_item_id, variant) | **183 MB** |
+
+**`idx_titles_item` is dead.** A B-tree on `(a, b, c)` serves every lookup a B-tree on
+`(a, b)` could, so SQLite never chooses it — confirmed against the real 6.2-million-row
+table:
+
+```
+SELECT title FROM titles WHERE media_item_id = ? ORDER BY variant
+  -> SEARCH titles USING COVERING INDEX idx_titles_unique (media_item_id=?)
+```
+
+It was added in migration 0001 and made redundant by 0007, which changed the unique
+index's shape. Nothing noticed for five migrations, because a redundant index costs
+disk and changes no behaviour at all.
+
+Dropping it (migration 0012) and vacuuming:
+
+| | |
+|---|---|
+| Before | 4,023 MB |
+| **After** | **3,486 MB** |
+| Recovered | **537 MB** — 183 from the dead index, ~354 from fragmentation |
+
+**~350 MB of that was fragmentation** accumulated across incremental ingestion — nine
+separate jobs writing, deleting and rewriting. Nothing was wrong with it; SQLite simply
+does not repack as it goes. Worth knowing that `VACUUM` is a 46-second operation that
+recovers a tenth of this database.
+
+**R4 headroom is now 610 MB**, so the full-catalogue trigram index fits after all and
+the core-only fallback is not needed. That answer came from measuring what was already
+there rather than from cutting the catalogue, which was the first thing I reached for.
+
+### Live search on the real catalogue
+
+2,702,737 titles indexed, exact-title short-circuit:
+
+| Query | Time | Top result |
+|---|---|---|
+| `Seven Samurai` | 3.8 ms | Seven Samurai (1954) |
+| `Sen to Chihiro no Kamikakushi` | 8.8 ms | **Spirited Away** (2001) |
+| `Tarkovsky` | 1.2 ms | Tarkovsky (2010) |
+| `Face/Off` | 0.7 ms | Face/Off (1997) |
+| `fullmetal alchemist brotherhood` | 1.4 ms | Fullmetal Alchemist: Brotherhood (2009) |
+
+Against E1's 80 ms p95 budget. **These are the short-circuit path, not the full hybrid**
+— they are a floor, not the criterion, which also has to include query embedding (~1 ms,
+Spike C) and the vector half. But the Japanese title resolving to the English one, and a
+title containing FTS5 syntax returning rather than erroring, are both real behaviour on
+real data.
+
+### The trigram index, and what "trigram fuzzy matching" actually is
+
+`./target/release/ingest search-index --trigram`, 2026-09-06.
+
+| | |
+|---|---|
+| Titles | 2,702,737 |
+| Trigram index | **196 MB** (dbstat), +117 MB on disk |
+| Time | 56 s |
+| Database | **3,626 MB** — 470 MB of R4 headroom |
+
+Projected 192 MB from the core-tier measurement, actual 196. That projection held because
+it came from a complete measurement of 855,703 titles rather than from a sample.
+
+The D28 fix also worked: the main index reported **"0 items"** and took no time at all,
+where the previous run had re-indexed all 2.7 million.
+
+**SQLite's trigram tokenizer does substring search, not typo tolerance.** `SPEC.md` calls
+this deliverable "trigram fuzzy matching for typos" and the name invites the assumption.
+A phrase query against a trigram index asks *"does this document contain this
+substring"* — and `Solaris` does not contain `solariss`, so the first implementation
+returned nothing for every typo.
+
+Typo tolerance comes from the trigrams **individually**: `solariss` yields
+`sol ola lar ari ris iss`, `Solaris` contains five of those six, and OR-ing them lets
+BM25 rank by overlap. That is trigram similarity computed by the index rather than by us.
+
+### Live typo tolerance, and why E1 is not met yet
+
+| Query | Time | Top result |
+|---|---|---|
+| `solariss` | 256 ms | **Solaris** |
+| `seven samuria` | 390 ms | **Seven Samurai** |
+| `blade runer` | 354 ms | **Blade Runner** |
+| `tarkovski` | 0.4 ms | *Why Can't I Be Tarkovsky?* (keyword) |
+| `kurosowa` | 0.3 ms | *Margazhi Raagam* (keyword) |
+
+**The mechanism is right and the performance is not.** E1's budget is 80 ms p95 and the
+fuzzy path costs 256–390 ms — four to five times over. OR-ing ten trigrams across a
+2.7-million-row index touches a great deal of it.
+
+**And a weak keyword match blocks a good fuzzy one.** `kurosowa` returns *Margazhi
+Raagam* because the keyword tier found *something*, filled the result limit, and fuzzy
+never ran. The rule "fuzzy only fills what is left" is right in principle and wrong as
+implemented: it should be "fuzzy fills what is left once weak keyword hits are
+discounted", which needs a score threshold rather than a count.
+
+Both are recorded rather than papered over: E1 is a measured criterion and it is
+currently missed on this path.
+
+### E2 met — and the harness found three different things
+
+`cargo run -p eval --release -- search --report`, 2026-09-06, over 43 deliberately
+awkward queries against the real 2.7-million-title catalogue.
+
+| | First run | After |
+|---|---|---|
+| **E2 exact-title top-1** | 38/44 = 86.4% | **43/43 = 100%** |
+| **E1 latency p95** | 803 ms | **7.3 ms** |
+| p50 | 7.3 ms | **1.0 ms** |
+
+E1's target is 80 ms *including* query embedding, which does not exist yet — so 7.3 ms
+is a floor with room in it, not the criterion met.
+
+**1. The tiering was correct for ranking and wrong for cost.** Fuzzy ran whenever there
+was room left on the page — which is nearly always, since one excellent exact match
+still leaves four empty slots. So every search paid for a trigram scan over 2.7 million
+rows it did not need, and the slowest queries were ones whose answer had *already been
+found*. Fuzzy now runs only when the other tiers found fewer than two results. p95:
+803 ms → 13.5 ms.
+
+**2. A real bug: the two halves of the same search disagreed about what a title is.**
+The FTS5 index folds diacritics (`remove_diacritics 2`); `normalise` did not. So
+"Nausicaa of the Valley of the Wind" missed "Nausicaä of the Valley of the Wind" and
+fell through to a keyword match on a making-of documentary. Both now fold via NFD, and
+618,605 accented titles were re-folded (151 s).
+
+**3. Four of the six failures were the fixture, not the code.** Where several works
+share an exact title, search returns the most popular — and I had asserted the version I
+think of as canonical:
+
+| Query | Code | I asserted |
+|---|---|---|
+| and then there were none | 2015, 49,811 votes | 1945, 18,802 |
+| monster | 2022, 226,103 | 2004 anime, 74,880 |
+| hunter x hunter | 2011, 204,023 | 1999, 12,528 |
+| fullmetal alchemist | Brotherhood, 257,061 | 2003, 87,114 |
+
+The code is right: E2's intent is "you get a film with that title", not "you get the one
+I would have picked". Corrected in the fixture with the reasoning kept, exactly as the
+E5 anime fixture records its own four errors. **Across two fixtures this session, the
+fixtures have been wrong eight times and the code twice.**
+
+### The vector index: recall measured against brute force, and the dial chosen from it
+
+`cargo run -p eval --release -- vector --report`, 2026-09-06, commit pending, over the
+real 855,703-vector artefact. Built by `./target/release/ingest vector-index`.
+
+| | |
+|---|---|
+| **vectors** | 855,703 |
+| **build** | **439 s** (1,947/s average; starts near 6,800/s, settles near 1,950/s) |
+| **index on disk** | **435 MB** — 1.4x the 313 MB artefact |
+| **open (mmap)** | 69.9 ms |
+| **resident** | **6.6 MB** against 435 MB on disk |
+| **recall@10** | **0.9670** (gate 0.95) |
+| **latency** | p50 1.59 ms, p95 4.20 ms |
+
+**The mmap claim is now a number.** `eval vector --memory`, opening the same file both
+ways:
+
+| | resident | open time |
+|---|---|---|
+| **`view` (mmap)** | **6.6 MB** | 70 ms |
+| `load` (read it all) | **758.6 MB** | 438 ms |
+
+758.6 MB is **three times Tier 0's entire 250 MB idle budget** (`SPEC.md` §2.3), for
+the tier the artefact exists to serve — and it exceeds the 435 MB file, because loading
+rebuilds the graph as live allocations rather than mapping it. This is P11 settled with
+a measurement instead of a library's description of itself.
+
+**The graph costs 122 MB on top of the vectors it indexes.** 435 MB against the
+artefact's 313 MB. It is derived, so it is not a download — but it is disk, and it sits
+outside the database alongside the artefact.
+
+#### expansion_search was swept, not guessed
+
+`eval vector --ef N`, same 200 queries:
+
+| ef | recall@10 | p50 | p95 |
+|---|---|---|---|
+| 64 (usearch's default) | 0.9400 | 0.97 ms | 2.09 ms |
+| 128 | 0.9550 | 1.23 ms | 3.33 ms |
+| **192 (shipped)** | **0.9670** | **1.57 ms** | **4.28 ms** |
+| 256 | 0.9750 | 1.93 ms | 4.96 ms |
+| 384 | 0.9845 | 2.55 ms | 6.03 ms |
+
+**The library default missed the gate.** 0.9400 at ef 64 — which is the number that
+would have shipped had the constant been taken on trust and the harness written
+afterwards. 192 is the smallest value clearing 0.95 with margin. Higher was affordable
+on this machine, but the 80 ms budget is a *Tier 0* budget and the query embedding
+(P8: 24–33 ms padded) and keyword pass come out of the same 80 ms.
+
+#### The harness was proved before its numbers were believed
+
+`eval vector --prove` rotates the position → catalogue-id mapping by one, leaving the
+artefact, the index and the metric untouched.
+
+| | recall@10 |
+|---|---|
+| correct mapping | 0.9670 |
+| **mapping shifted by one** | **0.0055** |
+
+This is the check §10.8 asks for: a wrong key mapping is invisible by inspection,
+because it returns ten plausible films for every query. Ground truth comes from
+`crates/vector-index/src/brute.rs`, which scans the artefact bytes directly —
+deliberately **not** usearch's own `exact_search`, which would have compared usearch
+against usearch over the vectors usearch stored, and would have agreed with itself.
+
+#### One query loses 8 of its 10 neighbours, and it is not a measurement artefact
+
+`worst 0.20` at *every* ef value, which is the signature of something other than a
+lossy dial. Two explanations, opposite in meaning, so both were measured rather than
+assumed:
+
+- **Tied vectors** — duplicates in the artefact making "the true top ten" arbitrary:
+  **1** vector ties for last place. Not this.
+- **A crowded band** — thousands of vectors equally distant: **12** lie within 1% of
+  the 10th distance. Not this either.
+
+Position 697,314 has a real neighbourhood — nearest at 0.0000, tenth at 0.4009 — and
+HNSW misses most of it regardless of how many candidates it keeps. A genuinely
+poorly-connected node. Recorded as debt rather than smoothed away; the mean clears the
+gate and the shape of a single bad neighbourhood matters again in 5.4, where fusion
+decides what a weak candidate set does to a result page.
+
+#### E2 unchanged, and a cold-cache number worth having
+
+`eval search --report` after all of the above: **43/43 = 100%**, unchanged.
+
+Latency, however, split cleanly in two:
+
+| | p50 | p95 | max |
+|---|---|---|---|
+| **cold** (straight after 750 MB of index I/O) | 5.6 ms | **36.8 ms** | **131.9 ms** |
+| warm (three consecutive runs) | 0.9 ms | 7.1–7.4 ms | 59.9–61.7 ms |
+
+Not a regression — the warm numbers reproduce the 7.3 ms already recorded. But the
+cold column is the one a user meets on the first search after launch, and its **max
+already exceeds E1's 80 ms budget on a single query**. E1 is a p95 criterion so this
+does not fail it; it does mean E1 must eventually be measured cold, and Phase 21 owns
+that.
+
+### The query embedder, and proof the two halves have not drifted
+
+`cargo run -p eval --release -- embed --report`, 2026-09-07, commit 396f256.
+
+| | |
+|---|---|
+| model load | 141 ms (once, at startup) |
+| first inference | 2.5 ms (ONNX warm-up, paid once) |
+| **query latency** | **p50 2.2 ms, p95 2.4 ms** over 10 natural-language queries |
+| **agreement** | **10/10 byte-identical to the artefact** |
+
+The agreement number is the important one. A query is compared to document vectors by
+cosine, which only means anything if both were produced the same way — and tokenizer
+settings, truncation, pooling and normalisation are four chances to differ, every one of
+them silent. So the harness re-derives a document exactly as the producer built it,
+embeds it through the *query* path, quantises, and compares against that title's vector
+in the artefact. ADR-0014 makes the artefact deterministic, so the bar is byte-identical.
+
+**And the check was seen to fail.** Cutting `MAX_TOKENS` from 256 to 32 — one setting, in
+one crate, the most ordinary drift imaginable:
+
+| | agreement | worst cosine | exit |
+|---|---|---|---|
+| correct | 10/10 | 1.000000 | 0 |
+| **truncation changed** | **2/10** | **0.781292** | **1** |
+
+### E1, measured end to end for the first time
+
+`cargo run -p eval --release -- search --report`, 2026-09-07, commit bdbd560. The harness
+now drives the whole engine — query embedding, BM25, vector search and fusion — because
+E1's budget is keystroke-to-results and says the embedding is inside it.
+
+| | p50 | p95 | max |
+|---|---|---|---|
+| keyword only (previous phase state) | 0.9 ms | 7.3 ms | 60 ms |
+| **hybrid, warm** (3 consecutive runs) | **4.8 ms** | **15.0 ms** | 71 ms |
+| hybrid, cold | 17.1 ms | 67.5 ms | 324 ms |
+
+**E2 survives fusion at 43/43 = 100%** — the exact-title short-circuit still sits above
+everything, which is the property it exists to guarantee.
+
+**E1 is NOT claimed as met.** Both p95 figures are under 80 ms, but `SPEC.md` §2.3
+enforces budgets against **Tier 0** and this is a Tier 2 dev machine. At the 3–4x Tier 0
+penalty P8 already flags, warm lands at 45–60 ms and cold at 236–270 ms. The criterion is
+measured, not met.
+
+The rise from 7.3 to 15.0 ms warm is fusion doing what it is for: each half now returns
+50 candidates rather than 5, plus 2.4 ms of query embedding and 4.2 ms of vector search.
+
+### THE FINDING THAT MATTERS: the documents cannot answer a semantic question
+
+`eval search --query "films about grief that aren't depressing"` — the exact phrasing
+exit criterion **E4** names:
+
+| # | result | why |
+|---|---|---|
+| 1 | Grief (2017) | Semantic |
+| 2 | My Grief isn't Grief Enough (2024) | Semantic |
+| 3 | Grief (1994) | Semantic |
+| … | *seven more films titled "Grief"* | Semantic |
+
+And E4's second query, `"like Wong Kar-wai but Korean"`: *Wong Ka Yan*, *Hong Kil-dong*,
+*A Short Film About Wong Kar Wai*, *Miss Korea*. Name and word matching, with no notion
+of "like X" or "but Korean".
+
+**This is not a fusion defect.** The vector half is doing exactly what it was built to
+do. The problem is what it was built over:
+
+```sql
+SELECT COUNT(*) FROM media_items
+ WHERE in_core = 1 AND kind <> 'episode'
+   AND synopsis IS NOT NULL AND length(trim(synopsis)) > 0;
+-- 0    of 855,703
+```
+
+**Zero synopses in the entire catalogue.** So every embedded document is:
+
+```
+Placebo (2002), animation comedy short film, featuring Jim Carrey…
+```
+
+Title, year, genres, kind, cast — nothing about what a film is *about*. The embedding
+space encodes little more than the words of the title, which is why semantic search over
+it behaves like a fuzzy title matcher.
+
+**Why it was invisible until now.** Phase 4 built and verified the artefact — 855,703
+vectors, checksummed, deterministic, byte-reproducible — and every one of those checks
+passed, because they check that the file is *correct*, not that the documents are
+*informative*. Nothing had searched it. The first real query found it in one look.
+
+`SPEC.md` Phase 5 specifies the document as "synopsis, genres, keywords, director, mood
+descriptors, and era". Three of those six do not exist in the catalogue: synopsis,
+keywords, mood descriptors. Synopses come from TMDB, and ADR-0027 makes a TMDB key
+optional and absent by default — which is exactly the configuration this catalogue was
+built in.
+
+**E3 (nDCG@10 > 0.75) and E4 cannot be met against this artefact**, and no value of `k`
+or `ef` changes that. Raised as decision **P12** rather than worked around.
+
+### IMDb serves conditional requests — measured, and it decides the refresh design
+
+2026-09-07, resolving the open question in debt D24 and setting the shape of subtask 5.7.
+
+```
+HEAD https://datasets.imdbws.com/title.basics.tsv.gz
+  Content-Length: 226419080
+  Last-Modified:  Sun, 06 Sep 2026 00:48:16 GMT
+  ETag:           "c5a942c76317cde815f77fcf113ed80a-27"
+
+GET  with If-None-Match: "c5a942c76317cde815f77fcf113ed80a-27"
+  -> HTTP 304, 0 bytes downloaded
+```
+
+**Why it matters.** The author asked for the catalogue to refresh every time the app is
+opened. Taken literally that is a 216 MB download per launch (D24), which is not
+shippable. With a conditional request it is one round trip returning **zero bytes**
+whenever IMDb has not republished — and IMDb republishes daily, so at most one real
+refresh a day and nothing on every other launch.
+
+The `http_cache` table from migration 0008 already stores ETag and Last-Modified, and
+`crates/metadata-api` already handles revalidation, so the pieces exist. D24 guessed this
+would work; it now has a number.
+
+### Wikipedia as the text source: what the catalogue gained (ADR-0033)
+
+`ingest wikipedia`, 2026-09-07. Two phases, both measured.
+
+**Mapping** — IMDb id → English article, joined on Wikidata property P345:
+
+| | |
+|---|---|
+| queries | 110 (100 planned, **10 subdivided themselves** after timing out) |
+| mappings offered by Wikidata | 245,708 |
+| **matched onto this catalogue** | **233,661** (95.1%) |
+| time | 43 min |
+
+**Extracts** — the lead text, 20 articles per request:
+
+| | |
+|---|---|
+| articles fetched | 233,416 |
+| **with usable text** | **233,114** (99.87%) |
+| no usable lead | 302 |
+| time | 4.8 h (Wikimedia throttled us from 41/s to 13/s; the limiter absorbed it) |
+
+**Coverage is concentrated exactly where it matters**, which is the number that decides
+whether this was worth doing:
+
+| slice of the core tier | with a synopsis |
+|---|---|
+| top 1,000 by votes | **100.0%** |
+| top 10,000 | **98.8%** |
+| top 100,000 | 77.8% |
+| all 855,703 | 22.1% |
+
+The long tail stays empty and that is the correct outcome: a film nobody has voted on
+has no Wikipedia article either, and semantic search over it was never going to be the
+thing that surfaced it. Average extract is 495 characters, against the document
+builder's 400-character budget — so most titles contribute their whole lead.
+
+Before this, the same query was `0 of 855,703`.
+
+### Three distinct attempts at E3/E4, and where they stopped (§10.9)
+
+Wikipedia text was loaded, and semantic search still could not answer a plot query.
+Three genuinely different fixes followed; each helped, none was enough.
+
+**Attempt 1 — enrich the documents** (233,114 synopses). "films about grief that aren't
+depressing" still returned ten obscure films *titled* Grief, every one with **no**
+synopsis. A document reading `Grief (1921), drama short film` is almost entirely the
+word "grief", so it sits on top of any query containing it. **Sparse documents are
+louder than rich ones.**
+
+**Attempt 2 — index only items that have descriptive text** (855,703 → 189,470). Real
+gains, and free improvements elsewhere:
+
+| | before | after |
+|---|---|---|
+| index on disk | 435 MB | **96 MB** |
+| build | 428 s | 54 s |
+| resident (mmap) | 6.6 MB | 1.0 MB |
+
+Results improved but stayed lexical: *Fish Hooky*, *Killer Fish* for a query containing
+"fishing".
+
+**Attempt 3 — remove the title from the embedded document** (`document::VERSION` 2).
+`SPEC.md` Phase 5 lists the ingredients as "synopsis, genres, keywords, director, mood
+descriptors, and era" — the title was never among them; including it was my addition.
+
+Still not enough, and this measurement is why:
+
+```
+cargo run -p eval --release -- embed --compare \
+  "a grieving janitor becomes guardian of his teenage nephew in a Massachusetts fishing town"
+```
+
+| item | shipped (400 chars) | whole synopsis | synopsis |
+|---|---|---|---|
+| **Manchester by the Sea** | 0.1944 | **0.2689** | 1,847 chars |
+| Fish Hooky | **0.4194** | 0.3921 | 126 chars |
+| The Nephew | 0.3932 | 0.3835 | 159 chars |
+
+*Manchester by the Sea*'s synopsis contains the query almost verbatim — "a depressed and
+grief-stricken man who becomes the legal guardian of his teenage nephew after the death
+of his…". *Fish Hooky*'s says it was "the 120th Our Gang short to be released". The
+trivia scores **twice as high**, and giving the real answer its whole text does not close
+the gap.
+
+**That is hubness, not truncation.** Short generic documents land near the centre of the
+embedding space and are therefore close to every query. More text cannot fix a document
+that has no more text.
+
+**Attempt 3b — exclude trivia-length synopses** (`MIN_SYNOPSIS = 300`, 189,470 → 119,874).
+The hubs disappear — no more *Fish Hooky* or *The Nephew* — and *My Mister*, an acclaimed
+melancholic Korean drama, now answers "like Wong Kar-wai but Korean". But *Manchester by
+the Sea* still does not surface for its own plot.
+
+#### What the phase gained anyway
+
+| | |
+|---|---|
+| **E2 exact-title top-1** | **43/43 = 100%**, unchanged throughout |
+| **E1 latency** (hybrid, warm) | p50 7.5 ms, **p95 22.2 ms** against 80 ms |
+| **recall@10** | **0.9810** (gate 0.95) |
+| vector search | p50 1.01 ms, p95 1.72 ms |
+| index | 61 MB, **1.0 MB resident** |
+
+#### The conclusion, stated plainly
+
+`all-MiniLM-L6-v2` is a **symmetric similarity** model being asked to do **asymmetric
+retrieval** — a short query against a long document. Retrieval-trained models
+(`bge-small-en-v1.5`, `e5-small-v2`) exist for exactly this, use query/passage prefixes,
+and are the same 384 dimensions, so the artefact format would not change.
+
+E3 and E4 remain **not met**, and are not claimed on the strength of a plan. Raised as
+blocker **B4** under §10.9: three distinct approaches, each measured, none sufficient.
+
+### Query understanding (subtask 5.5): filters, and two failures found by typing
+
+`crates/search-engine/src/query.rs` extracts year ranges, runtime bounds and "directed
+by" as **constraints**, leaving the rest as the text that gets embedded. Measured against
+the real catalogue, 2026-09-07.
+
+| query | result |
+|---|---|
+| `directed by Akira Kurosawa` | Seven Samurai · Rashomon · Ran · Yojimbo · Ikiru |
+| `films directed by Alfred Hitchcock from the 1950s` | Rear Window · Vertigo · North by Northwest · Dial M for Murder · Strangers on a Train |
+| `comedies under 90 minutes from the 1980s` | filtered from four fuzzy hits to the one 1984 title |
+
+**Three of the four filters the spec names are implementable. Language is not** —
+`media_items.original_language` is NULL on all 2,702,737 rows, because the IMDb datasets
+do not publish it. A language filter today would be one that silently matches nothing.
+
+#### Two failures that only appeared by running it
+
+**1. A filter with a hole in it.** The first version filtered the fused tier and not the
+fuzzy tier, so "comedies under 90 minutes" cheerfully returned three-hour films the
+moment fuzzy ran. A filter the user believes and that does not hold is worse than none.
+
+**2. A purely structural query returned nothing at all.** "directed by Akira Kurosawa"
+leaves no text after extraction, and `admitted` can only *narrow* candidates some text
+tier produced. Filters now **retrieve** as well as narrow.
+
+#### And a 63x latency bug, in my own SQL
+
+`EXISTS (… JOIN people … WHERE p.name LIKE '%kurosawa%')` against `media_items` runs
+per row, so SQLite considered 2.7 million of them:
+
+| | |
+|---|---|
+| first version | **11,932 ms** |
+| resolve the person first, then `person_id IN (…)` | 1,800 ms |
+| **drive the query from `credits` rather than `media_items`** | **190 ms** |
+
+The indexes (`idx_people_name`, `idx_credits_person`) existed the whole time; the query
+shape defeated them. Starting from the thirty rows a director actually has, instead of
+filtering 2.7 million down to them, is the whole difference.
+
+**Still over budget and recorded as such**: 190 ms for a director query, 356 ms when a
+year filter joins it, against E1's 80 ms. E1's fixture is exact titles so this does not
+appear in that number — which is exactly why it is written down here.
+
+### The model swap, measured (ADR-0034)
+
+`bge-small-en-v1.5` replacing `all-MiniLM-L6-v2`. Re-embed 11,247 s (BGE is slower per
+document), index rebuild 29 s, artefact sha256 `b17f15da…`, document builder v2, text
+source `wikipedia`.
+
+**E4's two named queries, before and after:**
+
+| | MiniLM | **BGE** |
+|---|---|---|
+| *films about grief that are not depressing* | Funeral Home · Children of Sorrow · The Sadness · Sea Sorrow | **Good Grief (2023)** · Grief (1993) · Mourning Has Broken · **About Memory and Loss** · **No Sad Songs** · Bereavement |
+| *like Wong Kar-wai but Korean* | Miss Korea · You Are the Best! · Dear Hongrang · Mouse | **Chungking Express (1994)** · *wkw/tk/1996* · *There's Only One Sun* · then Korean series |
+
+The second is the striking one: **Chungking Express is Wong Kar-wai's signature film**,
+and positions 2 and 3 are also his. The model recognised the director from the name alone
+— MiniLM never did. It has not combined "like Wong Kar-wai" *with* "but Korean"; the page
+mixes his films and Korean drama rather than finding Korean films that resemble his.
+
+The first now leads with *Good Grief*, a comedy about bereavement, which is close to
+literally what the query asked for.
+
+**Everything else held or improved:**
+
+| | |
+|---|---|
+| **E2 exact-title top-1** | **43/43 = 100%** |
+| **E1** hybrid, warm | p50 9.8 ms, **p95 31.3 ms**, max 90.7 ms |
+| **recall@10** | **0.9670** (gate 0.95) |
+| vector search | p50 0.94 ms, p95 1.49 ms |
+| query embedding | p50 5.5 ms, p95 7.2 ms (BGE is ~3x MiniLM's 2.2 ms) |
+| producer/query agreement | **10/10 byte-identical** |
+| index | 61 MB, **1.0 MB resident** |
+
+#### What is still wrong, and the next measurable step
+
+A third, harder query — *"a grieving janitor becomes guardian of his teenage nephew in a
+Massachusetts fishing town"* — still does not surface *Manchester by the Sea*:
+
+| item | cosine | synopsis |
+|---|---|---|
+| They Killed Sister Dorothy | **0.5788** | 336 chars |
+| Manchester by the Sea | 0.4947 → **0.5239** with its whole synopsis | 1,847 chars |
+
+The gap narrows from 0.084 to 0.029 when the full synopsis is used, which points at the
+**document layout** rather than at the model. Manchester's document opens with
+`(2016) drama film, featuring Kenneth Lonergan, Casey Affleck, Michelle Williams, Kyle
+Chandler and Lucas Hedges.` — five names before a word of plot, inside a 400-character
+budget.
+
+Two untried changes, in order of expected value: **put the synopsis first**, and **raise
+`SYNOPSIS_CHARS`** (the model reads roughly 1,000 characters' worth of tokens; we give it
+400). Both are document-builder changes, so both cost a re-embed — and
+`eval embed --compare` can price them in a minute before that is spent.
+
+**E3 and E4 are still not claimed.** E4 additionally requires screenshots in a case
+study, which needs the Phase 5.8 UI; E3 needs the semantic fixture from 5.6.
+
+### E3 is a number now (subtask 5.6)
+
+`cargo run -p eval --release -- search --report`, 2026-09-13, over
+`fixtures/search/semantic-queries.tsv` — 10 queries, 37 graded answers, every film named
+from independent knowledge before anything was run.
+
+| | nDCG@10 | queries | target |
+|---|---|---|---|
+| **filter** | **1.0000** | 2 | 0.75 |
+| **meaning** | **0.1188** | 8 | 0.75 |
+
+**The filter half is perfect.** "directed by Akira Kurosawa" and "films directed by
+Alfred Hitchcock from the 1950s" both return exactly the graded answers, in order. The
+structured half of search works.
+
+**The meaning half is nowhere near**, and the per-query detail says why:
+
+```
+"a man returns to his hometown to care for his nephew after a death"   nDCG 0.0000
+   The Returning · The Return · Kids Return · We Shall Return · Returning Home
+
+"slow science fiction about memory"                                    nDCG 0.0000
+   About Memory and Loss · 2009: Lost Memories · Mémoire entropique · Hauser's Memory
+```
+
+**Still matching query words in titles** — after the titles were removed from documents
+in `document::VERSION` 2. The route back in is Wikipedia itself: **every lead opens by
+restating the title and the credits** — *"The Return is a 2003 Russian drama film directed
+by…"* — so the title returns through the synopsis, and under CLS pooling that opening
+sentence is weighted heavily while the plot behind it falls past the 400-character cut.
+
+#### D39 priced, and rejected on the evidence
+
+The obvious fix was to strip that boilerplate lead and put the plot first.
+`eval embed --compare` measured it for the cost of one command rather than a three-hour
+re-embed:
+
+| item | shipped | whole synopsis | **plot first, lead stripped** |
+|---|---|---|---|
+| Manchester by the Sea *(the answer)* | 0.4884 | 0.5059 | **0.5539** |
+| The Return | 0.5698 | 0.5823 | 0.5977 |
+| Uncle Boonmee | 0.6069 | 0.5942 | 0.6295 |
+
+It lifts the correct answer by 0.065 — **and lifts the wrong answers by about as much.**
+The ordering does not change. A re-embed on this evidence would have bought nothing, and
+the measurement cost a minute.
+
+#### What the number actually indicts
+
+Two of the eight meaning queries are **known-item** queries: they describe one specific
+film, and nDCG over a fixture listing two answers scores 0 whenever that film lands at
+rank 11. The other six are topical and score better — "films about grief that aren't
+depressing" reaches 0.4770 with *Good Grief* first.
+
+Worth saying plainly: *The Return* and *Uncle Boonmee* are **not absurd answers** to a
+query about a man returning home after a death, and the fixture grades them 0. Some of
+the 0.1188 is the fixture being narrower than the truth. Widening it to match what the
+engine returns is exactly the trap the fixture header warns about, so the honest move is
+to record the tension and change the fixture only where a film would have been listed
+anyway, on its merits.
+
+**E3 is not met, and it is now a number rather than an impression** — which is the whole
+point of the subtask.
+
+### The app opens the database, and refreshes itself (subtask 5.7, D26, D37)
+
+Release build, dev machine (Tier 2), 2026-09-13. `cold_start_ms` from
+`target/release/data/logs/`, process start → frontend painted.
+
+**Cold start is unchanged**, which is the point of opening the database off the startup
+path:
+
+| launch | cold start |
+|---|---|
+| Phase 1 baseline | 515 / 660 ms |
+| first run of a fresh binary | 871 ms |
+| subsequent | **522 · 366 · 342 · 339 · 328 ms** |
+
+The 871 ms outlier is the first execution of a newly-linked binary; every warm launch
+sits at or below the Phase 1 figures. The database handle is created on a background
+task and installed when ready, so nothing on the path to the first painted frame waits
+for a disk.
+
+**And the catalogue now refreshes itself**, automatically and silently, by the author's
+decision:
+
+```
+02:19:27  database open
+02:19:27  frontend interactive cold_start_ms=871
+02:20:27  catalogue freshness outcome=Refreshed { titles_added: 4604 }
+…
+02:55:11  frontend interactive cold_start_ms=339
+02:55:11  catalogue freshness outcome=AlreadyCurrent
+```
+
+**4,604 titles the catalogue did not have**, fetched without anyone typing a command —
+the thing ADR-0030 specified and nothing had ever done. And a launch where IMDb has not
+republished resolves to `AlreadyCurrent` **260 ms after the frontend paints**, costing
+one HEAD request and no download.
+
+#### Two bugs, both found by running it rather than reasoning about it
+
+**1. Every launch re-downloaded 216 MB.** The first check is stale *without* a request —
+there is no cached validator to compare — so it carried none, so nothing was recorded,
+so the next launch was stale again. Observed directly: two consecutive launches, the
+second reporting `Refreshed { titles_added: 0 }` after downloading the lot.
+
+**2. Recording it at the end did not fix it either.** The app exits when its window
+closes and a refresh takes about a minute, so a user who opens and closes quickly never
+reaches the end — and never learns a validator. Confirmed by four launches leaving
+`http_cache` empty.
+
+The validator is now recorded **after the download and before the load**, which is the
+only boundary that is wrong in neither direction:
+
+| killed during | consequence |
+|---|---|
+| the download | nothing recorded, fetched again — correct |
+| the load | bytes kept, validator recorded, `Job` resumes — correct |
+
+#### One number worth chasing later
+
+```
+slow statement: SELECT MAX(CAST(SUBSTR(e.external_id, 3) AS INTEGER)) …   13.68 s
+```
+
+The refresh watermark — the highest IMDb id already held — is a full scan with a cast
+over 3.2 million rows, and no index can serve it. It runs on the background task so it
+costs no user-visible time today, but 13.7 s of disk on every refresh is not free.
+Recorded as debt.
+
+### The optional downloads, end to end (subtask 5.9)
+
+`cargo run -p sinephile-catalogue --example fetch_assets -- <dir>`, 2026-09-15, against
+the real published release `embeddings-v2`.
+
+```
+  plan: 3 files, 346 MB total
+    Meaning index      313.4 MB  Absent
+    Language model      32.4 MB  Absent
+    Tokenizer            0.7 MB  Absent
+
+  Meaning index    VERIFIED      internal checksum + model identity + builder version
+  Language model   VERIFIED      pinned file sha256
+  Tokenizer        VERIFIED      pinned file sha256
+```
+
+**There are three downloads, not one.** The model that embeds the query is 32.4 MB of the
+346, and it had never been scoped because it was copied into place by hand during
+development. The consent screen names each file separately.
+
+#### The real download caught a mistake a unit test could not
+
+The first run downloaded all 313 MB and was **refused**:
+
+```
+has sha256 32b93f3ac0824683ec5e417d22493b6d01b8dc93ea826aec923ed308978955be,
+expected   b17f15dab916816be1e4b959cbfce6f5d369ab6e7bd5c676e6760b0a2980b7bb
+```
+
+`b17f15da…` is the value `ingest embed` prints — the artefact's **internal** checksum,
+computed over its header and vectors. `verify_sha256` hashes the **whole file**, which
+includes the 32-byte trailing checksum itself. Two different things both called "the
+sha256", and pinning one where the other was meant.
+
+The fix was not to pin the right constant. **The artefact verifies itself** — its own
+checksum covers its own bytes, catches truncation, and cannot go stale when the artefact
+is rebuilt — so `sha256` is now `Option`, `None` for the artefact, and pinned only for the
+model and tokenizer, which are opaque and cannot vouch for themselves.
+
+Worth noting what happened here: the refusal was *correct behaviour* firing on an
+*incorrect constant*, and the only thing that could distinguish those was running it
+against a real file.
+
+## Session 16 — 2026-09-21/22 — the document layout, priced properly
+
+### D39 was answered with the wrong documents, and the answer flips
+
+`cargo run -p eval --release -- embed --compare "<query>" <ids>`, 2026-09-22, real
+catalogue, `bge-small-en-v1.5-int8`.
+
+D39 concluded that re-laying-out the document lifts the right answer and the wrong ones
+by the same amount, leaving the order unchanged — so a re-embed would buy nothing. That
+conclusion came from variants built with `format!`:
+
+```
+longer = format!("{document} {synopsis}")        // synopsis prefix appears TWICE
+plot   = format!("{stripped} {document}")        // metadata AND prefix appear twice
+```
+
+Neither is a document any rebuild could produce. `document::build_with` now takes a
+`Layout`, so a variant is assembled by the producer's own builder and each part appears
+exactly once. Measured again, **the order does change.**
+
+`"a man returns to his hometown to care for his nephew after a death"`
+
+| item | shipped | 1000 chars | plot first | no cast |
+|---|---|---|---|---|
+| **Manchester by the Sea** *(graded 2)* | 0.4884 **#5** | 0.5136 #5 | 0.5609 **#3** | 0.5733 #3 |
+| Uncle Boonmee | 0.6069 #1 | 0.6105 #1 | 0.5958 #1 | 0.6005 #1 |
+| The Return | 0.5698 #3 | 0.5711 #3 | 0.5850 #2 | 0.6002 #2 |
+| The Returning | 0.5718 **#2** | 0.5666 #4 | 0.4798 **#6** | 0.4767 #6 |
+| Kids Return | 0.5691 #4 | 0.5807 #2 | 0.5395 #4 | 0.5420 #4 |
+| **Ordinary People** *(graded 1)* | 0.4689 **#6** | 0.4634 #6 | 0.4826 **#5** | 0.4865 #5 |
+
+`"films about grief that aren't depressing"` — the clearer one:
+
+| item | shipped | 1000 chars | plot first | no cast |
+|---|---|---|---|---|
+| **Good Grief** *(graded 2)* | 0.6760 #1 | 0.6771 #1 | 0.6522 #2 | 0.6598 #1 |
+| **Manchester by the Sea** *(graded 1)* | 0.5692 **#6** | 0.5795 #6 | 0.6553 **#1** | 0.6590 #2 |
+| **A Monster Calls** *(graded 1)* | 0.5430 **#7** | 0.5289 #7 | 0.5329 **#5** | 0.5343 #4 |
+| Grief *(ungraded)* | 0.6633 **#2** | 0.6638 #3 | 0.5186 **#6** | 0.5297 #5 |
+| Mourning Has Broken *(ungraded)* | 0.6579 #3 | 0.6654 #2 | 0.5701 #3 | 0.5815 #3 |
+| Disconnected *(ungraded)* | 0.6578 #4 | 0.6560 #4 | 0.5599 #4 | 0.5137 #6 |
+| Bereavement *(ungraded)* | 0.6369 **#5** | 0.6259 #5 | 0.4902 **#7** | 0.4849 #7 |
+
+Under `plot first` the three graded answers hold #1, #2 and #5 where they held #1, #6 and
+#7; every ungraded title falls. **That is a reordering, which is the trigger D39 set for
+spending a re-embed** — and `1000 chars` alone is not enough to produce it, so it is the
+position of the metadata rather than the length of the synopsis that does the work.
+
+What this does NOT establish: these are six- and seven-item probes over the fixture's own
+contested set, not the catalogue. Other items rise too, and nothing here predicts what
+nDCG@10 over 2.7 million titles would do. It says a rebuild is now worth its three hours,
+not what the rebuild would score.
+
+### E3's number, decomposed — it was measuring three things at once
+
+`cargo run -p eval --release -- search --report`, 2026-09-22. **The headline is
+unchanged** and stays the criterion as SPEC.md Phase 5 words it:
+
+```
+E3 — nDCG@10 over the semantic query set
+   meaning  0.1188  over 8 queries   (target 0.75)
+   filter   1.0000  over 2 queries   (target 0.75)
+
+diagnostics — what that number is made of, not a restatement of it
+   topical      nDCG@10 0.1584  over 6 queries
+   known-item   MRR 0.0000, found in the top 10: 0/2
+```
+
+D40's two known-item queries score 0.0000 and neither film reaches the top 10 at all, so
+MRR agrees with nDCG here rather than rescuing it. The topical six sit at 0.1584.
+
+### Two graded answers cannot be returned at all, and two queries are capped below E3
+
+The harness now reports, per query, the best nDCG@10 it could possibly reach given which
+graded answers are in the vector index:
+
+```
+UNREACHABLE ANSWERS — graded films the vector half cannot return at all
+   (synopsis under MIN_SYNOPSIS = 300, so not in the index)
+   ceiling 0.7468 — BELOW THE TARGET  "films about grief that aren't depressing"
+                      tt0103129  graded 2      (Truly Madly Deeply, 235 chars)
+   ceiling 0.7468 — BELOW THE TARGET  "like Wong Kar-wai but Korean"
+                      tt0140825  graded 2      (Christmas in August, 169 chars)
+```
+
+`MIN_SYNOPSIS = 300` keeps sparse documents out of the index, and it was measured and
+right. It also means two of the eight meaning queries **cannot reach 0.75 however good
+the engine gets** — the ceiling is 0.7468. A fixture that cannot distinguish "failing"
+from "already at its ceiling" is not measuring what it claims to.
+
+26 of the 28 graded meaning answers ARE reachable, so the rest of the 0.1188 is the
+engine, not the fixture.
+
+#### Seen to fail
+
+`MIN_SYNOPSIS` temporarily raised 300 → 1500 and one topical query retagged
+`meaning/known-item`: ceilings fell to 0.2385–0.7602, six queries reported capped instead
+of two, the "BELOW THE TARGET" marker appeared and disappeared correctly either side of
+0.75, and MRR moved 0.0000 → 0.3333 with presence 1/3. **E3's headline stayed 0.1188
+through both perturbations**, which is the property that matters. Both restored.
+
+### The agreement check had stopped running, and why
+
+`cargo run -p eval --release -- embed --report` errored:
+
+```
+the artefact holds 855703 vectors and the catalogue offers 858170 core ids
+```
+
+Subtask 5.7 made the catalogue refresh itself on launch; the artefact is a published
+snapshot. It had drifted **2,467 core titles in a week** and the equality check stopped
+the harness dead. All 2,467 new ids sit after the artefact's last position (verified
+directly), so position *n* still means the same title — the artefact is a prefix of the
+catalogue, and the check was stricter than the invariant. It now compares over the
+artefact's range, reports the gap, and still refuses if the catalogue has *fewer* ids,
+which would mean positions had shifted.
+
+Restored, and with `document::build_with` in place:
+
+```
+agreement  10/10 byte-identical to the artefact
+latency    p50 5.6 ms   p95 6.6 ms
+```
+
+**That 10/10 is what proves the `Layout` refactor changed no shipped bytes** — documents
+re-derived through the new builder quantise to exactly the published vectors.
+
+### D44/D45 fixed, and the fix measured on the real catalogue (session 16)
+
+`cargo run -p sinephile-ingest --release -- vector-index`, 2026-09-22, against the real
+`embeddings-v2` artefact and a catalogue that had already drifted 2,467 titles past it —
+the exact condition that made the old equality guard refuse:
+
+```
+  vectors          119874 of 855703 considered
+  beyond artefact  2467 core titles the catalogue has gained since — keyword only
+  index size       61 MB  (0.2x the artefact's 313 MB)
+  build            33s  (3651 vectors/s)
+```
+
+The content verification ran first and passed: eight documents re-derived from the live
+catalogue, embedded, quantised, and equal to the artefact's own bytes at those positions.
+
+**No regression against the hand-built index it replaced.** The index built by the new
+path and the one built by hand on 2026-09-07 are equivalent on every recorded metric:
+
+| metric | 2026-09-07 (hand-built) | 2026-09-22 (this path) |
+|---|---|---|
+| recall@10 | 0.9670 | **0.9670** |
+| E2 exact-title top-1 | 43/43 | **43/43** |
+| E3 meaning / filter | 0.1188 / 1.0000 | **0.1188 / 1.0000** |
+| index size | 61 MB | 61 MB |
+
+`cargo run -p eval --release -- vector --report` and `-- search --report`. E1 read
+23.7 ms p95 against 16.1–17.5 ms earlier in the session; the spread across three runs on
+an unquiesced machine is larger than the difference, and all three sit far under the
+80 ms budget.
+
+And the application agrees. Launching the release-path binary logs:
+
+```
+sin_e_phile_lib::commands::assets: search: hybrid
+cold_start_ms=485
+```
+
+which is the whole point of the fix: before it, a machine that had opened the app twice
+could never build an index again, so that line read `keyword only (no index)` and the
+313 MB sat unread.
+
+#### Seen to fail
+
+`verify_prefix`'s byte comparison was disabled (`if false && …`) and
+`a_title_promoted_into_the_middle_of_the_core_tier_is_refused` failed, as it must — that
+test promotes one title into the middle of the core tier, which is the shift a length
+check cannot distinguish from a harmless append. Restored; 6 of 6 pass.
+
+## Session 19 — 2026-10-25 — R4 re-measured, the v3 artefact, and its evals
+
+### The database against R4's 4 GB, read as SI (D47, author's option 1)
+
+R4 says "4 GB". Phase 4's "341 MB of headroom" read that as 4,000 MiB; the author chose
+the SI reading (4,000,000,000 bytes), so every figure below is in SI units unless it
+says MiB.
+
+| when | bytes | GB (SI) | against 4 GB | command |
+|---|---|---|---|---|
+| 2026-09-07, Phase 4 E1 | 3,836,723,200 | 3.837 | 163 MB under | `ls -la data/sinephile.db` |
+| 2026-10-25, before compaction | 4,062,978,048 | 4.063 | **63 MB over** | `ls -l data/sinephile.db` |
+| 2026-10-25, after compaction | 3,945,598,976 | **3.946** | **54 MB under** | `./target/release/ingest.exe compact` |
+
+Compaction recovered 111 MiB in 34 s (`compacted 4062978048 -> 3945598976 bytes`), at
+commit `814fc41`. Every ingestion command that writes the catalogue now compacts after
+itself (`df3ca35`) unless it's run with `--no-compact`. The app's own launch-time
+refresh does NOT compact (VACUUM is exclusive and slow), so each launch that adds titles
+eats into the 54 MB until the next ingestion command runs.
+
+### The v3 artefact (D48, D45)
+
+```
+./target/release/ingest.exe embed     (resume; reassembly only)
+  858170 vectors
+  314 MB · 7s
+  sha256 106f3de1644fe5a5d928a65495fea62b2a4412f132c794d5c737b918ae404229
+```
+
+329,537,568 bytes = 256 header + 858,170 × 384 + 32 trailer. Document layout v3
+(plot first, 1,000-char synopsis), artefact format 3 (watermark + id digest). Commit
+`814fc41`.
+
+### The v3 index and search evals — E3 meaning REGRESSED
+
+```
+./target/release/ingest.exe vector-index
+  vectors          119874 of 858170 considered
+  index size       61 MB  (0.2x the artefact's 314 MB)
+  build            22s  (5566 vectors/s)
+```
+
+| metric | v2 (2026-09-22) | **v3 (2026-10-25)** | command |
+|---|---|---|---|
+| recall@10 | 0.9670 | **0.9760** (164/200 perfect, worst 0.70) | `cargo run --release -p eval -- vector --report` |
+| index latency | — | p50 0.96 ms, p95 1.41 ms | same |
+| E2 exact-title top-1 | 43/43 | **43/43** | `cargo run --release -p eval -- search --report` |
+| E1 hybrid p95 | 23.7 ms | **15.2 ms** (p50 6.4, max 69.6) | same |
+| E3 meaning | 0.1188 | **0.0472** — regression | same |
+| E3 filter | 1.0000 | **1.0000** | same |
+| topical nDCG@10 | — | 0.0629 over 6 | same |
+| known-item MRR | — | 0.0000, 0/2 in top 10 | same |
+
+Commit `814fc41`. Per-query meaning nDCG@10: grief 0.1505, hometown/nephew 0.0000,
+Wong Kar-wai/Korean 0.0752, slow SF memory 0.0000, anime loneliness 0.0000, heist
+0.0000, mountain documentaries 0.1518, Italian neorealism 0.0000.
+
+**This is a regression on a recorded metric, so it blocks the merge (CLAUDE.md rule
+13).** v3 was chosen on `eval embed`'s ranking; that ranking and this number disagree,
+and finding out why comes next.
+
+#### v2 against v3, per query, on the same database
+
+The pre-v3 code (`5a4b01c`, built in a scratch worktree) was run against the intact v2
+artefact (`embeddings-…v2-backup.bin`) and today's compacted database. It reproduces
+v2's recorded headline exactly, so the comparison holds: the only variable is the
+artefact.
+
+| query | v2 nDCG@10 | v3 nDCG@10 |
+|---|---|---|
+| films about grief that aren't depressing | 0.4770 | **0.1505** |
+| a man returns to his hometown… nephew… | 0.0000 | 0.0000 |
+| like Wong Kar-wai but Korean | 0.2385 | **0.0752** |
+| slow science fiction about memory | 0.0000 | 0.0000 |
+| anime about loneliness in a big city | 0.0000 | 0.0000 |
+| heist films where the plan goes wrong | 0.0000 | 0.0000 |
+| documentaries about mountain climbing | 0.0000 | **0.1518** |
+| post-war Italian neorealism | 0.2346 | **0.0000** |
+| **meaning** | **0.1188** | **0.0472** |
+| topical (6) | 0.1584 | 0.0629 |
+| filter | 1.0000 | 1.0000 |
+| E2 | 43/43 | 43/43 |
+| E1 p95 | 14.8 ms | 15.2 ms |
+
+`SINEPHILE_DATA_DIR=<scratch> <5a4b01c>/eval search --report`, 2026-10-25.
+
+**What moved.** v2's layout led with the title, and its three wins were partly titles that
+contain the query's own words: *Good Grief* at #1 for "grief", and *Chungking Express*
+at #1 for "Wong Kar-wai". Under v3's plot-first layout *Good Grief* falls to #8 and
+*Chungking Express* to #8. The neorealism query lost *Rome, Open City* (#3 → absent).
+The mountain documentary query gained *Meru* at #6.
+
+**An observation, NOT a correction:** v3's neorealism top 10 holds *Stromboli* and
+*Germany Year Zero*, Rossellini films from the period, and neither is graded. The
+fixture's grades are sparse. Regrading after seeing which layout wins would be
+redefining the criterion to fit the result, so the 0.0472 stands as measured.
+
+**What D39's probe did and did not predict.** It showed plot-first *reorders* the
+six or seven contested items in a probe set, and said explicitly that it did not
+predict nDCG@10 over the catalogue. Over the catalogue, the reordering also let
+858,170 other plots compete, and the graded answers lost.
+
+**Accepted by the author, 2026-10-25: "keep v3".** The v3 artefact ships with E3 meaning at
+0.0472, a recorded regression from v2's 0.1188, chosen deliberately over a 3-hour revert
+(B7). The baseline future phases compare against is therefore **0.0472**, not 0.1188.
+
+### The search screen's byline query (D53 redesign)
+
+`SearchRepository::details`, the director/runtime/synopsis lookup for the hits on screen,
+timed against the real catalogue (3.946 GB), 20 random core-tier film ids per call,
+20 calls, cold pages: **p50 9.35 ms, p95 10.30 ms, max 12.62 ms**. Primary-key lookup on
+`media_items`, `idx_credits_item` for the credits. It runs after ranking, so it adds to
+E1's 15.2 ms p95 rather than replacing any of it, for roughly 25 ms of the 80 ms budget.
+Python `sqlite3` with the exact SQL, 2026-10-25, uncommitted tree on top of `21d0b23`.

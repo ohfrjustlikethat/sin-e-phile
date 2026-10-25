@@ -19,6 +19,11 @@ pub enum DbError {
     Path(#[from] PathError),
     #[error("could not write the pre-migration backup to {0}: {1}")]
     Backup(PathBuf, #[source] std::io::Error),
+    /// The caller asked for something the repository refuses to store — a malformed
+    /// API key, a secret read through the wrong accessor. Distinct from `Sqlx` on
+    /// purpose: this is a message a user should see, not a database fault.
+    #[error("{0}")]
+    Invalid(String),
 }
 
 /// An open database.
@@ -29,6 +34,19 @@ pub enum DbError {
 pub struct Db {
     pool: SqlitePool,
     path: PathBuf,
+}
+
+/// What [`Db::compact`] did, in bytes on disk.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Compacted {
+    pub before: u64,
+    pub after: u64,
+}
+
+impl Compacted {
+    pub fn recovered(&self) -> u64 {
+        self.before.saturating_sub(self.after)
+    }
 }
 
 impl std::fmt::Debug for Db {
@@ -137,6 +155,15 @@ impl Db {
         Ok(())
     }
 
+    /// The highest migration this binary carries.
+    ///
+    /// Tests assert against this rather than a hard-coded number: migration 0005
+    /// broke three tests that said `Some(4)`, which is a maintenance tax on every
+    /// future migration for no benefit.
+    pub fn latest_schema_version() -> i64 {
+        MIGRATOR.iter().map(|m| m.version).max().unwrap_or(0)
+    }
+
     /// The highest applied migration version, or `None` on a fresh database.
     pub async fn schema_version(&self) -> Result<Option<i64>, DbError> {
         let row: Option<(i64,)> =
@@ -177,6 +204,31 @@ impl Db {
         std::fs::copy(&self.path, destination)
             .map_err(|e| DbError::Backup(destination.to_path_buf(), e))?;
         Ok(())
+    }
+
+    /// Rewrite the database without the slack that incremental writes leave behind.
+    ///
+    /// D29 measured 354 MB of it after Phase 4's nine ingestion jobs. D47 measured
+    /// 112 MiB more after later ones, on a database 63 MB over R4's 4 GB trigger, where
+    /// that slack was the difference between over and under. Exclusive, and about 30 s
+    /// on the real catalogue, so it belongs at the end of an ingestion command and
+    /// never at app launch.
+    pub async fn compact(&self) -> Result<Compacted, DbError> {
+        let size = || std::fs::metadata(&self.path).map(|m| m.len()).unwrap_or(0);
+        // Checkpoint either side, so both sizes are of the whole database rather than
+        // a main file with recent writes still sitting in the WAL.
+        sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)")
+            .execute(&self.pool)
+            .await?;
+        let before = size();
+        sqlx::query("VACUUM").execute(&self.pool).await?;
+        sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)")
+            .execute(&self.pool)
+            .await?;
+        Ok(Compacted {
+            before,
+            after: size(),
+        })
     }
 
     /// Migrate, taking a backup first if the schema is actually going to change.

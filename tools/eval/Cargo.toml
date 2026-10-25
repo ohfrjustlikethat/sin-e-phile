@@ -1,0 +1,32 @@
+[package]
+name = "eval"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "Evaluation harnesses (SPEC.md §12.2). Every number in docs/eval-results.md comes from here."
+
+# One binary with a subcommand per harness, as SPEC.md §15 names them:
+#   cargo run -p eval -- search --report
+# Later phases add subtitles, filenames, recommender and discovery.
+
+[[bin]]
+name = "eval"
+path = "src/main.rs"
+
+[dependencies]
+sinephile-persistence = { path = "../../crates/persistence" }
+# The vector harness measures the index against brute force over the artefact, and
+# derives the position -> catalogue id mapping with the SAME query the producer walked.
+# Depending on the producer is deliberate: a second copy of that query here would be the
+# one place a drift could not be noticed.
+sinephile-embedding = { path = "../../crates/embedding" }
+sinephile-vector-index = { path = "../../crates/vector-index" }
+sinephile-catalogue = { path = "../../crates/catalogue" }
+sinephile-embedder = { path = "../../crates/embedder" }
+sinephile-search-engine = { path = "../../crates/search-engine" }
+sqlx = { version = "=0.8.6", default-features = false, features = [
+    "runtime-tokio", "sqlite", "macros",
+] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+thiserror = "2"

@@ -1,0 +1,25 @@
+[package]
+name = "sinephile-artwork"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "Artwork cache: lazy fetch, disk budget, WebP re-encoding, blurhash (SPEC.md Phase 4)."
+
+# Outside src-tauri so its tests run at all (ADR-0022), and independent of the
+# persistence crate: an image cache is files on disk, not rows in a database.
+
+[dependencies]
+# Decoding only. `image` is pure Rust and handles the JPEG and PNG that TMDB serves.
+# Its WebP support is DECODE plus LOSSLESS encode, which is the wrong tool for
+# photographs — see `encode.rs`.
+image = { version = "=0.25.10", default-features = false, features = ["jpeg", "png"] }
+# Lossy WebP. Wraps libwebp, so it needs the C toolchain this project already
+# requires for FFmpeg and librqbit.
+webp = "=0.3.1"
+thiserror = "2"
+
+[dev-dependencies]
+tempfile = "3"
+# The integration tests build their own JPEGs rather than committing binaries.
+image = { version = "=0.25.10", default-features = false, features = ["jpeg", "png"] }

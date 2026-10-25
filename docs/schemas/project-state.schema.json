@@ -63,6 +63,16 @@
             "null"
           ],
           "description": "SPEC.md §10.8 — an ARTEFACT, never an opinion. One of: a passing test name; a measured number WITH the command that produced it; a path to a produced file; a commit SHA implementing something specific; or an explicit 'manual: <what was done and observed>'. Prose such as 'implemented and working', 'tested manually' or 'looks good' is not evidence and means the criterion is not met."
+        },
+        "carried_to_phase": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "ADR-0036: a later phase this unmet criterion is handed to. Only on an unmet criterion; the receiving phase must meet it or carry it again."
+        },
+        "carried_reason": {
+          "type": "string",
+          "minLength": 40,
+          "description": "ADR-0036: why the criterion can't be met in this phase. Required with carried_to_phase."
         }
       },
       "allOf": [
@@ -105,6 +115,28 @@
             },
             "description": "Rejects the exact phrases SPEC.md §10.8 names as non-evidence."
           }
+        },
+        {
+          "if": {
+            "required": [
+              "carried_to_phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "carried_reason"
+            ],
+            "properties": {
+              "met": {
+                "const": false
+              },
+              "evidence": {
+                "type": "string",
+                "minLength": 12
+              }
+            }
+          },
+          "description": "ADR-0036: a carried criterion is unmet, says why, and still records its MEASURED state as evidence (§10.8)."
         }
       ]
     },
@@ -312,15 +344,25 @@
                 },
                 "exit_criteria": {
                   "items": {
-                    "properties": {
-                      "met": {
-                        "const": true
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "met": {
+                            "const": true
+                          }
+                        }
+                      },
+                      {
+                        "required": [
+                          "carried_to_phase"
+                        ]
                       }
-                    }
+                    ],
+                    "description": "a closed phase's criterion must be met, or carried to a later phase (ADR-0036)"
                   }
                 }
               },
-              "description": "SPEC.md Appendix B: a phase is complete only when EVERY exit criterion is met with evidence. This makes that unrepresentable rather than merely discouraged."
+              "description": "SPEC.md Appendix B as amended by ADR-0036: a phase is complete only when every exit criterion is met with evidence, or carried to a named later phase with its measured state and a reason."
             }
           }
         ]

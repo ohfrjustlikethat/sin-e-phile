@@ -21,7 +21,10 @@
 use sinephile_persistence::archive::Archiver;
 use sinephile_persistence::model::EpisodeNumbering;
 use sinephile_persistence::repositories::profiles::PlaybackPosition;
-use sinephile_persistence::repositories::{EpisodeRepository, MediaRepository, ProfileRepository};
+use sinephile_persistence::repositories::{
+    CatalogueRepository, CredentialRepository, EpisodeRepository, MatchReason, MediaRepository,
+    ProfileRepository, Readiness, SearchRepository, TmdbAccess, WikipediaRepository,
+};
 use sinephile_persistence::{Db, IdSource, MediaKind, NewMediaItem, TitleVariant};
 
 /// Exercise every public method on `MediaRepository`.
@@ -392,13 +395,353 @@ async fn db_surface() {
         1
     );
 
+    // ── CredentialRepository ──────────────────────────────────────────────────
+    // ADR-0027: no key ever ships, so every one of these starts from Absent.
+    let profile = ProfileRepository::new(&db)
+        .create("Author", true)
+        .await
+        .expect("profile");
+    let creds = CredentialRepository::new(&db);
+
+    // tmdb_access — the default state of the application
+    assert_eq!(
+        creds.tmdb_access(profile).await.expect("tmdb_access"),
+        TmdbAccess::Absent
+    );
+
+    // profiles_with_a_key
+    assert_eq!(creds.profiles_with_a_key().await.expect("count"), 0);
+
+    // set_tmdb_key
+    creds
+        .set_tmdb_key(profile, "abcdef0123456789abcdef0123456789")
+        .await
+        .expect("set_tmdb_key");
+    assert!(creds
+        .tmdb_access(profile)
+        .await
+        .expect("tmdb_access")
+        .is_configured());
+
+    // set_tmdb_key — refuses what is not a key
+    assert!(creds.set_tmdb_key(profile, "nope").await.is_err());
+
+    // set / get, the non-secret path
+    creds.set(profile, "ui.theme", "dark").await.expect("set");
+    assert_eq!(
+        creds.get(profile, "ui.theme").await.expect("get"),
+        Some("dark".to_string())
+    );
+    // get — refuses to hand back a secret
+    assert!(creds.get(profile, "tmdb.api_key").await.is_err());
+
+    // clear_tmdb_key
+    let (removed, _discarded) = creds.clear_tmdb_key(profile).await.expect("clear_tmdb_key");
+    assert!(removed);
+    assert_eq!(
+        creds.tmdb_access(profile).await.expect("tmdb_access"),
+        TmdbAccess::Absent
+    );
+
+    // ── SearchRepository ──────────────────────────────────────────────────────
+    let search = SearchRepository::new(&db);
+
+    // indexed_count — empty is zero, not an error
+    assert_eq!(search.indexed_count().await.expect("indexed_count"), 0);
+
+    // `search_indexed` has a foreign key onto media_items, so the row has to exist.
+    let probe = MediaRepository::new(&db)
+        .insert(&NewMediaItem::film("Probe Title", 1970))
+        .await
+        .expect("probe item");
+
+    // index_item, then again, to exercise the contentless delete-and-reinsert
+    search
+        .index_item(probe, "Probe Title", "Alt Probe", "A Person", "drama")
+        .await
+        .expect("index_item");
+    search
+        .index_item(probe, "Probe Title", "Alt Probe", "A Person", "drama")
+        .await
+        .expect("re-index");
+    assert_eq!(search.indexed_count().await.expect("indexed_count"), 1);
+
+    // index_trigram
+    search
+        .index_trigram(probe, "Probe Title")
+        .await
+        .expect("index_trigram");
+
+    // keyword / exact_title / search
+    assert_eq!(search.keyword("probe", 5).await.expect("keyword").len(), 1);
+    assert!(search
+        .exact_title("no such title", 5)
+        .await
+        .expect("exact")
+        .is_empty());
+    assert_eq!(search.search("probe", 5).await.expect("search").len(), 1);
+
+    // describe — the batch lookup the vector half needs, since it returns bare ids.
+    // An id that is not in the catalogue is absent rather than an error: an index built
+    // against an older snapshot is a real situation, not a corruption.
+    let described = search
+        .describe(&[probe, probe, 999_999], MatchReason::Semantic)
+        .await
+        .expect("describe");
+    assert_eq!(described.len(), 1, "duplicates collapse, strangers vanish");
+    assert_eq!(described[0].media_item_id, probe);
+    assert_eq!(described[0].why, MatchReason::Semantic);
+    assert!(
+        search
+            .describe(&[], MatchReason::Semantic)
+            .await
+            .expect("describe of nothing")
+            .is_empty(),
+        "an empty id list must not build a query with no placeholders"
+    );
+
+    // details — the byline under a result. Nothing credited yet: every field empty.
+    let bare = search.details(&[probe, 999_999]).await.expect("details");
+    assert_eq!(bare.len(), 1, "strangers vanish here too");
+    assert_eq!(
+        (bare[0].made_by.as_deref(), bare[0].runtime_minutes),
+        (None, None)
+    );
+    assert!(search
+        .details(&[])
+        .await
+        .expect("details of nothing")
+        .is_empty());
+
+    // Billing order decides, unbilled sorts last, a creator ranks after any director,
+    // and only two names are kept. Inserted directly: credits have no repository yet.
+    for (name, role, billing) in [
+        ("Third", "director", None),
+        ("Creator", "creator", Some(0)),
+        ("Second", "director", Some(2)),
+        ("First", "director", Some(1)),
+    ] {
+        let person: i64 = sqlx::query_scalar("INSERT INTO people (name) VALUES (?) RETURNING id")
+            .bind(name)
+            .fetch_one(db.pool())
+            .await
+            .expect("person");
+        sqlx::query(
+            "INSERT INTO credits (media_item_id, person_id, role, billing) VALUES (?, ?, ?, ?)",
+        )
+        .bind(probe)
+        .bind(person)
+        .bind(role)
+        .bind(billing)
+        .execute(db.pool())
+        .await
+        .expect("credit");
+    }
+    let credited = search.details(&[probe]).await.expect("details");
+    assert_eq!(credited[0].made_by.as_deref(), Some("First, Second"));
+    // The credits must not leak into the filter checks below, which expect none.
+    sqlx::query("DELETE FROM credits WHERE media_item_id = ?")
+        .bind(probe)
+        .execute(db.pool())
+        .await
+        .expect("clear credits");
+
+    // admitted — structured filters over a candidate set (subtask 5.5).
+    // The probe is "Probe Title" (1970), no runtime, no director.
+    assert_eq!(
+        search
+            .admitted(&[probe], Some((1960, 1979)), None, None, None)
+            .await
+            .expect("admitted: year in range"),
+        vec![probe]
+    );
+    assert!(search
+        .admitted(&[probe], Some((1980, 1989)), None, None, None)
+        .await
+        .expect("admitted: year out of range")
+        .is_empty());
+    // A NULL runtime cannot satisfy a runtime bound. It must be excluded deliberately
+    // rather than by SQL's three-valued logic doing it for the wrong reason.
+    assert!(
+        search
+            .admitted(&[probe], None, Some(200), None, None)
+            .await
+            .expect("admitted: null runtime")
+            .is_empty(),
+        "an item with no runtime cannot satisfy a runtime filter"
+    );
+    // No director credited, so a director filter admits nothing.
+    assert!(search
+        .admitted(&[probe], None, None, None, Some("Kurosawa"))
+        .await
+        .expect("admitted: director")
+        .is_empty());
+    // No filters at all is a pass-through, not an empty set.
+    assert_eq!(
+        search
+            .admitted(&[probe], None, None, None, None)
+            .await
+            .expect("admitted: no filters"),
+        vec![probe]
+    );
+    assert!(
+        search
+            .admitted(&[], Some((1900, 2000)), None, None, None)
+            .await
+            .expect("admitted: no candidates")
+            .is_empty(),
+        "an empty candidate list must not build a query with no placeholders"
+    );
+
+    // by_filters — retrieval BY a filter, for a query that is nothing but filters
+    let found = search
+        .by_filters(Some((1960, 1979)), None, None, None, 5)
+        .await
+        .expect("by_filters: year");
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].media_item_id, probe);
+    assert!(search
+        .by_filters(Some((1980, 1989)), None, None, None, 5)
+        .await
+        .expect("by_filters: year miss")
+        .is_empty());
+    // No constraints at all would be "every title, most popular first" — a browse
+    // surface, not a search result.
+    assert!(
+        search
+            .by_filters(None, None, None, None, 5)
+            .await
+            .expect("by_filters: unconstrained")
+            .is_empty(),
+        "an unconstrained filter query must return nothing, not everything"
+    );
+
+    // ── CatalogueRepository ───────────────────────────────────────────────────
+    let catalogue = CatalogueRepository::new(&db);
+
+    // searchable_titles — the probe item above is the only one here
+    assert_eq!(
+        catalogue
+            .searchable_titles()
+            .await
+            .expect("searchable_titles"),
+        1
+    );
+
+    // core_ids — the probe item is not in the core tier, so the list is empty rather
+    // than "every title". The artefact is positional, so an over-broad core query would
+    // shift every vector onto the wrong film; this asserts the predicate, not the count.
+    assert!(
+        catalogue.core_ids().await.expect("core_ids").is_empty(),
+        "a title with in_core = 0 must not appear in artefact order"
+    );
+    sqlx::query("UPDATE media_items SET in_core = 1 WHERE id = ?")
+        .bind(probe)
+        .execute(db.pool())
+        .await
+        .expect("promote to core");
+    assert_eq!(
+        catalogue.core_ids().await.expect("core_ids"),
+        vec![probe],
+        "and one that is in_core must appear exactly once"
+    );
+
+    // readiness — titles present and no ingest job ever ran, which is what a prebuilt
+    // index looks like
+    assert_eq!(
+        catalogue.readiness().await.expect("readiness"),
+        Readiness::Ready { titles: 1 }
+    );
+
+    // steps — no job, so nothing to report rather than an error
+    assert!(catalogue.steps().await.expect("steps").is_empty());
+
+    // ── WikipediaRepository (ADR-0033, migration 0014) ────────────────────────
+    let wiki = WikipediaRepository::new(&db);
+
+    // map — a mapping for an IMDb id we do not hold is nothing to do, not an error.
+    // Wikidata knows 509,464 of them and this catalogue holds a subset.
+    assert!(
+        !wiki
+            .map("tt9999999", "Some Article")
+            .await
+            .expect("map miss"),
+        "an unknown imdb id stores nothing and says so"
+    );
+    MediaRepository::new(&db)
+        .add_external_id(probe, IdSource::Imdb, "tt0000001", 1.0)
+        .await
+        .expect("probe imdb id");
+    assert!(wiki.map("tt0000001", "Probe Article").await.expect("map"));
+    // Re-mapping after an article was moved updates the title and must NOT re-queue.
+    assert!(wiki
+        .map("tt0000001", "Probe Article (film)")
+        .await
+        .expect("re-map"));
+
+    // pending — mapped and not yet fetched
+    let pending = wiki.pending(10).await.expect("pending");
+    assert_eq!(pending.len(), 1);
+    assert_eq!(pending[0].media_item_id, probe);
+    assert_eq!(pending[0].article, "Probe Article (film)");
+
+    // counts — (mapped, fetched, with a synopsis)
+    assert_eq!(wiki.counts().await.expect("counts"), (1, 0, 0));
+
+    // store — the synopsis and the fetch marker commit together
+    wiki.store(probe, "A film about a probe.")
+        .await
+        .expect("store");
+    assert!(
+        wiki.pending(10)
+            .await
+            .expect("pending after store")
+            .is_empty(),
+        "a fetched article leaves the queue"
+    );
+    assert_eq!(wiki.counts().await.expect("counts"), (1, 1, 1));
+
+    // mark_empty — an article Wikipedia has no lead for must not be re-asked forever
+    let second = MediaRepository::new(&db)
+        .insert(&NewMediaItem::film("Second Probe", 1971))
+        .await
+        .expect("second item");
+    MediaRepository::new(&db)
+        .add_external_id(second, IdSource::Imdb, "tt0000002", 1.0)
+        .await
+        .expect("second imdb id");
+    assert!(wiki.map("tt0000002", "Blank Article").await.expect("map"));
+    wiki.mark_empty(second).await.expect("mark_empty");
+    assert!(wiki
+        .pending(10)
+        .await
+        .expect("pending after mark_empty")
+        .is_empty());
+    assert_eq!(
+        wiki.counts().await.expect("counts"),
+        (2, 2, 1),
+        "both fetched, only one carries text"
+    );
+
     // schema_version
-    assert_eq!(db.schema_version().await.expect("schema_version"), Some(4));
+    assert_eq!(
+        db.schema_version().await.expect("schema_version"),
+        Some(Db::latest_schema_version())
+    );
 
     // backup_to
     let backup = dir.path().join("backups/b.db");
     db.backup_to(&backup).await.expect("backup_to");
     assert!(backup.is_file());
+
+    // compact — on a file database, so both sizes are real and VACUUM is meaningful
+    let compacted = db.compact().await.expect("compact");
+    assert!(compacted.before > 0, "measured a real file");
+    assert!(
+        compacted.after <= compacted.before,
+        "VACUUM never grows the file"
+    );
+    assert!(db.schema_version().await.expect("still open").is_some());
 
     // migrate_with_backup — the no-op path, already at the latest version
     assert!(db
@@ -408,6 +751,7 @@ async fn db_surface() {
         .is_none());
 
     // migrate_down_to
-    db.migrate_down_to(3).await.expect("migrate_down_to");
-    assert_eq!(db.schema_version().await.expect("version"), Some(3));
+    let one_back = Db::latest_schema_version() - 1;
+    db.migrate_down_to(one_back).await.expect("migrate_down_to");
+    assert_eq!(db.schema_version().await.expect("version"), Some(one_back));
 }

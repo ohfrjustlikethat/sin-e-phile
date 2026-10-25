@@ -212,6 +212,9 @@ ws.onmessage = (e) => {
 await send("Page.enable");
 await send("Runtime.enable");
 await send("Log.enable");
+// Logged because a Chromium release once broke this harness locally while CI's
+// older browser passed (D50). The version is the first thing to compare.
+const browser = (await send("Browser.getVersion")).product;
 
 // A silent failure must never pass as a green run — and it must never be
 // undiagnosable either. `Runtime.exceptionThrown` alone is not enough: a module
@@ -249,6 +252,7 @@ await waitFor(
     head: document.body ? document.body.innerText.slice(0, 400) : '(no body)',
     tabs: document.querySelectorAll('[role="tab"]').length,
   })`).catch((x) => ({ evalFailed: String(x) }));
+  console.error(`uiaudit: browser ${browser}`);
   console.error("uiaudit: page state at timeout:", JSON.stringify(dump, null, 2));
   console.error("page errors:", pageErrors);
   console.error("browser log:", pageLog.slice(0, 12));
@@ -256,12 +260,27 @@ await waitFor(
   throw e;
 });
 
-const results = { url: URL, when: new Date().toISOString() };
+const results = { url: URL, when: new Date().toISOString(), browser };
 
 // ── 2.5: frame timing while flicking the 500-card rail ──────────────────────
-await clickTab("500");
-results.rail = await evalJs(`
+//
+// In --ci, a frame-timing breach gets ONE re-measure, and the verdict is the
+// second attempt (D49). GitHub's hosted runner occasionally stalls a single
+// frame: 4 failures in 37 runs, each exactly 1 dropped frame with a 16.7ms
+// median, some on commits that touched only the state file. The budget is
+// unchanged — zero dropped frames — and a regression drops frames every time,
+// so it fails both attempts. Locally there is no retry: a stall on the author's
+// machine is worth seeing. Both attempts go into results.json.
+//
+// UIAUDIT_INJECT_STALL="1" (or "1,2") blocks one frame for 60ms on those
+// attempts. It exists only to prove the retry fires and still fails a real
+// regression; nothing sets it except a person checking exactly that.
+const STALL_ON = (process.env["UIAUDIT_INJECT_STALL"] ?? "")
+  .split(",").map(Number).filter(Boolean);
+
+const measureRail = (attempt) => evalJs(`
   (async () => {
+    const stall = ${STALL_ON.includes(attempt)};
     const rails = [...document.querySelectorAll('[data-rail-viewport]')];
     if (!rails.length) return { error: 'no [data-rail-viewport] in the DOM' };
     const rail = rails.reduce((a, b) => (b.scrollWidth > a.scrollWidth ? b : a));
@@ -278,6 +297,7 @@ results.rail = await evalJs(`
     await new Promise((done) => {
       function step(now) {
         deltas.push(now - last); last = now;
+        if (stall && deltas.length === 50) { const t = performance.now(); while (performance.now() - t < 60); }
         x += 55;                      // a fast flick: ~3,300px per second
         if (x >= max) x = 0;          // wrap, so the sample is always full length
         rail.scrollLeft = x;
@@ -298,6 +318,16 @@ results.rail = await evalJs(`
       droppedFrames: d.filter(v => v > 33.3).length,
     };
   })()`);
+
+const frameBreach = (m) =>
+  !m.error && (m.worstMs > BUDGET.worstFrameMs || m.droppedFrames > BUDGET.droppedFrames);
+
+await clickTab("500");
+results.railAttempts = [await measureRail(1)];
+if (CI && frameBreach(results.railAttempts[0])) {
+  results.railAttempts.push(await measureRail(2));
+}
+results.rail = results.railAttempts.at(-1);
 
 // ── 2.6a: the roving tabindex must reach the far end of all 500 ─────────────
 await evalJs(`
@@ -430,9 +460,13 @@ console.log(
   [
     "",
     `  rail       ${r.error ?? `${r.mountedCards}/500 mounted · median ${r.medianMs}ms · p95 ${r.p95Ms}ms · worst ${r.worstMs}ms · ${r.droppedFrames} dropped`}`,
+    ...(results.railAttempts.length > 1
+      ? [`  retry      attempt 1 breached (worst ${results.railAttempts[0].worstMs}ms · ${results.railAttempts[0].droppedFrames} dropped); verdict is attempt 2 (D49)`]
+      : []),
     `  keyboard   rail is ${results.railKeyboard.afterArrows.tabStops} tab stop; End reaches card ${results.railKeyboard.afterEnd.index} of 500`,
     `  focus      ${results.focus.stops} stops, ${results.focus.distinct} distinct, ${results.focus.withoutRing.length} without a ring`,
     `  motion     ${motionNormal.nonOpacityTransitions} non-opacity transitions normally → ${motionReduced.nonOpacityTransitions} under reduce`,
+    `  browser    ${browser}`,
     `  artefacts  ${OUT}/results.json`,
     "",
   ].join("\n"),
