@@ -2069,6 +2069,11 @@
       "id": "0035",
       "title": "gitleaks false positives are allowlisted by exact value, and only with an ADR",
       "date": "2026-10-23"
+    },
+    {
+      "id": "0036",
+      "title": "A built phase may carry an unmet criterion to a named later phase (PROPOSED)",
+      "date": "2026-10-25"
     }
   ],
   "environment": {

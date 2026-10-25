@@ -40,6 +40,7 @@ never be empty: if nothing was genuinely rejected, there was no decision.
 | [0022](0022-testable-logic-outside-the-tauri-crate.md) | Testable logic lives outside the Tauri crate | Accepted | 2026-08-31 |
 | [0023](0023-visual-direction.md) | Visual direction: editorial, near-black, and not AI-generated | Accepted | 2026-09-01 |
 | [0035](0035-gitleaks-false-positives-by-value.md) | gitleaks false positives are allowlisted by exact value, and only with an ADR | Accepted | 2026-10-23 |
+| [0036](0036-carry-an-unmet-criterion-to-a-named-phase.md) | A built phase may carry an unmet criterion to a named later phase | **Proposed** | 2026-10-25 |
 
 **0002–0008 record decisions that were already locked in `SPEC.md` §5 before this
 repository existed.** They were written in session 0b, after 0009–0015, which is why
