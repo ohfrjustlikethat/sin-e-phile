@@ -153,7 +153,11 @@ def render_open(phase: dict) -> str:
 
     for criterion in phase["exit_criteria"]:
         box = "x" if criterion["met"] else " "
-        lines.append(f"- [{box}] **{criterion['id']}** {criterion['text']}")
+        # A carried criterion stays unticked: it is NOT met, and the doc must not look
+        # as if it were. The destination is what makes it closable (ADR-0036).
+        carried = criterion.get("carried_to_phase")
+        suffix = f" — *carried to Phase {carried}*" if carried is not None else ""
+        lines.append(f"- [{box}] **{criterion['id']}** {criterion['text']}{suffix}")
 
     lines += ["", "## Subtasks", ""]
     if phase.get("subtasks"):
@@ -257,14 +261,18 @@ def do_close(number: int, next_action: str | None) -> int:
     if not path.exists():
         do_open(number, force=False)
 
+    # Closable: met with evidence, or carried to a named later phase with its measured
+    # evidence (SPEC.md Appendix B, ADR-0036). Unmet and not carried still refuses.
     unevidenced = [
         c["id"] for c in phase["exit_criteria"]
-        if not c["met"] or not (c.get("evidence") or "").strip()
+        if not (c.get("evidence") or "").strip()
+        or (not c["met"] and c.get("carried_to_phase") is None)
     ]
     if unevidenced:
         print(
             f"phasedoc: refusing to close phase {number} — "
-            f"{', '.join(unevidenced)} lack evidence (SPEC.md §10.8).",
+            f"{', '.join(unevidenced)} are neither met with evidence nor carried "
+            f"(SPEC.md §10.8, Appendix B).",
             file=sys.stderr,
         )
         return 1
@@ -291,7 +299,14 @@ def do_close(number: int, next_action: str | None) -> int:
         "",
     ]
     for criterion in phase["exit_criteria"]:
-        lines += [f"**{criterion['id']}** — {criterion['text']}", "", f"> {criterion['evidence']}", ""]
+        lines += [f"**{criterion['id']}** — {criterion['text']}", ""]
+        if criterion.get("carried_to_phase") is not None:
+            lines += [
+                f"**Not met; carried to Phase {criterion['carried_to_phase']}.** "
+                f"{criterion.get('carried_reason', '')}",
+                "",
+            ]
+        lines += [f"> {criterion['evidence']}", ""]
 
     if debt:
         lines += ["### Debt incurred", ""]

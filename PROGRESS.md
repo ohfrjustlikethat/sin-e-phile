@@ -10,50 +10,26 @@
 
 ## Where we are right now
 
-**Phase 4 — Metadata Backbone** (`in_progress`, branch `phase/04-metadata-backbone`)
+**Phase 6 — Source Resolver and Addon Protocol** (`in_progress`, branch `phase/06-source-resolver`)
 
-7 of 7 exit criteria met with evidence.
+0 of 6 exit criteria met with evidence.
 
-> The catalogue. Three constraints carry in: ADR-0013 and ADR-0027 mean the app must be complete and good-looking with NO TMDB key and no key ever ships; ADR-0026 means SQL is runtime-checked, so every new repository method needs a line in crates/persistence/tests/repository_surface.rs; and R4 (ingestion larger or slower than expected) is this phase's named risk — measure before committing to a shape, and scope by a popularity threshold rather than ingesting everything.
-
-### Subtasks — 13/13 complete
-
-- [x] **4.1** tools/ingest skeleton: resumable job runner with checkpointing and progress reporting, so a killed run resumes rather than restarts · `4a78d64`
-- [x] **4.2** IMDb dataset download, verification and normalisation into media_items, titles, people, credits, genres · `048180a`
-- [x] **4.3** MovieLens join for ratings and popularity (ADR-0019, on-device) · `42177d6`
-- [x] **4.4** AniList ingestion: anime catalogue, romaji/native/english titles, and seasonal episode numbering into episode_numbering. Absolute numbering is NULL by ADR-0031 - no free source publishes one. · `a170532`
-- [x] **4.5** External-ID cross-mapping TMDB/IMDb/AniList/MAL with documented conflict-resolution rules · `f67d939`
-- [x] **4.6** Live API clients (TMDB, AniList, Jikan, Fanart.tv): shared rate limiter, exponential backoff, persistent response cache with per-resource TTLs, graceful offline · `38d75d7`
-- [x] **4.7** Per-profile TMDB key from settings, never shipped (ADR-0027), DPAPI-wrapped at rest; every TMDB-dependent surface degrades to the typographic state. Storage and the degradation contract are done; the settings UI is Phase 14. CLOSED with Phase 4: the Phase 4 part (storage, DPAPI, degradation contract) is done; the settings UI is Phase 14's deliverable. · `2358993`
-- [x] **4.8** Image handling: lazy fetch, disk cache with a size budget, WebP re-encoding (42.1% measured on real stills), blurhash placeholders. crates/artwork is done; wiring it to a TMDB image client is Phase 11. CLOSED with Phase 4: crates/artwork is done; wiring it to a TMDB image client is Phase 11's deliverable. · `5840b99`
-- [x] **4.9** First-run flow: usable during the background build, searching what is ingested so far. CatalogueRepository::readiness is the backend surface (Empty/Building/Interrupted/Ready, each carrying the searchable count); the progress UI itself is Phase 14. CLOSED with Phase 4: the readiness surface is done; the progress UI is Phase 14's deliverable. · `624b76f`
-- [x] **4.10** The embedding artefact producer (ADR-0014). crates/embedding holds the document builder, int8 quantisation and the checksummed format; tools/ingest/src/embed.rs is the resumable producer, model and tokenizer checksum-pinned; format specified in docs/specs/embedding-artefact.md. PRODUCED: 855,703 vectors, 313 MB, sha256 3fce6f06..., verified by `ingest verify-embeddings`. Publishing it is blocker B3. · `4f302d5`
-- [x] **4.11** 50-title anime fixture for E5: fixtures/anime/e5-hand-checked.tsv, 64 rows, checked by `ingest verify-anime` which exits non-zero on any mismatch · `f19ddda`
-- [x] **4.12** Rate-limit stress test: 1,000 rapid lookups never exceed the documented limits · `38d75d7`
-- [x] **4.13** Incremental catalogue refresh (ADR-0030): re-fetch title.basics/ratings/episode and insert only the tail past the highest id already stored, reusing TsvReader::seek_past. Plus AniList airing schedules, which need no key. See docs/specs/catalogue-freshness.md. · `47e7353`
+> Opened 2026-10-25 when Phases 4 and 5 closed together in merge bf5a644. Subtasks are not yet authored: read SPEC.md §15 Phase 6 and plan them before any code. Carried in: nothing from Phase 4; from Phase 5, E1 goes to Phase 21 and E3/E4 to Phase 16, not here.
 
 ### Exit criteria
 
-- [x] **E1** Full ingestion completes on the dev machine and the resulting database is under a documented size budget.
-      - *Evidence:* Re-confirmed 2026-10-25 under the SI reading of R4's 4 GB (author's D47 option 1). RESULTING DATABASE 3,945,598,976 bytes = 3.946 GB, 54 MB under 4 GB, after `./target/release/ingest.exe compact` at 814fc41 (4,062,978,048 -> 3,945,598,976 bytes, 111 MiB recovered, 34 s; recorded in docs/eval-results.md Session 19). Every ingestion command now compacts after itself (df3ca35). Margin is thin: the app's launch-time refresh does not compact, so it erodes the 54 MB (docs/RISKS.md R4). Ingestion completeness unchanged from 2026-09-07: title.basics 2,701,195, title.principals 10,092,368, name.basics 2,736,235, title.akas 5,908,381, episodes 132,845 rows / 5,862 seasons / 4,529 series, MovieLens 61,912 of 62,423 films matched (99.2%). The artefact and index live outside the database and are counted separately (D33).
-- [x] **E2** Ingestion killed mid-run resumes correctly.
-      - *Evidence:* `cargo test -p sinephile-ingest --test resume` -> 10 passing, 2026-09-05. a_killed_run_resumes_and_repeats_nothing asserts 50 items exist EXACTLY once after a kill at item 20; progress_survives_a_restart; a_step_that_does_not_advance_its_cursor_is_stopped; and an_interrupted_run_resumes_at_the_next_page in tests/anime.rs. Demonstrated for real as well: the AniList sweep was interrupted and resumed during development, and a_crash_mid_step_reports_that_it_is_resuming was corrected after `is_resuming` was found reporting a fresh run on every real resume.
-- [x] **E3** Catalogue lookups work with the network disconnected.
-      - *Evidence:* STRUCTURAL: crates/persistence has no HTTP client in its dependency tree - sqlx is configured sqlite-only with no postgres/mysql feature, and the rest is serde, thiserror, time, tracing, windows-sys. The catalogue layer is incapable of a network call, so lookups cannot depend on one. Exercised by 72 passing tests in `cargo test -p sinephile-persistence`, including the 500,000-row indexed-lookup benchmark, none of which touch a network.
-- [x] **E4** Rate limits are never exceeded under a stress test of 1,000 rapid lookups.
-      - *Evidence:* `cargo test -p sinephile-metadata-api` -> limiter::tests::a_thousand_rapid_requests_never_exceed_the_limit, 2026-09-05. 1,000 acquisitions against a 40-per-10-seconds limit must take at least (1000-40)/4 = 240 simulated seconds; the test fails if they are faster. Uses tokio's paused clock, so it measures the limiter rather than the wall.
-- [x] **E5** Anime titles resolve across AniList and TMDB with correct ID mapping for a hand-checked set of 50 titles including tricky cases (long-running shonen, split-cour seasons, films tied to series).
-      - *Evidence:* `./target/release/ingest verify-anime` -> 64/64 pass, 2026-09-04. Fixture fixtures/anime/e5-hand-checked.tsv covers long-running shonen, split-cour seasons and films tied to series, plus 3 expected REFUSALS and 2 season claims. Numbers and the four fixture errors the first run exposed are in docs/eval-results.md. TMDB half of E5 is not covered - no key ships (ADR-0027), so it is verified per-user in subtask 4.7.
-- [x] **E6** The catalogue is fully usable with no TMDB key (ADR-0013): titles, years, runtimes, genres, cast, crew and ratings all present from IMDb + MovieLens alone. TMDB enrichment adds artwork and rich detail and is verified to be additive, never load-bearing.
-      - *Evidence:* MEASURED on the real catalogue, 2026-09-05, with NO TMDB key ever supplied: 0 rows in external_ids with source='tmdb' and 0 TMDB responses in http_cache. The catalogue nonetheless holds 2,702,737 titles, 855,703 core-tier, 10,079,841 credits, 6,176,950 title rows, 4,450,735 genre links, 1,086,210 ratings, 2,008,183 runtimes and 539,817 episodes - all from IMDb and AniList alone. ADR-0027's per-profile key surface exists (crates/persistence/src/repositories/credentials.rs) and defaults to TmdbAccess::Absent.
-- [x] **E7** The embedding artefact is produced and published (ADR-0014) by a reproducible script in `tools/ingest/`, run on the author's machine. It is deterministic, checksummed, resumable, and records model identity, quantisation, embedding dimension, document-builder version and catalogue snapshot date. The application refuses to load an artefact whose model identity does not match its own, and degrades to FTS5-only search when the artefact is absent.
-      - *Evidence:* MET 2026-09-15. PRODUCED: 855,703 vectors, 313 MB, deterministic, checksummed, resumable, recording model identity, quantisation, dimension, document-builder version, snapshot date and text source (format v2). PUBLISHED: release embeddings-v2 on github.com/ohfrjustlikethat/sin-e-phile, asset embeddings-bge-small-en-v1.5-int8.bin, 328,590,240 bytes, confirmed by `gh release view` and by the URL returning HTTP 200 at that exact length. DOWNLOADED AND VERIFIED end to end through the application's own code path (`assets::download` then `assets::verify`): internal checksum, model identity and document-builder version all pass - see docs/eval-results.md. THE REFUSAL IS EVIDENCED TOO: the superseded embeddings-v1 artefact is refused by name, 'artefact was built for model "all-MiniLM-L6-v2-int8", this build has "bge-small-en-v1.5-int8"'. DEGRADES to FTS5-only when absent: Engine::keyword_only, selected by the app at launch and surfaced in the UI.
+- [ ] **E1** Adding a new backend requires implementing one trait and registering it — no changes elsewhere.
+- [ ] **E2** The Internet Archive backend returns real, playable results.
+- [ ] **E3** A malformed or hostile addon manifest is rejected with a clear error and cannot crash or hang the app.
+- [ ] **E4** Backend timeout: one slow backend never delays results from the others.
+- [ ] **E5** `docs/specs/addon-protocol.md` is complete enough that a third party could implement a backend from it alone.
+- [ ] **E6** Repository-wide grep confirms zero indexer names or URLs anywhere, including tests and docs.
 
 ---
 
 ## What's next
 
-spec_version 2.0.0 is in force: P14 enacted (ADR-0036, Appendix B) and the masthead plus Phase 18 overhaul specified (ADR-0037). The author will direct what comes next. The open threads, in the order they unblock things: (1) Close Phase 4. Its record is current_phase; run /closephase 4, checking every criterion against evidence, carrying any that are genuinely unmeetable under Appendix B. (2) Close Phase 5 the same way: E1 carried to Phase 21 (Tier 0 measurement, P8), E3/E4 carried with evidence 'meaning 0.0472, eval search --report, 21d0b23' and the case-study screenshots; first retake those screenshots with the machine idle (`powershell -ExecutionPolicy Bypass -File tools/shots/capture.ps1 -SettleMs 9000 -QueryMs 3500`). (3) Optionally, if the author asks, build the masthead ahead of Phase 18 (SPEC.md §9.4): replace src/app/NavRail.tsx and src/app/TitleBar.tsx with one Masthead component, remove railExpanded from src/lib/store.ts, and extend tools/uiaudit's keyboard-reach check to the masthead's tab order. (4) Phase 6, source-resolver.
+Phases 4 and 5 are closed (merge bf5a644, tags phase-04 and phase-05). In progress on branch chore/masthead: the masthead (SPEC.md §9.4, ADR-0037), built ahead of Phase 18 at the author's request. Replace src/app/TitleBar.tsx and src/app/NavRail.tsx with one src/app/Masthead.tsx (wordmark, the five destinations as words with an oxblood underline on the active one, a labelled Search button with its '/' hint, Settings, window controls; empty space is the drag region), remove railExpanded and toggleRail from src/lib/store.ts and --rail-* from src/styles/tokens.css, and verify that it fits at 1024x640. After that: plan Phase 6 (source-resolver) by reading SPEC.md §15 Phase 6 and authoring its subtasks in PROJECT_STATE.json. AUTHOR ACTION OUTSTANDING: publish data/embeddings-bge-small-en-v1.5-int8.bin as GitHub release embeddings-v3; the downloader already points there.
 
 ---
 
@@ -73,9 +49,9 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 1 | Application Shell and Capability Tiers | A | 0 | 1–2 | 7/7 |
 | [x] | 2 | Design System and Visual Language | A | 1 | 1–2 | 5/5 |
 | [x] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 5/5 |
-| [~] | 4 | Metadata Backbone | A | 3 | 2–3 | 7/7 |
-| [~] | 5 | Semantic Search Engine | A | 4 | 2 | 2/5 |
-| [ ] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 0/6 |
+| [x] | 4 | Metadata Backbone | A | 3 | 2–3 | 7/7 |
+| [x] | 5 | Semantic Search Engine | A | 4 | 2 | 2/5 |
+| [~] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 0/6 |
 | [ ] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 0/8 |
 | [ ] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 0/6 |
 | [ ] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 0/6 |
