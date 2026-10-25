@@ -144,6 +144,13 @@ class Validator:
             elif "else" in schema:
                 self.check(value, schema["else"], path)
 
+        # Listed in KNOWN_KEYWORDS from the start but never evaluated, so a rule written
+        # with either passed silently. ADR-0036's completion rule is the first to use one.
+        if "anyOf" in schema and not any(self.matches(value, s) for s in schema["anyOf"]):
+            self.errors.append(f"{path}: matches none of anyOf — {schema.get('description', '')}")
+        if "oneOf" in schema and sum(self.matches(value, s) for s in schema["oneOf"]) != 1:
+            self.errors.append(f"{path}: must match exactly one of oneOf")
+
         if "not" in schema and self.matches(value, schema["not"]):
             self.errors.append(f"{path}: matches a forbidden shape — {schema['not'].get('description', schema['not'])}")
 
@@ -207,6 +214,34 @@ def check_current_phase_mirrors(state: dict) -> list[str]:
     return errors
 
 
+def carried_problems(state: dict, n: int, criterion: dict) -> list[str]:
+    """Why an unmet criterion on closed phase `n` is not a valid carry (ADR-0036).
+
+    The schema checks the shape: a destination, a reason, measured evidence. It can't
+    see across phases, so this checks the destination is real: later than `n`, in the
+    table, not skipped, and not already closed, since a closed phase would never look
+    at it again.
+    """
+    cid = f"phases[{n}].{criterion['id']}"
+    target = criterion.get("carried_to_phase")
+    if target is None:
+        return [
+            f"{cid} is not met, but phase {n} is closed. Evidence it, or carry it to a "
+            f"named later phase with carried_to_phase and carried_reason (ADR-0036)."
+        ]
+    phases = {p["number"]: p for p in state["phases"]}
+    if target <= n:
+        return [f"{cid} is carried to phase {target}, which is not later than {n}."]
+    if target not in phases:
+        return [f"{cid} is carried to phase {target}, which is not in the phases table."]
+    if phases[target].get("status") in ("skipped", "complete"):
+        return [
+            f"{cid} is carried to phase {target}, which is "
+            f"{phases[target]['status']}, so nothing would ever check it again."
+        ]
+    return []
+
+
 def check_phase_progression(state: dict) -> list[str]:
     """Every phase before the current one must be a CLOSED record.
 
@@ -253,11 +288,7 @@ def check_phase_progression(state: dict) -> list[str]:
             )
         for criterion in phase["exit_criteria"]:
             if not criterion["met"]:
-                errors.append(
-                    f"phases[{n}].{criterion['id']} is not met, but phase {n} is "
-                    f"behind current_phase {current}. Either evidence it, or say in "
-                    f"SESSION_LOG.md why the phase closed without it."
-                )
+                errors.extend(carried_problems(state, n, criterion))
             elif not (criterion.get("evidence") or "").strip():
                 errors.append(
                     f"phases[{n}].{criterion['id']} is met with no evidence (§10.8)."
