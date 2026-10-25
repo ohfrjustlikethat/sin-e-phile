@@ -19,4 +19,4 @@ pub use credentials::{CredentialRepository, TmdbAccess};
 pub use episodes::EpisodeRepository;
 pub use media::MediaRepository;
 pub use profiles::ProfileRepository;
-pub use search::{Hit, MatchReason, SearchRepository};
+pub use search::{Hit, HitDetail, MatchReason, SearchRepository};

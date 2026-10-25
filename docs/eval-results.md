@@ -2133,3 +2133,12 @@ predict nDCG@10 over the catalogue. Over the catalogue, the reordering also let
 **Accepted by the author, 2026-10-25: "keep v3".** The v3 artefact ships with E3 meaning at
 0.0472, a recorded regression from v2's 0.1188, chosen deliberately over a 3-hour revert
 (B7). The baseline future phases compare against is therefore **0.0472**, not 0.1188.
+
+### The search screen's byline query (D53 redesign)
+
+`SearchRepository::details`, the director/runtime/synopsis lookup for the hits on screen,
+timed against the real catalogue (3.946 GB), 20 random core-tier film ids per call,
+20 calls, cold pages: **p50 9.35 ms, p95 10.30 ms, max 12.62 ms**. Primary-key lookup on
+`media_items`, `idx_credits_item` for the credits. It runs after ranking, so it adds to
+E1's 15.2 ms p95 rather than replacing any of it, for roughly 25 ms of the 80 ms budget.
+Python `sqlite3` with the exact SQL, 2026-10-25, uncommitted tree on top of `21d0b23`.

@@ -194,6 +194,11 @@ export type SearchHit = {
 	kind: string,
 	/**  Why this is on the page — the "why this matched" hint §15 asks for. */
 	why: Why,
+	/**  Director, or a series' creator; up to two names. */
+	made_by: string | null,
+	runtime_minutes: number | null,
+	/**  The synopsis without its encyclopedia lead, cut to a couple of lines. */
+	excerpt: string | null,
 };
 
 /**

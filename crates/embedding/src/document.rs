@@ -186,7 +186,7 @@ pub fn build_with(doc: &Document<'_>, layout: Layout) -> String {
 /// Conservative on purpose: it fires only on a lead that both reads as a definition and
 /// names a form, because a synopsis whose real first sentence happens to contain "is a"
 /// would otherwise lose its opening.
-fn strip_lead(synopsis: &str) -> &str {
+pub fn strip_lead(synopsis: &str) -> &str {
     let Some(end) = synopsis.find(". ") else {
         return synopsis;
     };

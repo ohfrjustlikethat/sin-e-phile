@@ -500,6 +500,52 @@ async fn db_surface() {
         "an empty id list must not build a query with no placeholders"
     );
 
+    // details — the byline under a result. Nothing credited yet: every field empty.
+    let bare = search.details(&[probe, 999_999]).await.expect("details");
+    assert_eq!(bare.len(), 1, "strangers vanish here too");
+    assert_eq!(
+        (bare[0].made_by.as_deref(), bare[0].runtime_minutes),
+        (None, None)
+    );
+    assert!(search
+        .details(&[])
+        .await
+        .expect("details of nothing")
+        .is_empty());
+
+    // Billing order decides, unbilled sorts last, a creator ranks after any director,
+    // and only two names are kept. Inserted directly: credits have no repository yet.
+    for (name, role, billing) in [
+        ("Third", "director", None),
+        ("Creator", "creator", Some(0)),
+        ("Second", "director", Some(2)),
+        ("First", "director", Some(1)),
+    ] {
+        let person: i64 = sqlx::query_scalar("INSERT INTO people (name) VALUES (?) RETURNING id")
+            .bind(name)
+            .fetch_one(db.pool())
+            .await
+            .expect("person");
+        sqlx::query(
+            "INSERT INTO credits (media_item_id, person_id, role, billing) VALUES (?, ?, ?, ?)",
+        )
+        .bind(probe)
+        .bind(person)
+        .bind(role)
+        .bind(billing)
+        .execute(db.pool())
+        .await
+        .expect("credit");
+    }
+    let credited = search.details(&[probe]).await.expect("details");
+    assert_eq!(credited[0].made_by.as_deref(), Some("First, Second"));
+    // The credits must not leak into the filter checks below, which expect none.
+    sqlx::query("DELETE FROM credits WHERE media_item_id = ?")
+        .bind(probe)
+        .execute(db.pool())
+        .await
+        .expect("clear credits");
+
     // admitted — structured filters over a candidate set (subtask 5.5).
     // The probe is "Probe Title" (1970), no runtime, no director.
     assert_eq!(

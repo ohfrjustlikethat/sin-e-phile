@@ -27,6 +27,7 @@
 //! which `SPEC.md` §8 and ADR-0014 both require to be *diminished but genuinely useful*,
 //! never broken or empty. That path is the floor, and it is the same code path.
 
+pub mod card;
 pub mod query;
 
 use sinephile_persistence::repositories::{Hit, MatchReason, SearchRepository};

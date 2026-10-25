@@ -32,6 +32,12 @@ pub struct SearchHit {
     pub kind: String,
     /// Why this is on the page — the "why this matched" hint §15 asks for.
     pub why: Why,
+    /// Director, or a series' creator; up to two names.
+    pub made_by: Option<String>,
+    #[specta(type = Option<i32>)]
+    pub runtime_minutes: Option<i64>,
+    /// The synopsis without its encyclopedia lead, cut to a couple of lines.
+    pub excerpt: Option<String>,
 }
 
 /// The engine's [`MatchReason`], in the words a person would use.
@@ -132,15 +138,26 @@ pub async fn search(
         .await
         .map_err(|e| e.to_string())?;
 
+    let ids: Vec<i64> = hits.iter().map(|hit| hit.media_item_id).collect();
+    let mut cards = sinephile_search_engine::card::cards(&db, &ids)
+        .await
+        .map_err(|e| e.to_string())?;
+
     Ok(SearchResponse {
         hits: hits
             .into_iter()
-            .map(|hit| SearchHit {
-                id: hit.media_item_id,
-                title: hit.title,
-                year: hit.year,
-                kind: hit.kind,
-                why: hit.why.into(),
+            .map(|hit| {
+                let card = cards.remove(&hit.media_item_id).unwrap_or_default();
+                SearchHit {
+                    id: hit.media_item_id,
+                    title: hit.title,
+                    year: hit.year,
+                    kind: hit.kind,
+                    why: hit.why.into(),
+                    made_by: card.made_by,
+                    runtime_minutes: card.runtime_minutes,
+                    excerpt: card.excerpt,
+                }
             })
             .collect(),
         searchable_titles: readiness.searchable_titles(),

@@ -33,6 +33,11 @@ Add-Type -AssemblyName System.Drawing
 # DWMWA_EXTENDED_FRAME_BOUNDS (9) is the rectangle actually painted.
 $signature = @'
 [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int cmd);
+[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr pid);
+[DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
+[DllImport("user32.dll")] public static extern bool AttachThreadInput(uint from, uint to, bool attach);
 [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr hWnd, int attr, out RECT rect, int size);
 [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
 '@
@@ -72,20 +77,57 @@ Write-Host "shots: launching the release build"
 $process = Start-Process -FilePath "target\release\sin-e-phile.exe" -PassThru
 try {
     Start-Sleep -Milliseconds $SettleMs
-    $process.Refresh()
-    if ($process.MainWindowHandle -eq [IntPtr]::Zero) { throw "no window appeared" }
-    $handle = $process.MainWindowHandle
+
+    # MainWindowHandle is whichever top-level window .NET saw first, and the webview
+    # creates small helper windows. One run captured all four shots at 219x30. Wait for
+    # a handle whose painted frame is window-sized, and fail loudly if none appears.
+    $handle = [IntPtr]::Zero
+    for ($i = 0; $i -lt 40; $i++) {
+        $process.Refresh()
+        if ($process.HasExited) { throw "the app exited before its window appeared" }
+        $candidate = $process.MainWindowHandle
+        if ($candidate -ne [IntPtr]::Zero) {
+            # A window launched from a background process can come up minimised (seen
+            # 2026-10-25: 158x26, parked off-screen). SW_RESTORE (9) brings it back.
+            [void][Native.Win]::ShowWindow($candidate, 9)
+            Start-Sleep -Milliseconds 300
+            $rect = New-Object Native.Win+RECT
+            [void][Native.Win]::DwmGetWindowAttribute(
+                $candidate, 9, [ref]$rect, [System.Runtime.InteropServices.Marshal]::SizeOf($rect))
+            if (($rect.Right - $rect.Left) -ge 800) { $handle = $candidate; break }
+        }
+        Start-Sleep -Milliseconds 500
+    }
+    if ($handle -eq [IntPtr]::Zero) { throw "no window-sized window appeared" }
 
     foreach ($shot in $shots) {
+        [void][Native.Win]::ShowWindow($handle, 9)
+        # Windows refuses SetForegroundWindow from a process that is not in front. The
+        # documented way round it: attach to the input queue of the window that IS in
+        # front for the duration of the call, then detach.
+        $front = [Native.Win]::GetWindowThreadProcessId([Native.Win]::GetForegroundWindow(), [IntPtr]::Zero)
+        $mine = [Native.Win]::GetCurrentThreadId()
+        [void][Native.Win]::AttachThreadInput($mine, $front, $true)
         [void][Native.Win]::SetForegroundWindow($handle)
-        Start-Sleep -Milliseconds 400
+        [void][Native.Win]::AttachThreadInput($mine, $front, $false)
+        Start-Sleep -Milliseconds 600
+
+        # SendKeys types into WHATEVER window is in front. Windows may refuse to bring a
+        # background process's window forward, and then the query would be typed into
+        # someone's terminal or editor. Never send a key unless the app is in front.
+        if ([Native.Win]::GetForegroundWindow() -ne $handle) {
+            throw "the app is not the foreground window, so no keys were sent ($($shot.name))"
+        }
 
         # "/" enters search from anywhere; Escape leaves it. Sent as real keystrokes
         # rather than injected state, so what is captured is what a person would get.
         [System.Windows.Forms.SendKeys]::SendWait("{ESC}")
-        Start-Sleep -Milliseconds 200
+        Start-Sleep -Milliseconds 600
         [System.Windows.Forms.SendKeys]::SendWait("/")
-        Start-Sleep -Milliseconds 400
+        # Long enough for the search screen to mount and take focus. At 400 ms the query
+        # sometimes arrived first, and its first space pressed the focused title-bar
+        # Minimise button.
+        Start-Sleep -Milliseconds 1000
 
         # SendKeys reads + ^ % ~ ( ) { } as syntax, so anything a film title might
         # contain is escaped.

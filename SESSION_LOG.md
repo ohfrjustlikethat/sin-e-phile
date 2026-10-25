@@ -1539,3 +1539,33 @@ own test, and no phase's deliverables include it. Proposed: fold it into Phase 1
 
 **Next session, first:** get the author's answer on P14. Then either write the
 Appendix B amendment (ADR, schema, validator), or decide what keeps Phase 5 open.
+
+### Session 19, continued (2026-10-25) — P14 drafted, the search screen redesigned
+
+**P14, author: "your call".** The default was taken: ADR-0036 (Proposed) plus the schema and
+validator change are on branch `proposal/p14-carried-criteria` (`3a40010`), unmerged.
+SPEC.md is untouched. The validator refuses nine malformed carries and accepts the valid
+one. Found on the way: `anyOf`/`oneOf` were listed as known schema keywords but never
+evaluated. Nothing used them, so this was a latent trap, not a live bug.
+
+**The search screen (D53), author: "restyle + richer rows".** It now uses the type system
+Phase 2 built and it had ignored. Details are in D53. The new `SearchRepository::details`
+gives each row a byline and the lead result a synopsis excerpt, at p95 10.3 ms for 20
+ids. Two existing bugs were fixed along the way: keyboard focus on a result was
+invisible (nonexistent tokens plus `outline-none`), and arrow-key focus followed rank
+while the DOM followed grouping.
+
+**The screenshot harness typed into the wrong window.** `SendKeys` types into whatever
+window is in front, and Windows refuses `SetForegroundWindow` to a background process
+while the user is active. Some runs therefore sent query keystrokes elsewhere: one
+minimised the app through its own title-bar Minimise button, another opened TV Shows.
+`capture.ps1` now restores the window, waits for a window-sized handle, and refuses to
+type unless the app is the foreground window. Three approaches to getting foreground
+failed while the author was active, so it stopped there (§10.9). The fix is to run it
+while the machine is idle.
+
+**Bugs, and what each teaches.** A Python heredoc swallowed `\`-newline in Rust test
+strings for the third time this session. The tests still passed, so only reading the
+file caught it. Use the Edit tool for anything with a backslash. And a harness that
+drives real input is a harness that can act on the wrong target. It needs a precondition
+check, just as a destructive command does.

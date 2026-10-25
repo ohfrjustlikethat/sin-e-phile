@@ -31,6 +31,16 @@ pub struct Hit {
     pub why: MatchReason,
 }
 
+/// The byline and synopsis of one result. See [`SearchRepository::details`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct HitDetail {
+    pub media_item_id: i64,
+    /// Director, or a series' creator. Up to two names, comma-separated.
+    pub made_by: Option<String>,
+    pub runtime_minutes: Option<i64>,
+    pub synopsis: Option<String>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(clippy::enum_variant_names)]
 pub enum MatchReason {
@@ -548,6 +558,52 @@ impl<'a> SearchRepository<'a> {
                 score: None,
                 why,
             })
+            .collect())
+    }
+
+    /// What a result row shows besides its title: who made it, how long it runs, and
+    /// its synopsis.
+    ///
+    /// A separate query rather than more columns on every tier's SELECT, because only
+    /// the twenty hits that reach the screen need it, and the tiers rank thousands. The
+    /// director is the first by billing; a series has a creator instead, so that counts
+    /// too, after any director. At most two names, since a list of six reads as a credit
+    /// roll, not as a byline.
+    pub async fn details(&self, ids: &[i64]) -> Result<Vec<HitDetail>, DbError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let placeholders = std::iter::repeat_n("?", ids.len())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!(
+            "SELECT m.id, m.runtime_minutes, m.synopsis,
+                    (SELECT group_concat(name, ', ') FROM (
+                        SELECT p.name FROM credits c JOIN people p ON p.id = c.person_id
+                         WHERE c.media_item_id = m.id AND c.role IN ('director', 'creator')
+                         ORDER BY c.role = 'creator', c.billing IS NULL, c.billing
+                         LIMIT 2))
+               FROM media_items m
+              WHERE m.id IN ({placeholders})"
+        );
+        let mut query = sqlx::query_as(&sql);
+        for id in ids {
+            query = query.bind(id);
+        }
+        // id, runtime, synopsis, made_by — the SELECT's column order.
+        type DetailRow = (i64, Option<i64>, Option<String>, Option<String>);
+        let rows: Vec<DetailRow> = query.fetch_all(self.db.pool()).await?;
+
+        Ok(rows
+            .into_iter()
+            .map(
+                |(media_item_id, runtime_minutes, synopsis, made_by)| HitDetail {
+                    media_item_id,
+                    made_by,
+                    runtime_minutes,
+                    synopsis,
+                },
+            )
             .collect())
     }
 

@@ -209,6 +209,16 @@ No code tour.
 - **A probe isn't the population** — `docs/eval-results.md` Session 19. Plot-first won on
   seven contested items and lost over 858,170 documents.
 
+- **Weight by display order, not by rank** — `src/features/search/SearchScreen.tsx`,
+  `position++` in the render. Grouping reorders hits; numbering, size and arrow-key
+  focus must follow what's on screen.
+- **A correlated subquery with `LIMIT`** — `crates/persistence/src/repositories/search.rs`,
+  `details`. "First two directors by billing" per row, in one statement, index-backed.
+- **Display text is not embedding text** — `crates/search-engine/src/card.rs`. The same
+  synopsis is filtered differently for a reader (no production notes) than for a model.
+- **Preconditions on a harness that types** — `tools/shots/capture.ps1`. SendKeys hits
+  whatever is in front; check `GetForegroundWindow` before every keystroke.
+
 ## 4. The questions
 
 Written, not asked — Phase 5 is not a tier boundary (`SPEC.md` §10.10). They accumulate

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { commands, type SearchHit, type SearchResponse, type Why } from "@/lib/ipc";
-import { Input, Badge, Skeleton, EmptyState } from "@/design-system";
+import { Skeleton, EmptyState } from "@/design-system";
 import { MeaningDownload } from "./MeaningDownload";
 
 /**
@@ -61,6 +61,91 @@ function groupByKind(hits: SearchHit[]): [string, SearchHit[]][] {
   );
 }
 
+/** Display size for the query: large while it is a title, smaller as it becomes a sentence. */
+function querySize(query: string): string {
+  if (query.length <= 26) return "text-[46px]";
+  if (query.length <= 44) return "text-[34px]";
+  return "text-[26px]";
+}
+
+/** The line under the query: what kind of search just ran, in a word or two. */
+function status(response: SearchResponse | null, searching: boolean): string {
+  if (searching && !response) return "Searching";
+  if (!response?.ready || response.hits.length === 0) return "";
+  const count = `${response.hits.length} ${response.hits.length === 1 ? "result" : "results"}`;
+  return `${count} · ${response.semantic ? "titles, people and meaning" : "titles and people only"}`;
+}
+
+/**
+ * One result, in one of three weights.
+ *
+ * §9.0 bans uniform sizing, and a ranked list has a natural hierarchy to show: the
+ * lead result is set large with its synopsis, the next two a step down, and the rest
+ * as a quiet list. The page reads as an edited answer with a lead and a body, not as a
+ * table of equals.
+ *
+ * The match reason is quiet text, not a box on every row. It is only coloured when
+ * it says something strong ("exact title", "matched your filters").
+ */
+function Entry({
+  hit,
+  number,
+  weight,
+  focused,
+  onFocus,
+}: {
+  hit: SearchHit;
+  number: number;
+  weight: "lead" | "second" | "list";
+  focused: boolean;
+  onFocus: () => void;
+}) {
+  const why = WHY[hit.why];
+  const byline = [
+    hit.made_by,
+    hit.year,
+    hit.runtime_minutes !== null ? `${hit.runtime_minutes} min` : null,
+  ]
+    .filter((part) => part !== null && part !== undefined)
+    .join(" · ");
+
+  const title = {
+    lead: "text-[46px] leading-[1.02] tracking-[-0.01em]",
+    second: "text-[26px] leading-tight",
+    list: "text-[20px] leading-snug",
+  }[weight];
+
+  return (
+    <div
+      data-row
+      tabIndex={0}
+      onFocus={onFocus}
+      className={`grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-x-4 border-b border-line-subtle ${
+        weight === "lead" ? "pb-8" : weight === "second" ? "py-5" : "py-3"
+      } ${focused ? "bg-raised" : ""}`}
+    >
+      <span className="spine">{String(number).padStart(2, "0")}</span>
+      <div className="min-w-0">
+        <h3 className={`font-serif text-ink ${title} ${weight === "list" ? "truncate" : ""}`}>
+          {hit.title}
+          {weight === "list" && byline && (
+            <span className="label ml-4 align-middle">{byline}</span>
+          )}
+        </h3>
+        {weight !== "list" && byline && <p className="label mt-2">{byline}</p>}
+        {weight === "lead" && hit.excerpt && (
+          <p className="mt-4 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
+            {hit.excerpt}
+          </p>
+        )}
+      </div>
+      <span className={`label ${why.tone === "accent" ? "text-oxblood-text" : ""}`}>
+        {why.label}
+      </span>
+    </div>
+  );
+}
+
 export function SearchScreen() {
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState<SearchResponse | null>(null);
@@ -109,6 +194,8 @@ export function SearchScreen() {
   }, [query]);
 
   const hits = response?.hits ?? [];
+  const groups = groupByKind(hits);
+  let position = 0;
 
   function onKeyDown(event: React.KeyboardEvent) {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -123,87 +210,94 @@ export function SearchScreen() {
   }
 
   return (
-    <div className="mx-auto flex h-full max-w-3xl flex-col gap-6 p-8">
-      <Input
+    <div className="flex h-full max-w-[1100px] flex-col px-16 pt-14 pb-24">
+      {/*
+        The query is set in the display face, large, on a single rule rather than in a
+        box: what was asked is the headline of this page, and the results are the
+        article under it (§9.0, the MUBI reference).
+      */}
+      <input
         autoFocus
         value={query}
         onChange={(e) => setQuery(e.currentTarget.value)}
         onKeyDown={onKeyDown}
-        placeholder="Search — a title, a director, or what a film is about"
+        placeholder="A title, a director, or what it is about"
         aria-label="Search the catalogue"
+        spellCheck={false}
+        // The underline IS the focus indicator: it turns oxblood when focused, so the
+        // global ring (a box) is replaced rather than removed. The size steps down as
+        // the query grows, because a sentence-long query at 46px scrolls out of sight.
+        className={`w-full border-0 border-b-2 border-line-strong bg-transparent pb-4 font-display leading-none font-semibold tracking-[-0.035em] text-ink placeholder:text-ink-faint focus:border-oxblood-bright focus-visible:outline-none ${querySize(query)}`}
       />
+      <p className="label mt-3 h-4" aria-live="polite">
+        {status(response, searching)}
+      </p>
 
-      {searching && !response && (
-        <div className="flex flex-col gap-2" aria-hidden>
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
+      <div className="mt-10">
+        {searching && !response && (
+          <div className="flex flex-col gap-3" aria-hidden>
+            <Skeleton className="h-14 w-2/3" />
+            <Skeleton className="h-8 w-1/2" />
+            <Skeleton className="h-8 w-1/2" />
+          </div>
+        )}
+
+        {error && (
+          <EmptyState title="Search failed" body={`The engine returned an error: ${error}`} />
+        )}
+
+        {response && !response.ready && (
+          <EmptyState
+            title="Still starting up"
+            body="The catalogue is opening. This takes a moment on the first search after launch."
+          />
+        )}
+
+        {/*
+          "Nothing found" is only ever said when it is TRUE. At 3% ingested it is a lie,
+          and the backend sends `catalogue_partial` precisely so this screen cannot tell
+          it — see the note on SearchResponse.
+        */}
+        {response?.ready && hits.length === 0 && !searching && (
+          <EmptyState
+            title={response.catalogue_partial ? "Still building the catalogue" : "Nothing found"}
+            body={
+              response.catalogue_partial
+                ? `${response.searchable_titles.toLocaleString()} titles are searchable so far, and more are still arriving. It may simply not be here yet.`
+                : "No title matches that. Try fewer words, or describe what the film is about."
+            }
+          />
+        )}
+
+        <div ref={rowsRef} className="flex flex-col gap-14">
+          {groups.map(([kind, group]) => (
+            <section key={kind} aria-label={KIND_LABEL[kind] ?? kind}>
+              <h2 className="label flex items-baseline justify-between border-t border-line-strong pt-3 pb-5">
+                <span className="text-ink-muted">{KIND_LABEL[kind] ?? kind}</span>
+                <span>{String(group.length).padStart(2, "0")}</span>
+              </h2>
+              <ol className="flex flex-col">
+                {group.map((hit) => {
+                  // DISPLAY order, not rank: grouping can put a lower-ranked film above a
+                  // higher-ranked series, and the arrow keys walk the DOM. Numbering,
+                  // weight and focus all follow what the eye and the keyboard see.
+                  const index = position++;
+                  return (
+                    <li key={hit.id}>
+                      <Entry
+                        hit={hit}
+                        number={index + 1}
+                        weight={index === 0 ? "lead" : index < 3 ? "second" : "list"}
+                        focused={focused === index}
+                        onFocus={() => setFocused(index)}
+                      />
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          ))}
         </div>
-      )}
-
-      {error && (
-        <EmptyState
-          title="Search failed"
-          body={`The engine returned an error: ${error}`}
-        />
-      )}
-
-      {response && !response.ready && (
-        <EmptyState
-          title="Still starting up"
-          body="The catalogue is opening. This takes a moment on the first search after launch."
-        />
-      )}
-
-      {/*
-        "Nothing found" is only ever said when it is TRUE. At 3% ingested it is a lie,
-        and the backend sends `catalogue_partial` precisely so this screen cannot tell
-        it — see the note on SearchResponse.
-      */}
-      {response?.ready && hits.length === 0 && !searching && (
-        <EmptyState
-          title={response.catalogue_partial ? "Still building the catalogue" : "Nothing found"}
-          body={
-            response.catalogue_partial
-              ? `${response.searchable_titles.toLocaleString()} titles are searchable so far, and more are still arriving. It may simply not be here yet.`
-              : "No title matches that. Try fewer words, or describe what the film is about."
-          }
-        />
-      )}
-
-      <div ref={rowsRef} className="flex flex-col gap-6">
-        {groupByKind(hits).map(([kind, group]) => (
-          <section key={kind} aria-label={KIND_LABEL[kind] ?? kind}>
-            <h2 className="mb-2 text-sm font-medium text-ink-muted">
-              {KIND_LABEL[kind] ?? kind}
-            </h2>
-            <ul className="flex flex-col">
-              {group.map((hit) => {
-                const index = hits.indexOf(hit);
-                return (
-                  <li key={hit.id}>
-                    <div
-                      data-row
-                      tabIndex={0}
-                      onFocus={() => setFocused(index)}
-                      className={`flex items-center justify-between gap-4 rounded px-3 py-2 outline-none ${
-                        focused === index ? "bg-surface-raised" : ""
-                      } focus-visible:ring-2 focus-visible:ring-accent`}
-                    >
-                      <span className="min-w-0 truncate">
-                        {hit.title}
-                        {hit.year !== null && (
-                          <span className="ml-2 text-ink-muted">{hit.year}</span>
-                        )}
-                      </span>
-                      <Badge tone={WHY[hit.why].tone}>{WHY[hit.why].label}</Badge>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        ))}
       </div>
 
       {/*
@@ -213,7 +307,7 @@ export function SearchScreen() {
         path, SPEC.md §8).
       */}
       {response?.ready && !response.semantic && (
-        <>
+        <div className="mt-14 flex flex-col gap-4">
           {hits.length > 0 && (
             <p className="text-sm text-ink-muted">
               Searching titles and people only — describing a film rather than naming it
@@ -221,7 +315,7 @@ export function SearchScreen() {
             </p>
           )}
           <MeaningDownload />
-        </>
+        </div>
       )}
     </div>
   );
