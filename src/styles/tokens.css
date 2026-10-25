@@ -120,8 +120,6 @@
   --dwell-preview: 400ms; /* before a hover preview may begin */
 
   /* ── Layout — §9.4 ──────────────────────────────────────────────────────── */
-  --rail-collapsed: 72px;
-  --rail-expanded: 240px;
   --index-col: 96px; /* the Take B index column — a layout invariant (ADR-0024) */
   --content-max: 1680px;
   --hero-height: 74vh; /* Take A's hero, per the author's choice */

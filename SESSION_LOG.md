@@ -1622,3 +1622,23 @@ filter path (1.000) are solid.
 - R4's 54 MB margin.
 - The case-study screenshots need retaking while the machine is idle.
 - 35-odd known debts, most owned by later phases.
+
+### Session 19, continued (2026-10-25) — Phases 4 and 5 closed; the masthead built
+
+**Closed.** `phase/05-search` was merged into `main` as `bf5a644` (branch CI green, run
+40152058731). Phase 4 met all seven criteria. Phase 5 carries E1 to Phase 21 and E3/E4
+to Phase 16. `phasedoc --close` was taught ADR-0036: a carried criterion stays unticked
+and is labelled, and an uncarried unmet one is still refused (seen to fail). Found at
+closing: the downloader still pointed at the `embeddings-v2` release, which today's
+format-3 reader refuses. It now points at `embeddings-v3`, and publishing that release
+is the author's job.
+
+**The masthead (ADR-0037), on `chore/masthead`.** `src/app/Masthead.tsx` replaces
+`TitleBar` and `NavRail`: wordmark, five word tabs with an oxblood underline, a labelled
+Search button with its `/` key, Settings, and window controls. The rail's state and
+tokens are gone. Six tests replace the one rail test, and one was seen to fail. At
+1024×640 it fits with about 190 px spare.
+
+**A capture-method lesson.** `PrintWindow` on a WebView2 window at 150% display scaling
+captured the page at the wrong scale. It looked like a layout overflow and wasn't. A
+headless Chrome screenshot over `vite preview`, at exact viewport sizes, settled it.

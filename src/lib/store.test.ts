@@ -3,23 +3,17 @@ import { DESTINATIONS, useUi } from "@/lib/store";
 
 describe("ui store", () => {
   beforeEach(() => {
-    useUi.setState({ destination: "home", railExpanded: true, settingsOpen: false });
+    useUi.setState({ destination: "home", settingsOpen: false });
   });
 
   it("exposes exactly the five destinations SPEC.md §3.1 requires, in order", () => {
-    // Order matters: it is the order they appear in the rail, and §3.1 fixes it.
+    // Order matters: it is the order of the masthead tabs, and §3.1 fixes it.
     expect(DESTINATIONS).toEqual(["home", "films", "tv", "watchlist", "live"]);
   });
 
   it("changes destination", () => {
     useUi.getState().setDestination("films");
     expect(useUi.getState().destination).toBe("films");
-  });
-
-  it("toggles the rail", () => {
-    expect(useUi.getState().railExpanded).toBe(true);
-    useUi.getState().toggleRail();
-    expect(useUi.getState().railExpanded).toBe(false);
   });
 
   it("keeps settings separate from destination", () => {

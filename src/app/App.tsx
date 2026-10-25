@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { TitleBar } from "@/app/TitleBar";
-import { NavRail } from "@/app/NavRail";
+import { Masthead } from "@/app/Masthead";
 import { Placeholder } from "@/app/Placeholder";
 import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { SearchScreen } from "@/features/search/SearchScreen";
@@ -71,7 +70,7 @@ export function App() {
   if (DESIGN_ROUTE) {
     return (
       <div className="flex h-full flex-col bg-base text-ink">
-        <TitleBar />
+        <Masthead searching={false} onSearchChange={() => {}} />
         <DesignGallery />
       </div>
     );
@@ -79,19 +78,16 @@ export function App() {
 
   return (
     <div className="flex h-full flex-col bg-base text-ink">
-      <TitleBar />
-      <div className="flex min-h-0 flex-1">
-        <NavRail suppressActive={searching || settingsOpen} />
-        <main className="min-w-0 flex-1 overflow-auto">
-          {settingsOpen ? (
-            <SettingsScreen />
-          ) : searching ? (
-            <SearchScreen />
-          ) : (
-            <Placeholder destination={destination} />
-          )}
-        </main>
-      </div>
+      <Masthead searching={searching} onSearchChange={setSearching} />
+      <main className="min-h-0 min-w-0 flex-1 overflow-auto">
+        {settingsOpen ? (
+          <SettingsScreen />
+        ) : searching ? (
+          <SearchScreen />
+        ) : (
+          <Placeholder destination={destination} />
+        )}
+      </main>
       <CommandPalette commands={commands} open={palette} onOpenChange={setPalette} />
     </div>
   );
