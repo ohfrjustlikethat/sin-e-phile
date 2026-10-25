@@ -1503,3 +1503,39 @@ same way. The gallery page stays blank, with no errors, in both Chrome and Edge.
 Chromium-156 hypothesis was disproved within the hour, because CI passes on 156 too.
 After three attempts the work stopped (§10.9) and the problem was recorded instead. It
 blocks nothing, since CI is the authoritative gate.
+
+### Session 19, continued (2026-10-25) — the v3 artefact lands, and lowers E3
+
+**Built and measured.** All numbers are also in `docs/eval-results.md`, Session 19.
+- The embed was reaped for low memory twice (a 13.5–14.9 GB game was running). The
+  second reap hit assembly and destroyed the in-place artefact, which raised **D52**.
+  D52 is fixed (`814fc41`): the artefact is now staged, synced, then renamed. A resume
+  then assembled all 858,170 vectors in 7 s, sha256 `106f3de1…`.
+- **D47 (option 1, SI):** `ingest compact` took the database from 4,062,978,048 to
+  3,945,598,976 bytes, recovering 111 MiB in 34 s. That is **3.946 GB, 54 MB under R4**.
+  Phase 4 E1 now has fresh evidence in both copies, and R4 records the thin margin.
+- v3 index: 119,874 vectors, 61 MB, built in 22 s. recall@10 **0.9760**, E2 **43/43**,
+  E1 p95 **15.2 ms**, filter **1.0000**.
+- **E3 meaning fell from 0.1188 to 0.0472.** The comparison is exact: `5a4b01c` was
+  rebuilt in a scratch worktree and run against the v2 backup on the same database, and
+  it reproduced 0.1188. Grief, Wong Kar-wai and neorealism fell; mountain documentaries
+  rose. v2 had been winning partly on query words that appear in titles.
+
+**Decisions.** B7 was raised as a merge block under rule 13. The author: **"keep v3"**.
+The meaning baseline is now 0.0472, and B7 is cleared. P14 is updated with the numbers,
+and its recommendation is now option 1 (amend Appendix B so a criterion can be carried
+to a named later phase). That is awaiting the author; nothing is amended.
+
+**Case study.** Screenshots were retaken and inspected. The first capture had two bad
+frames: in one, keystrokes went to the navigation before search had focus; in the
+other, the Snap Layouts flyout appeared because the pointer rested over the maximise
+button. `capture.ps1` now parks the pointer, and the rerun used longer settle and query
+waits. `docs/case-study/search.md` has new E4 captions, a section on the fifth attempt
+that made things worse, new numbers, and a corrected lesson. **E4 is not met**: neither
+named query returns a defensible page.
+
+**D53.** The author called the current UI "terrible". The search screen fails §9.0's
+own test, and no phase's deliverables include it. Proposed: fold it into Phase 18.
+
+**Next session, first:** get the author's answer on P14. Then either write the
+Appendix B amendment (ADR, schema, validator), or decide what keeps Phase 5 open.

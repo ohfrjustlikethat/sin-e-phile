@@ -92,6 +92,10 @@ try {
         $escaped = $shot.query -replace '([+^%~(){}\[\]])', '{$1}'
         [System.Windows.Forms.SendKeys]::SendWait($escaped)
 
+        # Park the pointer in the screen's corner. Resting over the maximise button, it
+        # opened Windows' Snap Layouts flyout across the results in one capture.
+        [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point 0, 0
+
         # Long enough for the 120 ms debounce, the query embedding and the search.
         Start-Sleep -Milliseconds $QueryMs
         Capture-Window -Handle $handle -Path (Join-Path $OutDir "$($shot.name).png")

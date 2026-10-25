@@ -2129,3 +2129,7 @@ redefining the criterion to fit the result, so the 0.0472 stands as measured.
 six or seven contested items in a probe set, and said explicitly that it did not
 predict nDCG@10 over the catalogue. Over the catalogue, the reordering also let
 858,170 other plots compete, and the graded answers lost.
+
+**Accepted by the author, 2026-10-25: "keep v3".** The v3 artefact ships with E3 meaning at
+0.0472, a recorded regression from v2's 0.1188, chosen deliberately over a 3-hour revert
+(B7). The baseline future phases compare against is therefore **0.0472**, not 0.1188.

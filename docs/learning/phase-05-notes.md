@@ -194,6 +194,20 @@ No code tour.
 - **A library default is not a chosen value** — `crates/vector-index/src/lib.rs:74`.
   usearch's `ef` of 64 measured 0.9400 recall@10 and missed the 0.95 gate. The sweep
   (64 → 384) is in `docs/eval-results.md`; 192 ships.
+- **Stage, sync, rename: an atomic replace** — `crates/catalogue/src/embed.rs:316-333`.
+  Writing over the real file in place meant a kill mid-write destroyed the good artefact
+  (D52). `sync_all` before `rename` makes sure the bytes are on disk before the name moves.
+- **A digest of the ids, not only the last id** — `crates/catalogue/src/index.rs:113`.
+  A watermark says where coverage ends; it can't see one title leaving and another
+  entering below it. SHA-256 over the covered ids can (D45).
+- **`VACUUM` gives back the slack** — `crates/persistence/src/db.rs:216`. Deleted and
+  rewritten rows leave free pages that SQLite reuses but never returns to the OS; 111 MiB
+  of them here. VACUUM rewrites the file, exclusively, so it runs after ingestion, never
+  at launch.
+- **SI vs binary units** — `docs/RISKS.md` R4. 4 GB is 4,000,000,000 bytes; 4 GiB is
+  4,294,967,296. Phase 4 mixed them and overstated its headroom by about 180 MB.
+- **A probe isn't the population** — `docs/eval-results.md` Session 19. Plot-first won on
+  seven contested items and lost over 858,170 documents.
 
 ## 4. The questions
 

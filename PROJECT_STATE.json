@@ -1848,16 +1848,8 @@
       ]
     }
   ],
-  "next_action": "Resolve B7 first (needs_user): revert to the v2 document layout or keep v3. If REVERT: in crates/embedding/src/document.rs set SHIPPED to Layout { synopsis_chars: 400, synopsis_first: false, people: true, strip_lead: false } (the eval's 'v2' variant in tools/eval/src/embed.rs) and bump VERSION to 4 (the exact-string unit tests must fail first, then update them); `./target/release/ingest.exe embed` (~3 h, resumable; close memory-heavy apps first, it was reaped twice), then `ingest.exe vector-index`, then `cargo run --release -p eval -- search --report` and `-- vector --report`, expecting meaning 0.1188. If KEEP: record the author's acceptance on B7 and delete it. Either way, then: rebuild the release app, run tools/shots/capture.ps1, inspect the shots, and rewrite docs/case-study/search.md's E4 sections, numbers table and the 'would have bought nothing' lesson with the Session 19 numbers. Then P14 (docs/DECISIONS_PENDING.md, now recommending option 1 with numbers). R4: the DB is 3.946 GB, 54 MB under 4 GB (SI) after compaction; the app's launch refresh erodes that.",
-  "blockers": [
-    {
-      "id": "B7",
-      "raised": "2026-10-25T00:00:00Z",
-      "needs_user": true,
-      "decide_by_phase": 5,
-      "description": "The v3 re-embed REGRESSED E3 meaning nDCG@10 from 0.1188 to 0.0472 (topical 0.1584 -> 0.0629), which blocks the merge under CLAUDE.md rule 13. Comparison is exact: pre-v3 code 5a4b01c built in a scratch worktree, run against the intact v2 artefact and today's compacted database, reproduces 0.1188, so only the artefact differs. Per query (v2 -> v3): grief 0.4770 -> 0.1505, Wong Kar-wai/Korean 0.2385 -> 0.0752, neorealism 0.2346 -> 0.0000, mountain documentaries 0.0000 -> 0.1518, the other four 0 both ways. recall@10 0.9760, E2 43/43, filter 1.0000, E1 p95 15.2 ms all hold. docs/eval-results.md Session 19. E4 names exactly the two queries that fell, so which artefact ships decides what the case-study screenshots show. AUTHOR DECIDES: (a) revert to the v2 layout (title first, 400 chars) under format 3, a ~3 h resumable re-embed, expected to reproduce 0.1188; or (b) keep v3 and accept the regression explicitly. data/ currently holds the v3 artefact and index; the v2 artefact is intact at data/embeddings-bge-small-en-v1.5-int8.v2-backup.bin (format 2, which the current reader refuses)."
-    }
-  ],
+  "next_action": "B7 resolved 2026-10-25, author: 'keep v3' - the v3 artefact ships and E3 meaning's baseline is now 0.0472 (docs/eval-results.md Session 19). Next: rebuild the release app (`npm run tauri build`), run tools/shots/capture.ps1, inspect the shots, and rewrite docs/case-study/search.md's E4 sections, numbers table and the 'would have bought nothing' lesson with the Session 19 numbers. Then P14 (docs/DECISIONS_PENDING.md, now recommending option 1 with numbers). R4: the DB is 3.946 GB, 54 MB under 4 GB (SI) after compaction; the app's launch refresh erodes that.",
+  "blockers": [],
   "decisions_pending": [
     {
       "id": "P1",
@@ -2353,6 +2345,11 @@
       "id": "D52",
       "phase_raised": 5,
       "text": "RESOLVED 2026-10-25: the embed producer wrote the artefact IN PLACE. The v3 run was reaped by Claude Code's memory monitor (a 13.5-14.9 GB game was running) during assembly, after all 858,170 vectors were in the .part file, and left a 43,504,000-byte fragment at data/embeddings-bge-small-en-v1.5-int8.bin where the good v2 artefact had been. The checksum would have refused it at load, so it could never be silently used, but the previous artefact was destroyed (the v2 backup made earlier this session is intact). Fix in crates/catalogue/src/embed.rs: assemble to <artefact>.bin.assembling, sync_all, then rename over the real path. Test a_failed_assembly_leaves_the_previous_artefact_untouched was seen to fail with the staging path set back to the real path."
+    },
+    {
+      "id": "D53",
+      "phase_raised": 5,
+      "text": "The search results screen fails SPEC.md §9.0's own test ('would this pass as a MUBI or Criterion screen?'); the author, 2026-10-25: 'as of now its terrible'. Evidence: docs/case-study/shots/01-04 - a uniform list of sans titles with identical outlined uppercase badges on every row, no display face, no artwork or typographic card, no asymmetry, uniform sizing (all on §9.0's banned or missing lists). No phase owns it: Phase 18 (browsing-surfaces) redesigns Home, Films, TV and detail pages, Phase 8 adds a minimal detail page, but the search screen is in neither deliverable list. Proposed: add the search screen to Phase 18's deliverables (a scope change, so the author decides when Phase 18 is planned), using the §9.4 typographic PosterCard rather than waiting for TMDB artwork."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."
