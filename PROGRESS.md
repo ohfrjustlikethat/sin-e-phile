@@ -16,7 +16,7 @@
 
 > Opened 2026-11-05 when Phase 6 merged (ea25da1); planned under ADR-0040 without waiting. Spike B: librqbit already prioritises a 32 MiB window ahead of each stream, so the scheduler is driven and measured rather than written; librqbit has no webseeds (Archive torrents stay HTTP) and no Windows interface binding (7.6 adds it).
 
-### Subtasks — 7/10 complete
+### Subtasks — 8/10 complete
 
 - [x] **7.1** crates/torrent: an Engine over an in-process librqbit 9 Session — data/torrents for files, session persistence and fastresume under data/, DHT on, magnet and .torrent input, add/list/pause/remove, a stats snapshot type. Config with sane defaults: bandwidth and connection limits, seeding stops at completion. · `6df5136`
 - [x] **7.2** A loopback test swarm: create a torrent from generated files (an FFmpeg test video, a sample, a readme), seed it from one session and leech from another via initial_peers. No network, no URLs, runs in CI. Every later test uses it. · `6df5136`
@@ -25,7 +25,7 @@
 - [x] **7.5** Streaming behaviour, measured: time to first bytes, seek re-prioritisation, buffer ahead of a simulated playhead under a rate-limited seeder (E3's documented floor), and a dead swarm failing fast and clearly (E4). · `6df5136`
 - [x] **7.6** Network interface binding on Windows (E7). librqbit's BindDevice returns NotSupported on Windows; vendor librqbit-dualstack-sockets 0.7.0 via [patch.crates-io] and implement it with GetAdaptersAddresses plus IP_UNICASTIF / IPV6_UNICAST_IF, so traffic stops rather than falling back when the adapter goes. Adapter listing for the UI. · `a279415`
 - [x] **7.7** Session persistence across restarts, tested by stopping and reopening a session mid-download. · `6df5136`
-- [ ] **7.8** Integration: the resolver's PlayableStream::Torrent becomes a local stream URL; per-torrent progress events to the frontend; Settings gains the network section (limits, seeding, adapter).
+- [x] **7.8** Integration: the resolver's PlayableStream::Torrent becomes a local stream URL; per-torrent progress events to the frontend; Settings gains the network section (limits, seeding, adapter). · `250dbf5`
 - [ ] **7.9** Live measurements against a legal, well-seeded torrent supplied at runtime and never committed (E1, E2), and the qBittorrent comparison on time-to-first-bytes and bulk throughput (E6), recorded in docs/eval-results.md.
 - [ ] **7.10** docs/specs/streaming-scheduler.md with a diagram (E8), the learning note, and the phase close.
 

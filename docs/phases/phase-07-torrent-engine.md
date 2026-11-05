@@ -33,7 +33,7 @@ Torrents that stream, not torrents that download. This is the hardest engineerin
 - [x] **7.5** Streaming behaviour, measured: time to first bytes, seek re-prioritisation, buffer ahead of a simulated playhead under a rate-limited seeder (E3's documented floor), and a dead swarm failing fast and clearly (E4).
 - [x] **7.6** Network interface binding on Windows (E7). librqbit's BindDevice returns NotSupported on Windows; vendor librqbit-dualstack-sockets 0.7.0 via [patch.crates-io] and implement it with GetAdaptersAddresses plus IP_UNICASTIF / IPV6_UNICAST_IF, so traffic stops rather than falling back when the adapter goes. Adapter listing for the UI.
 - [x] **7.7** Session persistence across restarts, tested by stopping and reopening a session mid-download.
-- [ ] **7.8** Integration: the resolver's PlayableStream::Torrent becomes a local stream URL; per-torrent progress events to the frontend; Settings gains the network section (limits, seeding, adapter).
+- [x] **7.8** Integration: the resolver's PlayableStream::Torrent becomes a local stream URL; per-torrent progress events to the frontend; Settings gains the network section (limits, seeding, adapter).
 - [ ] **7.9** Live measurements against a legal, well-seeded torrent supplied at runtime and never committed (E1, E2), and the qBittorrent comparison on time-to-first-bytes and bulk throughput (E6), recorded in docs/eval-results.md.
 - [ ] **7.10** docs/specs/streaming-scheduler.md with a diagram (E8), the learning note, and the phase close.
 
@@ -57,3 +57,4 @@ How BitTorrent works — pieces, swarms, DHT, rarest-first; why sequential downl
 - **7.5** Streaming behaviour, measured: time to first bytes, seek re-prioritisation, buffer ahead of a si · `6df5136`
 - **7.7** Session persistence across restarts, tested by stopping and reopening a session mid-download. · `6df5136`
 - **7.6** Network interface binding on Windows (E7). librqbit's BindDevice returns NotSupported on Windows · `a279415`
+- **7.8** Integration: the resolver's PlayableStream::Torrent becomes a local stream URL; per-torrent prog · `250dbf5`

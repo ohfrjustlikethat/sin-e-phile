@@ -2193,3 +2193,19 @@ the first open after a schema change, with the database's pages cold. The two ru
 it are the comparable ones and sit either side of the Phase 5 figure. Recorded rather than
 dropped, because a cold first search is what a user sees after an update, and it is still
 inside the 80 ms budget.
+
+## Phase 7 — Torrent engine (2026-11-05)
+
+Live, against the official Ubuntu 24.04 desktop torrent fetched at run time (never
+committed), over this machine's connection (routed through a VPN), commit `250dbf5`,
+`target/release/examples/bench.exe <torrent> <scratch> [bulk-seconds]`:
+
+| Run | add → first 1 MiB via local HTTP (E1 proxy, < 8 s) | seek to 60% → 1 MiB (E2, < 5 s) | bulk |
+|---|---|---|---|
+| 1 | **9.58 s** — over | **2.17 s** | 31.87 MiB/s over 60 s, 52 peers |
+| 2 | **15.37 s** — over | **0.84 s** | 12.48 MiB/s over 5 s |
+| 3 | failed: the first range read returned 181 bytes (an error response), not investigated yet | — | — |
+
+**E1 is not met on this run:** first bytes took 9.6–15.4 s against an 8 s target (Spike B
+measured 3.3–5.3 s on a different torrent). E2 is met. Run 3's short read needs
+diagnosis before E1 can be re-measured. qBittorrent comparison (E6) not yet run.
