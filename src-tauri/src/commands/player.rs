@@ -51,7 +51,9 @@ pub async fn player_open(
     target: String,
     start: Option<f64>,
 ) -> Result<(), String> {
-    let rt = runtime(&app, &state)?;
+    tracing::info!(%target, ?start, "player open");
+    let rt = runtime(&app, &state)
+        .inspect_err(|e| tracing::error!(error = %e, "player could not start"))?;
     rt.player.load(&target, start).map_err(err)?;
     rt.host.lock().expect("host").show();
     Ok(())
@@ -235,5 +237,22 @@ pub async fn state_loop(app: AppHandle) {
         if let Some(rt) = app.state::<AppState>().player() {
             let _ = app.emit("player-state", view(&rt));
         }
+    }
+}
+
+/// Debug builds only: `SINEPHILE_AUTOPLAY=<address or path>` plays it on launch, so the
+/// real window can be checked without driving the UI. Compiled out of release builds.
+#[tauri::command]
+#[specta::specta]
+pub async fn dev_autoplay() -> Result<Option<String>, String> {
+    #[cfg(debug_assertions)]
+    {
+        let v = std::env::var("SINEPHILE_AUTOPLAY").ok();
+        tracing::info!(autoplay = ?v, "dev autoplay asked");
+        Ok(v)
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Ok(None)
     }
 }

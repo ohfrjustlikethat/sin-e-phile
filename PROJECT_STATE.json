@@ -45,14 +45,14 @@
       {
         "id": "8.6",
         "text": "Position saving on exit and resume on reopen, per profile, across restarts.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "63ded9f"
       },
       {
         "id": "8.7",
         "text": "A minimal detail page — title, year, synopsis, cast, a Play button through the resolver — with the torrent started as soon as the page opens (Phase 7 E1, D61).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "63ded9f"
       },
       {
         "id": "8.8",
@@ -1183,14 +1183,14 @@
         {
           "id": "8.6",
           "text": "Position saving on exit and resume on reopen, per profile, across restarts.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "63ded9f"
         },
         {
           "id": "8.7",
           "text": "A minimal detail page — title, year, synopsis, cast, a Play button through the resolver — with the torrent started as soon as the page opens (Phase 7 E1, D61).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "63ded9f"
         },
         {
           "id": "8.8",

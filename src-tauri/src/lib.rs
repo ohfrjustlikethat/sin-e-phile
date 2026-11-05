@@ -71,6 +71,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::player::player_resume_video,
             commands::player::player_close,
             commands::player::player_state,
+            commands::player::dev_autoplay,
             commands::playback::item_detail,
             commands::playback::prepare_play,
             commands::playback::save_position,

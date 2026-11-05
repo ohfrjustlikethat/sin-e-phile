@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Masthead } from "@/app/Masthead";
 import { PlayerScreen } from "@/features/player/PlayerScreen";
 import { DetailScreen } from "@/features/detail/DetailScreen";
+import { useDropToPlay } from "@/features/player/useDropToPlay";
 import { Placeholder } from "@/app/Placeholder";
 import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { SearchScreen } from "@/features/search/SearchScreen";
@@ -24,6 +25,7 @@ export function App() {
   const { destination, settingsOpen, setDestination, setSettingsOpen } = useUi();
   const playing = useUi((s) => s.playing);
   const detail = useUi((s) => s.detail);
+  useDropToPlay();
   const [palette, setPalette] = useState(false);
   const [searching, setSearching] = useState(false);
 

@@ -143,6 +143,11 @@ export const commands = {
 	ended: boolean,
 	tracks: TrackView[],
 } | null, string>(__TAURI_INVOKE("player_state")),
+	/**
+	 *  Debug builds only: `SINEPHILE_AUTOPLAY=<address or path>` plays it on launch, so the
+	 *  real window can be checked without driving the UI. Compiled out of release builds.
+	 */
+	devAutoplay: () => typedError<string | null, string>(__TAURI_INVOKE("dev_autoplay")),
 	itemDetail: (id: number) => typedError<{
 	id: number,
 	title: string,

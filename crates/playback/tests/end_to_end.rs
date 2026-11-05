@@ -27,6 +27,7 @@ fn offline(dir: &Path) -> EngineConfig {
     c.dht = false;
     c.trackers = false;
     c.lsd = false;
+    c.loopback_only = true;
     c.seeding = SeedingPolicy::KeepSeeding;
     c.dead_swarm_after = Duration::from_secs(10);
     c
