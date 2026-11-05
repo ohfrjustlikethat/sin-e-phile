@@ -1,7 +1,7 @@
 {
   "spec_version": "3.0.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-11-05",
+  "last_updated": "2026-11-06",
   "sessions_completed": 20,
   "current_phase": {
     "number": 7,
@@ -63,14 +63,14 @@
       {
         "id": "7.9",
         "text": "Live measurements against a legal, well-seeded torrent supplied at runtime and never committed (E1, E2), and the qBittorrent comparison on time-to-first-bytes and bulk throughput (E6), recorded in docs/eval-results.md.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "01be3d8"
       },
       {
         "id": "7.10",
         "text": "docs/specs/streaming-scheduler.md with a diagram (E8), the learning note, and the phase close.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "01be3d8"
       }
     ],
     "exit_criteria": [
@@ -1101,14 +1101,14 @@
         {
           "id": "7.9",
           "text": "Live measurements against a legal, well-seeded torrent supplied at runtime and never committed (E1, E2), and the qBittorrent comparison on time-to-first-bytes and bulk throughput (E6), recorded in docs/eval-results.md.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "01be3d8"
         },
         {
           "id": "7.10",
           "text": "docs/specs/streaming-scheduler.md with a diagram (E8), the learning note, and the phase close.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "01be3d8"
         }
       ]
     },
@@ -2573,6 +2573,21 @@
       "id": "D59",
       "phase_raised": 6,
       "text": "The Sources settings screen was audited from headless-Chrome renders with a fake IPC bridge (scratch harness, not committed) at 1440x900 and 1024x640, and restyled once (1749551). It has not been seen in the real WebView2 window; the Phase 18 overhaul covers Settings."
+    },
+    {
+      "id": "D60",
+      "phase_raised": 7,
+      "text": "Phase 3's sources_config table (migration 0004) was superseded by Phase 6's source_backends and addons (migration 0015) and is unused. Drop it in a migration when the schema is next touched."
+    },
+    {
+      "id": "D61",
+      "phase_raised": 7,
+      "text": "Phase 7 E1 is carried to Phase 8: first-peer discovery takes 2-55 s on this network. Levers for Phase 8: start the torrent when the detail page opens, and persist DHT state sooner than librqbit's 60 s dump so a warm routing table survives short sessions."
+    },
+    {
+      "id": "D62",
+      "phase_raised": 7,
+      "text": "tools/bench/qbittorrent_compare.py assumes qBittorrent at C:\\Program Files\\qBittorrent and Web UI port 18081; it is a measurement script, not a product feature, and ADR-0029's qBittorrent backend (Phase 13) must not reuse its throwaway-profile approach."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

@@ -2238,3 +2238,9 @@ network (a VPN, no inbound connections), not the scheduler. Bulk throughput is l
 **E1 (< 8 s): not reliably met** — met in 4 of 20 runs. Carried to Phase 8 under ADR-0036,
 where first frame is measured end to end and the torrent can be started when the detail
 page opens, so peer discovery overlaps with the user reading rather than following Play.
+
+### Regression check before merging Phase 7 (rule 13)
+
+2026-11-06, release build at `01be3d8`: E2 **43/43**; E3 meaning **0.0472**, filter **1.0000**;
+E1 warm p50 / p95 **6.5 / 14.9 ms** (the first run after a rebuild read 13.8 / 44.7 ms with cold
+pages, as in Phase 6); HNSW recall@10 **0.9760**. Unchanged from Phase 6.

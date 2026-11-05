@@ -1724,3 +1724,38 @@ fixed, and Phase 5's carried criteria verified intact.
 existing focus system; a ten-foot focus treatment; a Phase 8 exit criterion (browse,
 play, pause, seek, leave with only a controller) and a Phase 18 one (every screen, with a
 D-pad on-screen keyboard).
+
+### Session 21 (2026-11-05 to 2026-11-06) — Phase 7, the torrent engine
+
+**Built.** `crates/torrent`: the engine over librqbit 9.0.1, the loopback streaming server,
+file selection, settings, the play step; Windows adapter binding through a vendored
+`librqbit-dualstack-sockets` (`[patch.crates-io]`); a two-engine test swarm on loopback;
+`examples/bench.rs` and `tools/bench/qbittorrent_compare.py`; Settings → Network; six thin
+commands and a progress event. The protocol's torrent stream gained optional trackers.
+
+**Numbers.** E3: a player never waited at 1.5× the bitrate and starved by 2.27 s at 0.7×.
+E5: byte-identical ranges and full stream. Live, 20 runs on the Ubuntu desktop torrent:
+seek 0.15–3.73 s (E2 met); first MiB 3.6 s at best but 9.6–55 s in most runs, all of it
+first-peer discovery (E1 carried to 8). Against qBittorrent on the same torrent: 3.58 s vs
+13.08 s to the first MiB, 33.85 vs 34.71 MiB/s bulk (E6 met).
+
+**Bugs the checks caught.** The streaming server promised `206` before opening the reader
+(a live run got 181 bytes); it now opens first and answers `503`. The guard refused magnet
+and tracker-announce strings in code and tests; the engine adds a bare info hash with the
+source's trackers instead, so it never builds a link. The
+seeder in the test swarm needed its output folder to be the content root, because an
+explicit folder holds files without a torrent-named subfolder.
+
+#### Phase 7 retrospective
+
+**Went well.** Reading librqbit before writing anything kept the phase small: the
+scheduler already existed, and the two real gaps — Windows binding and the seeding
+policy — were found by reading, not by failing in production. Building the swarm on
+loopback made every streaming claim testable in CI, including the bad cases.
+
+**Went badly.** Back-to-back live runs degraded through the day, and three attempts at
+E1 (fresh state, kept state, uTP) did not move it; the qBittorrent comparison was what
+showed the cause is the swarm and network, and it should have been run first.
+
+**Carry forward.** E1 and E7 to Phase 8 (D61; E7 needs the author to drop the VPN
+mid-download). D60 (dead `sources_config` table), D62.

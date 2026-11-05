@@ -15,14 +15,14 @@ Torrents that stream, not torrents that download. This is the hardest engineerin
 
 ## Exit criteria
 
-- [ ] **E1** Playback begins in < 8 s on a healthy swarm (measured against a legal, well-seeded Internet Archive or Linux ISO torrent).
-- [ ] **E2** Seeking to an unbuffered region resumes playback in < 5 s.
+- [ ] **E1** Playback begins in < 8 s on a healthy swarm (measured against a legal, well-seeded Internet Archive or Linux ISO torrent). — *carried to Phase 8*
+- [x] **E2** Seeking to an unbuffered region resumes playback in < 5 s.
 - [x] **E3** Sequential mode never starves — the buffer ahead of the playhead is maintained under a documented bandwidth floor.
 - [x] **E4** Correct behaviour on a dead swarm: clear, fast failure, not an indefinite hang.
 - [x] **E5** Range requests are byte-correct — verified by streaming a file and comparing its hash to a full download.
-- [ ] **E6** Measured against qBittorrent on both axes and both numbers published: time-to-first-frame on a healthy swarm, and sustained bulk throughput on the same torrent. Losing on bulk is a finding, not a failure — ADR-0029 exists so the project does not have to win that comparison — but the comparison must be made rather than left implicit.
-- [ ] **E7** Binding to a specific network interface works, verified by disabling that adapter mid-download and confirming traffic stops rather than falling back.
-- [ ] **E8** `docs/specs/streaming-scheduler.md` explains the algorithm with a diagram.
+- [x] **E6** Measured against qBittorrent on both axes and both numbers published: time-to-first-frame on a healthy swarm, and sustained bulk throughput on the same torrent. Losing on bulk is a finding, not a failure — ADR-0029 exists so the project does not have to win that comparison — but the comparison must be made rather than left implicit.
+- [ ] **E7** Binding to a specific network interface works, verified by disabling that adapter mid-download and confirming traffic stops rather than falling back. — *carried to Phase 8*
+- [x] **E8** `docs/specs/streaming-scheduler.md` explains the algorithm with a diagram.
 
 ## Subtasks
 
@@ -34,8 +34,8 @@ Torrents that stream, not torrents that download. This is the hardest engineerin
 - [x] **7.6** Network interface binding on Windows (E7). librqbit's BindDevice returns NotSupported on Windows; vendor librqbit-dualstack-sockets 0.7.0 via [patch.crates-io] and implement it with GetAdaptersAddresses plus IP_UNICASTIF / IPV6_UNICAST_IF, so traffic stops rather than falling back when the adapter goes. Adapter listing for the UI.
 - [x] **7.7** Session persistence across restarts, tested by stopping and reopening a session mid-download.
 - [x] **7.8** Integration: the resolver's PlayableStream::Torrent becomes a local stream URL; per-torrent progress events to the frontend; Settings gains the network section (limits, seeding, adapter).
-- [ ] **7.9** Live measurements against a legal, well-seeded torrent supplied at runtime and never committed (E1, E2), and the qBittorrent comparison on time-to-first-bytes and bulk throughput (E6), recorded in docs/eval-results.md.
-- [ ] **7.10** docs/specs/streaming-scheduler.md with a diagram (E8), the learning note, and the phase close.
+- [x] **7.9** Live measurements against a legal, well-seeded torrent supplied at runtime and never committed (E1, E2), and the qBittorrent comparison on time-to-first-bytes and bulk throughput (E6), recorded in docs/eval-results.md.
+- [x] **7.10** docs/specs/streaming-scheduler.md with a diagram (E8), the learning note, and the phase close.
 
 ## Risks named by this phase
 
@@ -58,3 +58,5 @@ How BitTorrent works — pieces, swarms, DHT, rarest-first; why sequential downl
 - **7.7** Session persistence across restarts, tested by stopping and reopening a session mid-download. · `6df5136`
 - **7.6** Network interface binding on Windows (E7). librqbit's BindDevice returns NotSupported on Windows · `a279415`
 - **7.8** Integration: the resolver's PlayableStream::Torrent becomes a local stream URL; per-torrent prog · `250dbf5`
+- **7.9** Live measurements against a legal, well-seeded torrent supplied at runtime and never committed ( · `01be3d8`
+- **7.10** docs/specs/streaming-scheduler.md with a diagram (E8), the learning note, and the phase close. · `01be3d8`
