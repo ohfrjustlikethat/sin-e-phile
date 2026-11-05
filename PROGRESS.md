@@ -10,49 +10,27 @@
 
 ## Where we are right now
 
-**Phase 7 — Torrent Engine and Streaming Server** (`in_progress`, branch `phase/07-torrent-engine`)
+**Phase 8 — Player Core — MILESTONE: FIRST DEMOABLE BUILD** (`in_progress`, branch `phase/08-player-core`)
 
-6 of 8 exit criteria met with evidence.
+0 of 7 exit criteria met with evidence.
 
-> Opened 2026-11-05 when Phase 6 merged (ea25da1); planned under ADR-0040 without waiting. Spike B: librqbit already prioritises a 32 MiB window ahead of each stream, so the scheduler is driven and measured rather than written; librqbit has no webseeds (Archive torrents stay HTTP) and no Windows interface binding (7.6 adds it).
-
-### Subtasks — 10/10 complete
-
-- [x] **7.1** crates/torrent: an Engine over an in-process librqbit 9 Session — data/torrents for files, session persistence and fastresume under data/, DHT on, magnet and .torrent input, add/list/pause/remove, a stats snapshot type. Config with sane defaults: bandwidth and connection limits, seeding stops at completion. · `6df5136`
-- [x] **7.2** A loopback test swarm: create a torrent from generated files (an FFmpeg test video, a sample, a readme), seed it from one session and leech from another via initial_peers. No network, no URLs, runs in CI. Every later test uses it. · `6df5136`
-- [x] **7.3** File selection within multi-file torrents: the main video, never the sample or the readme, and the requested episode when S/E is given. A pure function with a table of real-world-shaped layouts. · `6df5136`
-- [x] **7.4** The local streaming server: loopback only, a random per-session token in every path, HTTP Range (206, Content-Range, 416) over librqbit's FileStream, so libmpv treats a torrent as a file. E5: a full stream and random ranges hash-identical to the source. · `6df5136`
-- [x] **7.5** Streaming behaviour, measured: time to first bytes, seek re-prioritisation, buffer ahead of a simulated playhead under a rate-limited seeder (E3's documented floor), and a dead swarm failing fast and clearly (E4). · `6df5136`
-- [x] **7.6** Network interface binding on Windows (E7). librqbit's BindDevice returns NotSupported on Windows; vendor librqbit-dualstack-sockets 0.7.0 via [patch.crates-io] and implement it with GetAdaptersAddresses plus IP_UNICASTIF / IPV6_UNICAST_IF, so traffic stops rather than falling back when the adapter goes. Adapter listing for the UI. · `a279415`
-- [x] **7.7** Session persistence across restarts, tested by stopping and reopening a session mid-download. · `6df5136`
-- [x] **7.8** Integration: the resolver's PlayableStream::Torrent becomes a local stream URL; per-torrent progress events to the frontend; Settings gains the network section (limits, seeding, adapter). · `250dbf5`
-- [x] **7.9** Live measurements against a legal, well-seeded torrent supplied at runtime and never committed (E1, E2), and the qBittorrent comparison on time-to-first-bytes and bulk throughput (E6), recorded in docs/eval-results.md. · `01be3d8`
-- [x] **7.10** docs/specs/streaming-scheduler.md with a diagram (E8), the learning note, and the phase close. · `01be3d8`
+> Opened 2026-11-06 when Phase 7 merged (125a0a2). Carried in from Phase 7: E1 (start under 8 s; D61) and E7 (the live VPN-drop check, which needs the author).
 
 ### Exit criteria
 
-- [ ] **E1** Playback begins in < 8 s on a healthy swarm (measured against a legal, well-seeded Internet Archive or Linux ISO torrent).
-      - *Evidence:* MEASURED 2026-11-06, carried (ADR-0036): add -> first 1 MiB through the local streaming server, Ubuntu 24.04 desktop torrent fetched at run time: 3.6-3.8 s in 4 of 20 runs, 9.6-55 s in the rest; once a peer is connected the first MiB takes 0.6-3.4 s, the time is all first-peer discovery. qBittorrent on the same torrent minutes apart: 13.1 s. docs/eval-results.md 'Phase 7'.
-- [x] **E2** Seeking to an unbuffered region resumes playback in < 5 s.
-      - *Evidence:* cargo run --release -p sinephile-torrent --example bench (e45152a and later): seek to 60% of an unbuffered 6 GB torrent and read 1 MiB through the local server in 0.15-3.73 s across 18 live runs, all under 5 s; loopback test a_seek_into_an_unbuffered_region_is_served_quickly. docs/eval-results.md 'Phase 7'.
-- [x] **E3** Sequential mode never starves — the buffer ahead of the playhead is maintained under a documented bandwidth floor.
-      - *Evidence:* cargo test -p sinephile-torrent --test buffer (6df5136): a simulated player reading at 2 MiB/s in 256 KiB chunks after a 2 s start-up buffer, over a loopback swarm whose seeder is capped at 1.5x the bitrate, waited 0 ns for any chunk (floor documented in docs/specs/streaming-scheduler.md: bandwidth >= 1.5x bitrate, 2 s buffer, lateness <= 250 ms). Negative control in the same file: at 0.7x the bitrate the same player starved by 2.27 s.
-- [x] **E4** Correct behaviour on a dead swarm: clear, fast failure, not an indefinite hang.
-      - *Evidence:* cargo test -p sinephile-torrent --test swarm a_dead_swarm_fails_fast_with_a_clear_error (6df5136): with the only peer a closed port, wait_for_peers returns 'nobody is sharing this — no peers answered within 3 seconds' in under 5 s, and a streaming request through the local server ends instead of hanging; a magnet's metadata wait is bounded by the same dead_swarm_after (default 30 s). Seen to fail with the wait removed (the request hung past the 10 s guard).
-- [x] **E5** Range requests are byte-correct — verified by streaming a file and comparing its hash to a full download.
-      - *Evidence:* cargo test -p sinephile-torrent --test swarm the_stream_is_byte_identical_to_the_source_whole_and_in_ranges (6df5136): over a loopback swarm, 20 random byte ranges fetched while the torrent was still downloading, a suffix range and the full GET through the local streaming server are all byte-for-byte identical to the source file (stricter than comparing hashes); 416 with Content-Range past the end; a wrong token is 404. Seen to fail with an off-by-one in the body length.
-- [x] **E6** Measured against qBittorrent on both axes and both numbers published: time-to-first-frame on a healthy swarm, and sustained bulk throughput on the same torrent. Losing on bulk is a finding, not a failure — ADR-0029 exists so the project does not have to win that comparison — but the comparison must be made rather than left implicit.
-      - *Evidence:* docs/eval-results.md 'Phase 7', E6 table: same torrent, same connection, minutes apart — sin-e-phile 3.58 s to first MiB and 33.85 MiB/s bulk (bench example); qBittorrent 5.2.0 13.08 s and 34.71 MiB/s (python tools/bench/qbittorrent_compare.py, throwaway profile). Both published.
-- [ ] **E7** Binding to a specific network interface works, verified by disabling that adapter mid-download and confirming traffic stops rather than falling back.
-      - *Evidence:* MEASURED 2026-11-05, carried (ADR-0036): crates/torrent/tests/binding.rs (a279415) — an unknown adapter stops the engine starting; bound to loopback, local traffic flows and an outside address is unreachable (seen to fail with IP_UNICAST_IF removed). Probe: bound to the VPN adapter a connection succeeds, bound to a disconnected adapter it fails WSAENETUNREACH instead of using Wi-Fi.
-- [x] **E8** `docs/specs/streaming-scheduler.md` explains the algorithm with a diagram.
-      - *Evidence:* docs/specs/streaming-scheduler.md: the algorithm, where scheduling happens, the bandwidth floor with its measurements, and a diagram of the path from player to sockets.
+- [ ] **E1** A user can search, click, and watch — from a local file, from the Internet Archive backend, and from a configured P2P source.
+- [ ] **E2** Playback of 4K HEVC HDR uses hardware decode (verified in logs and by CPU usage).
+- [ ] **E3** Seeking is frame-accurate and responsive.
+- [ ] **E4** Position resume works across app restarts.
+- [ ] **E5** With only an Xbox controller, a user can browse to a film, start it, pause, seek and leave the player — tested with a simulated gamepad in CI and confirmed once by the author with a real controller.
+- [ ] **E6** A demo GIF of this flow exists and is in the README.
+- [ ] **E7** Tag `phase-08`, and celebrate — this is the first thing worth showing anyone.
 
 ---
 
 ## What's next
 
-Phases 4 and 5 are closed (merge bf5a644). The masthead is built on branch chore/masthead and merges to main once CI is green. Next: plan Phase 6 (source-resolver). Read SPEC.md §15 Phase 6, author its subtasks in PROJECT_STATE.json (both copies), and present the plan before code. AUTHOR ACTIONS OUTSTANDING: (1) publish data/embeddings-bge-small-en-v1.5-int8.bin as GitHub release embeddings-v3, because the downloader already points there and v2 can't be read; (2) with the machine idle, run `powershell -ExecutionPolicy Bypass -File tools/shots/capture.ps1 -SettleMs 9000 -QueryMs 3500` so the case-study shots show the current search screen.
+Plan Phase 8 (player core) per SPEC.md §15 Phase 8 and ADR-0020/0021/0041: libmpv embedded into a child HWND (spikes/spike-a-libmpv), custom chrome with region cutouts and still-frame-on-pause, keyboard and Xbox-controller control, position resume, a minimal detail page, and search -> detail -> resolve -> play end to end. Write the subtasks into PROJECT_STATE.json and start (ADR-0040). Carried in: Phase 7 E1 (start the torrent when the detail page opens; D61) and E7 (author's VPN-drop check). Author actions outstanding: publish embeddings-v3; retake case-study shots; E7.
 
 ---
 
@@ -75,8 +53,8 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 4 | Metadata Backbone | A | 3 | 2–3 | 7/7 |
 | [x] | 5 | Semantic Search Engine | A | 4 | 2 | 2/5 |
 | [x] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 6/6 |
-| [~] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 6/8 |
-| [ ] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 0/7 |
+| [x] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 6/8 |
+| [~] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 0/7 |
 | [ ] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 0/6 |
 | [ ] | 10 | Subtitle Pipeline | B | 8 | 2 | 0/6 |
 | [ ] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 0/5 |
