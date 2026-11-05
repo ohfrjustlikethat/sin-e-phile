@@ -57,8 +57,8 @@
       {
         "id": "6.8",
         "text": "AddonBackend: an addon is a manifest plus a remote service speaking the protocol's find/resolve JSON endpoints. Responses size-capped and time-limited like manifests.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "ebaba3f"
       },
       {
         "id": "6.9",
@@ -95,8 +95,8 @@
       {
         "id": "E3",
         "text": "A malformed or hostile addon manifest is rejected with a clear error and cannot crash or hang the app.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "Manifest: crates/source-protocol/tests/hostile_manifests.rs — 25 hostile fixtures each refused by its own named rule, 50 MB / 64K-bracket / bad-UTF-8 inputs refused in <250 ms, 10,000 seeded mutations with no panic (commit ff88924; seen to fail with same-host, depth and bidi checks removed). Fetch: crates/metadata-api/tests/untrusted_http.rs — body cap enforced with no or a lying Content-Length, no redirects (9036577; seen to fail). Addon at runtime: crates/sources/tests/addons.rs a_hostile_addon_costs_only_itself — a redirecting, a 5 MB-flooding and a 30 s-stalling addon each fail alone and the search returns in ~8 s, the default timeout; a_stored_manifest_that_no_longer_passes_is_not_loaded; wire.rs a_remote_stream_may_never_name_a_local_file (ebaba3f; seen to fail with redirects accepted, the stored-manifest recheck removed, and file streams allowed). Panics: resolver a_panicking_backend_fails_alone (6f99ed7)."
       },
       {
         "id": "E4",
@@ -885,8 +885,8 @@
         {
           "id": "E3",
           "text": "A malformed or hostile addon manifest is rejected with a clear error and cannot crash or hang the app.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "Manifest: crates/source-protocol/tests/hostile_manifests.rs — 25 hostile fixtures each refused by its own named rule, 50 MB / 64K-bracket / bad-UTF-8 inputs refused in <250 ms, 10,000 seeded mutations with no panic (commit ff88924; seen to fail with same-host, depth and bidi checks removed). Fetch: crates/metadata-api/tests/untrusted_http.rs — body cap enforced with no or a lying Content-Length, no redirects (9036577; seen to fail). Addon at runtime: crates/sources/tests/addons.rs a_hostile_addon_costs_only_itself — a redirecting, a 5 MB-flooding and a 30 s-stalling addon each fail alone and the search returns in ~8 s, the default timeout; a_stored_manifest_that_no_longer_passes_is_not_loaded; wire.rs a_remote_stream_may_never_name_a_local_file (ebaba3f; seen to fail with redirects accepted, the stored-manifest recheck removed, and file streams allowed). Panics: resolver a_panicking_backend_fails_alone (6f99ed7)."
         },
         {
           "id": "E4",
@@ -953,8 +953,8 @@
         {
           "id": "6.8",
           "text": "AddonBackend: an addon is a manifest plus a remote service speaking the protocol's find/resolve JSON endpoints. Responses size-capped and time-limited like manifests.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "ebaba3f"
         },
         {
           "id": "6.9",
