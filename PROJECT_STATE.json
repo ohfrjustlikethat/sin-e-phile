@@ -51,8 +51,8 @@
       {
         "id": "6.7",
         "text": "E2 evidence: a live query resolves to a stream URL that ffprobe decodes; command and output recorded in docs/eval-results.md.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "fc50bf4"
       },
       {
         "id": "6.8",
@@ -947,8 +947,8 @@
         {
           "id": "6.7",
           "text": "E2 evidence: a live query resolves to a stream URL that ffprobe decodes; command and output recorded in docs/eval-results.md.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "fc50bf4"
         },
         {
           "id": "6.8",
