@@ -4,6 +4,7 @@
 //! `persistence/`." Every statement in the application is in one of these
 //! modules, and `tools/guard` enforces that none appears under `src-tauri/`.
 
+pub mod backfill;
 pub mod catalogue;
 pub mod credentials;
 pub mod episodes;
@@ -12,6 +13,7 @@ pub mod profiles;
 pub mod search;
 pub mod sources;
 
+pub use backfill::{BackfillRepository, BackfilledRow};
 pub use catalogue::{
     CatalogueRepository, PendingArticle, Readiness, StepProgress, WikipediaRepository, CORE_TIER,
     MIN_SYNOPSIS,

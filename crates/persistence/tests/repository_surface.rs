@@ -22,9 +22,9 @@ use sinephile_persistence::archive::Archiver;
 use sinephile_persistence::model::EpisodeNumbering;
 use sinephile_persistence::repositories::profiles::PlaybackPosition;
 use sinephile_persistence::repositories::{
-    CatalogueRepository, CredentialRepository, DirectLinkRepository, EpisodeRepository,
-    MatchReason, MediaRepository, ProfileRepository, Readiness, Sample, SearchRepository,
-    SourceRepository, TmdbAccess, WikipediaRepository,
+    BackfillRepository, CatalogueRepository, CredentialRepository, DirectLinkRepository,
+    EpisodeRepository, MatchReason, MediaRepository, ProfileRepository, Readiness, Sample,
+    SearchRepository, SourceRepository, TmdbAccess, WikipediaRepository,
 };
 use sinephile_persistence::{Db, IdSource, MediaKind, NewMediaItem, TitleVariant};
 
@@ -911,4 +911,68 @@ async fn direct_link_repository_surface() {
         "already gone"
     );
     assert_eq!(repo.all().await.unwrap().len(), 1);
+}
+
+/// `BackfillRepository` (Phase 6, ADR-0030 layer 3, migration 0017).
+#[tokio::test]
+async fn backfill_repository_surface() {
+    let db = Db::in_memory().await.expect("open");
+    let repo = BackfillRepository::new(&db);
+    let media = MediaRepository::new(&db);
+    let search = SearchRepository::new(&db);
+
+    // existing — sees an ordinary catalogue row by its normalised title
+    let real = media
+        .insert(&NewMediaItem::film("Metropolis", 1927))
+        .await
+        .expect("film");
+    sqlx::query("UPDATE titles SET normalised = 'metropolis' WHERE media_item_id = ?")
+        .bind(real)
+        .execute(db.pool())
+        .await
+        .unwrap();
+    assert_eq!(
+        repo.existing("METROPOLIS!", Some(1927))
+            .await
+            .expect("existing"),
+        Some(real)
+    );
+    assert_eq!(
+        repo.existing("Metropolis", Some(2001)).await.unwrap(),
+        None,
+        "another year"
+    );
+
+    // create_film — findable by all three text tiers at once
+    let id = repo
+        .create_film("Häxan", Some(1922), "internet-archive")
+        .await
+        .expect("create_film");
+    assert_eq!(repo.existing("haxan", Some(1922)).await.unwrap(), Some(id));
+    let exact = search.exact_title("Haxan", 5).await.expect("exact");
+    assert_eq!(exact.first().map(|h| h.media_item_id), Some(id));
+    assert!(search
+        .keyword("häxan", 5)
+        .await
+        .unwrap()
+        .iter()
+        .any(|h| h.media_item_id == id));
+    assert!(search
+        .fuzzy("haxxan", 5)
+        .await
+        .unwrap()
+        .iter()
+        .any(|h| h.media_item_id == id));
+    assert!(
+        repo.create_film("  ", None, "x").await.is_err(),
+        "an empty title"
+    );
+
+    // all — only the marked rows
+    let rows = repo.all().await.expect("all");
+    assert_eq!(rows.len(), 1);
+    assert_eq!(
+        (rows[0].id, rows[0].from.as_str()),
+        (id, "internet-archive")
+    );
 }

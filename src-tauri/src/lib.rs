@@ -57,6 +57,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::sources::links_import,
             commands::sources::links_add,
             commands::sources::links_remove,
+            commands::sources::search_backfill,
         ])
         // `AssetProgress` travels as an EVENT payload, so no command signature mentions it
         // and specta would not export it. Registered explicitly rather than hand-written in

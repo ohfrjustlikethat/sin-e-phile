@@ -271,3 +271,40 @@ pub async fn links_remove(state: State<'_, AppState>, id: i32) -> Result<(), Str
         .map(|_| ())
         .map_err(|e| e.to_string())
 }
+
+/// A film a source found for a search the catalogue missed, now in the catalogue.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct Backfilled {
+    #[specta(type = i32)]
+    pub id: i64,
+    pub title: String,
+    pub year: u16,
+    /// The source's name, for "found by …".
+    pub found_by: String,
+}
+
+/// Ask the sources about a search that found nothing (ADR-0030 layer 3).
+///
+/// A separate command, called by the search screen only after it has SHOWN the empty
+/// result, so a search is never slower for it.
+#[tauri::command]
+#[specta::specta]
+pub async fn search_backfill(
+    state: State<'_, AppState>,
+    query: String,
+) -> Result<Option<Backfilled>, String> {
+    let db = db(&state)?;
+    let (ctx, _) = context(&state, &db).await?;
+    let resolver = sinephile_sources::registry::resolver_from(&db, all(&ctx))
+        .await
+        .map_err(|e| e.to_string())?;
+    let made = sinephile_sources::backfill::backfill(&db, &resolver, &query)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(made.map(|b| Backfilled {
+        found_by: overview::display_name(&b.from, &ctx.addons),
+        id: b.id,
+        title: b.title,
+        year: b.year,
+    }))
+}

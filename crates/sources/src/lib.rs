@@ -9,6 +9,7 @@
 
 pub mod addons;
 pub mod backends;
+pub mod backfill;
 pub mod links;
 pub mod merge;
 pub mod overview;

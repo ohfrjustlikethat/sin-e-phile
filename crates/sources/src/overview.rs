@@ -47,6 +47,18 @@ fn built_in(id: &str) -> Option<(&'static str, &'static str)> {
     })
 }
 
+/// What to call a backend in a sentence: "Found in Internet Archive".
+pub fn display_name(id: &str, addons: &[(Url, Manifest)]) -> String {
+    if let Some((name, _)) = built_in(id) {
+        return name.to_string();
+    }
+    addons
+        .iter()
+        .find(|(_, m)| backend_id(m) == id)
+        .map(|(_, m)| m.name.clone())
+        .unwrap_or_else(|| id.to_string())
+}
+
 /// The health line. Counts, phrased: no score, because a score would need a meaning
 /// Phase 9 has not given it yet.
 pub fn health_line(row: &BackendRow) -> String {

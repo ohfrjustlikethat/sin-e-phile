@@ -63,8 +63,8 @@
       {
         "id": "6.9",
         "text": "UI, Settings -> Sources: backend list (enable, order, health); paste a manifest URL, see in plain language what it declares, confirm, enable, with no raw JSON in the primary path; a catalogue browser over a user-supplied URL (no default ships).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "1136e78"
       },
       {
         "id": "6.10",
@@ -959,8 +959,8 @@
         {
           "id": "6.9",
           "text": "UI, Settings -> Sources: backend list (enable, order, health); paste a manifest URL, see in plain language what it declares, confirm, enable, with no raw JSON in the primary path; a catalogue browser over a user-supplied URL (no default ships).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "1136e78"
         },
         {
           "id": "6.10",

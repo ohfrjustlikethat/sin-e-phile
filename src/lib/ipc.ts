@@ -95,6 +95,19 @@ export const commands = {
 	/**  Add one link from the form's three fields. */
 	linksAdd: (title: string, year: number | null, url: string) => typedError<number, string>(__TAURI_INVOKE("links_add", { title, year, url })),
 	linksRemove: (id: number) => typedError<null, string>(__TAURI_INVOKE("links_remove", { id })),
+	/**
+	 *  Ask the sources about a search that found nothing (ADR-0030 layer 3).
+	 * 
+	 *  A separate command, called by the search screen only after it has SHOWN the empty
+	 *  result, so a search is never slower for it.
+	 */
+	searchBackfill: (query: string) => typedError<{
+	id: number,
+	title: string,
+	year: number,
+	/**  The source's name, for "found by …". */
+	found_by: string,
+} | null, string>(__TAURI_INVOKE("search_backfill", { query })),
 };
 
 /* Types */
@@ -141,6 +154,15 @@ export type AssetProgress = {
 	phase: string,
 	done_bytes: number,
 	total_bytes: number,
+};
+
+/**  A film a source found for a search the catalogue missed, now in the catalogue. */
+export type Backfilled = {
+	id: number,
+	title: string,
+	year: number,
+	/**  The source's name, for "found by …". */
+	found_by: string,
 };
 
 /**  What a tier permits. Features ask about a `Capability`, never about hardware. */
