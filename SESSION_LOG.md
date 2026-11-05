@@ -1699,3 +1699,28 @@ implementation of the protocol is still the stronger E5 test, the local backend 
 filename backfill wait for Phase 12, and the Sources screen needs a look in the real
 window. The author actions from Session 19 are still open: publish `embeddings-v3`, and
 retake the case-study screenshots.
+
+### Session 20, continued (2026-11-05) — Phase 6 merged; the working style pivots
+
+**Merged.** `phase/06-source-resolver` → `main` as `ea25da1`, tagged `phase-06`. Branch CI
+had gone red once on gitleaks' full-history scan reading the protocol's example
+candidate keys as API keys; ADR-0039 allowlists the two exact values (per ADR-0035), and
+run 42044625303 was green. Two unpushed commits that had tried renaming the keys (which
+gitleaks flagged too) were dropped with a soft reset, so they never reached history.
+
+**The pivot (spec_version 3.0.0).** The author: "make correct and most decisions, only
+leave very hard and detrimental to the entire app decisions for me … keep starting and
+finishing and testing and running and finalising and uploading to git yourself", with a
+two-day target for the rest of the app. ADR-0040 and amendment A29 remove every rule that
+*waited* for the author — plan approval, spec-amendment approval, stop-after-three, the
+blocking understanding gate — and keep every rule that *checks* the work. ADR-0040
+reserves five kinds of decision for the author. The pre-push checklist is written into
+SPEC §10.5 and CLAUDE.md, and `.githooks/pre-push` now runs gitleaks over the full
+history when it is installed (seen to fail with a stand-in that reports a leak).
+`build_state.py` was dropping ADR-0036's carried fields when it rebuilt the phase table;
+fixed, and Phase 5's carried criteria verified intact.
+
+**An Xbox controller as a remote (ADR-0041, A30).** The Gamepad API in WebView2 over the
+existing focus system; a ten-foot focus treatment; a Phase 8 exit criterion (browse,
+play, pause, seek, leave with only a controller) and a Phase 18 one (every screen, with a
+D-pad on-screen keyboard).

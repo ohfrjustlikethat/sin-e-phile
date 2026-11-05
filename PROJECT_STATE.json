@@ -1,5 +1,5 @@
 {
-  "spec_version": "2.0.0",
+  "spec_version": "3.0.0",
   "project": "sin-e-phile",
   "last_updated": "2026-11-05",
   "sessions_completed": 20,
@@ -1016,12 +1016,18 @@
         },
         {
           "id": "E5",
-          "text": "A demo GIF of this flow exists and is in the README.",
+          "text": "With only an Xbox controller, a user can browse to a film, start it, pause, seek and leave the player — tested with a simulated gamepad in CI and confirmed once by the author with a real controller.",
           "met": false,
           "evidence": null
         },
         {
           "id": "E6",
+          "text": "A demo GIF of this flow exists and is in the README.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E7",
           "text": "Tag `phase-08`, and celebrate — this is the first thing worth showing anyone.",
           "met": false,
           "evidence": null
@@ -1504,12 +1510,18 @@
         },
         {
           "id": "E8",
-          "text": "The design lint passes in CI, and each of its rules has been seen to fail.",
+          "text": "Every screen is usable with an Xbox controller alone, search included through an on-screen keyboard built for the D-pad (ADR-0041).",
           "met": false,
           "evidence": null
         },
         {
           "id": "E9",
+          "text": "The design lint passes in CI, and each of its rules has been seen to fail.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E10",
           "text": "The author signs off the screenshot review set (every surface, both sizes, with and without artwork) against §9.0's test: `manual: <what they reviewed and said>`. This set supplies the README's screenshots.",
           "met": false,
           "evidence": null
@@ -2108,6 +2120,16 @@
     {
       "id": "0039",
       "title": "Two example candidate keys are gitleaks false positives",
+      "date": "2026-11-05"
+    },
+    {
+      "id": "0040",
+      "title": "Autonomous delivery: Claude decides, builds, verifies and ships; the author is asked only about what could sink the app",
+      "date": "2026-11-05"
+    },
+    {
+      "id": "0041",
+      "title": "An Xbox controller drives the whole app, like a remote",
       "date": "2026-11-05"
     }
   ],

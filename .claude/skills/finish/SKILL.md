@@ -29,6 +29,8 @@ written late have slipped past a mid-session format twice now.
 python tools/guard/guard.py --tree
 python tools/guard/guard.py --selftest
 python tools/guard/secretscan.py --tree
+# the scan CI runs; the pre-push hook runs it too when gitleaks is installed
+gitleaks detect --source . --redact --no-banner --exit-code 1
 ```
 
 ## 3. The state is true

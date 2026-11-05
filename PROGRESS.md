@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 2.0.0** · 20 session(s) completed · last updated 2026-11-05
+**Spec version 3.0.0** · 20 session(s) completed · last updated 2026-11-05
 
 ---
 
@@ -55,7 +55,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 5 | Semantic Search Engine | A | 4 | 2 | 2/5 |
 | [x] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 6/6 |
 | [~] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 0/8 |
-| [ ] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 0/6 |
+| [ ] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 0/7 |
 | [ ] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 0/6 |
 | [ ] | 10 | Subtitle Pipeline | B | 8 | 2 | 0/6 |
 | [ ] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 0/5 |
@@ -65,7 +65,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [ ] | 15 | Taste Model | B | 5, 14 | 2 | 0/5 |
 | [ ] | 16 | Recommendation Engine | B | 15 | 2–3 | 0/6 |
 | [ ] | 17 | Discovery Engine | B | 16 | 2 | 0/6 |
-| [ ] | 18 | Browsing Surfaces 🏁 | B | 17 | 4–5 | 0/9 |
+| [ ] | 18 | Browsing Surfaces 🏁 | B | 17 | 4–5 | 0/10 |
 | [ ] | 19 | Watchlist and External Sync | C | 18 | 1–2 | 0/5 |
 | [ ] | 20 | Windows Platform Integration | C | 12, 18 | 2–3 | 0/5 |
 | [ ] | 21 | Performance Engineering and the Low-End Path | B | 18 (20 optional) | 2 | 0/4 |

@@ -63,7 +63,7 @@ approach. Read `SPEC.md` §15's entry for N+1 to author its subtasks.
 
 Fires at **tier boundaries only** — end of Phase 8, end of Phase 18, the end of
 whatever tier the author stops at, or on request (ADR-0016 A2). At a gate, ask the
-accumulated self-check questions in chat and wait for real answers. Otherwise the
+accumulated self-check questions in chat, and keep developing while they are answered (ADR-0040). Otherwise the
 questions are written and left to accumulate.
 
 If the phase just closed ends a tier, say so and suggest running Phase 27 so the
