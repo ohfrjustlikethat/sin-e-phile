@@ -1,7 +1,7 @@
 {
   "spec_version": "2.0.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-10-25",
+  "last_updated": "2026-11-05",
   "sessions_completed": 19,
   "current_phase": {
     "number": 6,
@@ -10,8 +10,75 @@
     "status": "in_progress",
     "branch": "phase/06-source-resolver",
     "started_at": "2026-10-25T12:00:00Z",
-    "note": "Opened 2026-10-25 when Phases 4 and 5 closed together in merge bf5a644. Subtasks are not yet authored: read SPEC.md §15 Phase 6 and plan them before any code. Carried in: nothing from Phase 4; from Phase 5, E1 goes to Phase 21 and E3/E4 to Phase 16, not here.",
-    "subtasks": [],
+    "note": "Planned 2026-11-05 and approved by the author. Addon model: manifest plus a remote service speaking the protocol (option a); backfill built minimally here from backend-reported title and year.",
+    "subtasks": [
+      {
+        "id": "6.1",
+        "text": "crates/source-protocol (MIT OR Apache-2.0, no Tauri, no network): the SPEC.md §6.1 SourceBackend trait via async-trait, and MediaQuery, SourceCandidate (quality, language, codec, size, health, provenance), PlayableStream, BackendCapabilities. The addon manifest types, JSON Schema at docs/schemas/addon-manifest.schema.json, and a parse-only validator.",
+        "status": "not_started",
+        "commit": null
+      },
+      {
+        "id": "6.2",
+        "text": "Manifest hardening (E3): 64 KiB cap, depth and string-length limits, https only (plain http for loopback), every endpoint on the manifest's own host, a protocol version field. A corpus of hostile manifests plus a randomised no-panic test.",
+        "status": "not_started",
+        "commit": null
+      },
+      {
+        "id": "6.3",
+        "text": "crates/sources (GPL): the resolver. Queries every enabled backend concurrently, each under its own timeout, then dedups and merges. A deliberately slow backend must not delay the others, proved by a timing test seen to fail with the timeout removed (E4).",
+        "status": "not_started",
+        "commit": null
+      },
+      {
+        "id": "6.4",
+        "text": "Backend registry: enable/disable, ordering, per-backend health (successes, failures, mean latency), persisted by migration with repository_surface.rs lines for every new method.",
+        "status": "not_started",
+        "commit": null
+      },
+      {
+        "id": "6.5",
+        "text": "LocalFileBackend (stub until Phase 12) and DirectHttpBackend (user-supplied URLs and M3U). Each added by one file plus one registration line, the diff checked (E1).",
+        "status": "not_started",
+        "commit": null
+      },
+      {
+        "id": "6.6",
+        "text": "InternetArchiveBackend: public-domain feature-film search, then item metadata to a playable file. Tested against recorded responses, plus an ignored live test.",
+        "status": "not_started",
+        "commit": null
+      },
+      {
+        "id": "6.7",
+        "text": "E2 evidence: a live query resolves to a stream URL that ffprobe decodes; command and output recorded in docs/eval-results.md.",
+        "status": "not_started",
+        "commit": null
+      },
+      {
+        "id": "6.8",
+        "text": "AddonBackend: an addon is a manifest plus a remote service speaking the protocol's find/resolve JSON endpoints. Responses size-capped and time-limited like manifests.",
+        "status": "not_started",
+        "commit": null
+      },
+      {
+        "id": "6.9",
+        "text": "UI, Settings -> Sources: backend list (enable, order, health); paste a manifest URL, see in plain language what it declares, confirm, enable, with no raw JSON in the primary path; a catalogue browser over a user-supplied URL (no default ships).",
+        "status": "not_started",
+        "commit": null
+      },
+      {
+        "id": "6.10",
+        "text": "Search-triggered backfill (ADR-0030), minimal: when search misses and the resolver finds a candidate, a background write creates a media_items row marked as backfilled, from the title and year the backend reports. Filename parsing and IMDb merge stay with Phase 12.",
+        "status": "not_started",
+        "commit": null
+      },
+      {
+        "id": "6.11",
+        "text": "docs/specs/addon-protocol.md written for a third party, tested by implementing a throwaway backend from it alone (E5); repository-wide guard over tree and history, seen to fail (E6).",
+        "status": "not_started",
+        "commit": null
+      }
+    ],
     "exit_criteria": [
       {
         "id": "E1",
@@ -838,6 +905,74 @@
           "text": "Repository-wide grep confirms zero indexer names or URLs anywhere, including tests and docs.",
           "met": false,
           "evidence": null
+        }
+      ],
+      "subtasks": [
+        {
+          "id": "6.1",
+          "text": "crates/source-protocol (MIT OR Apache-2.0, no Tauri, no network): the SPEC.md §6.1 SourceBackend trait via async-trait, and MediaQuery, SourceCandidate (quality, language, codec, size, health, provenance), PlayableStream, BackendCapabilities. The addon manifest types, JSON Schema at docs/schemas/addon-manifest.schema.json, and a parse-only validator.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "6.2",
+          "text": "Manifest hardening (E3): 64 KiB cap, depth and string-length limits, https only (plain http for loopback), every endpoint on the manifest's own host, a protocol version field. A corpus of hostile manifests plus a randomised no-panic test.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "6.3",
+          "text": "crates/sources (GPL): the resolver. Queries every enabled backend concurrently, each under its own timeout, then dedups and merges. A deliberately slow backend must not delay the others, proved by a timing test seen to fail with the timeout removed (E4).",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "6.4",
+          "text": "Backend registry: enable/disable, ordering, per-backend health (successes, failures, mean latency), persisted by migration with repository_surface.rs lines for every new method.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "6.5",
+          "text": "LocalFileBackend (stub until Phase 12) and DirectHttpBackend (user-supplied URLs and M3U). Each added by one file plus one registration line, the diff checked (E1).",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "6.6",
+          "text": "InternetArchiveBackend: public-domain feature-film search, then item metadata to a playable file. Tested against recorded responses, plus an ignored live test.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "6.7",
+          "text": "E2 evidence: a live query resolves to a stream URL that ffprobe decodes; command and output recorded in docs/eval-results.md.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "6.8",
+          "text": "AddonBackend: an addon is a manifest plus a remote service speaking the protocol's find/resolve JSON endpoints. Responses size-capped and time-limited like manifests.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "6.9",
+          "text": "UI, Settings -> Sources: backend list (enable, order, health); paste a manifest URL, see in plain language what it declares, confirm, enable, with no raw JSON in the primary path; a catalogue browser over a user-supplied URL (no default ships).",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "6.10",
+          "text": "Search-triggered backfill (ADR-0030), minimal: when search misses and the resolver finds a candidate, a background write creates a media_items row marked as backfilled, from the title and year the backend reports. Filename parsing and IMDb merge stay with Phase 12.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "6.11",
+          "text": "docs/specs/addon-protocol.md written for a third party, tested by implementing a throwaway backend from it alone (E5); repository-wide guard over tree and history, seen to fail (E6).",
+          "status": "not_started",
+          "commit": null
         }
       ]
     },
