@@ -39,8 +39,8 @@
       {
         "id": "6.5",
         "text": "LocalFileBackend (stub until Phase 12) and DirectHttpBackend (user-supplied URLs and M3U). Each added by one file plus one registration line, the diff checked (E1).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "bd80a1f"
       },
       {
         "id": "6.6",
@@ -83,8 +83,8 @@
       {
         "id": "E1",
         "text": "Adding a new backend requires implementing one trait and registering it — no changes elsewhere.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "Commit bd80a1f adds LocalFileBackend as crates/sources/src/backends/local.rs plus its registration in backends/mod.rs (git show --stat bd80a1f: 2 files, +98 -3) and touches nothing else; the resolver, registry and property tests (crates/sources/tests/backends.rs, every_backend_has_a_unique_well_formed_id, committed earlier in d234361) picked it up unedited. The registry discovers backends only through backends::all()."
       },
       {
         "id": "E2",
@@ -873,8 +873,8 @@
         {
           "id": "E1",
           "text": "Adding a new backend requires implementing one trait and registering it — no changes elsewhere.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "Commit bd80a1f adds LocalFileBackend as crates/sources/src/backends/local.rs plus its registration in backends/mod.rs (git show --stat bd80a1f: 2 files, +98 -3) and touches nothing else; the resolver, registry and property tests (crates/sources/tests/backends.rs, every_backend_has_a_unique_well_formed_id, committed earlier in d234361) picked it up unedited. The registry discovers backends only through backends::all()."
         },
         {
           "id": "E2",
@@ -935,8 +935,8 @@
         {
           "id": "6.5",
           "text": "LocalFileBackend (stub until Phase 12) and DirectHttpBackend (user-supplied URLs and M3U). Each added by one file plus one registration line, the diff checked (E1).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "bd80a1f"
         },
         {
           "id": "6.6",

@@ -12,17 +12,17 @@
 
 **Phase 6 — Source Resolver and Addon Protocol** (`in_progress`, branch `phase/06-source-resolver`)
 
-1 of 6 exit criteria met with evidence.
+2 of 6 exit criteria met with evidence.
 
 > Planned 2026-11-05 and approved by the author. Addon model: manifest plus a remote service speaking the protocol (option a); backfill built minimally here from backend-reported title and year.
 
-### Subtasks — 3/11 complete
+### Subtasks — 5/11 complete
 
 - [x] **6.1** crates/source-protocol (MIT OR Apache-2.0, no Tauri, no network): the SPEC.md §6.1 SourceBackend trait via async-trait, and MediaQuery, SourceCandidate (quality, language, codec, size, health, provenance), PlayableStream, BackendCapabilities. The addon manifest types, JSON Schema at docs/schemas/addon-manifest.schema.json, and a parse-only validator. · `ff88924`
 - [x] **6.2** Manifest hardening (E3): 64 KiB cap, depth and string-length limits, https only (plain http for loopback), every endpoint on the manifest's own host, a protocol version field. A corpus of hostile manifests plus a randomised no-panic test. · `ff88924`
 - [x] **6.3** crates/sources (GPL): the resolver. Queries every enabled backend concurrently, each under its own timeout, then dedups and merges. A deliberately slow backend must not delay the others, proved by a timing test seen to fail with the timeout removed (E4). · `6f99ed7`
-- [ ] **6.4** Backend registry: enable/disable, ordering, per-backend health (successes, failures, mean latency), persisted by migration with repository_surface.rs lines for every new method.
-- [ ] **6.5** LocalFileBackend (stub until Phase 12) and DirectHttpBackend (user-supplied URLs and M3U). Each added by one file plus one registration line, the diff checked (E1).
+- [x] **6.4** Backend registry: enable/disable, ordering, per-backend health (successes, failures, mean latency), persisted by migration with repository_surface.rs lines for every new method. · `a024811`
+- [x] **6.5** LocalFileBackend (stub until Phase 12) and DirectHttpBackend (user-supplied URLs and M3U). Each added by one file plus one registration line, the diff checked (E1). · `bd80a1f`
 - [ ] **6.6** InternetArchiveBackend: public-domain feature-film search, then item metadata to a playable file. Tested against recorded responses, plus an ignored live test.
 - [ ] **6.7** E2 evidence: a live query resolves to a stream URL that ffprobe decodes; command and output recorded in docs/eval-results.md.
 - [ ] **6.8** AddonBackend: an addon is a manifest plus a remote service speaking the protocol's find/resolve JSON endpoints. Responses size-capped and time-limited like manifests.
@@ -32,7 +32,8 @@
 
 ### Exit criteria
 
-- [ ] **E1** Adding a new backend requires implementing one trait and registering it — no changes elsewhere.
+- [x] **E1** Adding a new backend requires implementing one trait and registering it — no changes elsewhere.
+      - *Evidence:* Commit bd80a1f adds LocalFileBackend as crates/sources/src/backends/local.rs plus its registration in backends/mod.rs (git show --stat bd80a1f: 2 files, +98 -3) and touches nothing else; the resolver, registry and property tests (crates/sources/tests/backends.rs, every_backend_has_a_unique_well_formed_id, committed earlier in d234361) picked it up unedited. The registry discovers backends only through backends::all().
 - [ ] **E2** The Internet Archive backend returns real, playable results.
 - [ ] **E3** A malformed or hostile addon manifest is rejected with a clear error and cannot crash or hang the app.
 - [x] **E4** Backend timeout: one slow backend never delays results from the others.
@@ -66,7 +67,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 5/5 |
 | [x] | 4 | Metadata Backbone | A | 3 | 2–3 | 7/7 |
 | [x] | 5 | Semantic Search Engine | A | 4 | 2 | 2/5 |
-| [~] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 1/6 |
+| [~] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 2/6 |
 | [ ] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 0/8 |
 | [ ] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 0/6 |
 | [ ] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 0/6 |

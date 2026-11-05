@@ -15,7 +15,7 @@ The `SourceBackend` trait (§6.1) and its types: `MediaQuery`, `SourceCandidate`
 
 ## Exit criteria
 
-- [ ] **E1** Adding a new backend requires implementing one trait and registering it — no changes elsewhere.
+- [x] **E1** Adding a new backend requires implementing one trait and registering it — no changes elsewhere.
 - [ ] **E2** The Internet Archive backend returns real, playable results.
 - [ ] **E3** A malformed or hostile addon manifest is rejected with a clear error and cannot crash or hang the app.
 - [x] **E4** Backend timeout: one slow backend never delays results from the others.
@@ -27,8 +27,8 @@ The `SourceBackend` trait (§6.1) and its types: `MediaQuery`, `SourceCandidate`
 - [x] **6.1** crates/source-protocol (MIT OR Apache-2.0, no Tauri, no network): the SPEC.md §6.1 SourceBackend trait via async-trait, and MediaQuery, SourceCandidate (quality, language, codec, size, health, provenance), PlayableStream, BackendCapabilities. The addon manifest types, JSON Schema at docs/schemas/addon-manifest.schema.json, and a parse-only validator.
 - [x] **6.2** Manifest hardening (E3): 64 KiB cap, depth and string-length limits, https only (plain http for loopback), every endpoint on the manifest's own host, a protocol version field. A corpus of hostile manifests plus a randomised no-panic test.
 - [x] **6.3** crates/sources (GPL): the resolver. Queries every enabled backend concurrently, each under its own timeout, then dedups and merges. A deliberately slow backend must not delay the others, proved by a timing test seen to fail with the timeout removed (E4).
-- [ ] **6.4** Backend registry: enable/disable, ordering, per-backend health (successes, failures, mean latency), persisted by migration with repository_surface.rs lines for every new method.
-- [ ] **6.5** LocalFileBackend (stub until Phase 12) and DirectHttpBackend (user-supplied URLs and M3U). Each added by one file plus one registration line, the diff checked (E1).
+- [x] **6.4** Backend registry: enable/disable, ordering, per-backend health (successes, failures, mean latency), persisted by migration with repository_surface.rs lines for every new method.
+- [x] **6.5** LocalFileBackend (stub until Phase 12) and DirectHttpBackend (user-supplied URLs and M3U). Each added by one file plus one registration line, the diff checked (E1).
 - [ ] **6.6** InternetArchiveBackend: public-domain feature-film search, then item metadata to a playable file. Tested against recorded responses, plus an ignored live test.
 - [ ] **6.7** E2 evidence: a live query resolves to a stream URL that ffprobe decodes; command and output recorded in docs/eval-results.md.
 - [ ] **6.8** AddonBackend: an addon is a manifest plus a remote service speaking the protocol's find/resolve JSON endpoints. Responses size-capped and time-limited like manifests.
@@ -48,3 +48,5 @@ Trait objects and `async_trait` in Rust; designing an interface you can't change
 - **6.1** crates/source-protocol (MIT OR Apache-2.0, no Tauri, no network): the SPEC.md §6.1 SourceBackend · `ff88924`
 - **6.2** Manifest hardening (E3): 64 KiB cap, depth and string-length limits, https only (plain http for  · `ff88924`
 - **6.3** crates/sources (GPL): the resolver. Queries every enabled backend concurrently, each under its o · `6f99ed7`
+- **6.4** Backend registry: enable/disable, ordering, per-backend health (successes, failures, mean latenc · `a024811`
+- **6.5** LocalFileBackend (stub until Phase 12) and DirectHttpBackend (user-supplied URLs and M3U). Each  · `bd80a1f`
