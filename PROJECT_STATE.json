@@ -2,7 +2,7 @@
   "spec_version": "2.0.0",
   "project": "sin-e-phile",
   "last_updated": "2026-11-05",
-  "sessions_completed": 19,
+  "sessions_completed": 20,
   "current_phase": {
     "number": 6,
     "slug": "source-resolver",
@@ -2439,6 +2439,36 @@
       "id": "D53",
       "phase_raised": 5,
       "text": "RESCOPED 2026-10-25 into SPEC.md Phase 18 (spec_version 2.0.0, A25/A27, ADR-0037). The author: 'the design still isn't amazing, i want the home, film, tv show etc tabs to be on top, i want a search button too'. Done in Phase 5 (cff9cdb): the search screen uses the Phase 2 type system, with bylines from SearchRepository::details, a lead excerpt, visible keyboard focus and display-order numbering. MASTHEAD BUILT 2026-10-25 ahead of Phase 18 at the author's request (branch chore/masthead): src/app/Masthead.tsx replaces TitleBar and NavRail, with 6 tests (one seen to fail); it fits at 1024x640 with about 190 px spare (headless Chrome over `vite preview`). Owned by Phase 18 now: mockups before code, the artwork-free state as primary, no placeholder screens, a design lint in CI, motion, and an author-signed screenshot review set. Still open from Phase 5: the case-study screenshots need retaking with the machine idle (tools/shots/capture.ps1 refuses to type unless the app is in front)."
+    },
+    {
+      "id": "D54",
+      "phase_raised": 6,
+      "text": "The Internet Archive's items also carry an 'Archive BitTorrent' file and, often, machine-generated SubRip subtitles (seen in NightOfTheLivingDead-MPEG). The Phase 6 backend ignores both: the torrent is Phase 7's (a second, P2P candidate for the same film), the subtitles Phase 10's."
+    },
+    {
+      "id": "D55",
+      "phase_raised": 6,
+      "text": "A valid Archive candidate can be briefly unreachable: on 2026-11-05 one download redirected to a storage node whose name did not resolve, and minutes later to one that did (docs/eval-results.md, Phase 6 E2). Phase 8's player must treat a failed open as 'try the next candidate', not as the film being unavailable, and the resolver's health record should count it."
+    },
+    {
+      "id": "D56",
+      "phase_raised": 6,
+      "text": "E5's example addon (tools/protocol/example_addon.py) was written by the same author as the protocol code, against the document. An implementation by someone outside the project is still the stronger test of 'a third party could implement a backend from it alone'; Phase 27 is a natural moment to ask for one."
+    },
+    {
+      "id": "D57",
+      "phase_raised": 6,
+      "text": "LocalFileBackend.find returns nothing until Phase 12's library scanner exists; it is registered now so order and settings already include it. Search backfill builds only from backend-reported titles and years; filename parsing and merging a backfilled row into an IMDb match are Phase 12's (docs/specs/catalogue-freshness.md layer 3)."
+    },
+    {
+      "id": "D58",
+      "phase_raised": 6,
+      "text": "metadata-api's FakeTransport returns queued responses LAST-IN-FIRST-OUT, although its doc comment said first-in-first-out. catalogue/tests/anime.rs depends on the stack order, so the comment was corrected rather than the behaviour (commit 9036577). Any new test queuing several responses must push them in reverse."
+    },
+    {
+      "id": "D59",
+      "phase_raised": 6,
+      "text": "The Sources settings screen was audited from headless-Chrome renders with a fake IPC bridge (scratch harness, not committed) at 1440x900 and 1024x640, and restyled once (1749551). It has not been seen in the real WebView2 window; the Phase 18 overhaul covers Settings."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

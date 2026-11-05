@@ -4,10 +4,11 @@
 local film library behind one semantic search engine and a discovery-first
 recommender.**
 
-> **Status: Phases 0–5 of 28 closed — the shell, the design system, the data layer,
-> the metadata backbone, and hybrid search.** The catalogue is real: 2.7 million titles
-> ingested offline from public datasets, with no API key of any kind, and searchable by
-> title, person, filter and meaning. Nothing plays yet; that's Phases 6–8.
+> **Status: Phases 0–6 of 28 closed — the shell, the design system, the data layer,
+> the metadata backbone, hybrid search, and the source resolver.** The catalogue is real:
+> 2.7 million titles ingested offline from public datasets, with no API key of any kind,
+> searchable by title, person, filter and meaning, and the app can now find where a film
+> can be watched. Nothing plays yet; that's Phases 7–8.
 > This README describes what is being built and is updated at
 > the end of every phase that changes what the app can do. It is never allowed to
 > over-claim; the [feature list](#what-actually-works-today) below says exactly what
@@ -218,15 +219,15 @@ off means the pause overlay shows the full cast list, beautifully.
 
 ## What actually works today
 
-**Phases 0–5 — the shell, the design system, the catalogue, and search.** Nothing
-plays yet. Honestly:
+**Phases 0–6 — the shell, the design system, the catalogue, search, and sources.**
+Nothing plays yet. Honestly:
 
 - ✅ Posture guard, secret scanner, and prerequisite doctor — all three verified by
   deliberately planted failures
-- ✅ CI on `windows-latest`; git hooks; GPL-3.0; specification at 1.4.0 with 24 ADRs recorded
+- ✅ CI on `windows-latest`; git hooks; GPL-3.0; specification at 2.0.0 with 38 ADRs recorded
 - ✅ Machine-readable project state for all 28 phases, generated from the spec and
   schema-validated so a criterion cannot be marked done without evidence
-- ✅ A Tauri window that opens, with a custom title bar and hardware tier detection.
+- ✅ A Tauri window that opens, with a top masthead for navigation and hardware tier detection.
   Cold start measured to the first painted frame — 515ms and 660ms across two
   release runs — not to the point where the window handle exists, which would
   have been a flattering and dishonest 267ms
@@ -253,6 +254,19 @@ plays yet. Honestly:
   target, after five attempts; the last one, a full re-embed, made it worse. The
   [case study](docs/case-study/search.md) shows the failures with screenshots and
   explains them. This criterion is carried to Phase 16, not hidden.
+- ✅ Sources: one interface that every source implements, a resolver that asks them all
+  at once and never lets a slow one hold up the rest, and per-source health in plain
+  words. Built in: the Internet Archive's public-domain films (a live query found
+  *Night of the Living Dead*, and FFmpeg decoded the stream), your own links and M3U
+  playlists, and a placeholder for local files.
+- ✅ Addons, described by a declarative manifest and served by someone else: paste an
+  address, read what it claims in sentences, confirm. Everything an addon sends is
+  parsed as hostile — a corpus of 25 hostile manifests, 10,000 random mutations, and an
+  addon that redirects, floods or stalls each fail alone. The
+  [protocol](docs/specs/addon-protocol.md) is written for outside authors, with an
+  example addon and a conformance test. **The app still ships no content sources.**
+- ✅ A search the catalogue misses but a source can answer becomes a catalogue entry,
+  marked as such, so an out-of-date catalogue is not a dead end.
 - ⬜ Everything else described above this section
 
 ---

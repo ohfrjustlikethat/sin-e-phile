@@ -277,3 +277,19 @@ too complex or went too fast, and the response is to simplify, not to proceed.
 **Tier A/B/C/D** *(Phase 0)* — The legitimate stopping points in `SPEC.md`
 Appendix E. **Tier B (Phases 9–18, 21, 27) is the definition of done.** A finished
 Tier B project beats an abandoned Tier D one, always.
+
+**Source / backend** *(Phase 6)* — Anything that can say where a film can be watched:
+your files, the Internet Archive, your own links, an addon. Each implements the one
+`SourceBackend` interface (`SPEC.md` §6.1).
+
+**Candidate** *(Phase 6)* — One way to watch one thing, as a source reports it: a file,
+a link, a swarm, with its quality, languages and size.
+
+**Resolver** *(Phase 6)* — The part that asks every source at once, each on its own
+clock, and merges what comes back.
+
+**Addon** *(Phase 6)* — A source someone else runs, described by a **manifest**: a small
+JSON document naming it and its two endpoints. Data, never code (ADR-0038).
+
+**Backfill** *(Phase 6)* — A catalogue entry created because a search missed and a
+source found the film anyway (ADR-0030 layer 3). Marked, so it can be reconciled.

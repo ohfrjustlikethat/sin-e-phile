@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 2.0.0** · 19 session(s) completed · last updated 2026-11-05
+**Spec version 2.0.0** · 20 session(s) completed · last updated 2026-11-05
 
 ---
 
@@ -12,11 +12,11 @@
 
 **Phase 6 — Source Resolver and Addon Protocol** (`in_progress`, branch `phase/06-source-resolver`)
 
-4 of 6 exit criteria met with evidence.
+6 of 6 exit criteria met with evidence.
 
 > Planned 2026-11-05 and approved by the author. Addon model: manifest plus a remote service speaking the protocol (option a); backfill built minimally here from backend-reported title and year.
 
-### Subtasks — 10/11 complete
+### Subtasks — 11/11 complete
 
 - [x] **6.1** crates/source-protocol (MIT OR Apache-2.0, no Tauri, no network): the SPEC.md §6.1 SourceBackend trait via async-trait, and MediaQuery, SourceCandidate (quality, language, codec, size, health, provenance), PlayableStream, BackendCapabilities. The addon manifest types, JSON Schema at docs/schemas/addon-manifest.schema.json, and a parse-only validator. · `ff88924`
 - [x] **6.2** Manifest hardening (E3): 64 KiB cap, depth and string-length limits, https only (plain http for loopback), every endpoint on the manifest's own host, a protocol version field. A corpus of hostile manifests plus a randomised no-panic test. · `ff88924`
@@ -28,7 +28,7 @@
 - [x] **6.8** AddonBackend: an addon is a manifest plus a remote service speaking the protocol's find/resolve JSON endpoints. Responses size-capped and time-limited like manifests. · `ebaba3f`
 - [x] **6.9** UI, Settings -> Sources: backend list (enable, order, health); paste a manifest URL, see in plain language what it declares, confirm, enable, with no raw JSON in the primary path; a catalogue browser over a user-supplied URL (no default ships). · `1136e78`
 - [x] **6.10** Search-triggered backfill (ADR-0030), minimal: when search misses and the resolver finds a candidate, a background write creates a media_items row marked as backfilled, from the title and year the backend reports. Filename parsing and IMDb merge stay with Phase 12. · `61ab278`
-- [ ] **6.11** docs/specs/addon-protocol.md written for a third party, tested by implementing a throwaway backend from it alone (E5); repository-wide guard over tree and history, seen to fail (E6).
+- [x] **6.11** docs/specs/addon-protocol.md written for a third party, tested by implementing a throwaway backend from it alone (E5); repository-wide guard over tree and history, seen to fail (E6). · `4e81c94`
 
 ### Exit criteria
 
@@ -40,8 +40,10 @@
       - *Evidence:* Manifest: crates/source-protocol/tests/hostile_manifests.rs — 25 hostile fixtures each refused by its own named rule, 50 MB / 64K-bracket / bad-UTF-8 inputs refused in <250 ms, 10,000 seeded mutations with no panic (commit ff88924; seen to fail with same-host, depth and bidi checks removed). Fetch: crates/metadata-api/tests/untrusted_http.rs — body cap enforced with no or a lying Content-Length, no redirects (9036577; seen to fail). Addon at runtime: crates/sources/tests/addons.rs a_hostile_addon_costs_only_itself — a redirecting, a 5 MB-flooding and a 30 s-stalling addon each fail alone and the search returns in ~8 s, the default timeout; a_stored_manifest_that_no_longer_passes_is_not_loaded; wire.rs a_remote_stream_may_never_name_a_local_file (ebaba3f; seen to fail with redirects accepted, the stored-manifest recheck removed, and file streams allowed). Panics: resolver a_panicking_backend_fails_alone (6f99ed7).
 - [x] **E4** Backend timeout: one slow backend never delays results from the others.
       - *Evidence:* cargo test -p sinephile-sources --test resolver: a_fast_backend_answers_before_a_slow_one_times_out (fast batch at <50 ms virtual while the slow backend times out at 300 ms), the_whole_search_is_bounded_by_the_timeout_not_the_slowest_backend (find_all returns at the 500 ms timeout although one backend would take 1 h), a_timed_out_backend_is_stopped_not_abandoned, a_panicking_backend_fails_alone. Commit 6f99ed7. Seen to fail with the timeout removed (took 3600s), the abort removed, and backends asked sequentially (took 520ms).
-- [ ] **E5** `docs/specs/addon-protocol.md` is complete enough that a third party could implement a backend from it alone.
-- [ ] **E6** Repository-wide grep confirms zero indexer names or URLs anywhere, including tests and docs.
+- [x] **E5** `docs/specs/addon-protocol.md` is complete enough that a third party could implement a backend from it alone.
+      - *Evidence:* docs/specs/addon-protocol.md (commit 4e81c94) specifies every manifest field and limit, both endpoints' requests and answers, timeouts, catalogues and versioning. tools/protocol/example_addon.py, a Python stdlib addon written against that document, passes the app's own client via crates/sources/tests/conformance.rs (SINEPHILE_ADDON=http://127.0.0.1:8765/manifest.json cargo test -p sinephile-sources --test conformance -- --ignored: manifest ok, 1 candidate, resolve ok, unknown key refused as not-found); a copy with an endpoint on another host fails it with the same-host message. Caveat: the example was written by the same author as the code, so an implementation by an outside person remains the stronger test.
+- [x] **E6** Repository-wide grep confirms zero indexer names or URLs anywhere, including tests and docs.
+      - *Evidence:* python tools/guard/guard.py --tree: clean over 517 tracked files; --history: clean over all 167 commits on phase/06-source-resolver (2026-11-05, after 4e81c94); --selftest: all 48 checks pass, the guard fires when it should. Seen to fail in real use this phase: the staged guard refused commits for undeclared domains (subdomains of the reserved example domains, and a licence host in recorded fixtures) and for a 40-hex example info hash, each fixed by removing the content, never by suppressing the guard. The hashed denylist is empty by design (tools/guard/denylist.txt header, ADR-0009); the allowlist check is the enforcement.
 
 ---
 
@@ -69,7 +71,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 5/5 |
 | [x] | 4 | Metadata Backbone | A | 3 | 2–3 | 7/7 |
 | [x] | 5 | Semantic Search Engine | A | 4 | 2 | 2/5 |
-| [~] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 4/6 |
+| [~] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 6/6 |
 | [ ] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 0/8 |
 | [ ] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 0/6 |
 | [ ] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 0/6 |
@@ -151,6 +153,12 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D51** (raised in Phase 5) RESOLVED 2026-10-25 in 7249a42, recorded because it weakens earlier evidence. Both test fake embedders (crates/catalogue/tests/index.rs and tests/embed.rs) returned one of only TWO vectors, [127; 8] or [-127; 8]: they multiplied `hash + i` by a 32-bit constant and kept the top bits, so the 8 dimensions differed only below the precision that survives, and one sign was all the text decided. So the sampled re-embed in index::verify_prefix caught a changed document only when the change flipped that sign, about half the time, and D45's 'seen to fail' rested on a fixture that carried one bit of the text. The old promotion test passed because its pair of documents happened to land on opposite signs. Found when a new test changed a covered title's synopsis and verify_prefix still returned Ok. Fixed with splitmix64 per dimension. The test a_covered_title_whose_text_changed_is_refused_by_the_sampled_re_embed failed before the fix and passes after it. Also fixed: three error messages in crates/catalogue (one from before this session) whose line continuations had been lost, so they printed runs of spaces.
 - **D52** (raised in Phase 5) RESOLVED 2026-10-25: the embed producer wrote the artefact IN PLACE. The v3 run was reaped by Claude Code's memory monitor (a 13.5-14.9 GB game was running) during assembly, after all 858,170 vectors were in the .part file, and left a 43,504,000-byte fragment at data/embeddings-bge-small-en-v1.5-int8.bin where the good v2 artefact had been. The checksum would have refused it at load, so it could never be silently used, but the previous artefact was destroyed (the v2 backup made earlier this session is intact). Fix in crates/catalogue/src/embed.rs: assemble to <artefact>.bin.assembling, sync_all, then rename over the real path. Test a_failed_assembly_leaves_the_previous_artefact_untouched was seen to fail with the staging path set back to the real path.
 - **D53** (raised in Phase 5) RESCOPED 2026-10-25 into SPEC.md Phase 18 (spec_version 2.0.0, A25/A27, ADR-0037). The author: 'the design still isn't amazing, i want the home, film, tv show etc tabs to be on top, i want a search button too'. Done in Phase 5 (cff9cdb): the search screen uses the Phase 2 type system, with bylines from SearchRepository::details, a lead excerpt, visible keyboard focus and display-order numbering. MASTHEAD BUILT 2026-10-25 ahead of Phase 18 at the author's request (branch chore/masthead): src/app/Masthead.tsx replaces TitleBar and NavRail, with 6 tests (one seen to fail); it fits at 1024x640 with about 190 px spare (headless Chrome over `vite preview`). Owned by Phase 18 now: mockups before code, the artwork-free state as primary, no placeholder screens, a design lint in CI, motion, and an author-signed screenshot review set. Still open from Phase 5: the case-study screenshots need retaking with the machine idle (tools/shots/capture.ps1 refuses to type unless the app is in front).
+- **D54** (raised in Phase 6) The Internet Archive's items also carry an 'Archive BitTorrent' file and, often, machine-generated SubRip subtitles (seen in NightOfTheLivingDead-MPEG). The Phase 6 backend ignores both: the torrent is Phase 7's (a second, P2P candidate for the same film), the subtitles Phase 10's.
+- **D55** (raised in Phase 6) A valid Archive candidate can be briefly unreachable: on 2026-11-05 one download redirected to a storage node whose name did not resolve, and minutes later to one that did (docs/eval-results.md, Phase 6 E2). Phase 8's player must treat a failed open as 'try the next candidate', not as the film being unavailable, and the resolver's health record should count it.
+- **D56** (raised in Phase 6) E5's example addon (tools/protocol/example_addon.py) was written by the same author as the protocol code, against the document. An implementation by someone outside the project is still the stronger test of 'a third party could implement a backend from it alone'; Phase 27 is a natural moment to ask for one.
+- **D57** (raised in Phase 6) LocalFileBackend.find returns nothing until Phase 12's library scanner exists; it is registered now so order and settings already include it. Search backfill builds only from backend-reported titles and years; filename parsing and merging a backfilled row into an IMDb match are Phase 12's (docs/specs/catalogue-freshness.md layer 3).
+- **D58** (raised in Phase 6) metadata-api's FakeTransport returns queued responses LAST-IN-FIRST-OUT, although its doc comment said first-in-first-out. catalogue/tests/anime.rs depends on the stack order, so the comment was corrected rather than the behaviour (commit 9036577). Any new test queuing several responses must push them in reverse.
+- **D59** (raised in Phase 6) The Sources settings screen was audited from headless-Chrome renders with a fake IPC bridge (scratch harness, not committed) at 1440x900 and 1024x640, and restyled once (1749551). It has not been seen in the real WebView2 window; the Phase 18 overhaul covers Settings.
 
 ---
 

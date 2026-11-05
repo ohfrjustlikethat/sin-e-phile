@@ -19,8 +19,8 @@ The `SourceBackend` trait (§6.1) and its types: `MediaQuery`, `SourceCandidate`
 - [x] **E2** The Internet Archive backend returns real, playable results.
 - [x] **E3** A malformed or hostile addon manifest is rejected with a clear error and cannot crash or hang the app.
 - [x] **E4** Backend timeout: one slow backend never delays results from the others.
-- [ ] **E5** `docs/specs/addon-protocol.md` is complete enough that a third party could implement a backend from it alone.
-- [ ] **E6** Repository-wide grep confirms zero indexer names or URLs anywhere, including tests and docs.
+- [x] **E5** `docs/specs/addon-protocol.md` is complete enough that a third party could implement a backend from it alone.
+- [x] **E6** Repository-wide grep confirms zero indexer names or URLs anywhere, including tests and docs.
 
 ## Subtasks
 
@@ -34,7 +34,7 @@ The `SourceBackend` trait (§6.1) and its types: `MediaQuery`, `SourceCandidate`
 - [x] **6.8** AddonBackend: an addon is a manifest plus a remote service speaking the protocol's find/resolve JSON endpoints. Responses size-capped and time-limited like manifests.
 - [x] **6.9** UI, Settings -> Sources: backend list (enable, order, health); paste a manifest URL, see in plain language what it declares, confirm, enable, with no raw JSON in the primary path; a catalogue browser over a user-supplied URL (no default ships).
 - [x] **6.10** Search-triggered backfill (ADR-0030), minimal: when search misses and the resolver finds a candidate, a background write creates a media_items row marked as backfilled, from the title and year the backend reports. Filename parsing and IMDb merge stay with Phase 12.
-- [ ] **6.11** docs/specs/addon-protocol.md written for a third party, tested by implementing a throwaway backend from it alone (E5); repository-wide guard over tree and history, seen to fail (E6).
+- [x] **6.11** docs/specs/addon-protocol.md written for a third party, tested by implementing a throwaway backend from it alone (E5); repository-wide guard over tree and history, seen to fail (E6).
 
 ## Learning note
 
@@ -55,3 +55,4 @@ Trait objects and `async_trait` in Rust; designing an interface you can't change
 - **6.8** AddonBackend: an addon is a manifest plus a remote service speaking the protocol's find/resolve  · `ebaba3f`
 - **6.9** UI, Settings -> Sources: backend list (enable, order, health); paste a manifest URL, see in plai · `1136e78`
 - **6.10** Search-triggered backfill (ADR-0030), minimal: when search misses and the resolver finds a candi · `61ab278`
+- **6.11** docs/specs/addon-protocol.md written for a third party, tested by implementing a throwaway backe · `4e81c94`
