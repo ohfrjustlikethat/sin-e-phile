@@ -45,8 +45,8 @@
       {
         "id": "6.6",
         "text": "InternetArchiveBackend: public-domain feature-film search, then item metadata to a playable file. Tested against recorded responses, plus an ignored live test.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "9ab7929"
       },
       {
         "id": "6.7",
@@ -89,8 +89,8 @@
       {
         "id": "E2",
         "text": "The Internet Archive backend returns real, playable results.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "docs/eval-results.md 'Phase 6 — Source resolver': live test live_the_archive_returns_a_reachable_whole_film (cargo test -p sinephile-sources --test archive -- --ignored, commit 9ab7929) found 3 candidates for Night of the Living Dead (1968); the resolved URL returned HEAD 200, ffprobe showed h264 640x480 + aac, 5744.97 s, and ffmpeg -t 30 -f null decoded 900 frames with exit 0 and no errors. Recorded-response tests (finds_whole_films_from_recorded_responses) run in CI."
       },
       {
         "id": "E3",
@@ -879,8 +879,8 @@
         {
           "id": "E2",
           "text": "The Internet Archive backend returns real, playable results.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "docs/eval-results.md 'Phase 6 — Source resolver': live test live_the_archive_returns_a_reachable_whole_film (cargo test -p sinephile-sources --test archive -- --ignored, commit 9ab7929) found 3 candidates for Night of the Living Dead (1968); the resolved URL returned HEAD 200, ffprobe showed h264 640x480 + aac, 5744.97 s, and ffmpeg -t 30 -f null decoded 900 frames with exit 0 and no errors. Recorded-response tests (finds_whole_films_from_recorded_responses) run in CI."
         },
         {
           "id": "E3",
@@ -941,8 +941,8 @@
         {
           "id": "6.6",
           "text": "InternetArchiveBackend: public-domain feature-film search, then item metadata to a playable file. Tested against recorded responses, plus an ignored live test.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "9ab7929"
         },
         {
           "id": "6.7",

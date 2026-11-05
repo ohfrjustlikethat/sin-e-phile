@@ -2142,3 +2142,34 @@ timed against the real catalogue (3.946 GB), 20 random core-tier film ids per ca
 `media_items`, `idx_credits_item` for the credits. It runs after ranking, so it adds to
 E1's 15.2 ms p95 rather than replacing any of it, for roughly 25 ms of the 80 ms budget.
 Python `sqlite3` with the exact SQL, 2026-10-25, uncommitted tree on top of `21d0b23`.
+
+---
+
+## Phase 6 — Source resolver (2026-11-05)
+
+### E2: the Internet Archive backend returns real, playable results
+
+**Find.** `cargo test -p sinephile-sources --test archive -- --ignored --nocapture`
+(`live_the_archive_returns_a_reachable_whole_film`, commit `9ab7929`), query
+*Night of the Living Dead* (1968), the live service: **3 candidates** in 12.68 s for the
+whole test binary (one search, up to four metadata lookups, one HEAD). First candidate
+resolved to `https://archive.org/download/NightOfTheLivingDead-MPEG/NightOfTheLivingDead.mp4`,
+HEAD **200** after the Archive's redirect to a storage node.
+
+**Play.** The same URL, through FFmpeg 9.0 (the decoder the player will use):
+
+| Check | Command | Result |
+|---|---|---|
+| Streams | `ffprobe -v error -show_entries format=duration,format_name:stream=codec_type,codec_name,width,height -of compact <url>` | h264 640×480 video, aac audio, mp4 container, duration 5744.97 s (1 h 35 min) |
+| Decode | `ffmpeg -v error -t 30 -i <url> -f null -` | exit 0, no errors; **900 frames** (30.03 s) decoded, 223× realtime, 5.47 s wall including connection |
+
+The Archive labels the file `h.264`, which the backend maps to `VideoCodec::H264`, and
+the probe agrees.
+
+**One transient failure on the way, recorded because it will recur.** The first live
+run's HEAD failed with a network error after ~16 s: the download redirected to
+`dn711104.ca.archive.org`, which did not resolve from this machine at that moment.
+Minutes later the same request redirected to a different storage node and succeeded,
+and the first name resolved again. A candidate can be valid and briefly unreachable;
+the player (Phase 8) must treat a failed open as "try the next candidate", not as the
+film being unavailable.
