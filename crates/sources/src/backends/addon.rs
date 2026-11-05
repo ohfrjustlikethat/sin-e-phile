@@ -50,6 +50,11 @@ impl AddonBackend {
             300..=399 => Err(SourceError::InvalidResponse(
                 "the addon tried to redirect, which is not allowed".into(),
             )),
+            // Only resolve can say this: the key it was given is not one it has (any
+            // more). From find, a 404 means the endpoint itself is missing.
+            404 if url == self.manifest.endpoints.resolve => {
+                Err(SourceError::NotFound("the source no longer has it".into()))
+            }
             s => Err(SourceError::Unavailable(format!("the addon answered {s}"))),
         }
     }
