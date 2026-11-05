@@ -9,7 +9,9 @@
 
 pub mod addons;
 pub mod backends;
+pub mod links;
 pub mod merge;
+pub mod overview;
 pub mod registry;
 pub mod resolver;
 

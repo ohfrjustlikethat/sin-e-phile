@@ -6,4 +6,5 @@
 
 pub mod assets;
 pub mod search;
+pub mod sources;
 pub mod system;

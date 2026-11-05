@@ -106,3 +106,22 @@ async fn outcomes_become_health() {
     assert_eq!(rows[2].failures, 1);
     assert_eq!(rows[2].last_error.as_deref(), Some("unavailable: refused"));
 }
+
+#[tokio::test]
+async fn the_overview_names_built_ins_in_words_and_hides_dead_addons() {
+    use sinephile_sources::backends::{all, Context};
+    use sinephile_sources::overview::overview;
+
+    let db = Db::in_memory().await.unwrap();
+    // A stored addon whose manifest is gone from the context, as a refused one would be.
+    SourceRepository::new(&db)
+        .install_addon("addon:gone", "https://gone.example/m.json", "{}")
+        .await
+        .unwrap();
+    let backends = all(&Context::default());
+    let rows = overview(&db, &backends, &[]).await.unwrap();
+    let names: Vec<&str> = rows.iter().map(|r| r.name.as_str()).collect();
+    assert_eq!(names, ["Your files", "Internet Archive", "Your links"]);
+    assert!(rows.iter().all(|r| r.health == "Not asked yet."));
+    assert!(rows.iter().all(|r| r.addon_host.is_none()));
+}

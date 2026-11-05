@@ -18,10 +18,14 @@
 //! then gets `None` and says so, which is the same contract
 //! `CatalogueRepository::readiness` already has for a half-built catalogue.
 
-use std::sync::{Arc, RwLock};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, RwLock};
 
+use sinephile_metadata_api::HttpTransport;
 use sinephile_persistence::Db;
 use sinephile_search_engine::Engine;
+use source_protocol::Manifest;
+use url::Url;
 
 use crate::tiers::{self, HardwareProfile, Tier};
 
@@ -35,6 +39,15 @@ pub struct AppState {
     /// an ONNX session and one forward pass at a time is the honest model of it — and
     /// because it is held across awaits, which a `std` mutex may not be.
     engine: RwLock<Option<Arc<tokio::sync::Mutex<Engine>>>>,
+    /// The two HTTP clients sources use (Phase 6). Built once: a client holds a
+    /// connection pool, and a new one per search would reconnect every time.
+    pub http: Arc<HttpTransport>,
+    /// For addresses a user supplied — addons and catalogues. No redirects.
+    pub untrusted_http: Arc<HttpTransport>,
+    /// Manifests shown on the confirm screen and not yet installed, by the URL the user
+    /// pasted. Install takes the manifest from HERE, so what is installed is exactly
+    /// what was shown — not whatever the address serves a second time.
+    pending_addons: Mutex<HashMap<String, (Url, Manifest)>>,
 }
 
 struct Inner {
@@ -60,6 +73,9 @@ impl AppState {
             }),
             db: RwLock::new(None),
             engine: RwLock::new(None),
+            http: Arc::new(HttpTransport::new()),
+            untrusted_http: Arc::new(HttpTransport::untrusted()),
+            pending_addons: Mutex::new(HashMap::new()),
         }
     }
 
@@ -90,6 +106,22 @@ impl AppState {
     /// "never", and a UI thread waiting on a disk is how a splash screen becomes a hang.
     pub fn db(&self) -> Option<Arc<Db>> {
         self.db.read().expect("db lock poisoned").clone()
+    }
+
+    /// Remember a manifest the user is being asked to confirm.
+    pub fn hold_addon(&self, pasted: &str, url: Url, manifest: Manifest) {
+        self.pending_addons
+            .lock()
+            .expect("pending lock poisoned")
+            .insert(pasted.to_string(), (url, manifest));
+    }
+
+    /// The manifest shown for this address, taken so it cannot be installed twice.
+    pub fn take_addon(&self, pasted: &str) -> Option<(Url, Manifest)> {
+        self.pending_addons
+            .lock()
+            .expect("pending lock poisoned")
+            .remove(pasted)
     }
 
     pub fn hardware_profile(&self) -> HardwareProfile {

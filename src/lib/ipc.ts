@@ -77,9 +77,42 @@ export const commands = {
 	 *  — without it the user would have to restart the app to use what they just fetched.
 	 */
 	downloadOptionalAssets: () => typedError<null, string>(__TAURI_INVOKE("download_optional_assets")),
+	sourcesOverview: () => typedError<SourcesView, string>(__TAURI_INVOKE("sources_overview")),
+	sourcesSetEnabled: (id: string, enabled: boolean) => typedError<null, string>(__TAURI_INVOKE("sources_set_enabled", { id, enabled })),
+	sourcesReorder: (ids: string[]) => typedError<null, string>(__TAURI_INVOKE("sources_reorder", { ids })),
+	addonPreview: (url: string) => typedError<AddonPreview, string>(__TAURI_INVOKE("addon_preview", { url })),
+	/**
+	 *  Install the manifest that `addon_preview` showed for this address — not a fresh
+	 *  fetch of it.
+	 */
+	addonInstall: (pasted: string) => typedError<string, string>(__TAURI_INVOKE("addon_install", { pasted })),
+	addonRemove: (id: string) => typedError<null, string>(__TAURI_INVOKE("addon_remove", { id })),
+	/**  Open a catalogue from an address the user supplied. No default exists. */
+	catalogueOpen: (url: string) => typedError<CatalogueView, string>(__TAURI_INVOKE("catalogue_open", { url })),
+	linksList: () => typedError<LinkInfo[], string>(__TAURI_INVOKE("links_list")),
+	/**  Add from pasted playlist text. Returns how many links were written. */
+	linksImport: (text: string) => typedError<number, string>(__TAURI_INVOKE("links_import", { text })),
+	/**  Add one link from the form's three fields. */
+	linksAdd: (title: string, year: number | null, url: string) => typedError<number, string>(__TAURI_INVOKE("links_add", { title, year, url })),
+	linksRemove: (id: number) => typedError<null, string>(__TAURI_INVOKE("links_remove", { id })),
 };
 
 /* Types */
+/**  What the confirm screen shows for a pasted manifest address. */
+export type AddonPreview = {
+	/**  The address as pasted; send it back to `addon_install`. */
+	pasted: string,
+	backend_id: string,
+	name: string,
+	version: string,
+	description: string,
+	finds: string,
+	delivers: string[],
+	host: string,
+	homepage: string | null,
+	replaces: boolean,
+};
+
 /**
  *  What is missing, and what agreeing would cost.
  * 
@@ -138,6 +171,17 @@ export type Capability =
 /**  Full motion design: hover previews, background blur, parallax. */
 "full_motion";
 
+export type CatalogueItem = {
+	name: string,
+	description: string,
+	manifest: string,
+};
+
+export type CatalogueView = {
+	name: string,
+	addons: CatalogueItem[],
+};
+
 /**
  *  What detection actually found. Shown verbatim in Settings (§8: "in plain
  *  language. This is a nice UI moment, not an apology").
@@ -158,6 +202,14 @@ export type HardwareProfile = {
 	/**  The tier actually in force. Differs only when the user has overridden. */
 	effective_tier: Tier,
 	overridden: boolean,
+};
+
+/**  One of the user's own links. Ids are rowids, far below 2^53 (see `SearchHit`). */
+export type LinkInfo = {
+	id: number,
+	title: string,
+	year: number | null,
+	url: string,
 };
 
 /**  One optional download, as the consent screen needs it. */
@@ -227,6 +279,25 @@ export type SearchResponse = {
 	 *  "found nothing", and the two must never render the same.
 	 */
 	ready: boolean,
+};
+
+/**  One row of the Sources list. */
+export type SourceInfo = {
+	id: string,
+	name: string,
+	blurb: string,
+	/**  Set for an addon: the host its queries go to. */
+	addon_host: string | null,
+	enabled: boolean,
+	health: string,
+	last_error: string | null,
+};
+
+/**  Everything the Sources section needs at once. */
+export type SourcesView = {
+	sources: SourceInfo[],
+	/**  Installed addons whose stored manifest no longer passes the checks. */
+	refused_addons: string[],
 };
 
 /**  The three tiers from §8. */
