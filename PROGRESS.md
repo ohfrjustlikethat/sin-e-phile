@@ -10,40 +10,22 @@
 
 ## Where we are right now
 
-**Phase 6 — Source Resolver and Addon Protocol** (`in_progress`, branch `phase/06-source-resolver`)
+**Phase 7 — Torrent Engine and Streaming Server** (`in_progress`, branch `phase/07-torrent-engine`)
 
-6 of 6 exit criteria met with evidence.
+0 of 8 exit criteria met with evidence.
 
-> Planned 2026-11-05 and approved by the author. Addon model: manifest plus a remote service speaking the protocol (option a); backfill built minimally here from backend-reported title and year.
-
-### Subtasks — 11/11 complete
-
-- [x] **6.1** crates/source-protocol (MIT OR Apache-2.0, no Tauri, no network): the SPEC.md §6.1 SourceBackend trait via async-trait, and MediaQuery, SourceCandidate (quality, language, codec, size, health, provenance), PlayableStream, BackendCapabilities. The addon manifest types, JSON Schema at docs/schemas/addon-manifest.schema.json, and a parse-only validator. · `ff88924`
-- [x] **6.2** Manifest hardening (E3): 64 KiB cap, depth and string-length limits, https only (plain http for loopback), every endpoint on the manifest's own host, a protocol version field. A corpus of hostile manifests plus a randomised no-panic test. · `ff88924`
-- [x] **6.3** crates/sources (GPL): the resolver. Queries every enabled backend concurrently, each under its own timeout, then dedups and merges. A deliberately slow backend must not delay the others, proved by a timing test seen to fail with the timeout removed (E4). · `6f99ed7`
-- [x] **6.4** Backend registry: enable/disable, ordering, per-backend health (successes, failures, mean latency), persisted by migration with repository_surface.rs lines for every new method. · `a024811`
-- [x] **6.5** LocalFileBackend (stub until Phase 12) and DirectHttpBackend (user-supplied URLs and M3U). Each added by one file plus one registration line, the diff checked (E1). · `bd80a1f`
-- [x] **6.6** InternetArchiveBackend: public-domain feature-film search, then item metadata to a playable file. Tested against recorded responses, plus an ignored live test. · `9ab7929`
-- [x] **6.7** E2 evidence: a live query resolves to a stream URL that ffprobe decodes; command and output recorded in docs/eval-results.md. · `fc50bf4`
-- [x] **6.8** AddonBackend: an addon is a manifest plus a remote service speaking the protocol's find/resolve JSON endpoints. Responses size-capped and time-limited like manifests. · `ebaba3f`
-- [x] **6.9** UI, Settings -> Sources: backend list (enable, order, health); paste a manifest URL, see in plain language what it declares, confirm, enable, with no raw JSON in the primary path; a catalogue browser over a user-supplied URL (no default ships). · `1136e78`
-- [x] **6.10** Search-triggered backfill (ADR-0030), minimal: when search misses and the resolver finds a candidate, a background write creates a media_items row marked as backfilled, from the title and year the backend reports. Filename parsing and IMDb merge stay with Phase 12. · `61ab278`
-- [x] **6.11** docs/specs/addon-protocol.md written for a third party, tested by implementing a throwaway backend from it alone (E5); repository-wide guard over tree and history, seen to fail (E6). · `4e81c94`
+> Opened 2026-11-05 when Phase 6 merged (ea25da1). First phase under ADR-0040 (autonomous delivery): planned and built without waiting for approval.
 
 ### Exit criteria
 
-- [x] **E1** Adding a new backend requires implementing one trait and registering it — no changes elsewhere.
-      - *Evidence:* Commit bd80a1f adds LocalFileBackend as crates/sources/src/backends/local.rs plus its registration in backends/mod.rs (git show --stat bd80a1f: 2 files, +98 -3) and touches nothing else; the resolver, registry and property tests (crates/sources/tests/backends.rs, every_backend_has_a_unique_well_formed_id, committed earlier in d234361) picked it up unedited. The registry discovers backends only through backends::all().
-- [x] **E2** The Internet Archive backend returns real, playable results.
-      - *Evidence:* docs/eval-results.md 'Phase 6 — Source resolver': live test live_the_archive_returns_a_reachable_whole_film (cargo test -p sinephile-sources --test archive -- --ignored, commit 9ab7929) found 3 candidates for Night of the Living Dead (1968); the resolved URL returned HEAD 200, ffprobe showed h264 640x480 + aac, 5744.97 s, and ffmpeg -t 30 -f null decoded 900 frames with exit 0 and no errors. Recorded-response tests (finds_whole_films_from_recorded_responses) run in CI.
-- [x] **E3** A malformed or hostile addon manifest is rejected with a clear error and cannot crash or hang the app.
-      - *Evidence:* Manifest: crates/source-protocol/tests/hostile_manifests.rs — 25 hostile fixtures each refused by its own named rule, 50 MB / 64K-bracket / bad-UTF-8 inputs refused in <250 ms, 10,000 seeded mutations with no panic (commit ff88924; seen to fail with same-host, depth and bidi checks removed). Fetch: crates/metadata-api/tests/untrusted_http.rs — body cap enforced with no or a lying Content-Length, no redirects (9036577; seen to fail). Addon at runtime: crates/sources/tests/addons.rs a_hostile_addon_costs_only_itself — a redirecting, a 5 MB-flooding and a 30 s-stalling addon each fail alone and the search returns in ~8 s, the default timeout; a_stored_manifest_that_no_longer_passes_is_not_loaded; wire.rs a_remote_stream_may_never_name_a_local_file (ebaba3f; seen to fail with redirects accepted, the stored-manifest recheck removed, and file streams allowed). Panics: resolver a_panicking_backend_fails_alone (6f99ed7).
-- [x] **E4** Backend timeout: one slow backend never delays results from the others.
-      - *Evidence:* cargo test -p sinephile-sources --test resolver: a_fast_backend_answers_before_a_slow_one_times_out (fast batch at <50 ms virtual while the slow backend times out at 300 ms), the_whole_search_is_bounded_by_the_timeout_not_the_slowest_backend (find_all returns at the 500 ms timeout although one backend would take 1 h), a_timed_out_backend_is_stopped_not_abandoned, a_panicking_backend_fails_alone. Commit 6f99ed7. Seen to fail with the timeout removed (took 3600s), the abort removed, and backends asked sequentially (took 520ms).
-- [x] **E5** `docs/specs/addon-protocol.md` is complete enough that a third party could implement a backend from it alone.
-      - *Evidence:* docs/specs/addon-protocol.md (commit 4e81c94) specifies every manifest field and limit, both endpoints' requests and answers, timeouts, catalogues and versioning. tools/protocol/example_addon.py, a Python stdlib addon written against that document, passes the app's own client via crates/sources/tests/conformance.rs (SINEPHILE_ADDON=http://127.0.0.1:8765/manifest.json cargo test -p sinephile-sources --test conformance -- --ignored: manifest ok, 1 candidate, resolve ok, unknown key refused as not-found); a copy with an endpoint on another host fails it with the same-host message. Caveat: the example was written by the same author as the code, so an implementation by an outside person remains the stronger test.
-- [x] **E6** Repository-wide grep confirms zero indexer names or URLs anywhere, including tests and docs.
-      - *Evidence:* python tools/guard/guard.py --tree: clean over 517 tracked files; --history: clean over all 167 commits on phase/06-source-resolver (2026-11-05, after 4e81c94); --selftest: all 48 checks pass, the guard fires when it should. Seen to fail in real use this phase: the staged guard refused commits for undeclared domains (subdomains of the reserved example domains, and a licence host in recorded fixtures) and for a 40-hex example info hash, each fixed by removing the content, never by suppressing the guard. The hashed denylist is empty by design (tools/guard/denylist.txt header, ADR-0009); the allowlist check is the enforcement.
+- [ ] **E1** Playback begins in < 8 s on a healthy swarm (measured against a legal, well-seeded Internet Archive or Linux ISO torrent).
+- [ ] **E2** Seeking to an unbuffered region resumes playback in < 5 s.
+- [ ] **E3** Sequential mode never starves — the buffer ahead of the playhead is maintained under a documented bandwidth floor.
+- [ ] **E4** Correct behaviour on a dead swarm: clear, fast failure, not an indefinite hang.
+- [ ] **E5** Range requests are byte-correct — verified by streaming a file and comparing its hash to a full download.
+- [ ] **E6** Measured against qBittorrent on both axes and both numbers published: time-to-first-frame on a healthy swarm, and sustained bulk throughput on the same torrent. Losing on bulk is a finding, not a failure — ADR-0029 exists so the project does not have to win that comparison — but the comparison must be made rather than left implicit.
+- [ ] **E7** Binding to a specific network interface works, verified by disabling that adapter mid-download and confirming traffic stops rather than falling back.
+- [ ] **E8** `docs/specs/streaming-scheduler.md` explains the algorithm with a diagram.
 
 ---
 
@@ -55,7 +37,7 @@ Phases 4 and 5 are closed (merge bf5a644). The masthead is built on branch chore
 
 ## Blockers
 
-- **B8** CI run 42041500226 on phase/06-source-resolver failed in 'Posture guard and secret scan': gitleaks' full-history scan read the addon protocol's example candidate keys ("key": "nosferatu-1922-sd", commit 4e81c94) as generic API keys. Not a secret. Fixed by ADR-0039, which allowlists the two exact values per ADR-0035 (commit fb7d697); a local `gitleaks detect` over the full history now finds no leaks. Clear this blocker when the next CI run on the branch is green.
+None.
 
 ---
 
@@ -71,8 +53,8 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 3 | Data Layer and Portable Storage | A | 1 | 1–2 | 5/5 |
 | [x] | 4 | Metadata Backbone | A | 3 | 2–3 | 7/7 |
 | [x] | 5 | Semantic Search Engine | A | 4 | 2 | 2/5 |
-| [~] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 6/6 |
-| [ ] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 0/8 |
+| [x] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 6/6 |
+| [~] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 0/8 |
 | [ ] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 0/6 |
 | [ ] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 0/6 |
 | [ ] | 10 | Subtitle Pipeline | B | 8 | 2 | 0/6 |
