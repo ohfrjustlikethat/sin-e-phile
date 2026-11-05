@@ -8,6 +8,7 @@ mod ffi;
 #[cfg(windows)]
 pub mod host;
 pub mod player;
+pub mod still;
 
 #[cfg(windows)]
 pub use host::{Cutout, VideoHost};

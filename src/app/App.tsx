@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Masthead } from "@/app/Masthead";
+import { PlayerScreen } from "@/features/player/PlayerScreen";
 import { Placeholder } from "@/app/Placeholder";
 import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { SearchScreen } from "@/features/search/SearchScreen";
@@ -20,6 +21,7 @@ const LABELS: Record<Destination, string> = {
 
 export function App() {
   const { destination, settingsOpen, setDestination, setSettingsOpen } = useUi();
+  const playing = useUi((s) => s.playing);
   const [palette, setPalette] = useState(false);
   const [searching, setSearching] = useState(false);
 
@@ -72,6 +74,15 @@ export function App() {
       <div className="flex h-full flex-col bg-base text-ink">
         <Masthead searching={false} onSearchChange={() => {}} />
         <DesignGallery />
+      </div>
+    );
+  }
+
+  // The player is immersive: no masthead, its own top bar (with a drag region).
+  if (playing) {
+    return (
+      <div className="h-full bg-black text-ink">
+        <PlayerScreen />
       </div>
     );
   }

@@ -5242,6 +5242,7 @@ dependencies = [
  "sinephile-embedding",
  "sinephile-metadata-api",
  "sinephile-persistence",
+ "sinephile-player",
  "sinephile-search-engine",
  "sinephile-sources",
  "sinephile-tiers",

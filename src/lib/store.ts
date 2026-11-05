@@ -9,11 +9,25 @@ import { persist } from "zustand/middleware";
 export const DESTINATIONS = ["home", "films", "tv", "watchlist", "live"] as const;
 export type Destination = (typeof DESTINATIONS)[number];
 
+/** What the player is showing. Not persisted: a restart resumes from the saved position. */
+export interface Playing {
+  /** An http(s) address or a file path, as the player opens it. */
+  target: string;
+  title: string;
+  /** The catalogue item, for saving the position. */
+  mediaItemId: number | null;
+  /** Seconds to start from (position resume). */
+  start: number | null;
+}
+
 interface UiState {
   destination: Destination;
   settingsOpen: boolean;
+  playing: Playing | null;
   setDestination: (d: Destination) => void;
   setSettingsOpen: (open: boolean) => void;
+  play: (p: Playing) => void;
+  stopPlaying: () => void;
 }
 
 export const useUi = create<UiState>()(
@@ -21,8 +35,11 @@ export const useUi = create<UiState>()(
     (set) => ({
       destination: "home",
       settingsOpen: false,
+      playing: null,
       setDestination: (destination) => set({ destination }),
       setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+      play: (playing) => set({ playing }),
+      stopPlaying: () => set({ playing: null }),
     }),
     {
       name: "sin-e-phile.ui",

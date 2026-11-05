@@ -279,6 +279,25 @@ impl Player {
             .or_else(|_| self.cmd(&["screenshot-to-file", &p, "video"]))
     }
 
+    /// Capture the frame on screen and return it once mpv has finished writing it.
+    pub fn capture_still(&self, path: &Path, timeout: Duration) -> Result<Vec<u8>, PlayerError> {
+        let _ = std::fs::remove_file(path);
+        self.screenshot(path)?;
+        let deadline = Instant::now() + timeout;
+        loop {
+            if let Ok(bytes) = std::fs::read(path) {
+                if crate::still::is_complete_jpeg(&bytes) {
+                    let _ = std::fs::remove_file(path);
+                    return Ok(bytes);
+                }
+            }
+            if Instant::now() >= deadline {
+                return Err(PlayerError::Timeout("the still frame"));
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
     pub fn stop(&self) -> Result<(), PlayerError> {
         self.cmd(&["stop"])
     }

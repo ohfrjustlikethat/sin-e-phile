@@ -114,6 +114,35 @@ export const commands = {
 	torrentPause: (id: string) => typedError<null, string>(__TAURI_INVOKE("torrent_pause", { id })),
 	torrentResume: (id: string) => typedError<null, string>(__TAURI_INVOKE("torrent_resume", { id })),
 	torrentRemove: (id: string, deleteFiles: boolean) => typedError<null, string>(__TAURI_INVOKE("torrent_remove", { id, deleteFiles })),
+	/**  Open something to play: an `http(s)` address or a file path. `start` resumes. */
+	playerOpen: (target: string, start: number | null) => typedError<null, string>(__TAURI_INVOKE("player_open", { target, start })),
+	/**
+	 *  Place the video and cut the chrome out of it. Coordinates are CSS pixels within the
+	 *  window's client area; `scale` is the page's `devicePixelRatio`.
+	 */
+	playerLayout: (x: number | null, y: number | null, width: number | null, height: number | null, scale: number | null, cutouts: CutoutRect[]) => typedError<null, string>(__TAURI_INVOKE("player_layout", { x, y, width, height, scale, cutouts })),
+	playerAction: (action: PlayerAction) => typedError<null, string>(__TAURI_INVOKE("player_action", { action })),
+	/**
+	 *  Pause, and hand the page the frame on screen so it can draw the pause overlay over
+	 *  it while the video window is hidden (ADR-0021). Returns a `data:` URI.
+	 */
+	playerPauseStill: () => typedError<string, string>(__TAURI_INVOKE("player_pause_still")),
+	/**  Show the video again after the pause overlay. */
+	playerResumeVideo: () => typedError<null, string>(__TAURI_INVOKE("player_resume_video")),
+	/**  Stop and hide the video. */
+	playerClose: () => typedError<null, string>(__TAURI_INVOKE("player_close")),
+	playerState: () => typedError<{
+	position: number | null,
+	duration: number | null,
+	paused: boolean,
+	buffered_until: number | null,
+	volume: number | null,
+	muted: boolean,
+	speed: number | null,
+	hwdec: string | null,
+	ended: boolean,
+	tracks: TrackView[],
+} | null, string>(__TAURI_INVOKE("player_state")),
 };
 
 /* Types */
@@ -215,6 +244,15 @@ export type CatalogueView = {
 	addons: CatalogueItem[],
 };
 
+/**  A chrome panel's silhouette in CSS pixels; the page converts nothing, this does. */
+export type CutoutRect = {
+	x: number | null,
+	y: number | null,
+	width: number | null,
+	height: number | null,
+	radius: number | null,
+};
+
 /**
  *  What detection actually found. Shown verbatim in Settings (§8: "in plain
  *  language. This is a nice UI moment, not an apology").
@@ -254,6 +292,26 @@ export type OptionalAsset = {
 	/**  `absent`, `present`, or a reason it cannot be used. */
 	state: string,
 	unusable_reason: string | null,
+};
+
+/**
+ *  One control action. A single command for all of them keeps the IPC surface small;
+ *  each maps to one `Player` method.
+ */
+export type PlayerAction = { kind: "pause"; paused: boolean } | { kind: "seek_to"; seconds: number | null } | { kind: "seek_by"; seconds: number | null } | { kind: "frame_step"; forward: boolean } | { kind: "volume"; percent: number | null } | { kind: "mute"; muted: boolean } | { kind: "speed"; speed: number | null } | { kind: "audio"; id: number } | { kind: "subtitles"; id: number | null };
+
+/**  The player as the chrome draws it, a few times a second. */
+export type PlayerStateView = {
+	position: number | null,
+	duration: number | null,
+	paused: boolean,
+	buffered_until: number | null,
+	volume: number | null,
+	muted: boolean,
+	speed: number | null,
+	hwdec: string | null,
+	ended: boolean,
+	tracks: TrackView[],
 };
 
 /**
@@ -378,6 +436,14 @@ export type TorrentView = {
 	live_peers: number,
 	finished: boolean,
 	error: string | null,
+};
+
+export type TrackView = {
+	id: number,
+	kind: string,
+	lang: string | null,
+	title: string | null,
+	selected: boolean,
 };
 
 /**

@@ -57,6 +57,8 @@ source-protocol = { path = "../crates/source-protocol" }
 sinephile-sources = { path = "../crates/sources" }
 # The torrent engine and local streaming server (Phase 7), started on first use.
 sinephile-torrent = { path = "../crates/torrent" }
+# The player: libmpv in a child window of the main window (Phase 8).
+sinephile-player = { path = "../crates/player" }
 url = "=2.5.8"
 # For the async mutex around the engine: its lock is held across awaits, which a std
 # mutex may not be.
