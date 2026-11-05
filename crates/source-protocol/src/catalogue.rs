@@ -85,10 +85,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(c.addons.len(), 2);
-        assert_eq!(
-            c.manifest_url(1).unwrap().host_str(),
-            Some("two.example")
-        );
+        assert_eq!(c.manifest_url(1).unwrap().host_str(), Some("two.example"));
     }
 
     #[test]

@@ -1,0 +1,21 @@
+[package]
+name = "sinephile-sources"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "The source resolver and the reference backends (SPEC.md §6.1, Phase 6)."
+
+# The PROTOCOL lives in crates/source-protocol, permissively licensed for third
+# parties. This crate is the app's side of it: the resolver that queries backends
+# concurrently, and the backends the app itself ships (Internet Archive, direct HTTP,
+# local files). Not in src-tauri, because a test binary that links Tauri cannot
+# launch on Windows (ADR-0022), and E4 is a timing test.
+
+[dependencies]
+source-protocol = { path = "../source-protocol" }
+tokio = { version = "1", features = ["rt", "time", "sync", "macros"] }
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "time", "sync", "macros", "test-util"] }

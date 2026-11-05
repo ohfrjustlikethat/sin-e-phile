@@ -4334,6 +4334,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sinephile-sources"
+version = "0.1.0"
+dependencies = [
+ "source-protocol",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "sinephile-tiers"
 version = "0.1.0"
 dependencies = [
