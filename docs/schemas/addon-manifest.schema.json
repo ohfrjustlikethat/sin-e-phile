@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ohfrjustlikethat/sin-e-phile/docs/schemas/addon-manifest.schema.json",
+  "title": "sin-e-phile addon manifest, protocol 1",
+  "description": "A source described as data (ADR-0006). The normative specification is docs/specs/addon-protocol.md; crates/source-protocol/src/manifest.rs is the reference validator. Three rules cannot be written in JSON Schema and are enforced by the validator only: both endpoints must be on the manifest's own host and port; plain http is allowed only for a loopback host; and the whole document must be at most 65536 bytes and nest at most 8 levels deep.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol", "id", "name", "version", "media", "transports", "endpoints"],
+  "properties": {
+    "protocol": {
+      "description": "The protocol version the addon speaks. Only 1 exists.",
+      "type": "integer",
+      "const": 1
+    },
+    "id": {
+      "description": "Stable identity, conventionally reverse-DNS. Settings and health are stored under it.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]{2,63}$"
+    },
+    "name": {
+      "description": "Shown to the user. No control, zero-width or bidirectional-override characters.",
+      "allOf": [{ "$ref": "#/$defs/displayText" }, { "pattern": "\\S" }],
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "version": {
+      "description": "The addon's own version, free-form (semver suggested).",
+      "allOf": [{ "$ref": "#/$defs/displayText" }, { "pattern": "\\S" }],
+      "minLength": 1,
+      "maxLength": 32
+    },
+    "description": {
+      "description": "Shown to the user before they confirm. May contain newlines.",
+      "allOf": [{ "$ref": "#/$defs/displayText" }],
+      "maxLength": 500
+    },
+    "media": {
+      "description": "What the addon can find. Values this app does not know are ignored, but at least one must be known.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": { "type": "string", "enum": ["film", "episode"] }
+    },
+    "transports": {
+      "description": "How its candidates' bytes travel.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": { "type": "string", "enum": ["local", "http", "p2p"] }
+    },
+    "endpoints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["find", "resolve"],
+      "properties": {
+        "find": { "$ref": "#/$defs/url" },
+        "resolve": { "$ref": "#/$defs/url" }
+      }
+    },
+    "homepage": {
+      "description": "A page about the addon, shown as a link.",
+      "$ref": "#/$defs/url"
+    }
+  },
+  "$defs": {
+    "url": {
+      "type": "string",
+      "maxLength": 2048,
+      "pattern": "^(https://[^/@\\s]+(/\\S*)?|http://(localhost|127\\.\\d+\\.\\d+\\.\\d+|\\[::1\\])(:\\d+)?(/\\S*)?)$"
+    },
+    "displayText": {
+      "type": "string",
+      "pattern": "^[^\\u0000-\\u0009\\u000b-\\u001f\\u007f-\\u009f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069\\ufeff]*$"
+    }
+  }
+}

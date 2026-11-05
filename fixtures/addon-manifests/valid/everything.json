@@ -1,0 +1,20 @@
+{
+  "protocol": 1,
+  "id": "org.example.tv-and-films",
+  "name": "Example Films",
+  "version": "1.0.0",
+  "description": "Films and episodes.\nTwo lines are fine.",
+  "media": [
+    "film",
+    "episode"
+  ],
+  "transports": [
+    "http",
+    "p2p"
+  ],
+  "endpoints": {
+    "find": "https://addon.example:443/v1/find",
+    "resolve": "https://addon.example/v1/resolve"
+  },
+  "homepage": "https://about.example/addon"
+}
