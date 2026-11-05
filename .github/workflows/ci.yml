@@ -280,6 +280,13 @@ jobs:
       - name: PROJECT_STATE.json validates against its schema
         run: python tools/state/validate_state.py --check
 
+      # The schema third parties validate against, and the validator the app enforces,
+      # describe one format. This runs both over the same corpus (Phase 6, E3/E5).
+      - name: Addon manifest schema agrees with the validator
+        run: |
+          python tools/protocol/schema_agrees.py --selftest
+          python tools/protocol/schema_agrees.py
+
       # Every check here exists because that exact thing went wrong in this
       # repository silently, and was found by reading rather than by a tool. The
       # last one — "the most recent code commit is recorded in the state file" —

@@ -34,6 +34,9 @@ pub struct Request {
     pub url: String,
     pub body: Option<String>,
     pub headers: Vec<(String, String)>,
+    /// Refuse a response body larger than this. `None` trusts the server, which is
+    /// right for a metadata API and wrong for anything a user pointed the app at.
+    pub max_body_bytes: Option<usize>,
 }
 
 impl Request {
@@ -43,6 +46,7 @@ impl Request {
             url: url.into(),
             body: None,
             headers: Vec::new(),
+            max_body_bytes: None,
         }
     }
 
@@ -53,6 +57,7 @@ impl Request {
             url: url.into(),
             body: None,
             headers: Vec::new(),
+            max_body_bytes: None,
         }
     }
 
@@ -65,7 +70,15 @@ impl Request {
                 ("content-type".into(), "application/json".into()),
                 ("accept".into(), "application/json".into()),
             ],
+            max_body_bytes: None,
         }
+    }
+
+    /// Cap the response body. Over the cap is [`TransportError::TooLarge`], and the
+    /// rest of the body is never read.
+    pub fn limit(mut self, max_body_bytes: usize) -> Self {
+        self.max_body_bytes = Some(max_body_bytes);
+        self
     }
 
     pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
@@ -143,6 +156,8 @@ pub enum TransportError {
     Network(String),
     #[error("timed out")]
     Timeout,
+    #[error("the response is larger than {0} bytes")]
+    TooLarge(usize),
 }
 
 pub trait Transport: Send + Sync {
@@ -166,7 +181,9 @@ impl FakeTransport {
         Self::default()
     }
 
-    /// Queue a response. They are returned in the order queued.
+    /// Queue a response. They are returned LAST-QUEUED FIRST — a stack, not a queue.
+    /// (This line used to say "in the order queued"; at least one test,
+    /// `catalogue/tests/anime.rs`, pushes its pages in reverse and depends on the stack.)
     pub fn push(&self, response: Response) -> &Self {
         self.queued.lock().expect("lock").push(Ok(response));
         self
@@ -188,10 +205,16 @@ impl FakeTransport {
 
 impl Transport for FakeTransport {
     fn send(&self, request: Request) -> ResponseFuture<'_> {
+        let limit = request.max_body_bytes;
         self.requests.lock().expect("lock").push(request);
         let queued = self.queued.lock().expect("lock").pop();
         Box::pin(async move {
             match queued {
+                // The cap behaves as the real transport's does, so a client's size
+                // limit can be tested without a network.
+                Some(Ok(r)) if limit.is_some_and(|max| r.body.len() > max) => {
+                    Err(TransportError::TooLarge(limit.unwrap_or(0)))
+                }
                 Some(result) => result,
                 // Running out of queued responses is a test bug, and saying so is
                 // far more useful than returning a default that makes the test pass

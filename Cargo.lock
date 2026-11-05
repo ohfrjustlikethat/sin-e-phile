@@ -78,6 +78,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-trait"
+version = "0.1.92"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82f6aeea286b8eb4dd3431a1be1b59d290ace00f5bfd8e2a159bc2a05e2c1667"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.4",
+]
+
+[[package]]
 name = "atk"
 version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4194,8 +4205,10 @@ dependencies = [
  "sinephile-metadata-api",
  "sinephile-persistence",
  "sinephile-search-engine",
+ "sinephile-sources",
  "sinephile-tiers",
  "sinephile-vector-index",
+ "source-protocol",
  "specta",
  "specta-typescript",
  "tauri",
@@ -4208,6 +4221,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "url",
  "windows 0.61.3",
 ]
 
@@ -4323,6 +4337,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "sinephile-sources"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "sinephile-catalogue",
+ "sinephile-metadata-api",
+ "sinephile-persistence",
+ "source-protocol",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "sinephile-tiers"
 version = "0.1.0"
 dependencies = [
@@ -4431,6 +4460,18 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps",
+]
+
+[[package]]
+name = "source-protocol"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+ "url",
 ]
 
 [[package]]

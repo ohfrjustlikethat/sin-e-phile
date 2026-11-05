@@ -25,4 +25,9 @@ regexes = [
   # The DPAPI round-trip test vector in crates/persistence/src/secrets.rs
   # (history; the tree now uses an obviously fake value).
   '''^abcdef0123456789abcdef0123456789$''',
+  # Example candidate keys in the addon protocol spec and its example addon: a film
+  # title, a year and a quality word (ADR-0039). docs/specs/addon-protocol.md,
+  # tools/protocol/example_addon.py.
+  '''^nosferatu-1922-sd$''',
+  '''^nosferatu-1922$''',
 ]

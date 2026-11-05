@@ -117,8 +117,14 @@ the one film someone wanted appears.
 - This runs at search time and must not block the search. It is a background write
   after results are shown.
 
-**Depends on Phase 6** (the resolver) and reads best alongside Phase 12's parser, so
-it is specified here and built there.
+**Built in Phase 6, minimally; completed in Phase 12.** Phase 6 builds it from what a
+backend *reports*: a candidate's title and year (the Internet Archive and the user's
+own links both give them). `crates/sources/src/backfill.rs` holds the rules — called
+by the search screen only after an empty result is shown, a year required, never a
+second copy of a title already in that year, one row per search, marked with the
+reporting backend in `media_items.backfilled_from` (migration 0017). Phase 12 adds
+the two things that need its filename parser: reading a title and year out of a
+candidate that carries neither, and merging a backfilled row into an IMDb match.
 
 ---
 
@@ -149,5 +155,5 @@ Saying so plainly is better than implying a freshness the design cannot deliver.
 |---|---|
 | 1 — incremental bulk refresh | Phase 4 (subtask 4.13) |
 | 2 — airing schedules | Phase 4 for AniList; Phase 11 for the UI |
-| 3 — search-triggered backfill | Phase 6, using Phase 12's parser |
+| 3 — search-triggered backfill | Phase 6 from backend-reported titles; Phase 12 adds the parser and the IMDb merge |
 | 4 — full re-ingest | Phase 4 (already exists — `ingest imdb` is idempotent) |

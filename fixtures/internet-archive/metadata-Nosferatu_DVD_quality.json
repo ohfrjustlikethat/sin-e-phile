@@ -1,0 +1,205 @@
+{
+ "metadata": {
+  "identifier": "Nosferatu_DVD_quality",
+  "title": "Nosferatu_DVD_quality",
+  "year": "1922",
+  "licenseurl": "https://licence.example/licenses/publicdomain/",
+  "mediatype": "movies",
+  "collection": [
+   "silent_films",
+   "SciFi_Horror",
+   "feature_films",
+   "moviesandfilms"
+  ]
+ },
+ "files": [
+  {
+   "name": "Nosferatu_DVD_quality_archive.torrent",
+   "source": "metadata",
+   "format": "Archive BitTorrent",
+   "size": "30394"
+  },
+  {
+   "name": "Nosferatu_DVD_quality_files.xml",
+   "source": "metadata",
+   "format": "Metadata"
+  },
+  {
+   "name": "Nosferatu_DVD_quality_meta.xml",
+   "source": "metadata",
+   "format": "Metadata",
+   "size": "1681"
+  },
+  {
+   "name": "Nosferatu_DVD_quality_reviews.xml",
+   "source": "metadata",
+   "format": "Metadata",
+   "size": "8355"
+  },
+  {
+   "name": "nosferatu-1of5.gif",
+   "source": "derivative",
+   "format": "Animated GIF",
+   "size": "177371"
+  },
+  {
+   "name": "nosferatu-1of5.mpg",
+   "source": "original",
+   "format": "MPEG2",
+   "size": "999714816",
+   "height": "480",
+   "width": "640",
+   "length": "1190.3"
+  },
+  {
+   "name": "nosferatu-1of5.ogv",
+   "source": "derivative",
+   "format": "Ogg Video",
+   "size": "84959635",
+   "height": "304",
+   "width": "400",
+   "length": "1190.49"
+  },
+  {
+   "name": "nosferatu-1of5_512kb.mp4",
+   "source": "derivative",
+   "format": "512Kb MPEG4",
+   "size": "86457002",
+   "height": "240",
+   "width": "320",
+   "length": "1190.49"
+  },
+  {
+   "name": "nosferatu-2of5.gif",
+   "source": "derivative",
+   "format": "Animated GIF",
+   "size": "190539"
+  },
+  {
+   "name": "nosferatu-2of5.mpg",
+   "source": "original",
+   "format": "MPEG2",
+   "size": "999587840",
+   "height": "480",
+   "width": "640",
+   "length": "1190.46"
+  },
+  {
+   "name": "nosferatu-2of5.ogv",
+   "source": "derivative",
+   "format": "Ogg Video",
+   "size": "84974472",
+   "height": "304",
+   "width": "400",
+   "length": "1190.65"
+  },
+  {
+   "name": "nosferatu-2of5_512kb.mp4",
+   "source": "derivative",
+   "format": "512Kb MPEG4",
+   "size": "86490513",
+   "height": "240",
+   "width": "320",
+   "length": "1190.65"
+  },
+  {
+   "name": "nosferatu-3of5.gif",
+   "source": "derivative",
+   "format": "Animated GIF",
+   "size": "200081"
+  },
+  {
+   "name": "nosferatu-3of5.mpg",
+   "source": "original",
+   "format": "MPEG2",
+   "size": "999673856",
+   "height": "480",
+   "width": "640",
+   "length": "1190.46"
+  },
+  {
+   "name": "nosferatu-3of5.ogv",
+   "source": "derivative",
+   "format": "Ogg Video",
+   "size": "84629170",
+   "height": "304",
+   "width": "400",
+   "length": "1190.62"
+  },
+  {
+   "name": "nosferatu-3of5_512kb.mp4",
+   "source": "derivative",
+   "format": "512Kb MPEG4",
+   "size": "86492659",
+   "height": "240",
+   "width": "320",
+   "length": "1190.62"
+  },
+  {
+   "name": "nosferatu-4of5.gif",
+   "source": "derivative",
+   "format": "Animated GIF",
+   "size": "205281"
+  },
+  {
+   "name": "nosferatu-4of5.mpg",
+   "source": "original",
+   "format": "MPEG2",
+   "size": "999835648",
+   "height": "480",
+   "width": "640",
+   "length": "1190.43"
+  },
+  {
+   "name": "nosferatu-4of5.ogv",
+   "source": "derivative",
+   "format": "Ogg Video",
+   "size": "85015505",
+   "height": "304",
+   "width": "400",
+   "length": "1190.59"
+  },
+  {
+   "name": "nosferatu-4of5_512kb.mp4",
+   "source": "derivative",
+   "format": "512Kb MPEG4",
+   "size": "86498845",
+   "height": "240",
+   "width": "320",
+   "length": "1190.59"
+  },
+  {
+   "name": "nosferatu-5of5.gif",
+   "source": "derivative",
+   "format": "Animated GIF",
+   "size": "95105"
+  },
+  {
+   "name": "nosferatu-5of5.mpg",
+   "source": "original",
+   "format": "MPEG2",
+   "size": "249659392",
+   "height": "480",
+   "width": "640",
+   "length": "297.5"
+  },
+  {
+   "name": "nosferatu-5of5.ogv",
+   "source": "derivative",
+   "format": "Ogg Video",
+   "size": "20783635",
+   "height": "304",
+   "width": "400",
+   "length": "297.53"
+  },
+  {
+   "name": "nosferatu-5of5_512kb.mp4",
+   "source": "derivative",
+   "format": "512Kb MPEG4",
+   "size": "21756414",
+   "height": "240",
+   "width": "320",
+   "length": "297.53"
+  }
+ ]
+}

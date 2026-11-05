@@ -142,6 +142,26 @@ weak machine.
 **The analogy:** one librarian who remembers exact titles, and one who understands
 what you are in the mood for. You ask both, then combine their answers.
 
+### Sources — where a film can be watched `✅ Phase 6`
+
+Everything watchable arrives through **one interface**. Your own file, a public-domain
+film on the Internet Archive, a link you pasted, and an addon someone else runs are all
+**sources**, and each answers the same two questions: *what do you have for this film?*
+and *how do I play this one?*
+
+A search asks every source at once, and each has its own stopwatch. A source that is
+slow, broken or offline costs only itself: the others' answers appear as soon as they
+arrive. The same film reached two ways shows once.
+
+**Addons** are the way to add a source without changing the app. An addon is a short
+description — its name, what it finds, and two web addresses — plus a service its
+author runs. The app never runs an addon's code; it sends a question and reads the
+answer, and it reads every answer as if it were written by an attacker.
+
+**The analogy:** a reference desk that phones every library at once. The ones that
+answer quickly are read out first, and a library that never picks up does not keep
+anyone waiting.
+
 ### The torrent engine — why streaming is hard `⬜ Phase 7`
 
 BitTorrent splits a file into **pieces** and, by default, fetches the **rarest**
@@ -275,6 +295,16 @@ when the rest found almost nothing. Phrases like "from the 1950s" or "directed b
 parsed into filters before any of it, because models are bad at numbers. Exact titles
 and filters work very well; searching by meaning works poorly (nDCG 0.047 against
 0.75), and [`docs/case-study/search.md`](case-study/search.md) explains why.
+
+### Sources ✅ `Phase 6`
+
+`crates/source-protocol` (the interface, the manifest and the wire format, with
+validators that treat their input as hostile) and `crates/sources` (the resolver, the
+registry with health, the backends, the addon install flow, and search backfill). The
+resolver gives every source its own task and its own 8-second budget; the registry
+stores on/off, order, and counts of answers, failures and time-outs. The Internet
+Archive backend is tested against recorded responses and once against the live
+service. Settings → Sources is the screen.
 
 ### The posture guard ✅ `Phase 0`
 

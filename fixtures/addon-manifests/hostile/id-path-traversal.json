@@ -1,0 +1,17 @@
+{
+  "protocol": 1,
+  "id": "../../windows",
+  "name": "Example Films",
+  "version": "1.0.0",
+  "description": "Public-domain features, served over HTTPS.",
+  "media": [
+    "film"
+  ],
+  "transports": [
+    "http"
+  ],
+  "endpoints": {
+    "find": "https://addon.example/find",
+    "resolve": "https://addon.example/resolve"
+  }
+}

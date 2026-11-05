@@ -666,7 +666,7 @@ impl<'a> SearchRepository<'a> {
 /// exact-title match that stops working for one kind of input — which is E2 going from
 /// 100% to 86%. That is not hypothetical: the two disagreed about diacritics until the
 /// relevance harness measured it.
-fn normalise_query(query: &str) -> String {
+pub(crate) fn normalise_query(query: &str) -> String {
     use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
 
     let mut out = String::with_capacity(query.len());

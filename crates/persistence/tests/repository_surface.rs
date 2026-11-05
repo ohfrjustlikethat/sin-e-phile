@@ -22,8 +22,9 @@ use sinephile_persistence::archive::Archiver;
 use sinephile_persistence::model::EpisodeNumbering;
 use sinephile_persistence::repositories::profiles::PlaybackPosition;
 use sinephile_persistence::repositories::{
-    CatalogueRepository, CredentialRepository, EpisodeRepository, MatchReason, MediaRepository,
-    ProfileRepository, Readiness, SearchRepository, TmdbAccess, WikipediaRepository,
+    BackfillRepository, CatalogueRepository, CredentialRepository, DirectLinkRepository,
+    EpisodeRepository, MatchReason, MediaRepository, ProfileRepository, Readiness, Sample,
+    SearchRepository, SourceRepository, TmdbAccess, WikipediaRepository,
 };
 use sinephile_persistence::{Db, IdSource, MediaKind, NewMediaItem, TitleVariant};
 
@@ -754,4 +755,224 @@ async fn db_surface() {
     let one_back = Db::latest_schema_version() - 1;
     db.migrate_down_to(one_back).await.expect("migrate_down_to");
     assert_eq!(db.schema_version().await.expect("version"), Some(one_back));
+}
+
+/// `SourceRepository` (Phase 6, migration 0015).
+#[tokio::test]
+async fn source_repository_surface() {
+    let db = Db::in_memory().await.expect("open");
+    let repo = SourceRepository::new(&db);
+
+    // ensure — new rows at the end, existing ones untouched
+    repo.ensure(&["local", "archive"]).await.expect("ensure");
+    repo.set_enabled("archive", false)
+        .await
+        .expect("set_enabled");
+    repo.ensure(&["archive", "direct"])
+        .await
+        .expect("ensure again");
+
+    // all — in order, and the user's switch survived the second ensure
+    let all = repo.all().await.expect("all");
+    let ids: Vec<&str> = all.iter().map(|b| b.id.as_str()).collect();
+    assert_eq!(ids, ["local", "archive", "direct"]);
+    assert!(
+        !all[1].enabled,
+        "ensure must not re-enable what the user turned off"
+    );
+    assert!(repo.set_enabled("nope", true).await.is_err());
+
+    // reorder — must name every backend exactly once
+    let order = ["direct", "local", "archive"].map(String::from);
+    repo.reorder(&order).await.expect("reorder");
+    let ids: Vec<String> = repo
+        .all()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|b| b.id)
+        .collect();
+    assert_eq!(ids, order);
+    assert!(
+        repo.reorder(&["direct".to_string()]).await.is_err(),
+        "a partial order"
+    );
+
+    // record — counts, the weighted latency, and the last error
+    repo.record("local", &Sample::Answered { latency_ms: 100.0 })
+        .await
+        .expect("record");
+    repo.record("local", &Sample::Answered { latency_ms: 200.0 })
+        .await
+        .unwrap();
+    repo.record(
+        "local",
+        &Sample::Failed {
+            error: "x".repeat(5_000),
+        },
+    )
+    .await
+    .unwrap();
+    repo.record("local", &Sample::TimedOut).await.unwrap();
+    repo.record("gone", &Sample::TimedOut)
+        .await
+        .expect("an unknown id is ignored");
+    let local = repo
+        .all()
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|b| b.id == "local")
+        .unwrap();
+    assert_eq!((local.successes, local.failures, local.timeouts), (2, 1, 1));
+    assert!(
+        (local.latency_ms.unwrap() - 120.0).abs() < 1e-9,
+        "100 + 0.2 × (200 − 100)"
+    );
+    assert_eq!(local.last_error.as_deref(), Some("timed out"));
+    assert!(local.last_outcome_at.is_some());
+
+    // install_addon, addons — and reinstalling replaces the manifest in place
+    repo.install_addon("addon:com.example.a", "https://a.example/m.json", "{}")
+        .await
+        .expect("install_addon");
+    repo.set_enabled("addon:com.example.a", false)
+        .await
+        .unwrap();
+    repo.install_addon(
+        "addon:com.example.a",
+        "https://a.example/m2.json",
+        r#"{"v":2}"#,
+    )
+    .await
+    .expect("reinstall");
+    let addons = repo.addons().await.expect("addons");
+    assert_eq!(addons.len(), 1);
+    assert_eq!(addons[0].manifest_url, "https://a.example/m2.json");
+    assert!(!addons[0].installed_at.is_empty());
+    let row = repo
+        .all()
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|b| b.id == "addon:com.example.a")
+        .unwrap();
+    assert!(!row.enabled, "an update keeps the user's switch");
+    assert_eq!(row.position, 3);
+
+    // remove_addon — the registry row and the manifest go together; built-ins cannot
+    repo.remove_addon("addon:com.example.a")
+        .await
+        .expect("remove_addon");
+    assert!(repo.addons().await.unwrap().is_empty());
+    assert_eq!(repo.all().await.unwrap().len(), 3);
+    assert!(
+        repo.remove_addon("local").await.is_err(),
+        "a built-in is switched off, not deleted"
+    );
+}
+
+/// `DirectLinkRepository` (Phase 6, migration 0016).
+#[tokio::test]
+async fn direct_link_repository_surface() {
+    let db = Db::in_memory().await.expect("open");
+    let repo = DirectLinkRepository::new(&db);
+
+    // add — and the same URL again updates rather than duplicating
+    let link = |t: &str, y, u: &str| (t.to_string(), y, u.to_string());
+    let n = repo
+        .add(&[
+            link("Nosferatu", Some(1922), "https://a.example/nosferatu.mp4"),
+            link("Metropolis", None, "https://a.example/metropolis.mp4"),
+        ])
+        .await
+        .expect("add");
+    assert_eq!(n, 2);
+    repo.add(&[link(
+        "Metropolis",
+        Some(1927),
+        "https://a.example/metropolis.mp4",
+    )])
+    .await
+    .expect("add again");
+
+    // all — ordered by title, one row per URL
+    let all = repo.all().await.expect("all");
+    assert_eq!(all.len(), 2);
+    assert_eq!(
+        (all[0].title.as_str(), all[0].year),
+        ("Metropolis", Some(1927))
+    );
+
+    // remove
+    assert!(repo.remove(all[0].id).await.expect("remove"));
+    assert!(
+        !repo.remove(all[0].id).await.expect("remove again"),
+        "already gone"
+    );
+    assert_eq!(repo.all().await.unwrap().len(), 1);
+}
+
+/// `BackfillRepository` (Phase 6, ADR-0030 layer 3, migration 0017).
+#[tokio::test]
+async fn backfill_repository_surface() {
+    let db = Db::in_memory().await.expect("open");
+    let repo = BackfillRepository::new(&db);
+    let media = MediaRepository::new(&db);
+    let search = SearchRepository::new(&db);
+
+    // existing — sees an ordinary catalogue row by its normalised title
+    let real = media
+        .insert(&NewMediaItem::film("Metropolis", 1927))
+        .await
+        .expect("film");
+    sqlx::query("UPDATE titles SET normalised = 'metropolis' WHERE media_item_id = ?")
+        .bind(real)
+        .execute(db.pool())
+        .await
+        .unwrap();
+    assert_eq!(
+        repo.existing("METROPOLIS!", Some(1927))
+            .await
+            .expect("existing"),
+        Some(real)
+    );
+    assert_eq!(
+        repo.existing("Metropolis", Some(2001)).await.unwrap(),
+        None,
+        "another year"
+    );
+
+    // create_film — findable by all three text tiers at once
+    let id = repo
+        .create_film("Häxan", Some(1922), "internet-archive")
+        .await
+        .expect("create_film");
+    assert_eq!(repo.existing("haxan", Some(1922)).await.unwrap(), Some(id));
+    let exact = search.exact_title("Haxan", 5).await.expect("exact");
+    assert_eq!(exact.first().map(|h| h.media_item_id), Some(id));
+    assert!(search
+        .keyword("häxan", 5)
+        .await
+        .unwrap()
+        .iter()
+        .any(|h| h.media_item_id == id));
+    assert!(search
+        .fuzzy("haxxan", 5)
+        .await
+        .unwrap()
+        .iter()
+        .any(|h| h.media_item_id == id));
+    assert!(
+        repo.create_film("  ", None, "x").await.is_err(),
+        "an empty title"
+    );
+
+    // all — only the marked rows
+    let rows = repo.all().await.expect("all");
+    assert_eq!(rows.len(), 1);
+    assert_eq!(
+        (rows[0].id, rows[0].from.as_str()),
+        (id, "internet-archive")
+    );
 }

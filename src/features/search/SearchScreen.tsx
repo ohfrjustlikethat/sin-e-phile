@@ -152,6 +152,11 @@ export function SearchScreen() {
   const [searching, setSearching] = useState(false);
   const [focused, setFocused] = useState(-1);
   const [error, setError] = useState<string | null>(null);
+  // ADR-0030 layer 3: a miss is put to the sources AFTER it is on screen.
+  const [asking, setAsking] = useState(false);
+  const [found, setFound] = useState<{ title: string; year: number; found_by: string } | null>(
+    null,
+  );
 
   // The sequence number of the most recent response rendered. See the note above.
   const latest = useRef(0);
@@ -160,6 +165,8 @@ export function SearchScreen() {
 
   useEffect(() => {
     const text = query.trim();
+    setFound(null);
+    setAsking(false);
     if (!text) {
       setResponse(null);
       setError(null);
@@ -180,6 +187,9 @@ export function SearchScreen() {
           if (result.status === "ok") {
             setResponse(result.data);
             setError(null);
+            if (result.data.ready && result.data.hits.length === 0 && !result.data.catalogue_partial) {
+              backfill(text, sequence);
+            }
           } else {
             setResponse(null);
             setError(result.error);
@@ -192,6 +202,26 @@ export function SearchScreen() {
     }, DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [query]);
+
+  /**
+   * The catalogue had nothing; ask the sources, and if one has the film it becomes a
+   * catalogue entry (ADR-0030 layer 3) — then search again so it appears. Runs only
+   * after the empty result is rendered, and is dropped if the query has moved on.
+   */
+  function backfill(text: string, sequence: number) {
+    setAsking(true);
+    void commands
+      .searchBackfill(text)
+      .then(async (result) => {
+        if (sequence !== issued.current || result.status !== "ok" || !result.data) return;
+        setFound(result.data);
+        const again = await commands.search(text, 20);
+        if (sequence === issued.current && again.status === "ok") setResponse(again.data);
+      })
+      .finally(() => {
+        if (sequence === issued.current) setAsking(false);
+      });
+  }
 
   const hits = response?.hits ?? [];
   const groups = groupByKind(hits);
@@ -260,13 +290,31 @@ export function SearchScreen() {
         */}
         {response?.ready && hits.length === 0 && !searching && (
           <EmptyState
-            title={response.catalogue_partial ? "Still building the catalogue" : "Nothing found"}
+            title={
+              response.catalogue_partial
+                ? "Still building the catalogue"
+                : asking
+                  ? "Not in the catalogue"
+                  : "Nothing found"
+            }
             body={
               response.catalogue_partial
                 ? `${response.searchable_titles.toLocaleString()} titles are searchable so far, and more are still arriving. It may simply not be here yet.`
-                : "No title matches that. Try fewer words, or describe what the film is about."
+                : asking
+                  ? "Asking your sources whether any of them has it…"
+                  : "No title matches that, and none of your sources has it. Try fewer words, or describe what the film is about."
             }
           />
+        )}
+
+        {found && hits.length > 0 && (
+          <p className="mb-8 text-sm text-ink-muted" role="status">
+            Not in the catalogue until now: {found.found_by} has{" "}
+            <span className="text-ink">
+              {found.title} ({found.year})
+            </span>
+            , so it has been added.
+          </p>
         )}
 
         <div ref={rowsRef} className="flex flex-col gap-14">

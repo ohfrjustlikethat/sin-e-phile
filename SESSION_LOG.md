@@ -1642,3 +1642,60 @@ tokens are gone. Six tests replace the one rail test, and one was seen to fail. 
 **A capture-method lesson.** `PrintWindow` on a WebView2 window at 150% display scaling
 captured the page at the wrong scale. It looked like a layout overflow and wasn't. A
 headless Chrome screenshot over `vite preview`, at exact viewport sizes, settled it.
+
+### Session 20 (2026-11-03 to 2026-11-05) — Phase 6, the source resolver and addon protocol
+
+**Start.** The author asked to delete files added to the folder by accident. None could be
+found: git saw nothing untracked and nothing in the repository or `Documents` had changed
+since 2026-10-25, so nothing was deleted and the author was asked to name them. Then
+"next", then "do whatever you think is good and next". Phase 6 was planned (eleven
+subtasks, `f42a113`) with two decisions taken at their stated defaults: an addon is a
+manifest plus a remote service (ADR-0038), and backfill is built minimally now.
+
+**Built.** `crates/source-protocol` (trait, types, manifest, catalogue, wire format, all
+validated as hostile; MIT OR Apache-2.0) and `crates/sources` (resolver, registry,
+backends, install flow, overview, links, backfill). Migrations 0015 (registry, addons),
+0016 (direct links), 0017 (`backfilled_from`). `HttpTransport::untrusted()` with capped
+bodies and no redirects. Settings → Sources. `search_backfill` on the search screen. The
+protocol specification, an example addon and a conformance test.
+
+**Numbers.** E2 live: 3 candidates for *Night of the Living Dead* (1968), HEAD 200, FFmpeg
+decoded 900 frames. E4: a fast backend's batch at < 50 ms virtual while a slow one timed
+out at 300 ms; the whole search bounded at 500 ms against a backend that would take an
+hour. Regression check: E2 43/43, E3 0.0472 / 1.0000, E1 warm p95 14.5 and 15.6 ms
+(recorded 15.2), recall@10 0.9760 — unchanged. All in `docs/eval-results.md`.
+
+**Bugs the checks caught.** An Archive key check let `..` through as an identifier (caught
+by its own test). The fake transport is a stack though documented as a queue. The posture
+guard refused commits four times — subdomains of reserved names, a licence host inside
+recorded fixtures, a CDN example host, a 40-hex example hash — each fixed by removing the
+content. A Python text-mode write on Windows flipped line endings on six files; fixed per
+file to match the index. Three commit subjects ran over 72 characters, and twice the state
+recorded a SHA from a commit the hook had refused; the state is now only written after a
+commit succeeds.
+
+**A process note.** `guard.py --tree` scans tracked files only, so it reports clean on
+untracked new files; the staged check is the one that saw them. E6's evidence is the tree
+and history scans after the last commit, not before.
+
+#### Phase 6 retrospective
+
+**What went well.** Every criterion was met with evidence, in one phase-length stretch
+rather than eight sessions. Each protection was broken on purpose and seen to fail: the
+same-host rule, the depth check, bidi detection, the timeout, the abort, concurrency,
+redirect refusal, the stored-manifest recheck, the local-file refusal, the duplicate
+check, the partial-catalogue guard, and the confirm step in the UI. Recorded responses
+turned up a real-world shape — films split into five parts — that the documentation never
+mentioned, and the backend now refuses to offer a fifth of a film.
+
+**What went badly.** Small mechanical errors cost several round trips: line endings,
+long commit subjects, and state written before a commit had succeeded. The Sources screen's
+first render was cluttered, and only a screenshot showed it. It's restyled, but the
+lesson stands: render first, then judge.
+
+**Carry forward.** D54–D59: the Archive's torrent and subtitle files are unused (Phases 7
+and 10), the player must retry the next candidate on a failed open (Phase 8), an outside
+implementation of the protocol is still the stronger E5 test, the local backend and
+filename backfill wait for Phase 12, and the Sources screen needs a look in the real
+window. The author actions from Session 19 are still open: publish `embeddings-v3`, and
+retake the case-study screenshots.

@@ -24,7 +24,23 @@ impl Default for HttpTransport {
 
 impl HttpTransport {
     pub fn new() -> Self {
+        Self::build(reqwest::redirect::Policy::default())
+    }
+
+    /// For addresses a USER supplied — addon manifests and endpoints, catalogues.
+    ///
+    /// Redirects are not followed. A manifest's endpoints must be on the manifest's own
+    /// host (`source_protocol::manifest`), and a redirect is a way round that rule:
+    /// the endpoint passes the check, then answers 302 to somewhere else, or to plain
+    /// http. A 3xx comes back to the caller as a status like any other, and is refused
+    /// there.
+    pub fn untrusted() -> Self {
+        Self::build(reqwest::redirect::Policy::none())
+    }
+
+    fn build(redirects: reqwest::redirect::Policy) -> Self {
         let client = reqwest::Client::builder()
+            .redirect(redirects)
             // Identify honestly. A metadata service is entitled to know what is
             // asking, and an anonymous scraper-shaped request is the one that gets
             // blocked.
@@ -80,10 +96,13 @@ impl Transport for HttpTransport {
 
             // The body is read even for an error status: the message in it is
             // frequently the only thing that says what went wrong.
-            let body = response
-                .text()
-                .await
-                .map_err(|error| TransportError::Network(error.to_string()))?;
+            let body = match request.max_body_bytes {
+                None => response
+                    .text()
+                    .await
+                    .map_err(|error| TransportError::Network(error.to_string()))?,
+                Some(max) => read_capped(response, max).await?,
+            };
 
             Ok(Response {
                 status,
@@ -92,4 +111,29 @@ impl Transport for HttpTransport {
             })
         })
     }
+}
+
+/// Read at most `max` bytes, chunk by chunk, and stop the moment the body exceeds it.
+/// `Content-Length` is checked first, but not trusted: a server can omit it or lie, so
+/// the running count is what actually enforces the cap.
+async fn read_capped(
+    mut response: reqwest::Response,
+    max: usize,
+) -> Result<String, TransportError> {
+    if response.content_length().is_some_and(|n| n > max as u64) {
+        return Err(TransportError::TooLarge(max));
+    }
+    let mut body = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|error| TransportError::Network(error.to_string()))?
+    {
+        if body.len() + chunk.len() > max {
+            return Err(TransportError::TooLarge(max));
+        }
+        body.extend_from_slice(&chunk);
+    }
+    String::from_utf8(body)
+        .map_err(|_| TransportError::Network("the response is not UTF-8 text".into()))
 }
