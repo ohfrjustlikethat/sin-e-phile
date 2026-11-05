@@ -55,7 +55,7 @@ Phases 4 and 5 are closed (merge bf5a644). The masthead is built on branch chore
 
 ## Blockers
 
-None.
+- **B8** CI run 42041500226 on phase/06-source-resolver failed in 'Posture guard and secret scan': gitleaks' full-history scan read the addon protocol's example candidate keys ("key": "nosferatu-1922-sd", commit 4e81c94) as generic API keys. Not a secret. Fixed by ADR-0039, which allowlists the two exact values per ADR-0035 (commit fb7d697); a local `gitleaks detect` over the full history now finds no leaks. Clear this blocker when the next CI run on the branch is green.
 
 ---
 

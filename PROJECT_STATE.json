@@ -1929,7 +1929,15 @@
     }
   ],
   "next_action": "Phases 4 and 5 are closed (merge bf5a644). The masthead is built on branch chore/masthead and merges to main once CI is green. Next: plan Phase 6 (source-resolver). Read SPEC.md §15 Phase 6, author its subtasks in PROJECT_STATE.json (both copies), and present the plan before code. AUTHOR ACTIONS OUTSTANDING: (1) publish data/embeddings-bge-small-en-v1.5-int8.bin as GitHub release embeddings-v3, because the downloader already points there and v2 can't be read; (2) with the machine idle, run `powershell -ExecutionPolicy Bypass -File tools/shots/capture.ps1 -SettleMs 9000 -QueryMs 3500` so the case-study shots show the current search screen.",
-  "blockers": [],
+  "blockers": [
+    {
+      "id": "B8",
+      "raised": "2026-11-05T14:20:00Z",
+      "needs_user": false,
+      "description": "CI run 42041500226 on phase/06-source-resolver failed in 'Posture guard and secret scan': gitleaks' full-history scan read the addon protocol's example candidate keys (\"key\": \"nosferatu-1922-sd\", commit 4e81c94) as generic API keys. Not a secret. Fixed by ADR-0039, which allowlists the two exact values per ADR-0035 (commit fb7d697); a local `gitleaks detect` over the full history now finds no leaks. Clear this blocker when the next CI run on the branch is green.",
+      "decide_by_phase": 6
+    }
+  ],
   "decisions_pending": [
     {
       "id": "P1",
