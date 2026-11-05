@@ -2153,6 +2153,11 @@
       "id": "0037",
       "title": "Navigation moves to a top masthead, and Phase 18 ends with a design overhaul",
       "date": "2026-10-25"
+    },
+    {
+      "id": "0038",
+      "title": "An addon is a remote service described by a manifest",
+      "date": "2026-11-05"
     }
   ],
   "environment": {

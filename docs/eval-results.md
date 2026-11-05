@@ -2173,3 +2173,23 @@ Minutes later the same request redirected to a different storage node and succee
 and the first name resolved again. A candidate can be valid and briefly unreachable;
 the player (Phase 8) must treat a failed open as "try the next candidate", not as the
 film being unavailable.
+
+### Regression check before merging Phase 6 (rule 13)
+
+Every harness against the real catalogue (3.946 GB, migrations 0015–0017 applied on
+open), release build, commit `1749551`, 2026-11-05. Phase 6 did not touch ranking; these
+confirm it did not move anything either.
+
+| Metric | Phase 5 recorded | Now | Command |
+|---|---|---|---|
+| E2 exact-title top-1 | 43/43 | **43/43** | `cargo run --release -p eval -- all` |
+| E3 meaning nDCG@10 | 0.0472 | **0.0472** | same |
+| E3 filter nDCG@10 | 1.0000 | **1.0000** | same |
+| E1 p50 / p95, warm | 6.4 / 15.2 ms | **6.3 / 14.5 ms**, then 6.7 / 15.6 ms | `target/release/eval.exe search`, twice |
+| HNSW recall@10 | 0.9760 | **0.9760** (200 queries; index p95 1.29 ms) | `target/release/eval.exe vector --report` |
+
+The first E1 run, the one immediately after the migrations, read **p50 10.8 / p95 43.0 ms**:
+the first open after a schema change, with the database's pages cold. The two runs after
+it are the comparable ones and sit either side of the Phase 5 figure. Recorded rather than
+dropped, because a cold first search is what a user sees after an update, and it is still
+inside the 80 ms budget.
