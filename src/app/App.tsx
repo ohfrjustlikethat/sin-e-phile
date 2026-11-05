@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Masthead } from "@/app/Masthead";
 import { PlayerScreen } from "@/features/player/PlayerScreen";
+import { DetailScreen } from "@/features/detail/DetailScreen";
 import { Placeholder } from "@/app/Placeholder";
 import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { SearchScreen } from "@/features/search/SearchScreen";
@@ -22,6 +23,7 @@ const LABELS: Record<Destination, string> = {
 export function App() {
   const { destination, settingsOpen, setDestination, setSettingsOpen } = useUi();
   const playing = useUi((s) => s.playing);
+  const detail = useUi((s) => s.detail);
   const [palette, setPalette] = useState(false);
   const [searching, setSearching] = useState(false);
 
@@ -93,6 +95,8 @@ export function App() {
       <main className="min-h-0 min-w-0 flex-1 overflow-auto">
         {settingsOpen ? (
           <SettingsScreen />
+        ) : detail !== null ? (
+          <DetailScreen />
         ) : searching ? (
           <SearchScreen />
         ) : (

@@ -11,6 +11,7 @@ const commands = {
   playerAction: vi.fn(() => ok(null)),
   playerPauseStill: vi.fn(() => ok("data:image/jpeg;base64,AAAA")),
   playerResumeVideo: vi.fn(() => ok(null)),
+  savePosition: vi.fn(() => ok(null)),
 };
 vi.mock("@/lib/ipc", () => ({ commands }));
 const { PlayerScreen } = await import("./PlayerScreen");

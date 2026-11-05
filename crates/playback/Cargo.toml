@@ -18,4 +18,9 @@ source-protocol = { path = "../source-protocol" }
 thiserror = "2"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+# The end-to-end tests play what the plan opens, headless, and build a swarm to do it.
+sinephile-player = { path = "../player" }
+sinephile-metadata-api = { path = "../metadata-api" }
+librqbit = { version = "=9.0.1", default-features = false, features = ["rust-tls"] }
+tempfile = "3"

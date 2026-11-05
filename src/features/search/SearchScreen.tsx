@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { commands, type SearchHit, type SearchResponse, type Why } from "@/lib/ipc";
 import { Skeleton, EmptyState } from "@/design-system";
 import { MeaningDownload } from "./MeaningDownload";
+import { useUi } from "@/lib/store";
 
 /**
  * Search — `SPEC.md` §15 Phase 5: "results as you type, grouped by kind, keyboard
@@ -93,12 +94,14 @@ function Entry({
   weight,
   focused,
   onFocus,
+  onOpen,
 }: {
   hit: SearchHit;
   number: number;
   weight: "lead" | "second" | "list";
   focused: boolean;
   onFocus: () => void;
+  onOpen: () => void;
 }) {
   const why = WHY[hit.why];
   const byline = [
@@ -118,8 +121,13 @@ function Entry({
   return (
     <div
       data-row
+      role="link"
       tabIndex={0}
       onFocus={onFocus}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onOpen();
+      }}
       className={`grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-x-4 border-b border-line-subtle ${
         weight === "lead" ? "pb-8" : weight === "second" ? "py-5" : "py-3"
       } ${focused ? "bg-raised" : ""}`}
@@ -147,6 +155,7 @@ function Entry({
 }
 
 export function SearchScreen() {
+  const openDetail = useUi((s) => s.openDetail);
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [searching, setSearching] = useState(false);
@@ -338,6 +347,7 @@ export function SearchScreen() {
                         weight={index === 0 ? "lead" : index < 3 ? "second" : "list"}
                         focused={focused === index}
                         onFocus={() => setFocused(index)}
+                        onOpen={() => openDetail(hit.id)}
                       />
                     </li>
                   );

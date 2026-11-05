@@ -5242,6 +5242,7 @@ dependencies = [
  "sinephile-embedding",
  "sinephile-metadata-api",
  "sinephile-persistence",
+ "sinephile-playback",
  "sinephile-player",
  "sinephile-search-engine",
  "sinephile-sources",
@@ -5368,10 +5369,14 @@ dependencies = [
 name = "sinephile-playback"
 version = "0.1.0"
 dependencies = [
+ "librqbit",
+ "sinephile-metadata-api",
  "sinephile-persistence",
+ "sinephile-player",
  "sinephile-sources",
  "sinephile-torrent",
  "source-protocol",
+ "tempfile",
  "thiserror 2.0.20",
  "tokio",
 ]

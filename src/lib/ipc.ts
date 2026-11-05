@@ -143,6 +143,18 @@ export const commands = {
 	ended: boolean,
 	tracks: TrackView[],
 } | null, string>(__TAURI_INVOKE("player_state")),
+	itemDetail: (id: number) => typedError<{
+	id: number,
+	title: string,
+	year: number | null,
+	kind: string,
+	runtime_minutes: number | null,
+	synopsis: string | null,
+	credits: CreditView[],
+} | null, string>(__TAURI_INVOKE("item_detail", { id })),
+	preparePlay: (id: number) => typedError<PlayPlanView, string>(__TAURI_INVOKE("prepare_play", { id })),
+	/**  Remember where the viewer is, for resume. Called periodically and on leaving. */
+	savePosition: (id: number, position: number | null, duration: number | null) => typedError<null, string>(__TAURI_INVOKE("save_position", { id, position, duration })),
 };
 
 /* Types */
@@ -244,6 +256,12 @@ export type CatalogueView = {
 	addons: CatalogueItem[],
 };
 
+export type CreditView = {
+	name: string,
+	role: string,
+	character: string | null,
+};
+
 /**  A chrome panel's silhouette in CSS pixels; the page converts nothing, this does. */
 export type CutoutRect = {
 	x: number | null,
@@ -275,6 +293,16 @@ export type HardwareProfile = {
 	overridden: boolean,
 };
 
+export type ItemDetail = {
+	id: number,
+	title: string,
+	year: number | null,
+	kind: string,
+	runtime_minutes: number | null,
+	synopsis: string | null,
+	credits: CreditView[],
+};
+
 /**  One of the user's own links. Ids are rowids, far below 2^53 (see `SearchHit`). */
 export type LinkInfo = {
 	id: number,
@@ -292,6 +320,16 @@ export type OptionalAsset = {
 	/**  `absent`, `present`, or a reason it cannot be used. */
 	state: string,
 	unusable_reason: string | null,
+};
+
+/**  What Play will open, decided now (see `sinephile_playback::plan`). */
+export type PlayPlanView = {
+	title: string,
+	open: string,
+	start: number | null,
+	/**  The source's display name. */
+	from: string,
+	offered: number,
 };
 
 /**

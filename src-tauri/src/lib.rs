@@ -71,6 +71,9 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::player::player_resume_video,
             commands::player::player_close,
             commands::player::player_state,
+            commands::playback::item_detail,
+            commands::playback::prepare_play,
+            commands::playback::save_position,
         ])
         // `AssetProgress` travels as an EVENT payload, so no command signature mentions it
         // and specta would not export it. Registered explicitly rather than hand-written in

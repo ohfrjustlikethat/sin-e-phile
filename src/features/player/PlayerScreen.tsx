@@ -64,13 +64,28 @@ export function PlayerScreen() {
   const bottom = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<number | undefined>(undefined);
 
-  // Open on mount, close on unmount.
+  // The latest position, for saving on the way out (Phase 8 E4).
+  const last = useRef<{ position: number; duration: number | null }>({ position: 0, duration: null });
+  useEffect(() => {
+    if (state?.position != null) last.current = { position: state.position, duration: state.duration };
+  }, [state]);
+
+  // Open on mount; save the position and close on unmount.
   useEffect(() => {
     if (!playing) return;
     void commands.playerOpen(playing.target, playing.start).then((r) => {
       if (r.status === "error") setError(r.error);
     });
+    const save = () => {
+      if (playing.mediaItemId !== null && last.current.position > 0) {
+        void commands.savePosition(playing.mediaItemId, last.current.position, last.current.duration);
+      }
+    };
+    // Also every 15 s, so a crash or a closed window loses little.
+    const timer = window.setInterval(save, 15_000);
     return () => {
+      window.clearInterval(timer);
+      save();
       void commands.playerClose();
       void setFullscreen(false);
     };

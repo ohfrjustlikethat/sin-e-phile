@@ -24,9 +24,13 @@ interface UiState {
   destination: Destination;
   settingsOpen: boolean;
   playing: Playing | null;
+  /** The catalogue item whose detail page is open. */
+  detail: number | null;
   setDestination: (d: Destination) => void;
   setSettingsOpen: (open: boolean) => void;
   play: (p: Playing) => void;
+  openDetail: (id: number) => void;
+  closeDetail: () => void;
   stopPlaying: () => void;
 }
 
@@ -36,9 +40,12 @@ export const useUi = create<UiState>()(
       destination: "home",
       settingsOpen: false,
       playing: null,
-      setDestination: (destination) => set({ destination }),
+      detail: null,
+      setDestination: (destination) => set({ destination, detail: null }),
       setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
       play: (playing) => set({ playing }),
+      openDetail: (detail) => set({ detail, settingsOpen: false }),
+      closeDetail: () => set({ detail: null }),
       stopPlaying: () => set({ playing: null }),
     }),
     {
