@@ -289,12 +289,30 @@ async fn serve(mut socket: TcpStream, token: &str, routes: &Routes) -> io::Resul
     if status == 206 {
         headers.push(("Content-Range", content_range.as_str()));
     }
+    // Open and seek BEFORE promising anything. A reader that cannot be opened — a dead
+    // swarm, a torrent removed mid-play — must be a 503 the player can report, not a
+    // 206 whose body never comes (seen live: a run that got 181 bytes of headers and a
+    // closed connection).
+    let reader = if request.head || body_len == 0 {
+        None
+    } else {
+        let opened = async {
+            let mut r = source.open().await?;
+            r.seek(SeekFrom::Start(start)).await?;
+            Ok::<_, io::Error>(r)
+        };
+        match opened.await {
+            Ok(r) => Some(r),
+            Err(e) => {
+                tracing::warn!(error = %e, "stream could not be opened");
+                return reply(&mut socket, 503, &[], None).await;
+            }
+        }
+    };
     reply(&mut socket, status, &headers, Some(body_len)).await?;
-    if request.head || body_len == 0 {
+    let Some(reader) = reader else {
         return Ok(());
-    }
-    let mut reader = source.open().await?;
-    reader.seek(SeekFrom::Start(start)).await?;
+    };
     let mut limited = reader.take(body_len);
     tokio::io::copy(&mut limited, &mut socket).await?;
     socket.shutdown().await
@@ -313,6 +331,7 @@ async fn reply(
         404 => "Not Found",
         405 => "Method Not Allowed",
         416 => "Range Not Satisfiable",
+        503 => "Service Unavailable",
         _ => "Error",
     };
     let mut head = format!("HTTP/1.1 {status} {reason}\r\nConnection: close\r\n");

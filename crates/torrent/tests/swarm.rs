@@ -199,9 +199,11 @@ async fn a_dead_swarm_fails_fast_with_a_clear_error() {
     let took = start.elapsed();
     assert!(err.to_string().contains("nobody is sharing this"), "{err}");
     assert!(took < Duration::from_secs(5), "took {took:?}");
-    // Through the server the request ends rather than hanging.
+    // Through the server the request ends rather than hanging — and says why, with a
+    // 503, rather than promising a 206 whose body never arrives.
     let ended = tokio::time::timeout(Duration::from_secs(10), get(&url, Some("bytes=0-99"))).await;
-    assert!(ended.is_ok(), "the streaming request hung on a dead swarm");
+    let (status, _, body) = ended.expect("the streaming request hung on a dead swarm");
+    assert_eq!((status, body.len()), (503, 0));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

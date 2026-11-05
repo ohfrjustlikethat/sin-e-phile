@@ -51,20 +51,49 @@ async fn main() {
     let mut config = EngineConfig::new(&scratch);
     config.dead_swarm_after = Duration::from_secs(60);
     let engine = Arc::new(Engine::start(config).await.unwrap());
-    println!("session started          {:>8.0} ms", t0.elapsed().as_secs_f64() * 1e3);
+    println!(
+        "session started          {:>8.0} ms",
+        t0.elapsed().as_secs_f64() * 1e3
+    );
 
     let t1 = Instant::now();
-    let id = engine.add(Source::File(torrent), AddOptions::default()).await.unwrap();
-    println!("torrent live             {:>8.0} ms", t1.elapsed().as_secs_f64() * 1e3);
+    let id = engine
+        .add(Source::File(torrent), AddOptions::default())
+        .await
+        .unwrap();
+    println!(
+        "torrent live             {:>8.0} ms",
+        t1.elapsed().as_secs_f64() * 1e3
+    );
+
+    // Where the start-up time goes: finding the first peer, then fetching.
+    let tp = Instant::now();
+    engine.wait_for_peers(&id).await.unwrap();
+    println!(
+        "first live peer          {:>8.0} ms",
+        (t1.elapsed()).as_secs_f64() * 1e3
+    );
+    let _ = tp;
 
     // The largest file: a disc image is not a video, so the selection rules do not apply.
-    let file = engine.files(&id).unwrap().into_iter().max_by_key(|f| f.len).unwrap();
+    let file = engine
+        .files(&id)
+        .unwrap()
+        .into_iter()
+        .max_by_key(|f| f.len)
+        .unwrap();
     let server = StreamServer::start().await.unwrap();
     let url = server.publish("bench", engine.stream_source(&id, &file).unwrap());
 
     let (ttfb, mib) = range(&url, 0, 1 << 20).await;
-    println!("first byte (local HTTP)  {:>8.0} ms", ttfb.as_secs_f64() * 1e3);
-    println!("first 1 MiB              {:>8.0} ms", mib.as_secs_f64() * 1e3);
+    println!(
+        "first byte (local HTTP)  {:>8.0} ms",
+        ttfb.as_secs_f64() * 1e3
+    );
+    println!(
+        "first 1 MiB              {:>8.0} ms",
+        mib.as_secs_f64() * 1e3
+    );
     println!(
         "E1 proxy: add -> 1 MiB   {:>8.0} ms   (target < 8000)",
         t1.elapsed().as_secs_f64() * 1e3
@@ -72,8 +101,14 @@ async fn main() {
 
     let at = file.len * 6 / 10;
     let (sfb, smib) = range(&url, at, 1 << 20).await;
-    println!("seek to 60%: first byte  {:>8.0} ms", sfb.as_secs_f64() * 1e3);
-    println!("seek to 60%: 1 MiB       {:>8.0} ms   (E2 target < 5000)", smib.as_secs_f64() * 1e3);
+    println!(
+        "seek to 60%: first byte  {:>8.0} ms",
+        sfb.as_secs_f64() * 1e3
+    );
+    println!(
+        "seek to 60%: 1 MiB       {:>8.0} ms   (E2 target < 5000)",
+        smib.as_secs_f64() * 1e3
+    );
 
     let before = engine.status(&id).unwrap().progress_bytes;
     let tb = Instant::now();

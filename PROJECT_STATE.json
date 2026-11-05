@@ -78,13 +78,15 @@
         "id": "E1",
         "text": "Playback begins in < 8 s on a healthy swarm (measured against a legal, well-seeded Internet Archive or Linux ISO torrent).",
         "met": false,
-        "evidence": null
+        "evidence": "MEASURED 2026-11-06, carried (ADR-0036): add -> first 1 MiB through the local streaming server, Ubuntu 24.04 desktop torrent fetched at run time: 3.6-3.8 s in 4 of 20 runs, 9.6-55 s in the rest; once a peer is connected the first MiB takes 0.6-3.4 s, the time is all first-peer discovery. qBittorrent on the same torrent minutes apart: 13.1 s. docs/eval-results.md 'Phase 7'.",
+        "carried_to_phase": 8,
+        "carried_reason": "The delay is peer discovery on this network, which qBittorrent also suffers (13.1 s); Phase 8 measures play to first frame end to end and can start the torrent when the detail page opens so discovery overlaps with reading."
       },
       {
         "id": "E2",
         "text": "Seeking to an unbuffered region resumes playback in < 5 s.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "cargo run --release -p sinephile-torrent --example bench (e45152a and later): seek to 60% of an unbuffered 6 GB torrent and read 1 MiB through the local server in 0.15-3.73 s across 18 live runs, all under 5 s; loopback test a_seek_into_an_unbuffered_region_is_served_quickly. docs/eval-results.md 'Phase 7'."
       },
       {
         "id": "E3",
@@ -107,20 +109,22 @@
       {
         "id": "E6",
         "text": "Measured against qBittorrent on both axes and both numbers published: time-to-first-frame on a healthy swarm, and sustained bulk throughput on the same torrent. Losing on bulk is a finding, not a failure — ADR-0029 exists so the project does not have to win that comparison — but the comparison must be made rather than left implicit.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "docs/eval-results.md 'Phase 7', E6 table: same torrent, same connection, minutes apart — sin-e-phile 3.58 s to first MiB and 33.85 MiB/s bulk (bench example); qBittorrent 5.2.0 13.08 s and 34.71 MiB/s (python tools/bench/qbittorrent_compare.py, throwaway profile). Both published."
       },
       {
         "id": "E7",
         "text": "Binding to a specific network interface works, verified by disabling that adapter mid-download and confirming traffic stops rather than falling back.",
         "met": false,
-        "evidence": null
+        "evidence": "MEASURED 2026-11-05, carried (ADR-0036): crates/torrent/tests/binding.rs (a279415) — an unknown adapter stops the engine starting; bound to loopback, local traffic flows and an outside address is unreachable (seen to fail with IP_UNICAST_IF removed). Probe: bound to the VPN adapter a connection succeeds, bound to a disconnected adapter it fails WSAENETUNREACH instead of using Wi-Fi.",
+        "carried_to_phase": 8,
+        "carried_reason": "The criterion requires disabling the bound adapter mid-download, which on this machine means dropping the author's VPN; it is batched with Phase 8's other manual checks for the author to perform."
       },
       {
         "id": "E8",
         "text": "`docs/specs/streaming-scheduler.md` explains the algorithm with a diagram.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "docs/specs/streaming-scheduler.md: the algorithm, where scheduling happens, the bandwidth floor with its measurements, and a diagram of the path from player to sockets."
       }
     ]
   },
@@ -996,13 +1000,15 @@
           "id": "E1",
           "text": "Playback begins in < 8 s on a healthy swarm (measured against a legal, well-seeded Internet Archive or Linux ISO torrent).",
           "met": false,
-          "evidence": null
+          "evidence": "MEASURED 2026-11-06, carried (ADR-0036): add -> first 1 MiB through the local streaming server, Ubuntu 24.04 desktop torrent fetched at run time: 3.6-3.8 s in 4 of 20 runs, 9.6-55 s in the rest; once a peer is connected the first MiB takes 0.6-3.4 s, the time is all first-peer discovery. qBittorrent on the same torrent minutes apart: 13.1 s. docs/eval-results.md 'Phase 7'.",
+          "carried_to_phase": 8,
+          "carried_reason": "The delay is peer discovery on this network, which qBittorrent also suffers (13.1 s); Phase 8 measures play to first frame end to end and can start the torrent when the detail page opens so discovery overlaps with reading."
         },
         {
           "id": "E2",
           "text": "Seeking to an unbuffered region resumes playback in < 5 s.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "cargo run --release -p sinephile-torrent --example bench (e45152a and later): seek to 60% of an unbuffered 6 GB torrent and read 1 MiB through the local server in 0.15-3.73 s across 18 live runs, all under 5 s; loopback test a_seek_into_an_unbuffered_region_is_served_quickly. docs/eval-results.md 'Phase 7'."
         },
         {
           "id": "E3",
@@ -1025,20 +1031,22 @@
         {
           "id": "E6",
           "text": "Measured against qBittorrent on both axes and both numbers published: time-to-first-frame on a healthy swarm, and sustained bulk throughput on the same torrent. Losing on bulk is a finding, not a failure — ADR-0029 exists so the project does not have to win that comparison — but the comparison must be made rather than left implicit.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "docs/eval-results.md 'Phase 7', E6 table: same torrent, same connection, minutes apart — sin-e-phile 3.58 s to first MiB and 33.85 MiB/s bulk (bench example); qBittorrent 5.2.0 13.08 s and 34.71 MiB/s (python tools/bench/qbittorrent_compare.py, throwaway profile). Both published."
         },
         {
           "id": "E7",
           "text": "Binding to a specific network interface works, verified by disabling that adapter mid-download and confirming traffic stops rather than falling back.",
           "met": false,
-          "evidence": null
+          "evidence": "MEASURED 2026-11-05, carried (ADR-0036): crates/torrent/tests/binding.rs (a279415) — an unknown adapter stops the engine starting; bound to loopback, local traffic flows and an outside address is unreachable (seen to fail with IP_UNICAST_IF removed). Probe: bound to the VPN adapter a connection succeeds, bound to a disconnected adapter it fails WSAENETUNREACH instead of using Wi-Fi.",
+          "carried_to_phase": 8,
+          "carried_reason": "The criterion requires disabling the bound adapter mid-download, which on this machine means dropping the author's VPN; it is batched with Phase 8's other manual checks for the author to perform."
         },
         {
           "id": "E8",
           "text": "`docs/specs/streaming-scheduler.md` explains the algorithm with a diagram.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "docs/specs/streaming-scheduler.md: the algorithm, where scheduling happens, the bandwidth floor with its measurements, and a diagram of the path from player to sockets."
         }
       ],
       "subtasks": [

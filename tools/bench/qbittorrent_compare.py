@@ -23,7 +23,10 @@ Stdlib only (ADR-0012).
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
+import os
 import subprocess
 import sys
 import time
@@ -42,6 +45,15 @@ def call(path: str, data: bytes | None = None, headers: dict | None = None) -> b
         return r.read()
 
 
+def password_entry() -> str:
+    """qBittorrent 5 will not start its Web UI without credentials, even with localhost
+    authentication off. A random password nobody knows, in qBittorrent's own format:
+    PBKDF2-HMAC-SHA512, 100,000 iterations, 16-byte salt, as @ByteArray(salt:hash)."""
+    salt = os.urandom(16)
+    key = hashlib.pbkdf2_hmac("sha512", os.urandom(24), salt, 100_000, dklen=64)
+    return f"@ByteArray({base64.b64encode(salt).decode()}:{base64.b64encode(key).decode()})"
+
+
 def write_profile(profile: Path, downloads: Path) -> None:
     config = profile / "qBittorrent" / "config"
     config.mkdir(parents=True, exist_ok=True)
@@ -55,6 +67,8 @@ def write_profile(profile: Path, downloads: Path) -> None:
         f"WebUI\\Port={PORT}\n"
         "WebUI\\Address=127.0.0.1\n"
         "WebUI\\LocalHostAuth=false\n"
+        "WebUI\\Username=bench\n"
+        f"WebUI\\Password_PBKDF2=\"{password_entry()}\"\n"
         "General\\ExitConfirm=false\n",
         encoding="utf-8",
     )
