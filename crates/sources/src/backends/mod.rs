@@ -9,6 +9,7 @@ use std::sync::Arc;
 use source_protocol::SourceBackend;
 
 pub mod direct;
+pub mod local;
 
 /// What backends may draw on when they are built. The app fills it once at startup
 /// and again whenever the user changes something a backend reads.
@@ -21,7 +22,8 @@ pub struct Context {
 /// Every backend available right now, built-in and addon alike. Which of them are
 /// asked, and in what order, is the registry's decision (`crate::registry`).
 pub fn all(ctx: &Context) -> Vec<Arc<dyn SourceBackend>> {
-    vec![Arc::new(direct::DirectHttpBackend::new(
-        ctx.direct_links.clone(),
-    ))]
+    vec![
+        Arc::new(local::LocalFileBackend),
+        Arc::new(direct::DirectHttpBackend::new(ctx.direct_links.clone())),
+    ]
 }
