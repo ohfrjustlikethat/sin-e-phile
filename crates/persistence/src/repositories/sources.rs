@@ -234,3 +234,65 @@ impl<'a> SourceRepository<'a> {
         Ok(())
     }
 }
+
+/// A link the user added, for the direct HTTP backend (migration 0016).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DirectLinkRow {
+    pub id: i64,
+    pub title: String,
+    pub year: Option<i64>,
+    pub url: String,
+}
+
+pub struct DirectLinkRepository<'a> {
+    db: &'a Db,
+}
+
+impl<'a> DirectLinkRepository<'a> {
+    pub fn new(db: &'a Db) -> Self {
+        Self { db }
+    }
+
+    /// Add links in one transaction. A URL already present has its title and year
+    /// replaced, so re-importing a corrected playlist corrects it. Returns how many
+    /// rows were written.
+    pub async fn add(&self, links: &[(String, Option<i64>, String)]) -> Result<usize, DbError> {
+        let mut tx = self.db.pool().begin().await?;
+        for (title, year, url) in links {
+            sqlx::query(
+                "INSERT INTO direct_links (title, year, url) VALUES (?1, ?2, ?3)
+                 ON CONFLICT (url) DO UPDATE SET title = excluded.title, year = excluded.year",
+            )
+            .bind(title)
+            .bind(year)
+            .bind(url)
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(links.len())
+    }
+
+    pub async fn all(&self) -> Result<Vec<DirectLinkRow>, DbError> {
+        let rows = sqlx::query("SELECT id, title, year, url FROM direct_links ORDER BY title, id")
+            .fetch_all(self.db.pool())
+            .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| DirectLinkRow {
+                id: r.get(0),
+                title: r.get(1),
+                year: r.get(2),
+                url: r.get(3),
+            })
+            .collect())
+    }
+
+    pub async fn remove(&self, id: i64) -> Result<bool, DbError> {
+        let done = sqlx::query("DELETE FROM direct_links WHERE id = ?1")
+            .bind(id)
+            .execute(self.db.pool())
+            .await?;
+        Ok(done.rows_affected() == 1)
+    }
+}

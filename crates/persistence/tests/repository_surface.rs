@@ -22,9 +22,9 @@ use sinephile_persistence::archive::Archiver;
 use sinephile_persistence::model::EpisodeNumbering;
 use sinephile_persistence::repositories::profiles::PlaybackPosition;
 use sinephile_persistence::repositories::{
-    CatalogueRepository, CredentialRepository, EpisodeRepository, MatchReason, MediaRepository,
-    ProfileRepository, Readiness, Sample, SearchRepository, SourceRepository, TmdbAccess,
-    WikipediaRepository,
+    CatalogueRepository, CredentialRepository, DirectLinkRepository, EpisodeRepository,
+    MatchReason, MediaRepository, ProfileRepository, Readiness, Sample, SearchRepository,
+    SourceRepository, TmdbAccess, WikipediaRepository,
 };
 use sinephile_persistence::{Db, IdSource, MediaKind, NewMediaItem, TitleVariant};
 
@@ -870,4 +870,45 @@ async fn source_repository_surface() {
         repo.remove_addon("local").await.is_err(),
         "a built-in is switched off, not deleted"
     );
+}
+
+/// `DirectLinkRepository` (Phase 6, migration 0016).
+#[tokio::test]
+async fn direct_link_repository_surface() {
+    let db = Db::in_memory().await.expect("open");
+    let repo = DirectLinkRepository::new(&db);
+
+    // add — and the same URL again updates rather than duplicating
+    let link = |t: &str, y, u: &str| (t.to_string(), y, u.to_string());
+    let n = repo
+        .add(&[
+            link("Nosferatu", Some(1922), "https://a.example/nosferatu.mp4"),
+            link("Metropolis", None, "https://a.example/metropolis.mp4"),
+        ])
+        .await
+        .expect("add");
+    assert_eq!(n, 2);
+    repo.add(&[link(
+        "Metropolis",
+        Some(1927),
+        "https://a.example/metropolis.mp4",
+    )])
+    .await
+    .expect("add again");
+
+    // all — ordered by title, one row per URL
+    let all = repo.all().await.expect("all");
+    assert_eq!(all.len(), 2);
+    assert_eq!(
+        (all[0].title.as_str(), all[0].year),
+        ("Metropolis", Some(1927))
+    );
+
+    // remove
+    assert!(repo.remove(all[0].id).await.expect("remove"));
+    assert!(
+        !repo.remove(all[0].id).await.expect("remove again"),
+        "already gone"
+    );
+    assert_eq!(repo.all().await.unwrap().len(), 1);
 }

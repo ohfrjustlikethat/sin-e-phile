@@ -16,6 +16,8 @@ description = "The source resolver and the reference backends (SPEC.md §6.1, Ph
 source-protocol = { path = "../source-protocol" }
 # The registry: which backends are on, their order, and their health (migration 0015).
 sinephile-persistence = { path = "../persistence" }
+# For `matching::normalise`, so a title matches here exactly as it does in search.
+sinephile-catalogue = { path = "../catalogue" }
 tokio = { version = "1", features = ["rt", "time", "sync", "macros"] }
 tracing = "0.1"
 

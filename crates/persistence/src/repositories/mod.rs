@@ -21,4 +21,6 @@ pub use episodes::EpisodeRepository;
 pub use media::MediaRepository;
 pub use profiles::ProfileRepository;
 pub use search::{Hit, HitDetail, MatchReason, SearchRepository};
-pub use sources::{AddonRow, BackendRow, Sample, SourceRepository};
+pub use sources::{
+    AddonRow, BackendRow, DirectLinkRepository, DirectLinkRow, Sample, SourceRepository,
+};
