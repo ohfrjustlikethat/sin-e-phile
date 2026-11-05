@@ -55,10 +55,12 @@ sinephile-vector-index = { path = "../crates/vector-index" }
 # install flow. Every rule lives in the crates; the commands only call them.
 source-protocol = { path = "../crates/source-protocol" }
 sinephile-sources = { path = "../crates/sources" }
+# The torrent engine and local streaming server (Phase 7), started on first use.
+sinephile-torrent = { path = "../crates/torrent" }
 url = "=2.5.8"
 # For the async mutex around the engine: its lock is held across awaits, which a std
 # mutex may not be.
-tokio = { version = "1", features = ["sync"] }
+tokio = { version = "1", features = ["sync", "time"] }
 thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }

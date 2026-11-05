@@ -43,11 +43,20 @@ async fn bound_to_loopback_local_traffic_still_flows() {
     let bd = BindDevice::new_from_name(&loopback_name()).unwrap();
     let conn = tokio::time::timeout(
         Duration::from_secs(3),
-        tcp_connect(addr, ConnectOpts { bind_device: Some(&bd), ..Default::default() }),
+        tcp_connect(
+            addr,
+            ConnectOpts {
+                bind_device: Some(&bd),
+                ..Default::default()
+            },
+        ),
     )
     .await
     .expect("timed out");
-    assert!(conn.is_ok(), "binding broke traffic on its own adapter: {conn:?}");
+    assert!(
+        conn.is_ok(),
+        "binding broke traffic on its own adapter: {conn:?}"
+    );
 }
 
 /// Needs the internet: `BINDING_TARGET=<ip:port> cargo test -p sinephile-torrent
@@ -56,14 +65,33 @@ async fn bound_to_loopback_local_traffic_still_flows() {
 #[tokio::test]
 #[ignore]
 async fn bound_to_one_adapter_traffic_never_leaves_by_another() {
-    let target = std::env::var("BINDING_TARGET").expect("BINDING_TARGET=ip:port").parse().unwrap();
-    let unbound = tokio::time::timeout(Duration::from_secs(5), tcp_connect(target, ConnectOpts::default())).await;
-    assert!(matches!(unbound, Ok(Ok(_))), "the target is not reachable at all: {unbound:?}");
+    let target = std::env::var("BINDING_TARGET")
+        .expect("BINDING_TARGET=ip:port")
+        .parse()
+        .unwrap();
+    let unbound = tokio::time::timeout(
+        Duration::from_secs(5),
+        tcp_connect(target, ConnectOpts::default()),
+    )
+    .await;
+    assert!(
+        matches!(unbound, Ok(Ok(_))),
+        "the target is not reachable at all: {unbound:?}"
+    );
     let bd = BindDevice::new_from_name(&loopback_name()).unwrap();
     let bound = tokio::time::timeout(
         Duration::from_secs(5),
-        tcp_connect(target, ConnectOpts { bind_device: Some(&bd), ..Default::default() }),
+        tcp_connect(
+            target,
+            ConnectOpts {
+                bind_device: Some(&bd),
+                ..Default::default()
+            },
+        ),
     )
     .await;
-    assert!(!matches!(bound, Ok(Ok(_))), "a socket bound to loopback reached the internet: it fell back");
+    assert!(
+        !matches!(bound, Ok(Ok(_))),
+        "a socket bound to loopback reached the internet: it fell back"
+    );
 }

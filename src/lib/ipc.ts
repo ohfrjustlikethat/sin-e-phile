@@ -108,9 +108,20 @@ export const commands = {
 	/**  The source's name, for "found by …". */
 	found_by: string,
 } | null, string>(__TAURI_INVOKE("search_backfill", { query })),
+	torrentSettings: () => typedError<TorrentSettingsView, string>(__TAURI_INVOKE("torrent_settings")),
+	setTorrentSettings: (downloadLimitKib: number | null, uploadLimitKib: number | null, peerLimit: number, keepSeeding: boolean, bindInterface: string | null) => typedError<null, string>(__TAURI_INVOKE("set_torrent_settings", { downloadLimitKib, uploadLimitKib, peerLimit, keepSeeding, bindInterface })),
+	torrents: () => typedError<TorrentView[], string>(__TAURI_INVOKE("torrents")),
+	torrentPause: (id: string) => typedError<null, string>(__TAURI_INVOKE("torrent_pause", { id })),
+	torrentResume: (id: string) => typedError<null, string>(__TAURI_INVOKE("torrent_resume", { id })),
+	torrentRemove: (id: string, deleteFiles: boolean) => typedError<null, string>(__TAURI_INVOKE("torrent_remove", { id, deleteFiles })),
 };
 
 /* Types */
+export type AdapterView = {
+	name: string,
+	connected: boolean,
+};
+
 /**  What the confirm screen shows for a pasted manifest address. */
 export type AddonPreview = {
 	/**  The address as pasted; send it back to `addon_install`. */
@@ -330,6 +341,44 @@ export type Tier =
 "standard" | 
 /**  >= 16 GB RAM, discrete GPU or strong iGPU, >= 6 cores. */
 "capable";
+
+/**  Every torrent's progress, once a second while the engine runs. */
+export type TorrentProgress = {
+	torrents: TorrentView[],
+};
+
+/**  The settings screen's view of torrent behaviour. */
+export type TorrentSettingsView = {
+	download_limit_kib: number | null,
+	upload_limit_kib: number | null,
+	peer_limit: number,
+	keep_seeding: boolean,
+	bind_interface: string | null,
+	/**  Adapters to offer, connected first. */
+	adapters: AdapterView[],
+	/**
+	 *  Settings are read when the engine starts; a change applies after a restart if
+	 *  the engine is already running.
+	 */
+	engine_running: boolean,
+};
+
+/**  One torrent, for the downloads surface and progress events. */
+export type TorrentView = {
+	id: string,
+	name: string | null,
+	/**  `initializing`, `live`, `paused` or `error`. */
+	state: string,
+	/**  0.0–1.0. */
+	progress: number | null,
+	/**  Bytes as f64: a JavaScript number is exact to 2^53, ample for any file. */
+	total_bytes: number | null,
+	download_bps: number | null,
+	upload_bps: number | null,
+	live_peers: number,
+	finished: boolean,
+	error: string | null,
+};
 
 /**
  *  The engine's [`MatchReason`], in the words a person would use.

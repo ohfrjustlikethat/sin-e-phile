@@ -257,3 +257,74 @@ async fn a_download_survives_a_restart() {
         "the resumed file differs"
     );
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn prepare_turns_a_torrent_into_a_playable_address() {
+    let s = swarm(LAYOUT, None).await;
+    let dir = temp();
+    let mut config = offline_config(dir.path());
+    config.seeding = SeedingPolicy::KeepSeeding;
+    let engine = Arc::new(sinephile_torrent::Engine::start(config).await.unwrap());
+    let server = StreamServer::start().await.unwrap();
+    let prepared = sinephile_torrent::play::prepare(
+        &engine,
+        &server,
+        sinephile_torrent::Source::File(s.torrent.clone()),
+        None,
+        Wanted::default(),
+        sinephile_torrent::AddOptions {
+            initial_peers: vec![s.peer],
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(prepared.file.path, "Test.Film.1922.mkv");
+    let (status, _, body) = get(&prepared.url, Some("bytes=0-65535")).await;
+    assert_eq!(status, 206);
+    assert!(body == s.bytes("Test.Film.1922.mkv")[..65536]);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_resolved_torrent_the_engine_holds_plays_without_being_added_again() {
+    use sinephile_torrent::play::{target, Target};
+    use source_protocol::PlayableStream;
+    let s = swarm(LAYOUT, None).await;
+    let dir = temp();
+    let (leech, id) = s.leecher(dir.path(), SeedingPolicy::KeepSeeding).await;
+    let leech = Arc::new(leech);
+    let server = StreamServer::start().await.unwrap();
+    // DHT and trackers are off, so if this went to the network for metadata it would
+    // never return: holding the torrent already is the only way it can succeed.
+    let stream = PlayableStream::Torrent {
+        info_hash: id.to_uppercase(),
+        file_index: None,
+        trackers: vec![],
+    };
+    let t = tokio::time::timeout(
+        Duration::from_secs(10),
+        target(&leech, &server, &stream, Wanted::default()),
+    )
+    .await
+    .expect("went looking for metadata")
+    .unwrap();
+    let Target::Url(url) = t else {
+        panic!("not a url")
+    };
+    let (status, _, body) = get(&url, Some("bytes=0-1023")).await;
+    assert_eq!(
+        (status, body.as_slice()),
+        (206, &s.bytes("Test.Film.1922.mkv")[..1024])
+    );
+    let http = PlayableStream::Http {
+        url: "https://films.example/a.mp4".into(),
+        content_type: None,
+        size_bytes: None,
+    };
+    assert_eq!(
+        target(&leech, &server, &http, Wanted::default())
+            .await
+            .unwrap(),
+        Target::Url("https://films.example/a.mp4".into())
+    );
+}

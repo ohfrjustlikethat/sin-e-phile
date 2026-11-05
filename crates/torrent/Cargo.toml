@@ -21,10 +21,14 @@ thiserror = "2"
 tracing = "0.1"
 serde = { version = "1", features = ["derive"] }
 rand = "0.8"
+serde_json = "1"
+# PlayableStream, which the resolver hands playback.
+source-protocol = { path = "../source-protocol" }
+# Adapter names and indexes, for interface binding (7.6) and the settings screen.
+network-interface = "2"
 
 [dev-dependencies]
 # The socket layer librqbit uses, patched in the workspace root, to test binding directly.
 librqbit-dualstack-sockets = "0.7"
-network-interface = "2"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "time", "sync", "fs", "test-util"] }
 tempfile = "3"

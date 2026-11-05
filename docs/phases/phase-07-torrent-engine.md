@@ -31,7 +31,7 @@ Torrents that stream, not torrents that download. This is the hardest engineerin
 - [x] **7.3** File selection within multi-file torrents: the main video, never the sample or the readme, and the requested episode when S/E is given. A pure function with a table of real-world-shaped layouts.
 - [x] **7.4** The local streaming server: loopback only, a random per-session token in every path, HTTP Range (206, Content-Range, 416) over librqbit's FileStream, so libmpv treats a torrent as a file. E5: a full stream and random ranges hash-identical to the source.
 - [x] **7.5** Streaming behaviour, measured: time to first bytes, seek re-prioritisation, buffer ahead of a simulated playhead under a rate-limited seeder (E3's documented floor), and a dead swarm failing fast and clearly (E4).
-- [ ] **7.6** Network interface binding on Windows (E7). librqbit's BindDevice returns NotSupported on Windows; vendor librqbit-dualstack-sockets 0.7.0 via [patch.crates-io] and implement it with GetAdaptersAddresses plus IP_UNICASTIF / IPV6_UNICAST_IF, so traffic stops rather than falling back when the adapter goes. Adapter listing for the UI.
+- [x] **7.6** Network interface binding on Windows (E7). librqbit's BindDevice returns NotSupported on Windows; vendor librqbit-dualstack-sockets 0.7.0 via [patch.crates-io] and implement it with GetAdaptersAddresses plus IP_UNICASTIF / IPV6_UNICAST_IF, so traffic stops rather than falling back when the adapter goes. Adapter listing for the UI.
 - [x] **7.7** Session persistence across restarts, tested by stopping and reopening a session mid-download.
 - [ ] **7.8** Integration: the resolver's PlayableStream::Torrent becomes a local stream URL; per-torrent progress events to the frontend; Settings gains the network section (limits, seeding, adapter).
 - [ ] **7.9** Live measurements against a legal, well-seeded torrent supplied at runtime and never committed (E1, E2), and the qBittorrent comparison on time-to-first-bytes and bulk throughput (E6), recorded in docs/eval-results.md.
@@ -56,3 +56,4 @@ How BitTorrent works — pieces, swarms, DHT, rarest-first; why sequential downl
 - **7.4** The local streaming server: loopback only, a random per-session token in every path, HTTP Range  · `6df5136`
 - **7.5** Streaming behaviour, measured: time to first bytes, seek re-prioritisation, buffer ahead of a si · `6df5136`
 - **7.7** Session persistence across restarts, tested by stopping and reopening a session mid-download. · `6df5136`
+- **7.6** Network interface binding on Windows (E7). librqbit's BindDevice returns NotSupported on Windows · `a279415`

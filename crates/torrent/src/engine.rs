@@ -123,6 +123,9 @@ pub enum Source {
     Magnet(String),
     /// The bytes of a `.torrent` file.
     File(Vec<u8>),
+    /// A v1 info hash, 40 hexadecimal characters, with any trackers the source supplied
+    /// (SPEC.md §2.1: the app ships none). DHT finds peers from the hash alone.
+    InfoHash { hash: String, trackers: Vec<String> },
 }
 
 #[derive(Debug, Clone, Default)]
@@ -237,6 +240,10 @@ impl Engine {
     /// Add a torrent and wait until it is live. A magnet whose metadata does not arrive
     /// within `dead_swarm_after` is a dead swarm, said plainly.
     pub async fn add(&self, source: Source, opts: AddOptions) -> Result<String, TorrentError> {
+        let trackers = match &source {
+            Source::InfoHash { trackers, .. } if !trackers.is_empty() => Some(trackers.clone()),
+            _ => None,
+        };
         let add = match source {
             Source::Magnet(m) => {
                 if !m.starts_with("magnet:?") {
@@ -245,6 +252,14 @@ impl Engine {
                 AddTorrent::from_url(m)
             }
             Source::File(bytes) => AddTorrent::from_bytes(bytes),
+            Source::InfoHash { ref hash, .. } => {
+                if hash.len() != 40 || !hash.chars().all(|c| c.is_ascii_hexdigit()) {
+                    return Err(TorrentError::BadInput(
+                        "an info hash is 40 hexadecimal characters".into(),
+                    ));
+                }
+                AddTorrent::from_url(hash.to_ascii_lowercase())
+            }
         };
         let options = AddTorrentOptions {
             paused: opts.paused,
@@ -252,6 +267,7 @@ impl Engine {
             overwrite: true,
             initial_peers: (!opts.initial_peers.is_empty()).then_some(opts.initial_peers),
             output_folder: opts.output_folder.map(|p| p.to_string_lossy().into_owned()),
+            trackers,
             ..Default::default()
         };
         let deadline = self.config.dead_swarm_after;
@@ -293,6 +309,11 @@ impl Engine {
                     .collect()
             })
             .map_err(engine_err)
+    }
+
+    /// Whether the engine already has this torrent.
+    pub fn has(&self, id: &str) -> bool {
+        self.handle(id).is_ok()
     }
 
     /// The file to play (`select::choose`), or `NoVideo`.

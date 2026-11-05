@@ -45,8 +45,8 @@
       {
         "id": "7.6",
         "text": "Network interface binding on Windows (E7). librqbit's BindDevice returns NotSupported on Windows; vendor librqbit-dualstack-sockets 0.7.0 via [patch.crates-io] and implement it with GetAdaptersAddresses plus IP_UNICASTIF / IPV6_UNICAST_IF, so traffic stops rather than falling back when the adapter goes. Adapter listing for the UI.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "a279415"
       },
       {
         "id": "7.7",
@@ -1075,8 +1075,8 @@
         {
           "id": "7.6",
           "text": "Network interface binding on Windows (E7). librqbit's BindDevice returns NotSupported on Windows; vendor librqbit-dualstack-sockets 0.7.0 via [patch.crates-io] and implement it with GetAdaptersAddresses plus IP_UNICASTIF / IPV6_UNICAST_IF, so traffic stops rather than falling back when the adapter goes. Adapter listing for the UI.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "a279415"
         },
         {
           "id": "7.7",

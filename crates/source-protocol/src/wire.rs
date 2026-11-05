@@ -23,6 +23,7 @@ pub const MAX_CANDIDATES: usize = 200;
 pub const MAX_KEY_CHARS: usize = 2048;
 pub const MAX_TITLE_CHARS: usize = 300;
 pub const MAX_LANGUAGES: usize = 16;
+pub const MAX_TRACKERS: usize = 32;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FindResponse {
@@ -79,12 +80,29 @@ pub fn check_stream(stream: &PlayableStream) -> Result<(), ManifestError> {
             }
             Ok(())
         }
-        PlayableStream::Torrent { info_hash, .. } => {
-            if info_hash.len() == 40 && info_hash.chars().all(|c| c.is_ascii_hexdigit()) {
-                Ok(())
-            } else {
-                Err(refuse("names a torrent with a malformed info hash"))
+        PlayableStream::Torrent {
+            info_hash,
+            trackers,
+            ..
+        } => {
+            if info_hash.len() != 40 || !info_hash.chars().all(|c| c.is_ascii_hexdigit()) {
+                return Err(refuse("names a torrent with a malformed info hash"));
             }
+            if trackers.len() > MAX_TRACKERS {
+                return Err(refuse("lists too many trackers"));
+            }
+            for t in trackers {
+                let ok = t.len() <= 512
+                    && url::Url::parse(t).is_ok_and(|u| {
+                        matches!(u.scheme(), "http" | "https" | "udp") && u.host().is_some()
+                    });
+                if !ok {
+                    return Err(refuse(
+                        "lists a tracker that is not an http, https or udp address",
+                    ));
+                }
+            }
+            Ok(())
         }
         PlayableStream::File { .. } => Err(refuse(
             "names a file on this computer, which an addon may not do",
@@ -186,6 +204,24 @@ mod tests {
             br#"{"stream":{"kind":"http","url":"https://cdn.example/film.mp4"}}"#
         )
         .is_ok());
+    }
+
+    #[test]
+    fn a_torrent_may_bring_trackers_but_only_tracker_shaped_ones() {
+        let hash = "a".repeat(40);
+        let ok = format!(
+            r#"{{"stream":{{"kind":"torrent","info_hash":"{hash}","trackers":["udp://t.example:6969","https://t.example/tracker"]}}}}"#
+        );
+        assert!(parse_resolve(ok.as_bytes()).is_ok());
+        for bad in ["file:///C:/x", "javascript:alert(1)", "udp:nohost"] {
+            let body = format!(
+                r#"{{"stream":{{"kind":"torrent","info_hash":"{hash}","trackers":["{bad}"]}}}}"#
+            );
+            assert!(
+                parse_resolve(body.as_bytes()).is_err(),
+                "{bad} was accepted"
+            );
+        }
     }
 
     #[test]
