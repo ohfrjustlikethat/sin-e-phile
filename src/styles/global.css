@@ -155,6 +155,17 @@ body {
 :focus:not(:focus-visible) {
   outline: none;
 }
+/* ADR-0041: driven by an Xbox controller, the viewer is across the room. Focus gets a
+ * thicker ring and a wash around it, readable at ten feet. `data-input="pad"` is set by
+ * src/lib/gamepad.ts on pad input and cleared on mouse or keyboard input. */
+[data-input="pad"] :focus {
+  outline: 3px solid var(--oxblood-bright);
+  outline-offset: 4px;
+  box-shadow: 0 0 0 9px var(--oxblood-wash);
+}
+[data-input="pad"] body {
+  cursor: none;
+}
 
 ::selection {
   background: var(--oxblood-wash);
