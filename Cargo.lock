@@ -4337,6 +4337,7 @@ dependencies = [
 name = "sinephile-sources"
 version = "0.1.0"
 dependencies = [
+ "sinephile-persistence",
  "source-protocol",
  "tokio",
  "tracing",

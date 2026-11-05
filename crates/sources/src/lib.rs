@@ -9,6 +9,7 @@
 
 pub mod backends;
 pub mod merge;
+pub mod registry;
 pub mod resolver;
 
 pub use resolver::{Batch, Entry, Found, Outcome, Resolver};

@@ -83,6 +83,11 @@ impl Resolver {
         }
     }
 
+    /// The backends that will be asked, in the order they were given.
+    pub fn ids(&self) -> Vec<&str> {
+        self.entries.iter().map(|e| e.backend.id()).collect()
+    }
+
     /// With no network, backends that need one are not asked at all — they would only
     /// time out, and a local file should not wait eight seconds to appear.
     pub fn offline(mut self, offline: bool) -> Self {

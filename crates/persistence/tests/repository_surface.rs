@@ -23,7 +23,8 @@ use sinephile_persistence::model::EpisodeNumbering;
 use sinephile_persistence::repositories::profiles::PlaybackPosition;
 use sinephile_persistence::repositories::{
     CatalogueRepository, CredentialRepository, EpisodeRepository, MatchReason, MediaRepository,
-    ProfileRepository, Readiness, SearchRepository, TmdbAccess, WikipediaRepository,
+    ProfileRepository, Readiness, Sample, SearchRepository, SourceRepository, TmdbAccess,
+    WikipediaRepository,
 };
 use sinephile_persistence::{Db, IdSource, MediaKind, NewMediaItem, TitleVariant};
 
@@ -754,4 +755,119 @@ async fn db_surface() {
     let one_back = Db::latest_schema_version() - 1;
     db.migrate_down_to(one_back).await.expect("migrate_down_to");
     assert_eq!(db.schema_version().await.expect("version"), Some(one_back));
+}
+
+/// `SourceRepository` (Phase 6, migration 0015).
+#[tokio::test]
+async fn source_repository_surface() {
+    let db = Db::in_memory().await.expect("open");
+    let repo = SourceRepository::new(&db);
+
+    // ensure — new rows at the end, existing ones untouched
+    repo.ensure(&["local", "archive"]).await.expect("ensure");
+    repo.set_enabled("archive", false)
+        .await
+        .expect("set_enabled");
+    repo.ensure(&["archive", "direct"])
+        .await
+        .expect("ensure again");
+
+    // all — in order, and the user's switch survived the second ensure
+    let all = repo.all().await.expect("all");
+    let ids: Vec<&str> = all.iter().map(|b| b.id.as_str()).collect();
+    assert_eq!(ids, ["local", "archive", "direct"]);
+    assert!(
+        !all[1].enabled,
+        "ensure must not re-enable what the user turned off"
+    );
+    assert!(repo.set_enabled("nope", true).await.is_err());
+
+    // reorder — must name every backend exactly once
+    let order = ["direct", "local", "archive"].map(String::from);
+    repo.reorder(&order).await.expect("reorder");
+    let ids: Vec<String> = repo
+        .all()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|b| b.id)
+        .collect();
+    assert_eq!(ids, order);
+    assert!(
+        repo.reorder(&["direct".to_string()]).await.is_err(),
+        "a partial order"
+    );
+
+    // record — counts, the weighted latency, and the last error
+    repo.record("local", &Sample::Answered { latency_ms: 100.0 })
+        .await
+        .expect("record");
+    repo.record("local", &Sample::Answered { latency_ms: 200.0 })
+        .await
+        .unwrap();
+    repo.record(
+        "local",
+        &Sample::Failed {
+            error: "x".repeat(5_000),
+        },
+    )
+    .await
+    .unwrap();
+    repo.record("local", &Sample::TimedOut).await.unwrap();
+    repo.record("gone", &Sample::TimedOut)
+        .await
+        .expect("an unknown id is ignored");
+    let local = repo
+        .all()
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|b| b.id == "local")
+        .unwrap();
+    assert_eq!((local.successes, local.failures, local.timeouts), (2, 1, 1));
+    assert!(
+        (local.latency_ms.unwrap() - 120.0).abs() < 1e-9,
+        "100 + 0.2 × (200 − 100)"
+    );
+    assert_eq!(local.last_error.as_deref(), Some("timed out"));
+    assert!(local.last_outcome_at.is_some());
+
+    // install_addon, addons — and reinstalling replaces the manifest in place
+    repo.install_addon("addon:com.example.a", "https://a.example/m.json", "{}")
+        .await
+        .expect("install_addon");
+    repo.set_enabled("addon:com.example.a", false)
+        .await
+        .unwrap();
+    repo.install_addon(
+        "addon:com.example.a",
+        "https://a.example/m2.json",
+        r#"{"v":2}"#,
+    )
+    .await
+    .expect("reinstall");
+    let addons = repo.addons().await.expect("addons");
+    assert_eq!(addons.len(), 1);
+    assert_eq!(addons[0].manifest_url, "https://a.example/m2.json");
+    assert!(!addons[0].installed_at.is_empty());
+    let row = repo
+        .all()
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|b| b.id == "addon:com.example.a")
+        .unwrap();
+    assert!(!row.enabled, "an update keeps the user's switch");
+    assert_eq!(row.position, 3);
+
+    // remove_addon — the registry row and the manifest go together; built-ins cannot
+    repo.remove_addon("addon:com.example.a")
+        .await
+        .expect("remove_addon");
+    assert!(repo.addons().await.unwrap().is_empty());
+    assert_eq!(repo.all().await.unwrap().len(), 3);
+    assert!(
+        repo.remove_addon("local").await.is_err(),
+        "a built-in is switched off, not deleted"
+    );
 }

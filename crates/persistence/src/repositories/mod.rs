@@ -10,6 +10,7 @@ pub mod episodes;
 pub mod media;
 pub mod profiles;
 pub mod search;
+pub mod sources;
 
 pub use catalogue::{
     CatalogueRepository, PendingArticle, Readiness, StepProgress, WikipediaRepository, CORE_TIER,
@@ -20,3 +21,4 @@ pub use episodes::EpisodeRepository;
 pub use media::MediaRepository;
 pub use profiles::ProfileRepository;
 pub use search::{Hit, HitDetail, MatchReason, SearchRepository};
+pub use sources::{AddonRow, BackendRow, Sample, SourceRepository};
