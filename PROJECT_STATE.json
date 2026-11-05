@@ -75,8 +75,8 @@
       {
         "id": "6.11",
         "text": "docs/specs/addon-protocol.md written for a third party, tested by implementing a throwaway backend from it alone (E5); repository-wide guard over tree and history, seen to fail (E6).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "4e81c94"
       }
     ],
     "exit_criteria": [
@@ -107,14 +107,14 @@
       {
         "id": "E5",
         "text": "`docs/specs/addon-protocol.md` is complete enough that a third party could implement a backend from it alone.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "docs/specs/addon-protocol.md (commit 4e81c94) specifies every manifest field and limit, both endpoints' requests and answers, timeouts, catalogues and versioning. tools/protocol/example_addon.py, a Python stdlib addon written against that document, passes the app's own client via crates/sources/tests/conformance.rs (SINEPHILE_ADDON=http://127.0.0.1:8765/manifest.json cargo test -p sinephile-sources --test conformance -- --ignored: manifest ok, 1 candidate, resolve ok, unknown key refused as not-found); a copy with an endpoint on another host fails it with the same-host message. Caveat: the example was written by the same author as the code, so an implementation by an outside person remains the stronger test."
       },
       {
         "id": "E6",
         "text": "Repository-wide grep confirms zero indexer names or URLs anywhere, including tests and docs.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "python tools/guard/guard.py --tree: clean over 517 tracked files; --history: clean over all 167 commits on phase/06-source-resolver (2026-11-05, after 4e81c94); --selftest: all 48 checks pass, the guard fires when it should. Seen to fail in real use this phase: the staged guard refused commits for undeclared domains (subdomains of the reserved example domains, and a licence host in recorded fixtures) and for a 40-hex example info hash, each fixed by removing the content, never by suppressing the guard. The hashed denylist is empty by design (tools/guard/denylist.txt header, ADR-0009); the allowlist check is the enforcement."
       }
     ]
   },
@@ -897,14 +897,14 @@
         {
           "id": "E5",
           "text": "`docs/specs/addon-protocol.md` is complete enough that a third party could implement a backend from it alone.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "docs/specs/addon-protocol.md (commit 4e81c94) specifies every manifest field and limit, both endpoints' requests and answers, timeouts, catalogues and versioning. tools/protocol/example_addon.py, a Python stdlib addon written against that document, passes the app's own client via crates/sources/tests/conformance.rs (SINEPHILE_ADDON=http://127.0.0.1:8765/manifest.json cargo test -p sinephile-sources --test conformance -- --ignored: manifest ok, 1 candidate, resolve ok, unknown key refused as not-found); a copy with an endpoint on another host fails it with the same-host message. Caveat: the example was written by the same author as the code, so an implementation by an outside person remains the stronger test."
         },
         {
           "id": "E6",
           "text": "Repository-wide grep confirms zero indexer names or URLs anywhere, including tests and docs.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "python tools/guard/guard.py --tree: clean over 517 tracked files; --history: clean over all 167 commits on phase/06-source-resolver (2026-11-05, after 4e81c94); --selftest: all 48 checks pass, the guard fires when it should. Seen to fail in real use this phase: the staged guard refused commits for undeclared domains (subdomains of the reserved example domains, and a licence host in recorded fixtures) and for a 40-hex example info hash, each fixed by removing the content, never by suppressing the guard. The hashed denylist is empty by design (tools/guard/denylist.txt header, ADR-0009); the allowlist check is the enforcement."
         }
       ],
       "subtasks": [
@@ -971,8 +971,8 @@
         {
           "id": "6.11",
           "text": "docs/specs/addon-protocol.md written for a third party, tested by implementing a throwaway backend from it alone (E5); repository-wide guard over tree and history, seen to fail (E6).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "4e81c94"
         }
       ]
     },

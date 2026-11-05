@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Input, Toggle } from "@/design-system";
+import { Button, IconButton, Input, Toggle } from "@/design-system";
 import { commands, type AddonPreview, type CatalogueView, type SourceInfo } from "@/lib/ipc";
 
 /**
@@ -68,6 +68,7 @@ export function SourcesSection() {
           {sources.map((s, i) => (
             <SourceRow
               key={s.id}
+              number={i + 1}
               source={s}
               first={i === 0}
               last={i === sources.length - 1}
@@ -94,8 +95,9 @@ export function SourcesSection() {
 }
 
 function SourceRow({
-  source, first, last, busy, onToggle, onMove, onRemove,
+  number, source, first, last, busy, onToggle, onMove, onRemove,
 }: {
+  number: number;
   source: SourceInfo;
   first: boolean;
   last: boolean;
@@ -104,42 +106,64 @@ function SourceRow({
   onMove: (by: -1 | 1) => void;
   onRemove: () => void;
 }) {
+  // The order IS the setting, so it is shown as a number, the way search numbers its
+  // results; moving is two quiet arrows rather than two more labelled buttons per row.
   return (
-    <li className="border-b border-line-subtle py-2 last:border-b-0">
-      <Toggle
-        checked={source.enabled}
-        onChange={onToggle}
-        disabled={busy}
-        label={source.name}
-        description={
-          source.addon_host
-            ? `${source.blurb ? source.blurb + " " : ""}Sends your searches to ${source.addon_host}.`
-            : source.blurb
-        }
-      />
-      <div className="flex items-center justify-between gap-4 pb-1">
-        <p className="text-[11px] text-ink-muted">
+    <li className="grid grid-cols-[2rem_1fr_auto] gap-x-3 border-b border-line-subtle py-3 last:border-b-0">
+      <span className="label pt-3.5 tabular-nums" aria-hidden>
+        {String(number).padStart(2, "0")}
+      </span>
+      <div className="min-w-0">
+        <Toggle
+          checked={source.enabled}
+          onChange={onToggle}
+          disabled={busy}
+          label={source.name}
+          description={
+            source.addon_host
+              ? `${source.blurb ? source.blurb + " " : ""}Sends your searches to ${source.addon_host}.`
+              : source.blurb
+          }
+        />
+        <p className="text-[11px] leading-relaxed text-ink-faint">
           {source.health}
-          {source.last_error && <span className="text-ink-faint"> Last problem: {source.last_error}.</span>}
-        </p>
-        <div className="flex shrink-0 gap-1">
-          <Button size="sm" variant="ghost" disabled={busy || first} onClick={() => onMove(-1)}
-            aria-label={`Ask ${source.name} earlier`}>
-            Earlier
-          </Button>
-          <Button size="sm" variant="ghost" disabled={busy || last} onClick={() => onMove(1)}
-            aria-label={`Ask ${source.name} later`}>
-            Later
-          </Button>
+          {source.last_error && <> Last problem: {source.last_error}.</>}
           {source.addon_host && (
-            <Button size="sm" variant="ghost" disabled={busy} onClick={onRemove}
-              aria-label={`Remove ${source.name}`}>
-              Remove
-            </Button>
+            <>
+              {" "}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onRemove}
+                aria-label={`Remove ${source.name}`}
+                className="text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink disabled:opacity-45"
+              >
+                Remove
+              </button>
+            </>
           )}
-        </div>
+        </p>
+      </div>
+      <div className="flex flex-col pt-1.5">
+        <IconButton size="sm" label={`Ask ${source.name} earlier`} disabled={busy || first}
+          onClick={() => onMove(-1)}>
+          <Chevron up />
+        </IconButton>
+        <IconButton size="sm" label={`Ask ${source.name} later`} disabled={busy || last}
+          onClick={() => onMove(1)}>
+          <Chevron />
+        </IconButton>
       </div>
     </li>
+  );
+}
+
+function Chevron({ up = false }: { up?: boolean }) {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden
+      className={up ? "rotate-180" : undefined}>
+      <path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -222,7 +246,6 @@ function AddSource({ onAdded }: { onAdded: () => void }) {
         <Input
           className="flex-1"
           label="Or browse a catalogue"
-          hint="A list of sources someone recommends. None is built in."
           placeholder="https://example.com/catalogue.json"
           value={catalogueAddress}
           onChange={(e) => setCatalogueAddress(e.target.value)}
@@ -233,6 +256,9 @@ function AddSource({ onAdded }: { onAdded: () => void }) {
           {open.isPending ? "Opening…" : "Open"}
         </Button>
       </form>
+      <p className="mt-1.5 text-[11px] text-ink-faint">
+        A list of sources someone recommends. None is built in.
+      </p>
 
       {catalogue && (
         <div className="mt-4">
@@ -376,7 +402,7 @@ function YourLinks() {
           value={playlist}
           onChange={(e) => setPlaylist(e.target.value)}
           spellCheck={false}
-          className="mt-1.5 w-full resize-y rounded-sm border border-line bg-void px-3 py-2 font-mono text-[12px] text-ink focus-visible:border-oxblood-bright focus-visible:outline-none"
+          className="mt-1.5 w-full resize-y rounded-sm border border-line-interactive bg-surface px-3 py-2 font-mono text-[12px] text-ink transition-colors hover:border-line-strong"
         />
         {importList.isError && <p className="mt-1 text-xs text-danger">{importList.error.message}</p>}
         {importList.isSuccess && (
