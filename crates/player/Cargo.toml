@@ -1,0 +1,20 @@
+[package]
+name = "sinephile-player"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "The player: libmpv, loaded dynamically, behind a safe API (SPEC.md Phase 8)."
+
+# libmpv is loaded at run time from lib/libmpv-2.dll (tools/mpv/fetch.py), as Spike A
+# established: no import library, no bindgen. Not in src-tauri, so the player can be
+# tested headless (ADR-0022).
+
+[dependencies]
+libloading = "=0.8.9"
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+tracing = "0.1"
+
+[dev-dependencies]
+tempfile = "3"

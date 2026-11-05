@@ -15,8 +15,8 @@
       {
         "id": "8.1",
         "text": "libmpv as a pinned dependency: tools/mpv/fetch.py downloads shinchiro's mpv-dev-x86_64 20261021 build (baseline x86-64, not v3, so Tier 0 CPUs without AVX2 work), verifies its SHA-256, and places libmpv-2.dll beside the app; doctor checks for it; the bundle ships it.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "a3b2079"
       },
       {
         "id": "8.2",
@@ -1153,8 +1153,8 @@
         {
           "id": "8.1",
           "text": "libmpv as a pinned dependency: tools/mpv/fetch.py downloads shinchiro's mpv-dev-x86_64 20261021 build (baseline x86-64, not v3, so Tier 0 CPUs without AVX2 work), verifies its SHA-256, and places libmpv-2.dll beside the app; doctor checks for it; the bundle ships it.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "a3b2079"
         },
         {
           "id": "8.2",

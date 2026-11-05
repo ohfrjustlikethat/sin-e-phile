@@ -8,7 +8,7 @@
 [workspace]
 resolver = "2"
 members = ["src-tauri", "crates/tiers", "crates/artwork", "crates/embedding", "crates/embedder",
-    "crates/persistence", "crates/catalogue", "crates/vector-index", "crates/search-engine", "crates/metadata-api", "crates/source-protocol", "crates/sources", "crates/torrent", "tools/ingest", "tools/eval"]
+    "crates/persistence", "crates/catalogue", "crates/vector-index", "crates/search-engine", "crates/metadata-api", "crates/source-protocol", "crates/sources", "crates/torrent", "crates/player", "tools/ingest", "tools/eval"]
 
 # Vendored upstream code, built as a dependency rather than held to this workspace's
 # lints. Each has a README saying what was changed and why.

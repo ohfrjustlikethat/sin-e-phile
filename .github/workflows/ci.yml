@@ -129,6 +129,14 @@ jobs:
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
         if: steps.detect.outputs.present == 'true'
 
+      # The player's tests play a real clip headless (Phase 8): FFmpeg builds the clip,
+      # and libmpv is the pinned, checksum-verified build developers fetch the same way.
+      - name: FFmpeg and libmpv for the player tests
+        if: steps.detect.outputs.present == 'true'
+        run: |
+          choco install ffmpeg --no-progress -y
+          python tools/mpv/fetch.py
+
       - run: cargo test --workspace --all-features
         if: steps.detect.outputs.present == 'true'
 
