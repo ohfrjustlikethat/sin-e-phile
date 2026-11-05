@@ -1,0 +1,27 @@
+[package]
+name = "sinephile-torrent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "The torrent engine and its local streaming server (SPEC.md Phase 7)."
+
+# librqbit in-process (ADR-0003) is the only streaming path. Not in src-tauri, because
+# a test binary that links Tauri cannot launch on Windows (ADR-0022), and almost every
+# claim this crate makes — byte-correct ranges, a dead swarm failing fast, the buffer
+# holding under a bandwidth floor — is a test against a real swarm on loopback.
+
+[dependencies]
+# rustls rather than the platform TLS, as everywhere else in the workspace. Pinned: the
+# Phase 1 spike measured this exact version (docs/eval-results.md, Spike B).
+librqbit = { version = "=9.0.1", default-features = false, features = ["rust-tls"] }
+tokio = { version = "1", features = ["rt", "macros", "net", "io-util", "time", "sync", "fs"] }
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+serde = { version = "1", features = ["derive"] }
+rand = "0.8"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "time", "sync", "fs", "test-util"] }
+tempfile = "3"
