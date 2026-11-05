@@ -43,6 +43,7 @@ never be empty: if nothing was genuinely rejected, there was no decision.
 | [0036](0036-carry-an-unmet-criterion-to-a-named-phase.md) | A built phase may carry an unmet criterion to a named later phase | Accepted | 2026-10-25 |
 | [0037](0037-masthead-navigation-and-final-design-overhaul.md) | Navigation moves to a top masthead, and Phase 18 ends with a design overhaul | Accepted | 2026-10-25 |
 | [0038](0038-addons-are-remote-services-described-by-a-manifest.md) | An addon is a remote service described by a manifest | Accepted | 2026-11-05 |
+| [0039](0039-gitleaks-allowlist-example-candidate-keys.md) | Two example candidate keys are gitleaks false positives | Accepted | 2026-11-05 |
 
 **0002–0008 record decisions that were already locked in `SPEC.md` §5 before this
 repository existed.** They were written in session 0b, after 0009–0015, which is why
