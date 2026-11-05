@@ -19,6 +19,7 @@
 //! `CatalogueRepository::readiness` already has for a half-built catalogue.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
 
 use sinephile_metadata_api::HttpTransport;
@@ -48,6 +49,16 @@ pub struct AppState {
     /// pasted. Install takes the manifest from HERE, so what is installed is exactly
     /// what was shown — not whatever the address serves a second time.
     pending_addons: Mutex<HashMap<String, (Url, Manifest)>>,
+    /// Where `data/` is, once the startup task has found it.
+    data_dir: RwLock<Option<PathBuf>>,
+    /// The torrent engine and its streaming server, started the first time anything
+    /// needs them — never on the cold-start path (SPEC.md §2.3).
+    torrent: tokio::sync::OnceCell<Arc<TorrentRuntime>>,
+}
+
+pub struct TorrentRuntime {
+    pub engine: Arc<sinephile_torrent::Engine>,
+    pub server: sinephile_torrent::StreamServer,
 }
 
 struct Inner {
@@ -76,6 +87,8 @@ impl AppState {
             http: Arc::new(HttpTransport::new()),
             untrusted_http: Arc::new(HttpTransport::untrusted()),
             pending_addons: Mutex::new(HashMap::new()),
+            data_dir: RwLock::new(None),
+            torrent: tokio::sync::OnceCell::new(),
         }
     }
 
@@ -106,6 +119,49 @@ impl AppState {
     /// "never", and a UI thread waiting on a disk is how a splash screen becomes a hang.
     pub fn db(&self) -> Option<Arc<Db>> {
         self.db.read().expect("db lock poisoned").clone()
+    }
+
+    pub fn set_data_dir(&self, dir: PathBuf) {
+        *self.data_dir.write().expect("data dir lock poisoned") = Some(dir);
+    }
+
+    /// The torrent runtime, started on first call with the stored settings. The
+    /// engine's rules are in `crates/torrent`; this only builds it once.
+    pub async fn torrent(&self) -> Result<Arc<TorrentRuntime>, String> {
+        self.torrent
+            .get_or_try_init(|| async {
+                let dir = self
+                    .data_dir
+                    .read()
+                    .expect("data dir lock poisoned")
+                    .clone()
+                    .ok_or("the data folder is not ready yet")?;
+                let db = self.db().ok_or("the library is still opening")?;
+                let stored = sinephile_persistence::repositories::ProfileRepository::new(&db)
+                    .setting(sinephile_torrent::settings::SETTINGS_KEY)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let settings =
+                    sinephile_torrent::settings::TorrentSettings::parse(stored.as_deref());
+                let config = settings.apply(sinephile_torrent::EngineConfig::new(dir));
+                let engine = sinephile_torrent::Engine::start(config)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let server = sinephile_torrent::StreamServer::start()
+                    .await
+                    .map_err(|e| e.to_string())?;
+                Ok(Arc::new(TorrentRuntime {
+                    engine: Arc::new(engine),
+                    server,
+                }))
+            })
+            .await
+            .cloned()
+    }
+
+    /// The runtime if it has been started, without starting it.
+    pub fn torrent_if_started(&self) -> Option<Arc<TorrentRuntime>> {
+        self.torrent.get().cloned()
     }
 
     /// Remember a manifest the user is being asked to confirm.

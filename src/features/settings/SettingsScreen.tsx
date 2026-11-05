@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { commands, type Capability, type HardwareProfile, type Tier } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
+import { NetworkSection } from "./NetworkSection";
 import { SourcesSection } from "./SourcesSection";
 
 /**
@@ -50,6 +51,7 @@ export function SettingsScreen() {
       </header>
 
       <SourcesSection />
+      <NetworkSection />
 
       {profile.isPending && <Skeleton />}
       {profile.isError && (

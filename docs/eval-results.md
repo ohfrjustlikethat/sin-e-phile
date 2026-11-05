@@ -2193,3 +2193,54 @@ the first open after a schema change, with the database's pages cold. The two ru
 it are the comparable ones and sit either side of the Phase 5 figure. Recorded rather than
 dropped, because a cold first search is what a user sees after an update, and it is still
 inside the 80 ms budget.
+
+## Phase 7 — Torrent engine (2026-11-05)
+
+Live, against the official Ubuntu 24.04 desktop torrent fetched at run time (never
+committed), over this machine's connection (routed through a VPN), commit `250dbf5`,
+`target/release/examples/bench.exe <torrent> <scratch> [bulk-seconds]`:
+
+| Run | add → first 1 MiB via local HTTP (E1 proxy, < 8 s) | seek to 60% → 1 MiB (E2, < 5 s) | bulk |
+|---|---|---|---|
+| 1 | **9.58 s** — over | **2.17 s** | 31.87 MiB/s over 60 s, 52 peers |
+| 2 | **15.37 s** — over | **0.84 s** | 12.48 MiB/s over 5 s |
+| 3 | failed: the first range read returned 181 bytes (an error response), not investigated yet | — | — |
+
+Run 3's short read was a real bug, now fixed: the streaming server sent `206` headers
+before opening the torrent reader, so when opening failed the player got headers and a
+closed connection. It now opens first and answers `503` (`a_dead_swarm_fails_fast_with_a_clear_error`
+asserts the 503; seen to fail against the old ordering, which gave `206` with an empty body).
+
+### Where E1's time goes (2026-11-06, `bench` now prints the first live peer)
+
+Eighteen more runs. Once a peer is connected, the first MiB arrives in **0.6–3.4 s**. The
+variance is all in **finding the first peer**: 2.2 s at best, 55 s at worst, and it grew over
+a day of back-to-back runs re-announcing the same torrent from one address.
+
+| Attempt | First live peer | add → first MiB |
+|---|---|---|
+| fresh data dir ×3 | 2.6, 2.2, 25.0 s | 3.8, 3.8, 28.5 s |
+| kept data dir ×6 (DHT state is only saved every 60 s, so it never warmed) | 8.2–48.6 s | 11.7–50.1 s |
+| TCP + uTP listener ×4 (reverted: no evidence it helps) | 22.1–53.8 s | 24.2–55.4 s |
+
+### E6: against qBittorrent, same torrent, same connection, minutes apart
+
+| | add → first 1 MiB | bulk |
+|---|---|---|
+| **sin-e-phile** (`bench`, 30 s bulk) | **3.58 s** (first peer 2.45 s) | **33.85 MiB/s**, 55 peers |
+| **qBittorrent 5.2.0** (`python tools/bench/qbittorrent_compare.py`, sequential + first/last-piece priority, throwaway profile) | **13.08 s** | **34.71 MiB/s**, 32 seeds |
+
+qBittorrent waits on the same peer discovery, so the slow starts are the swarm and this
+network (a VPN, no inbound connections), not the scheduler. Bulk throughput is level.
+
+**E2 (seek, < 5 s): met in all 18 runs**, 0.15–3.73 s.
+
+**E1 (< 8 s): not reliably met** — met in 4 of 20 runs. Carried to Phase 8 under ADR-0036,
+where first frame is measured end to end and the torrent can be started when the detail
+page opens, so peer discovery overlaps with the user reading rather than following Play.
+
+### Regression check before merging Phase 7 (rule 13)
+
+2026-11-06, release build at `01be3d8`: E2 **43/43**; E3 meaning **0.0472**, filter **1.0000**;
+E1 warm p50 / p95 **6.5 / 14.9 ms** (the first run after a rebuild read 13.8 / 44.7 ms with cold
+pages, as in Phase 6); HNSW recall@10 **0.9760**. Unchanged from Phase 6.

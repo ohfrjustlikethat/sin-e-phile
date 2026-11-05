@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **2.0.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **3.0.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -22,6 +22,38 @@ Code the author cannot explain is a failure condition, not a shortcut.
 `SPEC.md` is the complete specification and the constitution of this project. It
 outranks convenience, it outranks "we could just", and it outranks anything you think
 you remember from a previous session.
+
+---
+
+## Working mode: autonomous delivery (ADR-0040) — read this first
+
+The author's instruction, 2026-11-05: *make the decisions, build it fast, test it
+thoroughly, push it yourself, and involve me only for decisions that are very hard and
+could hurt the whole app.* So:
+
+- **Decide and keep moving.** Plans are written into the phase doc and the state file,
+  never waited on. Every decision is recorded where the next session will find it
+  (an ADR if architectural, the phase doc or `known_debt` if smaller).
+- **Ask the author only for ADR-0040's reserved decisions:** the legal posture (§2.1);
+  anything irreversible outside the repo (publishing a release, deleting their data,
+  money, accounts); reversing a locked technology or the licence; cutting a Tier B
+  deliverable; or genuine doubt about what they want where a wrong guess would hurt
+  the app. Batch these; if work cannot wait, take the stated default and say so.
+- **Ship continuously, never unverified.** Start, finish, test, commit, push, merge and
+  tag phases yourself. Before **every** push, run all of:
+  `cargo fmt --all --check` · `cargo clippy --workspace --all-targets -- -D warnings` ·
+  `cargo test --workspace` · `npm run lint` · `npm test` · `npm run build` ·
+  `python tools/guard/guard.py --staged` (the hook) · `python tools/guard/secretscan.py --tree` ·
+  **gitleaks over full history** (CI runs it; the regex scanner does not catch what it
+  catches): `gitleaks detect --source . --redact --no-banner --exit-code 1`, using the
+  binary at `%LOCALAPPDATA%\Microsoft\WinGet\Packages\Gitleaks.Gitleaks_*\gitleaks.exe`.
+- **Every report lists the decisions taken and the spec amendments made** since the last
+  one, so the author is always on the same page. Short; bullets.
+- **Speed never comes from skipping a check.** Evidence, seen-to-fail, the guard, the
+  regression check and honest reporting are unchanged. A criterion that needs the
+  author's hands or hardware (a real controller, a Tier 0 machine, a network adapter
+  pulled mid-download) is built and tested as far as code allows, and the manual step is
+  asked for in one batch rather than blocking the phase.
 
 ---
 
@@ -43,7 +75,8 @@ it — §15's entry for the phase is already what the phase doc is generated fro
 5. Report in five lines or fewer: phase → done → next → blockers → decisions waiting.
    Bullets, not tables. Do not restate the spec.
 6. Raise any blocker with `needs_user: true` *before* planning.
-7. Produce a plan. **Wait for approval before implementing.**
+7. Produce a plan, write it into the phase doc and `PROJECT_STATE.json`, and **start**
+   (ADR-0040). Do not wait for approval.
 
 Steps 1–7 are what `/next` does. See `docs/COMMANDS.md` for the six commands.
 
@@ -100,15 +133,15 @@ every future session's ability to trust the state file.
 **A check that has never been seen to fail is not evidence.** When you add an audit,
 a guard, or a harness, break the thing it protects and confirm it fails, then restore.
 
-### Three attempts, then stop (`SPEC.md` §10.9)
+### Three attempts, then choose (`SPEC.md` §10.9, ADR-0040)
 
 After three **genuinely distinct** approaches to the same problem fail — not three
-variations of one idea — stop.
+variations of one idea — stop grinding.
 
-Record it as a blocker with `needs_user: true` including what was tried and what
-happened. Present the author with honestly-costed options: different library,
-different approach, defer to a later phase, or cut the requirement. Recommend one,
-say why, **and wait.**
+Record it as a blocker including what was tried and what happened, cost the options
+(different library, different approach, carry to a later phase under ADR-0036, cut),
+**take the best one and continue**. Set `needs_user: true` and wait only if every
+option is one of ADR-0040's reserved decisions.
 
 Do not burn a session grinding. If a blocker will take more than a session, propose
 working a later independent phase instead — working out of order beats sitting stuck.
@@ -117,14 +150,15 @@ working a later independent phase instead — working out of order beats sitting
 
 **Gates: the end of Phase 8, the end of Phase 18, the end of whatever tier the author
 stops at, and whenever the author asks.** At those points, ask the five self-check
-questions from the relevant learning notes, in the chat, and wait for real answers.
+questions from the relevant learning notes, in the chat — and **keep developing while
+they answer** (ADR-0040).
 
 Every phase still *writes* its five questions. They accumulate unasked until a gate,
 which is what makes a gate meaningful rather than a formality.
 
 Struggling on one → re-explain differently and fix that note. Struggling on most →
-say directly that we went too fast, and propose simplifying the implementation or
-splitting the phase. Do not accept "yeah I get it". Ask them to explain it back.
+say directly that we went too fast, and make simplifying the implementation a task.
+Do not accept "yeah I get it". Ask them to explain it back.
 
 ### How to ask the author for a decision
 
@@ -143,9 +177,8 @@ That last line matters most: it means the author can answer in two words and you
 moving.
 
 **Never block on a decision where a reasonable default exists.** Take the default,
-record it, and say that you did. Only a decision that is genuinely the author's to
-make — one where proceeding either way would be unsafe or would waste real work —
-stops the session.
+record it, and say that you did. Only one of ADR-0040's reserved decisions is the
+author's to make, and even then the default is taken if the work cannot wait.
 
 `/decide` lists everything currently open in this shape.
 
@@ -154,20 +187,22 @@ stops the session.
 **Never pause a session to walk the author through a concept.** Write it into the
 learning note and keep going. They will read it when they read it.
 
-The only things that stop you are: a tier boundary, a §10.9 escalation, a spec
-amendment, and a decision the author owns. Learning is never one of them.
+The only thing that stops you is a decision ADR-0040 reserves for the author, when
+no safe default exists. Tier boundaries, §10.9 escalations, spec amendments and
+learning are not stops.
 
 ---
 
 ## Changing the spec (`SPEC.md` §2.8)
 
 `SPEC.md` is amendable — deliberately, never casually. If you find yourself thinking
-*"the spec says X but Y is obviously better here"*, that is the moment to **stop and
-raise it**, not to proceed.
+*"the spec says X but Y is obviously better here"*, that is the moment to **amend it in
+the open**, before building Y.
 
-Write an ADR → get the author's explicit approval → edit `SPEC.md` directly (no stale
-text patched around) → bump `spec_version` → log it in the `## Amendments` section and
-`SESSION_LOG.md` → **resync this file in the same commit**.
+Write an ADR → edit `SPEC.md` directly (no stale text patched around) → bump
+`spec_version` → log it in the `## Amendments` section and `SESSION_LOG.md` → **resync
+this file in the same commit** → list it in your next report. The author's approval
+first is needed only for an amendment in ADR-0040's reserved list.
 
 **Never build contrary to the spec intending to update it afterwards.** Amend first,
 then build.
@@ -178,7 +213,7 @@ then build.
 
 1. `SPEC.md` outranks memory. Re-read the *relevant section* rather than recalling it.
 2. Verify state against the repository, not against the state file.
-3. Plan before implementing. Wait for approval.
+3. Plan before implementing, record the plan, and proceed (ADR-0040).
 4. Small commits, conventional messages, always-buildable `main`.
 5. **No content source URLs, indexer names, scrapers, or catalogues. Ever. Anywhere**
    — and when the qBittorrent backend lands, **it is a transport only**: its search
@@ -274,6 +309,9 @@ typographic treatment rather than breaking.
   button (ADR-0037); never reintroduce a sidebar. A default install has no artwork, so
   design the artwork-free state first. Phase 18 ends with a full overhaul and the
   author's sign-off on a screenshot set.
+- **An Xbox controller is a remote** (ADR-0041): the Gamepad API drives the same focus
+  system as the keyboard, everywhere. Anything reachable by keyboard must be reachable
+  by controller, with a ten-foot focus treatment when the last input was a pad.
 - **Windows only.** Use Windows APIs directly where they give a better result.
 - **Portable by default.** All data in `./data/` next to the executable. Installed
   mode using `%APPDATA%` is an opt-in, never the default.

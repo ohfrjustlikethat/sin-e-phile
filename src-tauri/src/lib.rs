@@ -58,12 +58,19 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::sources::links_add,
             commands::sources::links_remove,
             commands::sources::search_backfill,
+            commands::torrent::torrent_settings,
+            commands::torrent::set_torrent_settings,
+            commands::torrent::torrents,
+            commands::torrent::torrent_pause,
+            commands::torrent::torrent_resume,
+            commands::torrent::torrent_remove,
         ])
         // `AssetProgress` travels as an EVENT payload, so no command signature mentions it
         // and specta would not export it. Registered explicitly rather than hand-written in
         // TypeScript: a hand-written payload type is exactly the silent drift the generated
         // boundary exists to prevent.
         .typ::<commands::assets::AssetProgress>()
+        .typ::<commands::torrent::TorrentProgress>()
 }
 
 pub fn run() {
@@ -92,6 +99,7 @@ pub fn run() {
         .setup(move |app| {
             builder.mount_events(app);
             app.manage(AppState::new());
+            tauri::async_runtime::spawn(commands::torrent::progress_loop(app.handle().clone()));
 
             // THE DATABASE OPENS OFF THE STARTUP PATH, and the catalogue refreshes
             // itself behind it (D37, ADR-0030). Both on a background task, because
@@ -124,6 +132,7 @@ pub fn run() {
                         return;
                     }
                 };
+                db_handle.state::<AppState>().set_data_dir(dir.clone());
                 db_handle
                     .state::<AppState>()
                     .set_db(std::sync::Arc::clone(&db));

@@ -7,7 +7,7 @@ Type one word. Cheat sheet.
 | Command | What it does |
 |---|---|
 | `/status` | Five lines: phase, what's done, next action, blockers, decisions waiting on you. |
-| `/next` | Orients from state, plans the next unit of work, waits for approval, executes, records. **The one you'll use most.** |
+| `/next` | Orients from state, plans the next unit of work, executes, verifies, ships and records — without waiting for approval (ADR-0040). **The one you'll use most.** |
 | `/finish` | Session end: tests, lints, guard, state, PROGRESS, session log, phase doc, commit, push. |
 | `/closephase` | Verifies every exit criterion has real evidence, merges, tags, opens the next phase doc. **Refuses if evidence is missing.** |
 | `/unstuck` | Recovery. Re-reads everything from disk, verifies against git and the tests, reports what diverged. For after a crash or a compaction. |

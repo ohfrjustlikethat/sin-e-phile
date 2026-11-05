@@ -4,11 +4,11 @@
 local film library behind one semantic search engine and a discovery-first
 recommender.**
 
-> **Status: Phases 0–6 of 28 closed — the shell, the design system, the data layer,
-> the metadata backbone, hybrid search, and the source resolver.** The catalogue is real:
+> **Status: Phases 0–7 of 28 closed — the shell, the design system, the data layer,
+> the metadata backbone, hybrid search, the source resolver, and the torrent engine.** The catalogue is real:
 > 2.7 million titles ingested offline from public datasets, with no API key of any kind,
 > searchable by title, person, filter and meaning, and the app can now find where a film
-> can be watched. Nothing plays yet; that's Phases 7–8.
+> can be watched and stream a torrent as a seekable file. Nothing plays yet; that's Phase 8.
 > This README describes what is being built and is updated at
 > the end of every phase that changes what the app can do. It is never allowed to
 > over-claim; the [feature list](#what-actually-works-today) below says exactly what
@@ -219,7 +219,7 @@ off means the pause overlay shows the full cast list, beautifully.
 
 ## What actually works today
 
-**Phases 0–6 — the shell, the design system, the catalogue, search, and sources.**
+**Phases 0–7 — the shell, the design system, the catalogue, search, sources, and torrents.**
 Nothing plays yet. Honestly:
 
 - ✅ Posture guard, secret scanner, and prerequisite doctor — all three verified by
@@ -267,6 +267,14 @@ Nothing plays yet. Honestly:
   example addon and a conformance test. **The app still ships no content sources.**
 - ✅ A search the catalogue misses but a source can answer becomes a catalogue entry,
   marked as such, so an out-of-date catalogue is not a dead end.
+- ✅ A torrent engine that streams rather than downloads: a seek into an unbuffered part
+  of a 6 GB torrent is served in 0.2–3.7 s, the stream is byte-identical to the source,
+  a dead swarm fails in seconds with a plain message, and seeding stops at completion by
+  default. Bound to a VPN's adapter, its traffic cannot leak if the VPN drops — librqbit
+  could not do that on Windows, so the project added it. On the same torrent it reached
+  the first MiB in 3.6 s to qBittorrent's 13.1 s, with bulk speed level.
+- ❌ **Playback start under 8 s is not reliable yet**: finding the first peer took 2–55 s
+  across 20 live runs (qBittorrent waits on the same thing). Carried to Phase 8.
 - ⬜ Everything else described above this section
 
 ---

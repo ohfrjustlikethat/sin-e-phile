@@ -1,0 +1,4 @@
+# Generated state files are written by several tools, some in Windows text mode (CRLF)
+# and some not. Normalising them here stops every write showing as a whole-file diff.
+PROJECT_STATE.json text eol=lf
+PROGRESS.md text eol=lf

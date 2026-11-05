@@ -229,6 +229,10 @@ pub enum PlayableStream {
         /// Which file inside the torrent, when there is more than one.
         #[serde(default)]
         file_index: Option<u32>,
+        /// Trackers that know the swarm. Optional: DHT can find peers from the hash
+        /// alone, but slowly. Supplied by the source at runtime; the app ships none.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        trackers: Vec<String>,
     },
 }
 
@@ -292,6 +296,7 @@ mod tests {
         let s = PlayableStream::Torrent {
             info_hash: "0".repeat(40),
             file_index: Some(2),
+            trackers: vec![],
         };
         let json = serde_json::to_string(&s).unwrap();
         assert!(json.starts_with(r#"{"kind":"torrent""#), "{json}");

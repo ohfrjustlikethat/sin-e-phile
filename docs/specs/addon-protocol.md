@@ -209,7 +209,9 @@ Answer `200` with one stream, tagged by `kind`:
 
 - `http`: an `http://` or `https://` address with a host and no credentials. It may be on
   any host — a CDN is normal. `content_type` and `size_bytes` are optional.
-- `torrent`: a 40-hex-character BitTorrent v1 info hash; `file_index` is optional.
+- `torrent`: a 40-hex-character BitTorrent v1 info hash; `file_index` is optional, and so
+  is `trackers` — up to 32 `http`, `https` or `udp` tracker addresses that know the swarm.
+  Without them the app finds peers through DHT from the hash alone, which is slower.
 - **An addon may not return a `file` stream.** A remote service has no business naming a
   path on the user's computer; such an answer is refused.
 - At most 16 KiB.

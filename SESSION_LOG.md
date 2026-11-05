@@ -1699,3 +1699,63 @@ implementation of the protocol is still the stronger E5 test, the local backend 
 filename backfill wait for Phase 12, and the Sources screen needs a look in the real
 window. The author actions from Session 19 are still open: publish `embeddings-v3`, and
 retake the case-study screenshots.
+
+### Session 20, continued (2026-11-05) — Phase 6 merged; the working style pivots
+
+**Merged.** `phase/06-source-resolver` → `main` as `ea25da1`, tagged `phase-06`. Branch CI
+had gone red once on gitleaks' full-history scan reading the protocol's example
+candidate keys as API keys; ADR-0039 allowlists the two exact values (per ADR-0035), and
+run 42044625303 was green. Two unpushed commits that had tried renaming the keys (which
+gitleaks flagged too) were dropped with a soft reset, so they never reached history.
+
+**The pivot (spec_version 3.0.0).** The author: "make correct and most decisions, only
+leave very hard and detrimental to the entire app decisions for me … keep starting and
+finishing and testing and running and finalising and uploading to git yourself", with a
+two-day target for the rest of the app. ADR-0040 and amendment A29 remove every rule that
+*waited* for the author — plan approval, spec-amendment approval, stop-after-three, the
+blocking understanding gate — and keep every rule that *checks* the work. ADR-0040
+reserves five kinds of decision for the author. The pre-push checklist is written into
+SPEC §10.5 and CLAUDE.md, and `.githooks/pre-push` now runs gitleaks over the full
+history when it is installed (seen to fail with a stand-in that reports a leak).
+`build_state.py` was dropping ADR-0036's carried fields when it rebuilt the phase table;
+fixed, and Phase 5's carried criteria verified intact.
+
+**An Xbox controller as a remote (ADR-0041, A30).** The Gamepad API in WebView2 over the
+existing focus system; a ten-foot focus treatment; a Phase 8 exit criterion (browse,
+play, pause, seek, leave with only a controller) and a Phase 18 one (every screen, with a
+D-pad on-screen keyboard).
+
+### Session 21 (2026-11-05 to 2026-11-06) — Phase 7, the torrent engine
+
+**Built.** `crates/torrent`: the engine over librqbit 9.0.1, the loopback streaming server,
+file selection, settings, the play step; Windows adapter binding through a vendored
+`librqbit-dualstack-sockets` (`[patch.crates-io]`); a two-engine test swarm on loopback;
+`examples/bench.rs` and `tools/bench/qbittorrent_compare.py`; Settings → Network; six thin
+commands and a progress event. The protocol's torrent stream gained optional trackers.
+
+**Numbers.** E3: a player never waited at 1.5× the bitrate and starved by 2.27 s at 0.7×.
+E5: byte-identical ranges and full stream. Live, 20 runs on the Ubuntu desktop torrent:
+seek 0.15–3.73 s (E2 met); first MiB 3.6 s at best but 9.6–55 s in most runs, all of it
+first-peer discovery (E1 carried to 8). Against qBittorrent on the same torrent: 3.58 s vs
+13.08 s to the first MiB, 33.85 vs 34.71 MiB/s bulk (E6 met).
+
+**Bugs the checks caught.** The streaming server promised `206` before opening the reader
+(a live run got 181 bytes); it now opens first and answers `503`. The guard refused magnet
+and tracker-announce strings in code and tests; the engine adds a bare info hash with the
+source's trackers instead, so it never builds a link. The
+seeder in the test swarm needed its output folder to be the content root, because an
+explicit folder holds files without a torrent-named subfolder.
+
+#### Phase 7 retrospective
+
+**Went well.** Reading librqbit before writing anything kept the phase small: the
+scheduler already existed, and the two real gaps — Windows binding and the seeding
+policy — were found by reading, not by failing in production. Building the swarm on
+loopback made every streaming claim testable in CI, including the bad cases.
+
+**Went badly.** Back-to-back live runs degraded through the day, and three attempts at
+E1 (fresh state, kept state, uTP) did not move it; the qBittorrent comparison was what
+showed the cause is the swarm and network, and it should have been run first.
+
+**Carry forward.** E1 and E7 to Phase 8 (D61; E7 needs the author to drop the VPN
+mid-download). D60 (dead `sources_config` table), D62.

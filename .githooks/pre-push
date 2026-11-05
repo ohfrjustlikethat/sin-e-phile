@@ -24,6 +24,24 @@ fi
 
 "$PY" tools/guard/guard.py --history || exit 1
 
+# The full-history secret scan CI runs (ADR-0040). The regex scanner does not catch
+# everything gitleaks does — on 2026-11-05 CI went red on a gitleaks finding that every
+# local check had passed. If gitleaks is not installed here, say so and carry on: CI is
+# still authoritative.
+GITLEAKS="$(command -v gitleaks 2>/dev/null || true)"
+if [ -z "$GITLEAKS" ] && [ -n "$LOCALAPPDATA" ]; then
+    GITLEAKS="$(ls "$(cygpath -u "$LOCALAPPDATA" 2>/dev/null || echo "$LOCALAPPDATA")"/Microsoft/WinGet/Packages/Gitleaks.Gitleaks_*/gitleaks.exe 2>/dev/null | head -n 1)"
+fi
+if [ -n "$GITLEAKS" ]; then
+    "$GITLEAKS" detect --source . --redact --no-banner --exit-code 1 >/dev/null 2>&1 || {
+        echo "pre-push: gitleaks found a secret-shaped value in history. Run:" >&2
+        echo "          gitleaks detect --source . --redact --no-banner -v" >&2
+        exit 1
+    }
+else
+    echo "pre-push: gitleaks not found; CI will run the full-history scan." >&2
+fi
+
 if ! "$PY" tools/statecheck/check.py; then
     echo "" >&2
     echo "pre-push: the repository would not be resumable by a session that knows" >&2

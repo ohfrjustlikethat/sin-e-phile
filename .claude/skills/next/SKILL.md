@@ -5,7 +5,7 @@ description: Session start ritual, then plan and execute the next unit of work. 
 
 # /next
 
-The command that does the work. Orient, plan, get approval, execute, record.
+The command that does the work. Orient, plan, execute, verify, ship, record — without waiting (ADR-0040).
 
 ## 1. Orient (do not skip, do not narrate)
 
@@ -32,7 +32,7 @@ Same shape as `/status`. Then produce a plan for the next unit of work:
   2–3 options with honest costs, your recommendation, **and the default you will take
   if the answer is "your call"**.
 
-**Wait for approval before implementing.** That rule is not suspended by /next.
+**Then start.** Write the plan into the phase doc and `PROJECT_STATE.json` and begin (ADR-0040). Stop for the author only on a decision ADR-0040 reserves, and only if no safe default exists.
 
 ## 3. Execute
 
@@ -46,7 +46,7 @@ Same shape as `/status`. Then produce a plan for the next unit of work:
 - Nothing blocks development, including the author's learning. Concepts go into the
   learning note as `concept + file:line`. Never pause the session to teach.
 - Three genuinely distinct approaches failed → stop, record a blocker with
-  `needs_user: true`, present costed options, recommend one, wait.
+  costed options, take the recommended one, and continue (ADR-0040); `needs_user: true` and a wait only if every option is reserved.
 
 ## 4. Before you stop
 

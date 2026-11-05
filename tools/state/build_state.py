@@ -132,6 +132,12 @@ def merge(generated: list[dict], existing: list[dict]) -> list[dict]:
             if prior and prior.get("text") == criterion["text"]:
                 criterion["met"] = prior.get("met", False)
                 criterion["evidence"] = prior.get("evidence")
+                # ADR-0036's fields. Dropping them silently turned three carried
+                # Phase 5 criteria into plain unmet ones the first time the table was
+                # rebuilt after carrying existed (spec_version 3.0.0).
+                for key in ("carried_to_phase", "carried_reason"):
+                    if key in prior:
+                        criterion[key] = prior[key]
     return generated
 
 

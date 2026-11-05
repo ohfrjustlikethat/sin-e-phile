@@ -93,11 +93,11 @@ A 28-phase project will discover that some decision here was wrong. That is expe
 2. Edit `SPEC.md` directly. Do not leave stale text and patch around it.
 3. Bump `spec_version` in `PROJECT_STATE.json` (minor for a clarification, major for a reversed decision).
 4. Record the amendment in `SESSION_LOG.md` and in a running `## Amendments` list at the bottom of `SPEC.md` — one line each: date, section, what changed, ADR number.
-5. Get the author's explicit approval first. Always. The spec is the author's, not Claude Code's.
+5. **Approval** (ADR-0040): Claude Code amends the spec on its own judgement and lists every amendment in its next report. The author's explicit approval is required first only for an amendment in ADR-0040's reserved list — the legal posture, anything irreversible outside the repository, a locked technology or the licence, cutting a Tier B deliverable, or a genuine doubt about what the author wants. The spec is still the author's: they can reverse any amendment, and the record makes that easy.
 
 **Never** implement something contrary to this document and plan to update the spec afterwards. Amend first, then build.
 
-If Claude Code finds itself thinking "the spec says X but Y is obviously better here" — that is exactly the moment to stop and raise it, not to proceed.
+If Claude Code finds itself thinking "the spec says X but Y is obviously better here" — that is exactly the moment to amend it, in the open, before building Y. Not to build Y quietly.
 
 ---
 
@@ -522,6 +522,13 @@ grotesque; Circular), so the equivalents here must be **free and self-hostable**
   thing to lose to density. When in doubt, more space.
 - Every interactive element has a visible `--oxblood-bright` focus ring. Full keyboard
   navigation is a Phase 2 requirement, not a Phase 27 retrofit.
+- **An Xbox controller is a remote** (ADR-0041). Over Bluetooth, the wireless adapter or
+  USB, a controller drives the same focus system as the keyboard through the WebView's
+  Gamepad API: D-pad and left stick move focus, A selects, B goes back, LB/RB change
+  destination, and the player maps play/pause, seek and the subtitle and audio menus to
+  the face buttons and triggers. When the last input came from a controller, focus gets
+  the larger ten-foot treatment, because the viewer is across the room. Built in Phase 8;
+  text entry (an on-screen keyboard) and the whole-app audit in Phase 18.
 - **`PosterCard` has a designed artwork-free state** (ADR-0013): a typographic
   title card, not a grey rectangle. Given this brief it should be genuinely
   beautiful — for a film app a typographic card is arguably the better default.
@@ -586,7 +593,7 @@ This section governs how Claude Code operates. It matters more than any individu
 2. **Verify state against reality**: run `git status`, `git log --oneline -10`, `cargo test`, `npm test`. If the repository disagrees with `PROJECT_STATE.json`, **the repository is right**. Correct the state file, and record the discrepancy in `SESSION_LOG.md`.
 3. Report to the author in **five lines or fewer**: current phase, what's done, what's next, blockers, anything needing a decision. Do not restate the spec back. Findings are bullets, not tables. Prose is for when something genuinely needs arguing (ADR-0016).
 4. If there are blockers with `needs_user: true`, raise them *before* planning.
-5. Produce a plan for this session. Wait for approval before implementing.
+5. Produce a plan for this session, write it into the phase document and `PROJECT_STATE.json`, and **start** (ADR-0040). The plan is not waited on; a decision in ADR-0040's reserved list is the only thing that stops work for the author.
 
 ### 10.3 Session end ritual — mandatory, every session
 
@@ -609,7 +616,8 @@ State is updated **after each completed subtask**, not only at session end. A se
 
 - One branch per phase: `phase/NN-slug`.
 - Conventional commits: `feat(torrent): implement sequential piece scheduler`, `docs(adr): record librqbit decision`, `test(subtitles): add misalignment fixture corpus`.
-- Merge to `main` only when the phase's exit criteria are all met and evidenced. Squash-merge with a summary body listing what landed.
+- Merge to `main` only when the phase's exit criteria are all met and evidenced, or carried under ADR-0036. Claude Code merges with `--no-ff` and a summary body listing what landed, once CI is green on the branch and the regression check (§10.12) shows no earlier number moved (ADR-0040).
+- **Before every push**, locally: `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test --workspace`, `npm run lint`, `npm test`, `npm run build`, the posture guard, and both secret scans — gitleaks over the full history included, because CI runs it.
 - Tag each phase completion: `phase-07`.
 - `main` must always build and run. If it doesn't, that is the highest-priority bug.
 
@@ -619,7 +627,7 @@ Each phase has a defined scope. When something desirable but out-of-scope surfac
 
 - If it's a bug in previously completed work → fix it now, note it in the session log.
 - If it's a new feature idea → add it to `known_debt` or open a GitHub issue, and move on.
-- If it's a genuine blocker requiring an architectural change → stop, write an ADR, get the author's approval, then proceed.
+- If it's a genuine blocker requiring an architectural change → write an ADR, amend the spec if needed, and proceed (ADR-0040); stop for the author only if the change is in ADR-0040's reserved list.
 
 Do not silently expand a phase. A phase that grows by 60% is a phase whose exit criteria stop meaning anything.
 
@@ -654,7 +662,7 @@ Claude Code will get stuck. libmpv will not embed. A crate will not build. A tes
 1. Write the problem into `PROJECT_STATE.json` as a blocker with `needs_user: true`, including what was tried and what happened each time.
 2. Present the author with the actual options, honestly costed: a different library, a different approach, deferring this to a later phase, or cutting the requirement.
 3. Recommend one and say why.
-4. **Stop and wait.** Do not keep going.
+4. **Take the recommended option and continue** (ADR-0040) — usually carrying the criterion to a named phase (ADR-0036) or working another phase meanwhile. Stop and wait only if every option is in ADR-0040's reserved list.
 
 If a blocker will take more than a session to resolve, propose reordering — work a later independent phase while the blocker is thought about. Sitting stuck is worse than working out of order.
 
@@ -662,7 +670,7 @@ Equally: if something turns out to be much easier than expected, say so. Do not 
 
 ### 10.10 The understanding gate is active, not passive
 
-**The gate fires at tier boundaries, not every phase** (ADR-0016): the end of Phase 8, the end of Phase 18, the end of whatever tier the author stops at, and whenever the author asks for it. At those points Claude Code **asks the five self-check questions** from the relevant learning notes, in the chat, and waits for answers.
+**The gate fires at tier boundaries, not every phase** (ADR-0016): the end of Phase 8, the end of Phase 18, the end of whatever tier the author stops at, and whenever the author asks for it. At those points Claude Code **asks the five self-check questions** from the relevant learning notes, in the chat — and **development continues while they are answered** (ADR-0040). A weak answer creates a task (rewrite the note, simplify the code), not a stop.
 
 Every phase still *writes* its five questions (§13.2). They accumulate unasked until a gate, which is what makes a gate meaningful rather than a formality.
 
@@ -903,7 +911,7 @@ Treat the quota as a scarce resource with a budget and a cache. This constraint 
 
 28 phases, `0`–`27`. Each is scoped to one Claude Code session where possible; larger ones state their expected session count.
 
-**Session counts are estimates, not commitments.** They are the honest expectation at the time of writing and they will be wrong in both directions. In particular, §2.2's rule that no more than ~400 lines of new logic ships without stopping to explain it, combined with the active understanding gate in §10.10, means **Phases 4, 7 and 16 should be expected to run 4+ sessions each** rather than the 2–3 stated. That is the specification working as intended, not falling behind. Written down here so it does not feel like failure when it happens.
+**Session counts are historical estimates, not a plan** (ADR-0040). From Phase 7 the phases run back to back at the author's pace: as fast as the work can be done *and verified*. Speed comes from not waiting and from scoping each phase to its exit criteria — never from skipping a check, marking a criterion met without evidence, or carrying one that could be met now.
 
 **Phase 8 is the first demoable milestone** — a working vertical slice — and it exists that early on purpose.
 
@@ -1090,13 +1098,14 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 **Goal.** Search for something, press play, watch it. The vertical slice that proves the whole thing works.
 
-**Deliverables.** libmpv embedded and rendering into the Tauri window, with hardware decoding enabled and a software fallback path. A custom player UI drawn over it — not mpv's OSD: play/pause, a scrub bar with buffered-range and torrent-download indication, volume, time, fullscreen, audio-track and subtitle-track selectors, playback speed. Full keyboard control (space, arrows, `J`/`K`/`L`, `F`, `M`, `,`/`.` frame step, `[`/`]` speed). Chrome auto-hide. Position saving on exit and resume on reopen. A minimal detail page: poster, synopsis, cast, and a play button that goes through the resolver. Wire search → detail → resolve → play end to end.
+**Deliverables.** libmpv embedded and rendering into the Tauri window, with hardware decoding enabled and a software fallback path. A custom player UI drawn over it — not mpv's OSD: play/pause, a scrub bar with buffered-range and torrent-download indication, volume, time, fullscreen, audio-track and subtitle-track selectors, playback speed. Full keyboard control (space, arrows, `J`/`K`/`L`, `F`, `M`, `,`/`.` frame step, `[`/`]` speed). **Xbox controller control** (ADR-0041): a gamepad layer over the Gamepad API that drives focus navigation on every existing screen and the player's controls, with the ten-foot focus treatment. Chrome auto-hide. Position saving on exit and resume on reopen. A minimal detail page: poster, synopsis, cast, and a play button that goes through the resolver. Wire search → detail → resolve → play end to end.
 
 **Exit criteria.**
 - [ ] A user can search, click, and watch — from a local file, from the Internet Archive backend, and from a configured P2P source.
 - [ ] Playback of 4K HEVC HDR uses hardware decode (verified in logs and by CPU usage).
 - [ ] Seeking is frame-accurate and responsive.
 - [ ] Position resume works across app restarts.
+- [ ] With only an Xbox controller, a user can browse to a film, start it, pause, seek and leave the player — tested with a simulated gamepad in CI and confirmed once by the author with a real controller.
 - [ ] **A demo GIF of this flow exists and is in the README.**
 - [ ] Tag `phase-08`, and celebrate — this is the first thing worth showing anyone.
 
@@ -1299,6 +1308,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 - [ ] The masthead fits at the 1024×640 minimum window with every destination, Search, Downloads and Settings visible, measured by `tools/uiaudit`.
 - [ ] Search is reachable from every surface by the visible Search button and by `/`.
 - [ ] No destination or state shows a placeholder screen.
+- [ ] Every screen is usable with an Xbox controller alone, search included through an on-screen keyboard built for the D-pad (ADR-0041).
 - [ ] The design lint passes in CI, and each of its rules has been seen to fail.
 - [ ] The author signs off the screenshot review set (every surface, both sizes, with and without artwork) against §9.0's test: `manual: <what they reviewed and said>`. This set supplies the README's screenshots.
 
@@ -1532,14 +1542,14 @@ A phase is complete when: every exit criterion is met with evidence recorded in 
 
 1. Read `SPEC.md` first. It outranks memory.
 2. Verify state against the repository, not against the state file.
-3. Plan before implementing. Wait for approval.
+3. Plan before implementing, record the plan, and proceed (ADR-0040). Stop only for ADR-0040's reserved decisions.
 4. Small commits, conventional messages, always buildable `main`.
 5. No source URLs, indexer names, or catalogues. Ever. Anywhere.
 6. Explain unfamiliar concepts as they're introduced, in the learning note.
 7. Never expand a phase's scope silently.
 8. Update state after every subtask, not just at the end.
 9. When choosing between clever and clear, choose clear.
-10. When something is genuinely uncertain, say so and ask, rather than guessing confidently.
+10. When something is genuinely uncertain, say so. If the wrong guess could hurt the app, ask; otherwise take the better-reasoned option, record it, and say that you did.
 11. Measure before optimising; record the numbers.
 12. If a phase's exit criteria can't be met, say so and explain why rather than redefining them.
 13. Evidence, not opinion (§10.8). Three attempts then escalate (§10.9). Amend the spec before deviating from it (§2.8).
@@ -1586,6 +1596,16 @@ Face recognition, live TV, manga and comics, casting and watch-together. Fully i
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 3.0.0 — 2026-11-05 (autonomous delivery, and a controller as a remote)
+
+Major, because A29 reverses a standing rule: work used to wait for the author's approval.
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A29 | §2.8, §10.2, §10.5, §10.6, §10.9, §10.10, §15, Appendix C | **Autonomous delivery**, at the author's request: Claude Code plans, decides, builds, verifies, merges and pushes without waiting, and asks only about the decisions ADR-0040 reserves (legal posture, irreversible external actions, locked technology or licence, cutting Tier B, genuine doubt about intent). Spec amendments follow the same rule. After three failed attempts it takes the recommended option instead of stopping. The understanding gate asks without blocking. Every quality rule stays, and the pre-push checks are written down, gitleaks over history included. | [0040](docs/adr/0040-autonomous-delivery.md) |
+| A30 | §9.4, Phase 8, Phase 18 | **An Xbox controller drives the app like a remote**, at the author's request: the Gamepad API over the existing focus system, a ten-foot focus treatment, player mappings in Phase 8 with an exit criterion, and an on-screen keyboard plus a controller-only audit in Phase 18. | [0041](docs/adr/0041-xbox-controller-as-a-remote.md) |
+| A31 | §10.5 | The merge rule now says what the project actually does — `--no-ff` merges with a summary — rather than squash-merge, which it never did. | [0040](docs/adr/0040-autonomous-delivery.md) |
 
 ### spec_version 2.0.0 — 2026-10-25 (the masthead, the overhaul, and carried criteria)
 

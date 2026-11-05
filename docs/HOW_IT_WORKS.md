@@ -162,7 +162,7 @@ answer, and it reads every answer as if it were written by an attacker.
 answer quickly are read out first, and a library that never picks up does not keep
 anyone waiting.
 
-### The torrent engine — why streaming is hard `⬜ Phase 7`
+### The torrent engine — why streaming is hard `✅ Phase 7`
 
 BitTorrent splits a file into **pieces** and, by default, fetches the **rarest**
 piece first. That is the right strategy for keeping a swarm healthy, and it is
@@ -305,6 +305,14 @@ resolver gives every source its own task and its own 8-second budget; the regist
 stores on/off, order, and counts of answers, failures and time-outs. The Internet
 Archive backend is tested against recorded responses and once against the live
 service. Settings → Sources is the screen.
+
+### The torrent engine ✅ `Phase 7`
+
+`crates/torrent`: librqbit in-process, a loopback HTTP server that turns any file in a
+torrent into a seekable stream for the player, file selection, the seeding policy, a
+fast failure for dead swarms, and adapter binding so a dropped VPN stops traffic
+instead of leaking it. Tested against a real two-engine swarm built on loopback for each
+test. How it schedules: `docs/specs/streaming-scheduler.md`.
 
 ### The posture guard ✅ `Phase 0`
 
