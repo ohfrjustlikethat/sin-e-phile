@@ -71,3 +71,6 @@ data/datasets/
 # (ADR-0014), never repository content. `models/` is already ignored above.
 *.vectors.part
 embeddings-*.bin
+
+# libmpv, fetched and checksum-verified by tools/mpv/fetch.py (121 MB, never committed)
+/lib/

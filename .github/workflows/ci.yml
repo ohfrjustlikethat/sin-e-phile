@@ -222,6 +222,12 @@ jobs:
       - name: Install FFmpeg per docs/SETUP.md
         run: choco install ffmpeg --no-progress -y
 
+      # Phase 8: the player's native library, pinned and checksum-verified, per
+      # docs/SETUP.md. The same command a developer runs.
+      - name: Fetch libmpv per docs/SETUP.md
+        working-directory: fresh
+        run: python tools/mpv/fetch.py
+
       - name: doctor reports a working environment
         working-directory: fresh
         run: python tools/doctor/doctor.py
