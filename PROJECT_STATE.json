@@ -15,14 +15,14 @@
       {
         "id": "6.1",
         "text": "crates/source-protocol (MIT OR Apache-2.0, no Tauri, no network): the SPEC.md §6.1 SourceBackend trait via async-trait, and MediaQuery, SourceCandidate (quality, language, codec, size, health, provenance), PlayableStream, BackendCapabilities. The addon manifest types, JSON Schema at docs/schemas/addon-manifest.schema.json, and a parse-only validator.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "ff88924"
       },
       {
         "id": "6.2",
         "text": "Manifest hardening (E3): 64 KiB cap, depth and string-length limits, https only (plain http for loopback), every endpoint on the manifest's own host, a protocol version field. A corpus of hostile manifests plus a randomised no-panic test.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "ff88924"
       },
       {
         "id": "6.3",
@@ -911,14 +911,14 @@
         {
           "id": "6.1",
           "text": "crates/source-protocol (MIT OR Apache-2.0, no Tauri, no network): the SPEC.md §6.1 SourceBackend trait via async-trait, and MediaQuery, SourceCandidate (quality, language, codec, size, health, provenance), PlayableStream, BackendCapabilities. The addon manifest types, JSON Schema at docs/schemas/addon-manifest.schema.json, and a parse-only validator.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "ff88924"
         },
         {
           "id": "6.2",
           "text": "Manifest hardening (E3): 64 KiB cap, depth and string-length limits, https only (plain http for loopback), every endpoint on the manifest's own host, a protocol version field. A corpus of hostile manifests plus a randomised no-panic test.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "ff88924"
         },
         {
           "id": "6.3",
