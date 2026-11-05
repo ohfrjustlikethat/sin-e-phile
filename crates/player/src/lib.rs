@@ -5,8 +5,12 @@
 //! pinned `libmpv-2.dll` that `tools/mpv/fetch.py` installs.
 
 mod ffi;
+#[cfg(windows)]
+pub mod host;
 pub mod player;
 
+#[cfg(windows)]
+pub use host::{Cutout, VideoHost};
 pub use player::{Options, Player, PlayerError, State, Track};
 
 /// Where libmpv is: `SINEPHILE_LIBMPV` if set, else `lib/libmpv-2.dll` beside the

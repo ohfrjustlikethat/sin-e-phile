@@ -21,8 +21,8 @@
       {
         "id": "8.2",
         "text": "crates/player: libmpv loaded dynamically (no import library, as Spike A), a safe wrapper — options, commands, properties, an event thread — and tests against an FFmpeg-generated clip: load, play, pause, exact seek (frame-accurate), tracks, speed.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "54396ea"
       },
       {
         "id": "8.3",
@@ -1159,8 +1159,8 @@
         {
           "id": "8.2",
           "text": "crates/player: libmpv loaded dynamically (no import library, as Spike A), a safe wrapper — options, commands, properties, an event thread — and tests against an FFmpeg-generated clip: load, play, pause, exact seek (frame-accurate), tracks, speed.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "54396ea"
         },
         {
           "id": "8.3",

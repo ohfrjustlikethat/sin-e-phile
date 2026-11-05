@@ -195,3 +195,19 @@ fn a_file_that_cannot_be_opened_is_an_error_not_a_hang() {
     let err = p.wait_loaded(Duration::from_secs(10)).unwrap_err();
     assert!(err.to_string().starts_with("could not play this"), "{err}");
 }
+
+#[test]
+fn a_still_frame_can_be_saved_for_the_pause_overlay() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = player();
+    p.load(clip(dir.path()).to_str().unwrap(), None).unwrap();
+    p.wait_first_frame(Duration::from_secs(10)).unwrap();
+    p.set_paused(true).unwrap();
+    let still = dir.path().join("still.jpg");
+    p.screenshot(&still).unwrap();
+    wait_until("the still to be written", || {
+        still.metadata().map(|m| m.len() > 1000).unwrap_or(false)
+    });
+    let head = std::fs::read(&still).unwrap();
+    assert_eq!(&head[..2], &[0xFF, 0xD8], "not a JPEG");
+}

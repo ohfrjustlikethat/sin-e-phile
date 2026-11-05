@@ -268,6 +268,17 @@ impl Player {
         self.prop("sid", &id.map_or("no".to_string(), |i| i.to_string()))
     }
 
+    /// Save the frame on screen, at window resolution, to `path` (JPEG by extension).
+    /// The pause overlay shows it while the video window is hidden (ADR-0021).
+    pub fn screenshot(&self, path: &Path) -> Result<(), PlayerError> {
+        let p = path.to_string_lossy();
+        // "window" is what the viewer saw, at window resolution, so its cost does not
+        // grow with a 4K source (ADR-0021). With no video output (headless) there is no
+        // window, and the decoded frame is the next best thing.
+        self.cmd(&["screenshot-to-file", &p, "window"])
+            .or_else(|_| self.cmd(&["screenshot-to-file", &p, "video"]))
+    }
+
     pub fn stop(&self) -> Result<(), PlayerError> {
         self.cmd(&["stop"])
     }
