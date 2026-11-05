@@ -27,8 +27,8 @@
       {
         "id": "6.3",
         "text": "crates/sources (GPL): the resolver. Queries every enabled backend concurrently, each under its own timeout, then dedups and merges. A deliberately slow backend must not delay the others, proved by a timing test seen to fail with the timeout removed (E4).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "6f99ed7"
       },
       {
         "id": "6.4",
@@ -101,8 +101,8 @@
       {
         "id": "E4",
         "text": "Backend timeout: one slow backend never delays results from the others.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "cargo test -p sinephile-sources --test resolver: a_fast_backend_answers_before_a_slow_one_times_out (fast batch at <50 ms virtual while the slow backend times out at 300 ms), the_whole_search_is_bounded_by_the_timeout_not_the_slowest_backend (find_all returns at the 500 ms timeout although one backend would take 1 h), a_timed_out_backend_is_stopped_not_abandoned, a_panicking_backend_fails_alone. Commit 6f99ed7. Seen to fail with the timeout removed (took 3600s), the abort removed, and backends asked sequentially (took 520ms)."
       },
       {
         "id": "E5",
@@ -891,8 +891,8 @@
         {
           "id": "E4",
           "text": "Backend timeout: one slow backend never delays results from the others.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "cargo test -p sinephile-sources --test resolver: a_fast_backend_answers_before_a_slow_one_times_out (fast batch at <50 ms virtual while the slow backend times out at 300 ms), the_whole_search_is_bounded_by_the_timeout_not_the_slowest_backend (find_all returns at the 500 ms timeout although one backend would take 1 h), a_timed_out_backend_is_stopped_not_abandoned, a_panicking_backend_fails_alone. Commit 6f99ed7. Seen to fail with the timeout removed (took 3600s), the abort removed, and backends asked sequentially (took 520ms)."
         },
         {
           "id": "E5",
@@ -923,8 +923,8 @@
         {
           "id": "6.3",
           "text": "crates/sources (GPL): the resolver. Queries every enabled backend concurrently, each under its own timeout, then dedups and merges. A deliberately slow backend must not delay the others, proved by a timing test seen to fail with the timeout removed (E4).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "6f99ed7"
         },
         {
           "id": "6.4",
