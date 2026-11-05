@@ -27,13 +27,13 @@
       {
         "id": "8.3",
         "text": "Embedding: libmpv renders into a child HWND of the main window (Spike A step 2), resized with it; play/pause/seek/volume/track/speed/stop commands; player state streamed to the frontend.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "e2fd2c8"
       },
       {
         "id": "8.4",
         "text": "The player chrome (ADR-0020/0021): scrub bar with buffered ranges and torrent progress, volume, time, fullscreen, audio and subtitle tracks, speed; full keyboard control; auto-hide; still frame on pause.",
-        "status": "not_started",
+        "status": "in_progress",
         "commit": null
       },
       {
@@ -1165,13 +1165,13 @@
         {
           "id": "8.3",
           "text": "Embedding: libmpv renders into a child HWND of the main window (Spike A step 2), resized with it; play/pause/seek/volume/track/speed/stop commands; player state streamed to the frontend.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "e2fd2c8"
         },
         {
           "id": "8.4",
           "text": "The player chrome (ADR-0020/0021): scrub bar with buffered ranges and torrent progress, volume, time, fullscreen, audio and subtitle tracks, speed; full keyboard control; auto-hide; still frame on pause.",
-          "status": "not_started",
+          "status": "in_progress",
           "commit": null
         },
         {

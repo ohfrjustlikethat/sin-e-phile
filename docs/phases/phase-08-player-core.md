@@ -27,7 +27,7 @@ libmpv embedded and rendering into the Tauri window, with hardware decoding enab
 
 - [x] **8.1** libmpv as a pinned dependency: tools/mpv/fetch.py downloads shinchiro's mpv-dev-x86_64 20261021 build (baseline x86-64, not v3, so Tier 0 CPUs without AVX2 work), verifies its SHA-256, and places libmpv-2.dll beside the app; doctor checks for it; the bundle ships it.
 - [x] **8.2** crates/player: libmpv loaded dynamically (no import library, as Spike A), a safe wrapper — options, commands, properties, an event thread — and tests against an FFmpeg-generated clip: load, play, pause, exact seek (frame-accurate), tracks, speed.
-- [ ] **8.3** Embedding: libmpv renders into a child HWND of the main window (Spike A step 2), resized with it; play/pause/seek/volume/track/speed/stop commands; player state streamed to the frontend.
+- [x] **8.3** Embedding: libmpv renders into a child HWND of the main window (Spike A step 2), resized with it; play/pause/seek/volume/track/speed/stop commands; player state streamed to the frontend.
 - [ ] **8.4** The player chrome (ADR-0020/0021): scrub bar with buffered ranges and torrent progress, volume, time, fullscreen, audio and subtitle tracks, speed; full keyboard control; auto-hide; still frame on pause.
 - [ ] **8.5** Xbox controller (ADR-0041): a gamepad layer over the focus system, the player mappings, the ten-foot focus treatment; tested with a simulated gamepad.
 - [ ] **8.6** Position saving on exit and resume on reopen, per profile, across restarts.
@@ -50,3 +50,4 @@ How video playback actually works — container, streams, codecs, decode, presen
 ## Work log
 - **8.1** libmpv as a pinned dependency: tools/mpv/fetch.py downloads shinchiro's mpv-dev-x86_64 20261021  · `a3b2079`
 - **8.2** crates/player: libmpv loaded dynamically (no import library, as Spike A), a safe wrapper — optio · `54396ea`
+- **8.3** Embedding: libmpv renders into a child HWND of the main window (Spike A step 2), resized with it · `e2fd2c8`

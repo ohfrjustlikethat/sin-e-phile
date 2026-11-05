@@ -5365,6 +5365,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sinephile-playback"
+version = "0.1.0"
+dependencies = [
+ "sinephile-persistence",
+ "sinephile-sources",
+ "sinephile-torrent",
+ "source-protocol",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
 name = "sinephile-player"
 version = "0.1.0"
 dependencies = [

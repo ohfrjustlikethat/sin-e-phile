@@ -976,3 +976,66 @@ async fn backfill_repository_surface() {
         (id, "internet-archive")
     );
 }
+
+/// `MediaRepository::credits` and `ProfileRepository::ensure_default` (Phase 8).
+#[tokio::test]
+async fn detail_and_default_profile_surface() {
+    let db = Db::in_memory().await.expect("open");
+    let media = MediaRepository::new(&db);
+    let film = media
+        .insert(&NewMediaItem::film("Sunrise", 1927))
+        .await
+        .unwrap();
+    for (name, role, character, billing) in [
+        ("Janet Gaynor", "actor", "The Wife", Some(2)),
+        ("F. W. Murnau", "director", "", None),
+        ("George O'Brien", "actor", "The Man", Some(1)),
+        ("Extra", "actor", "", None),
+    ] {
+        let person: i64 = sqlx::query_scalar("INSERT INTO people (name) VALUES (?) RETURNING id")
+            .bind(name)
+            .fetch_one(db.pool())
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO credits (media_item_id, person_id, role, character, billing) VALUES (?, ?, ?, ?, ?)")
+            .bind(film)
+            .bind(person)
+            .bind(role)
+            .bind(character)
+            .bind(billing)
+            .execute(db.pool())
+            .await
+            .unwrap();
+    }
+    // credits — the director first, then the cast by billing, the unbilled last
+    let credits = media.credits(film, 10).await.expect("credits");
+    let names: Vec<&str> = credits.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(
+        names,
+        ["F. W. Murnau", "George O'Brien", "Janet Gaynor", "Extra"]
+    );
+    assert_eq!(credits[1].character.as_deref(), Some("The Man"));
+    assert_eq!(credits[0].character, None, "an empty character is None");
+    assert_eq!(media.credits(film, 2).await.unwrap().len(), 2, "limit");
+
+    // external_id
+    media
+        .add_external_id(film, IdSource::Imdb, "tt0018455", 1.0)
+        .await
+        .unwrap();
+    assert_eq!(
+        media
+            .external_id(film, "imdb")
+            .await
+            .expect("external_id")
+            .as_deref(),
+        Some("tt0018455")
+    );
+    assert_eq!(media.external_id(film, "tmdb").await.unwrap(), None);
+
+    // ensure_default — creates once, then returns the same profile
+    let profiles = ProfileRepository::new(&db);
+    let first = profiles.ensure_default().await.expect("ensure_default");
+    assert_eq!(profiles.ensure_default().await.unwrap(), first);
+    assert_eq!(profiles.all().await.unwrap().len(), 1);
+}
