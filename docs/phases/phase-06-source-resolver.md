@@ -32,8 +32,8 @@ The `SourceBackend` trait (§6.1) and its types: `MediaQuery`, `SourceCandidate`
 - [x] **6.6** InternetArchiveBackend: public-domain feature-film search, then item metadata to a playable file. Tested against recorded responses, plus an ignored live test.
 - [x] **6.7** E2 evidence: a live query resolves to a stream URL that ffprobe decodes; command and output recorded in docs/eval-results.md.
 - [x] **6.8** AddonBackend: an addon is a manifest plus a remote service speaking the protocol's find/resolve JSON endpoints. Responses size-capped and time-limited like manifests.
-- [ ] **6.9** UI, Settings -> Sources: backend list (enable, order, health); paste a manifest URL, see in plain language what it declares, confirm, enable, with no raw JSON in the primary path; a catalogue browser over a user-supplied URL (no default ships).
-- [ ] **6.10** Search-triggered backfill (ADR-0030), minimal: when search misses and the resolver finds a candidate, a background write creates a media_items row marked as backfilled, from the title and year the backend reports. Filename parsing and IMDb merge stay with Phase 12.
+- [x] **6.9** UI, Settings -> Sources: backend list (enable, order, health); paste a manifest URL, see in plain language what it declares, confirm, enable, with no raw JSON in the primary path; a catalogue browser over a user-supplied URL (no default ships).
+- [x] **6.10** Search-triggered backfill (ADR-0030), minimal: when search misses and the resolver finds a candidate, a background write creates a media_items row marked as backfilled, from the title and year the backend reports. Filename parsing and IMDb merge stay with Phase 12.
 - [ ] **6.11** docs/specs/addon-protocol.md written for a third party, tested by implementing a throwaway backend from it alone (E5); repository-wide guard over tree and history, seen to fail (E6).
 
 ## Learning note
@@ -53,3 +53,5 @@ Trait objects and `async_trait` in Rust; designing an interface you can't change
 - **6.6** InternetArchiveBackend: public-domain feature-film search, then item metadata to a playable file · `9ab7929`
 - **6.7** E2 evidence: a live query resolves to a stream URL that ffprobe decodes; command and output reco · `fc50bf4`
 - **6.8** AddonBackend: an addon is a manifest plus a remote service speaking the protocol's find/resolve  · `ebaba3f`
+- **6.9** UI, Settings -> Sources: backend list (enable, order, health); paste a manifest URL, see in plai · `1136e78`
+- **6.10** Search-triggered backfill (ADR-0030), minimal: when search misses and the resolver finds a candi · `61ab278`

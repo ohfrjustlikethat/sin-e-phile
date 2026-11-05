@@ -16,7 +16,7 @@
 
 > Planned 2026-11-05 and approved by the author. Addon model: manifest plus a remote service speaking the protocol (option a); backfill built minimally here from backend-reported title and year.
 
-### Subtasks — 8/11 complete
+### Subtasks — 10/11 complete
 
 - [x] **6.1** crates/source-protocol (MIT OR Apache-2.0, no Tauri, no network): the SPEC.md §6.1 SourceBackend trait via async-trait, and MediaQuery, SourceCandidate (quality, language, codec, size, health, provenance), PlayableStream, BackendCapabilities. The addon manifest types, JSON Schema at docs/schemas/addon-manifest.schema.json, and a parse-only validator. · `ff88924`
 - [x] **6.2** Manifest hardening (E3): 64 KiB cap, depth and string-length limits, https only (plain http for loopback), every endpoint on the manifest's own host, a protocol version field. A corpus of hostile manifests plus a randomised no-panic test. · `ff88924`
@@ -26,8 +26,8 @@
 - [x] **6.6** InternetArchiveBackend: public-domain feature-film search, then item metadata to a playable file. Tested against recorded responses, plus an ignored live test. · `9ab7929`
 - [x] **6.7** E2 evidence: a live query resolves to a stream URL that ffprobe decodes; command and output recorded in docs/eval-results.md. · `fc50bf4`
 - [x] **6.8** AddonBackend: an addon is a manifest plus a remote service speaking the protocol's find/resolve JSON endpoints. Responses size-capped and time-limited like manifests. · `ebaba3f`
-- [ ] **6.9** UI, Settings -> Sources: backend list (enable, order, health); paste a manifest URL, see in plain language what it declares, confirm, enable, with no raw JSON in the primary path; a catalogue browser over a user-supplied URL (no default ships).
-- [ ] **6.10** Search-triggered backfill (ADR-0030), minimal: when search misses and the resolver finds a candidate, a background write creates a media_items row marked as backfilled, from the title and year the backend reports. Filename parsing and IMDb merge stay with Phase 12.
+- [x] **6.9** UI, Settings -> Sources: backend list (enable, order, health); paste a manifest URL, see in plain language what it declares, confirm, enable, with no raw JSON in the primary path; a catalogue browser over a user-supplied URL (no default ships). · `1136e78`
+- [x] **6.10** Search-triggered backfill (ADR-0030), minimal: when search misses and the resolver finds a candidate, a background write creates a media_items row marked as backfilled, from the title and year the backend reports. Filename parsing and IMDb merge stay with Phase 12. · `61ab278`
 - [ ] **6.11** docs/specs/addon-protocol.md written for a third party, tested by implementing a throwaway backend from it alone (E5); repository-wide guard over tree and history, seen to fail (E6).
 
 ### Exit criteria

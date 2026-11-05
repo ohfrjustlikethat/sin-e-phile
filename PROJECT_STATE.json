@@ -69,8 +69,8 @@
       {
         "id": "6.10",
         "text": "Search-triggered backfill (ADR-0030), minimal: when search misses and the resolver finds a candidate, a background write creates a media_items row marked as backfilled, from the title and year the backend reports. Filename parsing and IMDb merge stay with Phase 12.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "61ab278"
       },
       {
         "id": "6.11",
@@ -965,8 +965,8 @@
         {
           "id": "6.10",
           "text": "Search-triggered backfill (ADR-0030), minimal: when search misses and the resolver finds a candidate, a background write creates a media_items row marked as backfilled, from the title and year the backend reports. Filename parsing and IMDb merge stay with Phase 12.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "61ab278"
         },
         {
           "id": "6.11",
