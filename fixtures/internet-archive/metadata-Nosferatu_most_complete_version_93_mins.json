@@ -1,0 +1,72 @@
+{
+ "metadata": {
+  "identifier": "Nosferatu_most_complete_version_93_mins.",
+  "title": "Nosferatu, eine Symphonie des Grauens (A Symphony of Horror)",
+  "year": "1922",
+  "mediatype": "movies",
+  "collection": [
+   "silent_films",
+   "SciFi_Horror",
+   "feature_films",
+   "moviesandfilms"
+  ]
+ },
+ "files": [
+  {
+   "name": "Nosferatu_1922_Symphony_of_Horror.avi",
+   "source": "original",
+   "format": "DivX",
+   "size": "916378678",
+   "height": "480",
+   "width": "640",
+   "length": "5601.82"
+  },
+  {
+   "name": "Nosferatu_1922_Symphony_of_Horror.gif",
+   "source": "derivative",
+   "format": "Animated GIF",
+   "size": "416550"
+  },
+  {
+   "name": "Nosferatu_1922_Symphony_of_Horror.ogv",
+   "source": "derivative",
+   "format": "Ogg Video",
+   "size": "401195646",
+   "height": "304",
+   "width": "400",
+   "length": "5601.8"
+  },
+  {
+   "name": "Nosferatu_1922_Symphony_of_Horror_512kb.mp4",
+   "source": "derivative",
+   "format": "512Kb MPEG4",
+   "size": "395416378",
+   "height": "240",
+   "width": "320",
+   "length": "5601.8"
+  },
+  {
+   "name": "Nosferatu_most_complete_version_93_mins._archive.torrent",
+   "source": "metadata",
+   "format": "Archive BitTorrent",
+   "size": "35116"
+  },
+  {
+   "name": "Nosferatu_most_complete_version_93_mins._files.xml",
+   "source": "metadata",
+   "format": "Metadata"
+  },
+  {
+   "name": "Nosferatu_most_complete_version_93_mins._meta.xml",
+   "source": "metadata",
+   "format": "Metadata",
+   "size": "4299"
+  },
+  {
+   "name": "Nosferatu_most_complete_version_93_mins._reviews.xml",
+   "source": "metadata",
+   "format": "Metadata",
+   "size": "8868"
+  }
+ ]
+}

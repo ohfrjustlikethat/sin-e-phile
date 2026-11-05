@@ -4337,11 +4337,14 @@ dependencies = [
 name = "sinephile-sources"
 version = "0.1.0"
 dependencies = [
+ "serde_json",
  "sinephile-catalogue",
+ "sinephile-metadata-api",
  "sinephile-persistence",
  "source-protocol",
  "tokio",
  "tracing",
+ "url",
 ]
 
 [[package]]
