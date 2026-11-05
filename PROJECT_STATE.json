@@ -33,8 +33,8 @@
       {
         "id": "6.4",
         "text": "Backend registry: enable/disable, ordering, per-backend health (successes, failures, mean latency), persisted by migration with repository_surface.rs lines for every new method.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "a024811"
       },
       {
         "id": "6.5",
@@ -929,8 +929,8 @@
         {
           "id": "6.4",
           "text": "Backend registry: enable/disable, ordering, per-backend health (successes, failures, mean latency), persisted by migration with repository_surface.rs lines for every new method.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "a024811"
         },
         {
           "id": "6.5",
