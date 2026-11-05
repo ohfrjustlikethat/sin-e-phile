@@ -7,6 +7,7 @@
 //!   [`BackendCapabilities`]), which are also the addon wire format.
 //! - The declarative addon [`Manifest`] and the [`Catalogue`] that lists manifests,
 //!   each with a validator that treats its input as hostile.
+//! - The [`wire`] format of an addon's two endpoints, parsed just as defensively.
 //!
 //! The specification is `docs/specs/addon-protocol.md`; the JSON Schema is
 //! `docs/schemas/addon-manifest.schema.json`.
@@ -18,6 +19,7 @@ pub mod backend;
 pub mod catalogue;
 pub mod manifest;
 pub mod types;
+pub mod wire;
 
 pub use backend::{SourceBackend, SourceError};
 pub use catalogue::{Catalogue, CatalogueEntry};

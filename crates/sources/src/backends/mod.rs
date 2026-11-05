@@ -8,8 +8,10 @@ use std::sync::Arc;
 
 use sinephile_metadata_api::transport::ResponseFuture;
 use sinephile_metadata_api::{Request, Transport, TransportError};
-use source_protocol::SourceBackend;
+use source_protocol::{Manifest, SourceBackend};
+use url::Url;
 
+pub mod addon;
 pub mod archive;
 pub mod direct;
 pub mod local;
@@ -19,8 +21,12 @@ pub mod local;
 pub struct Context {
     /// For backends that talk to a service the app trusts — the Internet Archive.
     pub http: Arc<dyn Transport>,
+    /// For addresses a USER supplied — every addon. No redirects, capped bodies.
+    pub untrusted_http: Arc<dyn Transport>,
     /// The user's own links (migration 0016).
     pub direct_links: Vec<direct::DirectLink>,
+    /// Installed addons, already re-checked (`crate::addons::installed`).
+    pub addons: Vec<(Url, Manifest)>,
 }
 
 impl Default for Context {
@@ -28,7 +34,9 @@ impl Default for Context {
     fn default() -> Self {
         Self {
             http: Arc::new(Unconnected),
+            untrusted_http: Arc::new(Unconnected),
             direct_links: Vec::new(),
+            addons: Vec::new(),
         }
     }
 }
@@ -45,9 +53,17 @@ impl Transport for Unconnected {
 /// Every backend available right now, built-in and addon alike. Which of them are
 /// asked, and in what order, is the registry's decision (`crate::registry`).
 pub fn all(ctx: &Context) -> Vec<Arc<dyn SourceBackend>> {
-    vec![
+    let mut backends: Vec<Arc<dyn SourceBackend>> = vec![
         Arc::new(local::LocalFileBackend),
         Arc::new(archive::InternetArchiveBackend::new(ctx.http.clone())),
         Arc::new(direct::DirectHttpBackend::new(ctx.direct_links.clone())),
-    ]
+    ];
+    // Addons are data, not code: one backend per installed manifest.
+    for (_, manifest) in &ctx.addons {
+        backends.push(Arc::new(addon::AddonBackend::new(
+            manifest.clone(),
+            ctx.untrusted_http.clone(),
+        )));
+    }
+    backends
 }

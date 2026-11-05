@@ -4342,6 +4342,7 @@ dependencies = [
  "sinephile-metadata-api",
  "sinephile-persistence",
  "source-protocol",
+ "thiserror 2.0.20",
  "tokio",
  "tracing",
  "url",

@@ -7,6 +7,7 @@
 //! **Adding a backend** (Phase 6 E1) is one file implementing `SourceBackend` and one
 //! line in [`backends::all`]. Nothing else in the app names a backend.
 
+pub mod addons;
 pub mod backends;
 pub mod merge;
 pub mod registry;
