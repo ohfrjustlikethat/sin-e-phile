@@ -15,32 +15,32 @@
       {
         "id": "7.1",
         "text": "crates/torrent: an Engine over an in-process librqbit 9 Session — data/torrents for files, session persistence and fastresume under data/, DHT on, magnet and .torrent input, add/list/pause/remove, a stats snapshot type. Config with sane defaults: bandwidth and connection limits, seeding stops at completion.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "6df5136"
       },
       {
         "id": "7.2",
         "text": "A loopback test swarm: create a torrent from generated files (an FFmpeg test video, a sample, a readme), seed it from one session and leech from another via initial_peers. No network, no URLs, runs in CI. Every later test uses it.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "6df5136"
       },
       {
         "id": "7.3",
         "text": "File selection within multi-file torrents: the main video, never the sample or the readme, and the requested episode when S/E is given. A pure function with a table of real-world-shaped layouts.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "6df5136"
       },
       {
         "id": "7.4",
         "text": "The local streaming server: loopback only, a random per-session token in every path, HTTP Range (206, Content-Range, 416) over librqbit's FileStream, so libmpv treats a torrent as a file. E5: a full stream and random ranges hash-identical to the source.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "6df5136"
       },
       {
         "id": "7.5",
         "text": "Streaming behaviour, measured: time to first bytes, seek re-prioritisation, buffer ahead of a simulated playhead under a rate-limited seeder (E3's documented floor), and a dead swarm failing fast and clearly (E4).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "6df5136"
       },
       {
         "id": "7.6",
@@ -51,8 +51,8 @@
       {
         "id": "7.7",
         "text": "Session persistence across restarts, tested by stopping and reopening a session mid-download.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "6df5136"
       },
       {
         "id": "7.8",
@@ -89,20 +89,20 @@
       {
         "id": "E3",
         "text": "Sequential mode never starves — the buffer ahead of the playhead is maintained under a documented bandwidth floor.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "cargo test -p sinephile-torrent --test buffer (6df5136): a simulated player reading at 2 MiB/s in 256 KiB chunks after a 2 s start-up buffer, over a loopback swarm whose seeder is capped at 1.5x the bitrate, waited 0 ns for any chunk (floor documented in docs/specs/streaming-scheduler.md: bandwidth >= 1.5x bitrate, 2 s buffer, lateness <= 250 ms). Negative control in the same file: at 0.7x the bitrate the same player starved by 2.27 s."
       },
       {
         "id": "E4",
         "text": "Correct behaviour on a dead swarm: clear, fast failure, not an indefinite hang.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "cargo test -p sinephile-torrent --test swarm a_dead_swarm_fails_fast_with_a_clear_error (6df5136): with the only peer a closed port, wait_for_peers returns 'nobody is sharing this — no peers answered within 3 seconds' in under 5 s, and a streaming request through the local server ends instead of hanging; a magnet's metadata wait is bounded by the same dead_swarm_after (default 30 s). Seen to fail with the wait removed (the request hung past the 10 s guard)."
       },
       {
         "id": "E5",
         "text": "Range requests are byte-correct — verified by streaming a file and comparing its hash to a full download.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "cargo test -p sinephile-torrent --test swarm the_stream_is_byte_identical_to_the_source_whole_and_in_ranges (6df5136): over a loopback swarm, 20 random byte ranges fetched while the torrent was still downloading, a suffix range and the full GET through the local streaming server are all byte-for-byte identical to the source file (stricter than comparing hashes); 416 with Content-Range past the end; a wrong token is 404. Seen to fail with an off-by-one in the body length."
       },
       {
         "id": "E6",
@@ -1007,20 +1007,20 @@
         {
           "id": "E3",
           "text": "Sequential mode never starves — the buffer ahead of the playhead is maintained under a documented bandwidth floor.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "cargo test -p sinephile-torrent --test buffer (6df5136): a simulated player reading at 2 MiB/s in 256 KiB chunks after a 2 s start-up buffer, over a loopback swarm whose seeder is capped at 1.5x the bitrate, waited 0 ns for any chunk (floor documented in docs/specs/streaming-scheduler.md: bandwidth >= 1.5x bitrate, 2 s buffer, lateness <= 250 ms). Negative control in the same file: at 0.7x the bitrate the same player starved by 2.27 s."
         },
         {
           "id": "E4",
           "text": "Correct behaviour on a dead swarm: clear, fast failure, not an indefinite hang.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "cargo test -p sinephile-torrent --test swarm a_dead_swarm_fails_fast_with_a_clear_error (6df5136): with the only peer a closed port, wait_for_peers returns 'nobody is sharing this — no peers answered within 3 seconds' in under 5 s, and a streaming request through the local server ends instead of hanging; a magnet's metadata wait is bounded by the same dead_swarm_after (default 30 s). Seen to fail with the wait removed (the request hung past the 10 s guard)."
         },
         {
           "id": "E5",
           "text": "Range requests are byte-correct — verified by streaming a file and comparing its hash to a full download.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "cargo test -p sinephile-torrent --test swarm the_stream_is_byte_identical_to_the_source_whole_and_in_ranges (6df5136): over a loopback swarm, 20 random byte ranges fetched while the torrent was still downloading, a suffix range and the full GET through the local streaming server are all byte-for-byte identical to the source file (stricter than comparing hashes); 416 with Content-Range past the end; a wrong token is 404. Seen to fail with an off-by-one in the body length."
         },
         {
           "id": "E6",
@@ -1045,32 +1045,32 @@
         {
           "id": "7.1",
           "text": "crates/torrent: an Engine over an in-process librqbit 9 Session — data/torrents for files, session persistence and fastresume under data/, DHT on, magnet and .torrent input, add/list/pause/remove, a stats snapshot type. Config with sane defaults: bandwidth and connection limits, seeding stops at completion.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "6df5136"
         },
         {
           "id": "7.2",
           "text": "A loopback test swarm: create a torrent from generated files (an FFmpeg test video, a sample, a readme), seed it from one session and leech from another via initial_peers. No network, no URLs, runs in CI. Every later test uses it.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "6df5136"
         },
         {
           "id": "7.3",
           "text": "File selection within multi-file torrents: the main video, never the sample or the readme, and the requested episode when S/E is given. A pure function with a table of real-world-shaped layouts.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "6df5136"
         },
         {
           "id": "7.4",
           "text": "The local streaming server: loopback only, a random per-session token in every path, HTTP Range (206, Content-Range, 416) over librqbit's FileStream, so libmpv treats a torrent as a file. E5: a full stream and random ranges hash-identical to the source.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "6df5136"
         },
         {
           "id": "7.5",
           "text": "Streaming behaviour, measured: time to first bytes, seek re-prioritisation, buffer ahead of a simulated playhead under a rate-limited seeder (E3's documented floor), and a dead swarm failing fast and clearly (E4).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "6df5136"
         },
         {
           "id": "7.6",
@@ -1081,8 +1081,8 @@
         {
           "id": "7.7",
           "text": "Session persistence across restarts, tested by stopping and reopening a session mid-download.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "6df5136"
         },
         {
           "id": "7.8",

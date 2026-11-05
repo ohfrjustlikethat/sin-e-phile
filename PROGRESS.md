@@ -12,19 +12,19 @@
 
 **Phase 7 — Torrent Engine and Streaming Server** (`in_progress`, branch `phase/07-torrent-engine`)
 
-0 of 8 exit criteria met with evidence.
+3 of 8 exit criteria met with evidence.
 
 > Opened 2026-11-05 when Phase 6 merged (ea25da1); planned under ADR-0040 without waiting. Spike B: librqbit already prioritises a 32 MiB window ahead of each stream, so the scheduler is driven and measured rather than written; librqbit has no webseeds (Archive torrents stay HTTP) and no Windows interface binding (7.6 adds it).
 
-### Subtasks — 0/10 complete
+### Subtasks — 6/10 complete
 
-- [ ] **7.1** crates/torrent: an Engine over an in-process librqbit 9 Session — data/torrents for files, session persistence and fastresume under data/, DHT on, magnet and .torrent input, add/list/pause/remove, a stats snapshot type. Config with sane defaults: bandwidth and connection limits, seeding stops at completion.
-- [ ] **7.2** A loopback test swarm: create a torrent from generated files (an FFmpeg test video, a sample, a readme), seed it from one session and leech from another via initial_peers. No network, no URLs, runs in CI. Every later test uses it.
-- [ ] **7.3** File selection within multi-file torrents: the main video, never the sample or the readme, and the requested episode when S/E is given. A pure function with a table of real-world-shaped layouts.
-- [ ] **7.4** The local streaming server: loopback only, a random per-session token in every path, HTTP Range (206, Content-Range, 416) over librqbit's FileStream, so libmpv treats a torrent as a file. E5: a full stream and random ranges hash-identical to the source.
-- [ ] **7.5** Streaming behaviour, measured: time to first bytes, seek re-prioritisation, buffer ahead of a simulated playhead under a rate-limited seeder (E3's documented floor), and a dead swarm failing fast and clearly (E4).
+- [x] **7.1** crates/torrent: an Engine over an in-process librqbit 9 Session — data/torrents for files, session persistence and fastresume under data/, DHT on, magnet and .torrent input, add/list/pause/remove, a stats snapshot type. Config with sane defaults: bandwidth and connection limits, seeding stops at completion. · `6df5136`
+- [x] **7.2** A loopback test swarm: create a torrent from generated files (an FFmpeg test video, a sample, a readme), seed it from one session and leech from another via initial_peers. No network, no URLs, runs in CI. Every later test uses it. · `6df5136`
+- [x] **7.3** File selection within multi-file torrents: the main video, never the sample or the readme, and the requested episode when S/E is given. A pure function with a table of real-world-shaped layouts. · `6df5136`
+- [x] **7.4** The local streaming server: loopback only, a random per-session token in every path, HTTP Range (206, Content-Range, 416) over librqbit's FileStream, so libmpv treats a torrent as a file. E5: a full stream and random ranges hash-identical to the source. · `6df5136`
+- [x] **7.5** Streaming behaviour, measured: time to first bytes, seek re-prioritisation, buffer ahead of a simulated playhead under a rate-limited seeder (E3's documented floor), and a dead swarm failing fast and clearly (E4). · `6df5136`
 - [ ] **7.6** Network interface binding on Windows (E7). librqbit's BindDevice returns NotSupported on Windows; vendor librqbit-dualstack-sockets 0.7.0 via [patch.crates-io] and implement it with GetAdaptersAddresses plus IP_UNICASTIF / IPV6_UNICAST_IF, so traffic stops rather than falling back when the adapter goes. Adapter listing for the UI.
-- [ ] **7.7** Session persistence across restarts, tested by stopping and reopening a session mid-download.
+- [x] **7.7** Session persistence across restarts, tested by stopping and reopening a session mid-download. · `6df5136`
 - [ ] **7.8** Integration: the resolver's PlayableStream::Torrent becomes a local stream URL; per-torrent progress events to the frontend; Settings gains the network section (limits, seeding, adapter).
 - [ ] **7.9** Live measurements against a legal, well-seeded torrent supplied at runtime and never committed (E1, E2), and the qBittorrent comparison on time-to-first-bytes and bulk throughput (E6), recorded in docs/eval-results.md.
 - [ ] **7.10** docs/specs/streaming-scheduler.md with a diagram (E8), the learning note, and the phase close.
@@ -33,9 +33,12 @@
 
 - [ ] **E1** Playback begins in < 8 s on a healthy swarm (measured against a legal, well-seeded Internet Archive or Linux ISO torrent).
 - [ ] **E2** Seeking to an unbuffered region resumes playback in < 5 s.
-- [ ] **E3** Sequential mode never starves — the buffer ahead of the playhead is maintained under a documented bandwidth floor.
-- [ ] **E4** Correct behaviour on a dead swarm: clear, fast failure, not an indefinite hang.
-- [ ] **E5** Range requests are byte-correct — verified by streaming a file and comparing its hash to a full download.
+- [x] **E3** Sequential mode never starves — the buffer ahead of the playhead is maintained under a documented bandwidth floor.
+      - *Evidence:* cargo test -p sinephile-torrent --test buffer (6df5136): a simulated player reading at 2 MiB/s in 256 KiB chunks after a 2 s start-up buffer, over a loopback swarm whose seeder is capped at 1.5x the bitrate, waited 0 ns for any chunk (floor documented in docs/specs/streaming-scheduler.md: bandwidth >= 1.5x bitrate, 2 s buffer, lateness <= 250 ms). Negative control in the same file: at 0.7x the bitrate the same player starved by 2.27 s.
+- [x] **E4** Correct behaviour on a dead swarm: clear, fast failure, not an indefinite hang.
+      - *Evidence:* cargo test -p sinephile-torrent --test swarm a_dead_swarm_fails_fast_with_a_clear_error (6df5136): with the only peer a closed port, wait_for_peers returns 'nobody is sharing this — no peers answered within 3 seconds' in under 5 s, and a streaming request through the local server ends instead of hanging; a magnet's metadata wait is bounded by the same dead_swarm_after (default 30 s). Seen to fail with the wait removed (the request hung past the 10 s guard).
+- [x] **E5** Range requests are byte-correct — verified by streaming a file and comparing its hash to a full download.
+      - *Evidence:* cargo test -p sinephile-torrent --test swarm the_stream_is_byte_identical_to_the_source_whole_and_in_ranges (6df5136): over a loopback swarm, 20 random byte ranges fetched while the torrent was still downloading, a suffix range and the full GET through the local streaming server are all byte-for-byte identical to the source file (stricter than comparing hashes); 416 with Content-Range past the end; a wrong token is 404. Seen to fail with an off-by-one in the body length.
 - [ ] **E6** Measured against qBittorrent on both axes and both numbers published: time-to-first-frame on a healthy swarm, and sustained bulk throughput on the same torrent. Losing on bulk is a finding, not a failure — ADR-0029 exists so the project does not have to win that comparison — but the comparison must be made rather than left implicit.
 - [ ] **E7** Binding to a specific network interface works, verified by disabling that adapter mid-download and confirming traffic stops rather than falling back.
 - [ ] **E8** `docs/specs/streaming-scheduler.md` explains the algorithm with a diagram.
@@ -67,7 +70,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 4 | Metadata Backbone | A | 3 | 2–3 | 7/7 |
 | [x] | 5 | Semantic Search Engine | A | 4 | 2 | 2/5 |
 | [x] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 6/6 |
-| [~] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 0/8 |
+| [~] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 3/8 |
 | [ ] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 0/7 |
 | [ ] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 0/6 |
 | [ ] | 10 | Subtitle Pipeline | B | 8 | 2 | 0/6 |

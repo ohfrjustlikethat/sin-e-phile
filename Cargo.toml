@@ -10,7 +10,18 @@ resolver = "2"
 members = ["src-tauri", "crates/tiers", "crates/artwork", "crates/embedding", "crates/embedder",
     "crates/persistence", "crates/catalogue", "crates/vector-index", "crates/search-engine", "crates/metadata-api", "crates/source-protocol", "crates/sources", "crates/torrent", "tools/ingest", "tools/eval"]
 
+# Vendored upstream code, built as a dependency rather than held to this workspace's
+# lints. Each has a README saying what was changed and why.
+exclude = ["crates/vendor"]
+
 [workspace.package]
 edition = "2021"
 license = "GPL-3.0-only"
 rust-version = "1.82"
+
+# librqbit's socket crate, with Windows network-interface binding added (SPEC.md Phase 7,
+# subtask 7.6). Upstream returns BindDeviceNotSupported on Windows, which would make the
+# "traffic stops if the VPN drops" guarantee impossible. crates/vendor/librqbit-dualstack-
+# sockets/SINEPHILE.md records the change; drop this patch if upstream gains it.
+[patch.crates-io]
+librqbit-dualstack-sockets = { path = "crates/vendor/librqbit-dualstack-sockets" }
