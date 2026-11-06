@@ -505,11 +505,13 @@ async fn write_match(
     // anime is alphabetised by romaji, not by native script or a localised title.
     sqlx::query(
         "UPDATE media_items
-            SET kind = ?, sort_title = COALESCE(?, sort_title), updated_at = datetime('now')
+            SET kind = ?, sort_title = COALESCE(?, sort_title),
+                original_language = COALESCE(?, original_language), updated_at = datetime('now')
           WHERE id = ?",
     )
     .bind(media.media_kind())
     .bind(media.title.romaji.as_deref())
+    .bind(media.original_language())
     .bind(media_item_id)
     .execute(&mut **tx)
     .await

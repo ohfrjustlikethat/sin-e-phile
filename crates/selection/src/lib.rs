@@ -180,6 +180,59 @@ pub fn rank(candidates: Vec<SourceCandidate>, ctx: &Context) -> Vec<(SourceCandi
     scored
 }
 
+/// What the candidates offer the viewer to choose between (SPEC.md Phase 9: "listing
+/// available audio languages"). Only what some honest copy actually states: a choice
+/// that nothing could satisfy is not offered.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct Offers {
+    /// Primary language subtags, lowercased, most widely carried first.
+    pub languages: Vec<String>,
+    /// Best first. `Unknown` is never offered.
+    pub qualities: Vec<Resolution>,
+}
+
+pub fn offers(ranked: &[(SourceCandidate, Score)]) -> Offers {
+    let honest = || {
+        ranked
+            .iter()
+            .filter(|(_, s)| s.sunk.is_none())
+            .map(|(c, _)| c)
+    };
+    let mut counts: Vec<(String, usize)> = Vec::new();
+    for c in honest() {
+        let mut seen: Vec<String> = Vec::new();
+        for l in &c.languages {
+            let p = primary(l);
+            if p.is_empty() || seen.contains(&p) {
+                continue;
+            }
+            match counts.iter_mut().find(|(have, _)| *have == p) {
+                Some((_, n)) => *n += 1,
+                None => counts.push((p.clone(), 1)),
+            }
+            seen.push(p);
+        }
+    }
+    counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    let mut qualities: Vec<Resolution> = honest()
+        .map(|c| c.quality.resolution)
+        .filter(|&r| r != Resolution::Unknown)
+        .collect();
+    qualities.sort_by_key(|r| std::cmp::Reverse(r.rank()));
+    qualities.dedup();
+    Offers {
+        languages: counts.into_iter().map(|(l, _)| l).collect(),
+        qualities,
+    }
+}
+
+fn primary(s: &str) -> String {
+    s.split(['-', '_'])
+        .next()
+        .unwrap_or("")
+        .to_ascii_lowercase()
+}
+
 /// `hi` matches `hi-IN`; case does not matter. BCP 47's primary subtag is the language.
 pub fn same_language(a: &str, b: &str) -> bool {
     let primary = |s: &str| {
@@ -199,6 +252,28 @@ pub fn resolution_label(r: Resolution) -> &'static str {
         Resolution::Uhd => "4K",
         Resolution::Unknown => "unknown quality",
     }
+}
+
+/// The wire name (`"full_hd"`), as the UI sends a choice back.
+pub fn resolution_code(r: Resolution) -> &'static str {
+    match r {
+        Resolution::Sd => "sd",
+        Resolution::Hd => "hd",
+        Resolution::FullHd => "full_hd",
+        Resolution::Uhd => "uhd",
+        Resolution::Unknown => "unknown",
+    }
+}
+
+pub fn resolution_from_code(code: &str) -> Option<Resolution> {
+    [
+        Resolution::Sd,
+        Resolution::Hd,
+        Resolution::FullHd,
+        Resolution::Uhd,
+    ]
+    .into_iter()
+    .find(|&r| resolution_code(r) == code)
 }
 
 fn language(c: &SourceCandidate, ctx: &Context) -> (Term, Option<String>) {

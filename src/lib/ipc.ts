@@ -159,7 +159,7 @@ export const commands = {
 	synopsis: string | null,
 	credits: CreditView[],
 } | null, string>(__TAURI_INVOKE("item_detail", { id })),
-	preparePlay: (id: number) => typedError<PlayPlanView, string>(__TAURI_INVOKE("prepare_play", { id })),
+	preparePlay: (id: number, language: string | null, quality: string | null) => typedError<PlayPlanView, string>(__TAURI_INVOKE("prepare_play", { id, language, quality })),
 	/**  Remember where the viewer is, for resume. Called periodically and on leaving. */
 	savePosition: (id: number, position: number | null, duration: number | null) => typedError<null, string>(__TAURI_INVOKE("save_position", { id, position, duration })),
 };
@@ -337,6 +337,14 @@ export type PlayPlanView = {
 	/**  The source's display name. */
 	from: string,
 	offered: number,
+	/**  Audio languages some honest copy carries, primary subtags, most common first. */
+	languages: string[],
+	/**  The film's own language, if known: an original soundtrack versus a dub. */
+	original_language: string | null,
+	/**  Qualities on offer, best first, as wire names (`"full_hd"`). */
+	qualities: string[],
+	/**  When the chosen language or quality is not to be had, why, in words. */
+	unmet: string | null,
 };
 
 /**

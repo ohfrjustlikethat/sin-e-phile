@@ -1,6 +1,6 @@
 # Source scoring
 
-**Status:** built in Phase 9 (subtasks 9.1–9.2) · **Code:** `crates/selection/` ·
+**Status:** built in Phase 9 (subtasks 9.1–9.3) · **Code:** `crates/selection/` ·
 **Tests:** `crates/selection/tests/fixtures.rs`, `crates/selection/tests/properties.rs`
 
 Which copy plays when the viewer presses Play. Every candidate the sources return, whether
@@ -102,9 +102,33 @@ and with the bytes.
 - `av1` and `hdr_display` are not probed yet, so both are assumed absent. Guessing low
   costs a little ranking; guessing high costs a stutter.
 
-## 5. Known limits
+## 5. The viewer's choices (9.3)
+
+- **What is offered** is `offers(&ranked)`: the audio languages and resolutions that some
+  *honest* copy states. A fake's claims offer nothing, because choosing them could only
+  play the fake. Languages are primary subtags (`hi`, not `hi-IN`), most widely carried
+  first; qualities are best first.
+- **On the detail page** these are two rows of options under Play, Audio (Auto, then each
+  language) and Quality (Best, then each resolution). They are buttons, not a
+  `<select>`: a native select opens a Windows popup the pad cannot drive (ADR-0041), and
+  each option is a focus stop for the TV focus ring (ADR-0042).
+- **Original or dub.** Each language is labelled "original" or "dub" against the film's
+  `original_language`. For anime that comes from AniList's `countryOfOrigin` (JP → ja,
+  KR → ko, CN/TW → zh; anywhere else is left unknown rather than guessed). With no
+  original language known, the labels are left off rather than guessed.
+- **Choosing re-plans** with `Context.audio_language` or `Context.wanted`. The choice is
+  remembered across films (`sinephile.choice` in local storage), the way a TV app keeps
+  the language you watch in.
+- **When nothing has it**, the copy that plays is the best other one, and the page says
+  so: "None of your sources has Hindi audio." The chosen option stays visible and
+  selected, so it can be changed. Play is never disabled for want of a choice.
+
+## 6. Known limits
 
 - A film genuinely titled with a camera tag as a word (*Cam*, 2018) takes the −1
   `encoding` term. It is not sunk, and a local copy still comes first.
+- `original_language` is filled only for anime matched to AniList, and only on an
+  ingest or refresh after this change. Films from IMDb have none, so they show no
+  original/dub labels.
 - Throughput is a term with no measurement behind it yet. `Context.throughput` is
   `None` until the engine reports a speed.

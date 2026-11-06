@@ -12,3 +12,6 @@ description = "Which copy to play: the source scoring function (SPEC.md Phase 9)
 [dependencies]
 source-protocol = { path = "../source-protocol" }
 serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

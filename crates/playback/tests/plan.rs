@@ -5,11 +5,11 @@ use std::sync::Arc;
 use sinephile_persistence::repositories::profiles::PlaybackPosition;
 use sinephile_persistence::repositories::{MediaRepository, ProfileRepository};
 use sinephile_persistence::{Db, NewMediaItem};
-use sinephile_playback::{plan, PlayError};
+use sinephile_playback::{plan, plan_with, Context, PlayError};
 use sinephile_sources::{Entry, Resolver};
 use source_protocol::{
-    async_trait, BackendCapabilities, Health, MediaKind, MediaQuery, PlayableStream, SourceBackend,
-    SourceCandidate, SourceError, Transport,
+    async_trait, BackendCapabilities, Health, MediaKind, MediaQuery, PlayableStream, Quality,
+    Resolution, SourceBackend, SourceCandidate, SourceError, Transport,
 };
 
 /// A source with one HTTP candidate that either resolves or does not.
@@ -19,6 +19,9 @@ struct Fake {
     url: &'static str,
     /// How long the source says its file plays.
     minutes: Option<u32>,
+    /// The audio languages and resolution it states.
+    audio: &'static [&'static str],
+    res: Resolution,
 }
 
 #[async_trait]
@@ -41,8 +44,11 @@ impl SourceBackend for Fake {
             title: "Sunrise".into(),
             year: Some(1927),
             transport: Transport::Http,
-            quality: Default::default(),
-            languages: vec![],
+            quality: Quality {
+                resolution: self.res,
+                hdr: false,
+            },
+            languages: self.audio.iter().map(|l| l.to_string()).collect(),
             subtitles: vec![],
             codec: Default::default(),
             size_bytes: None,
@@ -113,6 +119,8 @@ async fn the_position_survives_a_restart() {
         resolves: true,
         url: "https://films.example/sunrise.mp4",
         minutes: None,
+        audio: &[],
+        res: Resolution::Unknown,
     }]);
     let p = plan(&db, &r, None, id).await.unwrap();
     assert_eq!(p.start, Some(2712.0), "resumes where the last run stopped");
@@ -141,6 +149,8 @@ async fn a_playable_source_and_the_saved_position() {
         resolves: true,
         url: "https://films.example/sunrise.mp4",
         minutes: None,
+        audio: &[],
+        res: Resolution::Unknown,
     }]);
     let p = plan(&db, &r, None, id).await.unwrap();
     assert_eq!(p.open, "https://films.example/sunrise.mp4");
@@ -158,12 +168,16 @@ async fn a_source_that_cannot_be_opened_is_passed_over() {
             resolves: false,
             url: "https://a.example/x.mp4",
             minutes: None,
+            audio: &[],
+            res: Resolution::Unknown,
         },
         Fake {
             id: "works",
             resolves: true,
             url: "https://b.example/y.mp4",
             minutes: None,
+            audio: &[],
+            res: Resolution::Unknown,
         },
     ]);
     let p = plan(&db, &r, None, id).await.unwrap();
@@ -184,6 +198,8 @@ async fn nothing_to_play_is_said_plainly() {
         resolves: false,
         url: "https://a.example/x.mp4",
         minutes: None,
+        audio: &[],
+        res: Resolution::Unknown,
     }]);
     let err = plan(&db, &r, None, id).await.unwrap_err();
     assert!(err.to_string().contains("none could be opened"), "{err}");
@@ -211,15 +227,104 @@ async fn the_scorer_chooses_not_the_order_sources_answer_in() {
             resolves: true,
             url: "https://a.example/trailer.mp4",
             minutes: Some(20),
+            audio: &[],
+            res: Resolution::Unknown,
         },
         Fake {
             id: "whole",
             resolves: true,
             url: "https://b.example/film.mp4",
             minutes: Some(94),
+            audio: &[],
+            res: Resolution::Unknown,
         },
     ]);
     let p = plan(&db, &r, None, id).await.unwrap();
     assert_eq!(p.backend, "whole");
     assert_eq!(p.score.sunk, None);
+}
+
+fn two(a: Fake, b: Fake) -> Resolver {
+    resolver(vec![a, b])
+}
+
+fn fake(
+    id: &'static str,
+    url: &'static str,
+    audio: &'static [&'static str],
+    res: Resolution,
+) -> Fake {
+    Fake {
+        id,
+        resolves: true,
+        url,
+        minutes: None,
+        audio,
+        res,
+    }
+}
+
+#[tokio::test]
+async fn choosing_hindi_opens_the_copy_with_hindi_audio() {
+    // Phase 9 E2.
+    let db = Db::in_memory().await.unwrap();
+    let id = film(&db).await;
+    let r = two(
+        fake(
+            "en",
+            "https://a.example/en.mp4",
+            &["en"],
+            Resolution::FullHd,
+        ),
+        fake("hi", "https://b.example/hi.mp4", &["hi"], Resolution::Hd),
+    );
+    let hindi = Context {
+        audio_language: Some("hi".into()),
+        ..Context::default()
+    };
+    let p = plan_with(&db, &r, None, id, hindi.clone()).await.unwrap();
+    assert_eq!(
+        (p.open.as_str(), p.score.unmet.as_deref()),
+        ("https://b.example/hi.mp4", None)
+    );
+    assert_eq!(p.offers.languages, ["en", "hi"]);
+
+    // No Hindi anywhere: it still plays, and says why the copy is not what was asked.
+    let r = resolver(vec![fake(
+        "en",
+        "https://a.example/en.mp4",
+        &["en"],
+        Resolution::FullHd,
+    )]);
+    let p = plan_with(&db, &r, None, id, hindi).await.unwrap();
+    assert_eq!(p.score.unmet.as_deref(), Some("carries en, not hi"));
+}
+
+#[tokio::test]
+async fn choosing_4k_opens_the_4k_copy_or_says_there_is_none() {
+    // Phase 9 E3.
+    let db = Db::in_memory().await.unwrap();
+    let id = film(&db).await;
+    let r = two(
+        fake("fhd", "https://a.example/fhd.mp4", &[], Resolution::FullHd),
+        fake("uhd", "https://b.example/uhd.mp4", &[], Resolution::Uhd),
+    );
+    let uhd = Context {
+        wanted: Some(Resolution::Uhd),
+        ..Context::default()
+    };
+    let p = plan_with(&db, &r, None, id, uhd.clone()).await.unwrap();
+    assert_eq!(p.open, "https://b.example/uhd.mp4");
+    // With nothing chosen, a Tier 0 machine is given 1080p.
+    let p = plan(&db, &r, None, id).await.unwrap();
+    assert_eq!(p.open, "https://a.example/fhd.mp4");
+
+    let r = resolver(vec![fake(
+        "fhd",
+        "https://a.example/fhd.mp4",
+        &[],
+        Resolution::FullHd,
+    )]);
+    let p = plan_with(&db, &r, None, id, uhd).await.unwrap();
+    assert_eq!(p.score.unmet.as_deref(), Some("1080p, not 4K"));
 }

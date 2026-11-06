@@ -15,11 +15,11 @@ use std::sync::Arc;
 
 use sinephile_persistence::repositories::{MediaRepository, ProfileRepository};
 use sinephile_persistence::{Db, DbError, MediaKind};
-pub use sinephile_selection::{Context, Machine, Score};
+pub use sinephile_selection::{Context, Machine, Offers, Score};
 use sinephile_sources::{registry, Resolver};
 use sinephile_torrent::play::{target, Target};
 use sinephile_torrent::{Engine, StreamServer, Wanted};
-use source_protocol::{ExternalIds, MediaKind as Kind, MediaQuery};
+use source_protocol::{ExternalIds, MediaKind as Kind, MediaQuery, SourceCandidate};
 
 #[derive(Debug, thiserror::Error)]
 pub enum PlayError {
@@ -48,6 +48,13 @@ pub struct PlayPlan {
     pub offered: usize,
     /// Why this copy: its score, term by term.
     pub score: Score,
+    /// The languages and qualities the viewer can choose between.
+    pub offers: Offers,
+    /// The film's own language, if the catalogue knows it: what tells an original
+    /// soundtrack from a dub.
+    pub original_language: Option<String>,
+    /// Every candidate, best first, with its score: for the expert panel and fallback.
+    pub ranked: Vec<(SourceCandidate, Score)>,
 }
 
 /// The catalogue item as the query sources receive.
@@ -133,11 +140,12 @@ pub async fn plan_with(
     let query = query_for(db, media_item_id)
         .await?
         .ok_or(PlayError::Unknown)?;
-    ctx.runtime_minutes = MediaRepository::new(db)
-        .by_id(media_item_id)
-        .await?
-        .and_then(|item| item.runtime_minutes)
+    let item = MediaRepository::new(db).by_id(media_item_id).await?;
+    ctx.runtime_minutes = item
+        .as_ref()
+        .and_then(|i| i.runtime_minutes)
         .and_then(|m| u32::try_from(m).ok());
+    let original_language = item.and_then(|i| i.original_language);
     let found = resolver.find_all(&query).await;
     registry::record(db, &found.outcomes).await?;
     let ranked = sinephile_selection::rank(found.candidates, &ctx);
@@ -145,8 +153,9 @@ pub async fn plan_with(
         return Err(PlayError::NoSources);
     }
     let offered = ranked.len();
+    let offers = sinephile_selection::offers(&ranked);
     let mut reasons = Vec::new();
-    for (candidate, score) in ranked {
+    for (candidate, score) in ranked.clone() {
         let stream = match resolver.resolve(&candidate).await {
             Ok(s) => s,
             Err(e) => {
@@ -187,6 +196,9 @@ pub async fn plan_with(
             backend: candidate.provenance.backend,
             offered,
             score,
+            offers,
+            original_language,
+            ranked,
         });
     }
     Err(PlayError::NothingPlayable(offered, reasons.join("; ")))

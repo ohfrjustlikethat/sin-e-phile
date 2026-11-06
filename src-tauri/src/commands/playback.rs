@@ -78,11 +78,24 @@ pub struct PlayPlanView {
     /// The source's display name.
     pub from: String,
     pub offered: u32,
+    /// Audio languages some honest copy carries, primary subtags, most common first.
+    pub languages: Vec<String>,
+    /// The film's own language, if known: an original soundtrack versus a dub.
+    pub original_language: Option<String>,
+    /// Qualities on offer, best first, as wire names (`"full_hd"`).
+    pub qualities: Vec<String>,
+    /// When the chosen language or quality is not to be had, why, in words.
+    pub unmet: Option<String>,
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn prepare_play(state: State<'_, AppState>, id: i32) -> Result<PlayPlanView, String> {
+pub async fn prepare_play(
+    state: State<'_, AppState>,
+    id: i32,
+    language: Option<String>,
+    quality: Option<String>,
+) -> Result<PlayPlanView, String> {
     let db = state.db().ok_or("the library is still opening")?;
     let (ctx, _) = overview::context_from(&db, state.http.clone(), state.untrusted_http.clone())
         .await
@@ -100,6 +113,10 @@ pub async fn prepare_play(state: State<'_, AppState>, id: i32) -> Result<PlayPla
             tier.allows(crate::tiers::Capability::HighResPlayback),
             state.hardware_profile().hardware_decode,
         ),
+        audio_language: language,
+        wanted: quality
+            .as_deref()
+            .and_then(sinephile_selection::resolution_from_code),
         ..Default::default()
     };
     let plan = sinephile_playback::plan_with(&db, &resolver, torrent, i64::from(id), choice)
@@ -111,6 +128,15 @@ pub async fn prepare_play(state: State<'_, AppState>, id: i32) -> Result<PlayPla
         open: plan.open,
         start: plan.start,
         offered: plan.offered as u32,
+        languages: plan.offers.languages,
+        original_language: plan.original_language,
+        qualities: plan
+            .offers
+            .qualities
+            .into_iter()
+            .map(|r| sinephile_selection::resolution_code(r).to_string())
+            .collect(),
+        unmet: plan.score.unmet,
     })
 }
 

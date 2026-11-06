@@ -20,6 +20,9 @@ inherits.** Four sections per ADR-0016 (A4). Written as the phase goes; 9.0 firs
 - **Fake and mislabel detection** — `crates/selection/src/plausibility.rs`: too few bytes a
   minute for the claimed resolution, too short for the film's runtime, a name that
   contradicts its listing, or a file that is not a video at all.
+- **Language and quality choices** (9.3) — `src/features/detail/ChoiceRow.tsx`: Audio and
+  Quality rows under Play, offering only what honest copies carry, labelled original or
+  dub, remembered across films, and saying plainly when no copy has the choice.
 
 ## 2. Why
 
@@ -72,6 +75,13 @@ inherits.** Four sections per ADR-0016 (A4). Written as the phase goes; 9.0 firs
   proves nothing.
 - **`#[serde(default)]` for a wire field** — `crates/source-protocol/src/types.rs`
   `duration_seconds`: old addons that never send it still parse.
+
+- **`Intl.DisplayNames`** — `src/lib/playbackChoice.ts` `languageName`: the platform turns `hi`
+  into "Hindi", so the app ships no language table.
+- **`role="radiogroup"` with buttons** — `src/features/detail/ChoiceRow.tsx`: one choice of
+  several, announced correctly, and every option a focus stop for the pad.
+- **`COALESCE(?, column)` in an UPDATE** — `crates/catalogue/src/anime.rs`: write a value
+  only when there is one, never erase a known one with NULL.
 
 ## 4. The questions
 

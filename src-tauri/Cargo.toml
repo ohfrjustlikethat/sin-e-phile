@@ -60,6 +60,7 @@ sinephile-torrent = { path = "../crates/torrent" }
 # The player: libmpv in a child window of the main window (Phase 8).
 sinephile-player = { path = "../crates/player" }
 sinephile-playback = { path = "../crates/playback" }
+sinephile-selection = { path = "../crates/selection" }
 url = "=2.5.8"
 # For the async mutex around the engine: its lock is held across awaits, which a std
 # mutex may not be.

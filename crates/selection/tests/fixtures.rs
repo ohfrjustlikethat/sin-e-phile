@@ -4,7 +4,9 @@
 mod common;
 
 use common::*;
-use sinephile_selection::{rank, score, Context, Machine};
+use sinephile_selection::{
+    offers, rank, resolution_code, resolution_from_code, score, Context, Machine,
+};
 use source_protocol::{Resolution::*, SourceCandidate, VideoCodec};
 
 /// A 140-minute film on a Tier 0 machine, nothing chosen.
@@ -268,4 +270,37 @@ fn every_term_explains_itself() {
         ]
     );
     assert!(s.terms.iter().all(|t| !t.why.is_empty()));
+}
+
+#[test]
+fn the_choices_offered_are_what_honest_copies_carry() {
+    let ranked = rank(
+        vec![
+            swarm("a", 50).res(FullHd).audio(&["ja", "en"]).done(),
+            http("b").res(Hd).audio(&["ja-JP"]).done(),
+            http("c").res(FullHd).done(),
+            // A fake's claims offer nothing: choosing "fr" or 4K could only play the fake.
+            http("fake")
+                .res(Uhd)
+                .size(100 * MB)
+                .minutes(140)
+                .audio(&["fr"])
+                .done(),
+        ],
+        &film(),
+    );
+    let o = offers(&ranked);
+    assert_eq!(o.languages, ["ja", "en"]);
+    assert_eq!(o.qualities, [FullHd, Hd]);
+}
+
+#[test]
+fn a_quality_choice_round_trips_through_its_wire_name() {
+    for r in [Sd, Hd, FullHd, Uhd] {
+        assert_eq!(resolution_from_code(resolution_code(r)), Some(r));
+        // The same names the addon protocol uses.
+        let wire = serde_json::to_string(&r).unwrap();
+        assert_eq!(wire, format!("\"{}\"", resolution_code(r)));
+    }
+    assert_eq!(resolution_from_code("8k"), None);
 }

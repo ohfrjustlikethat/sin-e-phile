@@ -79,6 +79,9 @@ pub struct Media {
     /// the honest answer, not a gap.
     #[serde(rename = "nextAiringEpisode")]
     pub next_airing: Option<AiringEpisode>,
+    /// ISO 3166 country of production (`JP`, `KR`, `CN`, `TW`).
+    #[serde(rename = "countryOfOrigin", default)]
+    pub country_of_origin: Option<String>,
 }
 
 /// The three title forms §6.2 names.
@@ -118,6 +121,18 @@ impl Media {
     pub fn is_releasing(&self) -> bool {
         self.status.as_deref() == Some("RELEASING")
     }
+
+    /// The language of the original soundtrack, from where it was made: what tells a
+    /// dub from the original (SPEC.md Phase 9). Only the countries whose animation has
+    /// one language; anywhere else is `None` rather than a guess.
+    pub fn original_language(&self) -> Option<&'static str> {
+        match self.country_of_origin.as_deref()? {
+            "JP" => Some("ja"),
+            "KR" => Some("ko"),
+            "CN" | "TW" => Some("zh"),
+            _ => None,
+        }
+    }
 }
 
 const MEDIA_FIELDS: &str = "
@@ -129,6 +144,7 @@ const MEDIA_FIELDS: &str = "
     episodes
     seasonYear
     nextAiringEpisode { airingAt timeUntilAiring episode }
+    countryOfOrigin
 ";
 
 /// How the client holds its transport.
@@ -591,11 +607,31 @@ mod tests {
             episodes: None,
             season_year: None,
             next_airing: None,
+            country_of_origin: None,
         };
         assert_eq!(media(Some("MOVIE")).media_kind(), "anime_film");
         assert_eq!(media(Some("TV")).media_kind(), "anime_series");
         assert_eq!(media(Some("ONA")).media_kind(), "anime_series");
         assert_eq!(media(None).media_kind(), "anime_series");
+    }
+
+    #[test]
+    fn the_original_soundtrack_follows_the_country_of_origin() {
+        let media: Media = serde_json::from_str(
+            r#"{"id":1,"title":{"romaji":"x","english":null,"native":null},"countryOfOrigin":"JP"}"#,
+        )
+        .unwrap();
+        assert_eq!(media.original_language(), Some("ja"));
+        let elsewhere = Media {
+            country_of_origin: Some("FR".into()),
+            ..media.clone()
+        };
+        assert_eq!(elsewhere.original_language(), None, "not a guess");
+        // Older cached answers have no country at all, and still parse.
+        let old: Media =
+            serde_json::from_str(r#"{"id":1,"title":{"romaji":"x","english":null,"native":null}}"#)
+                .unwrap();
+        assert_eq!(old.original_language(), None);
     }
 
     #[test]

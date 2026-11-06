@@ -4,6 +4,8 @@ import { Button, EmptyState, Skeleton } from "@/design-system";
 import { commands, type PlayPlanView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
 import { clock } from "@/features/player/intents";
+import { languageName, qualityLabel, usePlaybackChoice } from "@/lib/playbackChoice";
+import { ChoiceRow, type Choice } from "./ChoiceRow";
 
 /**
  * The minimal detail page — SPEC.md Phase 8: title, synopsis, cast, and a Play button
@@ -12,6 +14,9 @@ import { clock } from "@/features/player/intents";
  * Designed for the artwork-free default (ADR-0013, CLAUDE.md): typography carries it.
  * It asks the sources **as soon as it opens** (`prepare_play`), so by the time Play is
  * pressed the source is chosen and a torrent is already finding peers (Phase 7 E1).
+ *
+ * Under Play: the audio languages and qualities the copies actually carry (SPEC.md
+ * Phase 9). Choosing one plans again, and if no copy has it the page says so.
  */
 
 async function ok<T>(p: Promise<{ status: "ok"; data: T } | { status: "error"; error: string }>) {
@@ -25,11 +30,36 @@ type PlanState =
   | { phase: "ready"; plan: PlayPlanView }
   | { phase: "none"; reason: string };
 
+/** What the copies offer, kept while a new choice is being planned. */
+type Offers = Pick<PlayPlanView, "languages" | "qualities" | "original_language">;
+
+function languageChoices(o: Offers, chosen: string | null): Choice[] {
+  const codes = chosen && !o.languages.includes(chosen) ? [...o.languages, chosen] : o.languages;
+  const role = (code: string) =>
+    o.original_language ? (code === o.original_language ? " · original" : " · dub") : "";
+  return [{ value: null, label: "Auto" }, ...codes.map((c) => ({ value: c, label: languageName(c) + role(c) }))];
+}
+
+function qualityChoices(o: Offers, chosen: string | null): Choice[] {
+  const codes = chosen && !o.qualities.includes(chosen) ? [...o.qualities, chosen] : o.qualities;
+  return [{ value: null, label: "Best" }, ...codes.map((c) => ({ value: c, label: qualityLabel(c) }))];
+}
+
+/** In words, when the copy that will play is not what was chosen. */
+function unmetText(plan: PlayPlanView, audio: string | null, quality: string | null): string | null {
+  if (!plan.unmet) return null;
+  if (audio && !plan.languages.includes(audio)) return `None of your sources has ${languageName(audio)} audio.`;
+  if (quality && !plan.qualities.includes(quality)) return `None of your sources has this in ${qualityLabel(quality)}.`;
+  return `The copy that will play: ${plan.unmet}.`;
+}
+
 export function DetailScreen() {
   const id = useUi((s) => s.detail);
   const closeDetail = useUi((s) => s.closeDetail);
   const play = useUi((s) => s.play);
   const [plan, setPlan] = useState<PlanState>({ phase: "finding" });
+  const [offers, setOffers] = useState<Offers | null>(null);
+  const { audio, quality, setAudio, setQuality } = usePlaybackChoice();
 
   const item = useQuery({
     queryKey: ["item", id],
@@ -41,14 +71,18 @@ export function DetailScreen() {
     if (id === null) return;
     let live = true;
     setPlan({ phase: "finding" });
-    void commands.preparePlay(id).then((r) => {
+    void commands.preparePlay(id, audio, quality).then((r) => {
       if (!live) return;
       setPlan(r.status === "ok" ? { phase: "ready", plan: r.data } : { phase: "none", reason: r.error });
+      if (r.status === "ok") setOffers(r.data);
     });
     return () => {
       live = false;
     };
-  }, [id]);
+  }, [id, audio, quality]);
+
+  // A different film offers different things.
+  useEffect(() => setOffers(null), [id]);
 
   // Once there is something to play, Play takes focus unless something else has it —
   // so a controller or keyboard user can press it at once (ADR-0041).
@@ -115,10 +149,21 @@ export function DetailScreen() {
         </Button>
         <p id="play-status" className="text-sm text-ink-muted" role="status">
           {plan.phase === "finding" && "Asking your sources…"}
-          {plan.phase === "ready" && `From ${plan.plan.from}`}
+          {plan.phase === "ready" && (unmetText(plan.plan, audio, quality) ?? `From ${plan.plan.from}`)}
           {plan.phase === "none" && plan.reason}
         </p>
       </div>
+
+      {offers && (offers.languages.length > 0 || audio || offers.qualities.length > 1 || quality) && (
+        <div className="mt-8 flex flex-col gap-3">
+          {(offers.languages.length > 0 || audio) && (
+            <ChoiceRow label="Audio" choices={languageChoices(offers, audio)} value={audio} onChange={setAudio} />
+          )}
+          {(offers.qualities.length > 1 || quality) && (
+            <ChoiceRow label="Quality" choices={qualityChoices(offers, quality)} value={quality} onChange={setQuality} />
+          )}
+        </div>
+      )}
 
       {d.synopsis && (
         <p className="mt-12 max-w-[68ch] text-[17px] leading-[1.65] text-ink-muted">{d.synopsis}</p>

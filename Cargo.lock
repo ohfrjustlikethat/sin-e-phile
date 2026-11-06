@@ -5245,6 +5245,7 @@ dependencies = [
  "sinephile-playback",
  "sinephile-player",
  "sinephile-search-engine",
+ "sinephile-selection",
  "sinephile-sources",
  "sinephile-tiers",
  "sinephile-torrent",
@@ -5411,6 +5412,7 @@ name = "sinephile-selection"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "serde_json",
  "source-protocol",
 ]
 
