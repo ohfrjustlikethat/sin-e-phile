@@ -106,6 +106,11 @@ Whatever is found gets checked for sync, and corrected if needed.
 decoding, hardware acceleration and rendering. Every control you see is ours; mpv's
 own on-screen display never appears.
 
+**8. While it plays.** *(Phase 11)* Pausing shows a panel about the film whose data was
+fetched as playback began, so it paints in milliseconds. Near the end of an episode a
+card offers the next one; a film's credits play out before an end card asks what you
+thought. The scrub bar shows chapters and thumbnails made quietly in the background.
+
 ---
 
 ## The subsystems
@@ -341,6 +346,18 @@ does not match the film, or a name that contradicts itself; never by a list of n
 film page offers the languages and qualities the honest copies carry, says why it chose a
 copy, and (Ctrl+Shift+S) shows the whole arithmetic. A copy that will not start is replaced
 by the next. Every term and weight: `docs/specs/source-scoring.md`.
+
+### The player experience ✅ `Phase 11`
+
+Everything around the picture. A series page lists seasons and episodes and says when the
+next one airs. Pausing opens a panel (cast, crew, ratings, more like this) whose data was
+fetched when playback started. An episode's last 30 seconds offer the next one with a
+countdown; a film's credits play in full, then an end card. The scrub bar shows chapters
+and thumbnails from FFmpeg sprite sheets made at low priority. Picture-in-picture, a mini
+player in the corner while you browse, sound timing, picture adjustments, statistics and a
+shortcuts list generated from the same table the keys use. With a controller, every text
+field gets the TV keyboard. Checked on all three tiers in the real window. How the pieces
+fit: `docs/specs/player-experience.md`.
 
 ### The posture guard ✅ `Phase 0`
 

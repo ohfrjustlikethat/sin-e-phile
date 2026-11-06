@@ -2394,3 +2394,20 @@ below-normal priority, one thread, keyframes only) took **970 ms** for the whole
 (two 10×10 sheets). It is light enough that it overlaps only the first second of playback; on
 a Tier 0 machine it would take longer, at the same priority.
 
+### Phase 11 E5 — the playback checklist on every tier
+
+2026-11-07, at `450cca6`, debug build in the real window, `SINEPHILE_TIER` set per run
+(`get_hardware_profile` reported the override), `Garden.mkv` (8:00, H.264 720p, `d3d11va`) with a
+sidecar `.srt` 82 s late, the aligned cache cleared before each run. Procedure:
+`docs/MANUAL_TESTS.md` "Playback, on every tier".
+
+| Tier | Subtitles | Pause overlay (`__pauseMs`) local / stream | Stream first frame |
+|---|---|---|---|
+| modest | loaded as is: fits the length (no speech alignment on Tier 0) | 2.2 ms / 2.3 ms | 359 ms |
+| standard | aligned: scale 1.00000, offset −82180 ms, confidence 1.91 | 2.3 ms / 2.5 ms | 275 ms |
+| capable | aligned: scale 1.00000, offset −82180 ms, confidence 1.91 | 2.4 ms / 3.7 ms | 272 ms |
+
+Every tier: scrub sheets produced, statistics, shortcuts, mini player out and back,
+picture-in-picture 742×418 on top and restored to the exact inner size, 0 `ERROR` lines.
+The stream was the same file from a local HTTP server, so its first-frame times are a floor,
+not a measure of a real network.

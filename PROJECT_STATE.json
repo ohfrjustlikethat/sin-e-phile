@@ -83,8 +83,8 @@
       {
         "id": "E5",
         "text": "Manual test plan for playback passes on all three tiers.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "450cca6: docs/MANUAL_TESTS.md 'Playback, on every tier (Phase 11, E5)' run in the real window 2026-11-07 under each tier (debug SINEPHILE_TIER override; get_hardware_profile reported effective_tier modest/standard/capable, overridden true), with Garden.mkv (8:00, H.264 720p) and a sidecar .srt offset by 82 s, aligned cache cleared before each run. Local file, every tier: first frame, d3d11va; pause overlay painted in 2.2 / 2.3 / 2.4 ms (window.__pauseMs); scrub_thumbs returned sheets; statistics, shortcuts (?), mini player (Ctrl+M out and back), picture-in-picture (742x418 always on top, Ctrl+P restored the exact 2204x1376 inner size at 200,125); 0 ERROR lines. Subtitles: standard and capable logged 'aligned: scale 1.00000, offset -82180 ms, confidence 1.91'; modest logged 'fits the film's length; loaded as it is' (no speech alignment on Tier 0, by design). Stream (the same file over local HTTP, 3 GETs served): first frame 359 / 275 / 272 ms, pause overlay 2.3 / 2.5 / 3.7 ms, statistics shown, 0 ERROR lines. The run found four defects, fixed and tested in 450cca6 before this evidence was taken: Ctrl+M could not leave the mini player, PiP restore used the outer size, a bare file paused into an empty panel, a 5 kbit/s stream read '0.0 Mbit/s'. Screenshots: docs/evidence/phase-11/{modest-paused,standard-stats,capable-mini,capable-pip}.png."
       },
       {
         "id": "E6",
@@ -1412,8 +1412,8 @@
         {
           "id": "E5",
           "text": "Manual test plan for playback passes on all three tiers.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "450cca6: docs/MANUAL_TESTS.md 'Playback, on every tier (Phase 11, E5)' run in the real window 2026-11-07 under each tier (debug SINEPHILE_TIER override; get_hardware_profile reported effective_tier modest/standard/capable, overridden true), with Garden.mkv (8:00, H.264 720p) and a sidecar .srt offset by 82 s, aligned cache cleared before each run. Local file, every tier: first frame, d3d11va; pause overlay painted in 2.2 / 2.3 / 2.4 ms (window.__pauseMs); scrub_thumbs returned sheets; statistics, shortcuts (?), mini player (Ctrl+M out and back), picture-in-picture (742x418 always on top, Ctrl+P restored the exact 2204x1376 inner size at 200,125); 0 ERROR lines. Subtitles: standard and capable logged 'aligned: scale 1.00000, offset -82180 ms, confidence 1.91'; modest logged 'fits the film's length; loaded as it is' (no speech alignment on Tier 0, by design). Stream (the same file over local HTTP, 3 GETs served): first frame 359 / 275 / 272 ms, pause overlay 2.3 / 2.5 / 3.7 ms, statistics shown, 0 ERROR lines. The run found four defects, fixed and tested in 450cca6 before this evidence was taken: Ctrl+M could not leave the mini player, PiP restore used the outer size, a bare file paused into an empty panel, a 5 kbit/s stream read '0.0 Mbit/s'. Screenshots: docs/evidence/phase-11/{modest-paused,standard-stats,capable-mini,capable-pip}.png."
         },
         {
           "id": "E6",
@@ -2191,14 +2191,7 @@
     }
   ],
   "next_action": "Phase 11 subtask 11.6 then close (docs/phases/phase-11-player-experience-layer.md): docs/MANUAL_TESTS.md playback plan (a checklist) run in the real window under each tier via set_tier_override (modest, standard, capable): play a local file and a stream, pause overlay, subtitles (alignment on Tier 1+ vs length scaling on Tier 0), scrub thumbnails, menu, PiP, mini player; record results with screenshots as E5's manual evidence; docs/specs/player-experience.md; learning note docs/learning/phase-11-notes.md; README and HOW_IT_WORKS; SESSION_LOG with retrospective; rule-13 regression; close Phase 11.",
-  "blockers": [
-    {
-      "id": "B11",
-      "raised": "2026-11-07T00:20:00Z",
-      "needs_user": false,
-      "description": "CI failed on phase/11 at the 11.4 state commit: crates/catalogue/tests/movielens.rs ratings_are_counted_without_being_stored asserted that no table named like '%rating%' exists (a guard against storing MovieLens's 25M ratings), and migration 0020 added the viewer's own per-profile ratings table. The test now asserts the only rating table is the per-profile one. Root cause on our side: pushes since 11.2 ran the touched crates' tests rather than the whole workspace. Clears when CI on the branch is green."
-    }
-  ],
+  "blockers": [],
   "decisions_pending": [
     {
       "id": "P1",
