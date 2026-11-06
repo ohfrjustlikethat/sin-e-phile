@@ -33,8 +33,8 @@
       {
         "id": "9.3",
         "text": "Language and quality as first-class choices: the detail page lists the audio languages the candidates actually carry and the qualities on offer (defaulting to the best the hardware and connection support), with dub/sub distinction for anime; choosing one re-plans to a candidate that carries it, or says plainly that none does.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "92d4d71"
       },
       {
         "id": "9.4",
@@ -65,14 +65,14 @@
       {
         "id": "E2",
         "text": "Selecting \"Hindi\" plays a source with a Hindi audio track, or clearly reports that none is available.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "92d4d71: crates/playback/tests/plan.rs choosing_hindi_opens_the_copy_with_hindi_audio (plan_with opens the Hindi copy over a higher-resolution English one; with no Hindi copy, score.unmet = \"carries en, not hi\"); src/features/detail/DetailScreen.test.tsx \"says plainly when no copy has the chosen language\" (\"None of your sources has Hindi audio.\", Play still enabled, Hindi still selected); both seen to fail with the unmet text removed. Real window 2026-11-06: Nosferatu (1922) detail page offers Quality Best/720p/SD from the Internet Archive and re-plans on choice (CDP + PrintWindow)."
       },
       {
         "id": "E3",
         "text": "Selecting 4K plays genuine 4K, or explains why it can't.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "92d4d71: crates/playback/tests/plan.rs choosing_4k_opens_the_4k_copy_or_says_there_is_none (4K chosen opens the UHD copy; Tier 0 with nothing chosen gets 1080p; with no 4K copy, unmet = \"1080p, not 4K\", shown as \"None of your sources has this in 4K.\"); \"genuine\" by crates/selection/tests/fixtures.rs a_700_mb_4k_file_is_a_lie (a fake 4K is sunk and never offered: the_choices_offered_are_what_honest_copies_carry)."
       },
       {
         "id": "E4",
@@ -1218,14 +1218,14 @@
         {
           "id": "E2",
           "text": "Selecting \"Hindi\" plays a source with a Hindi audio track, or clearly reports that none is available.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "92d4d71: crates/playback/tests/plan.rs choosing_hindi_opens_the_copy_with_hindi_audio (plan_with opens the Hindi copy over a higher-resolution English one; with no Hindi copy, score.unmet = \"carries en, not hi\"); src/features/detail/DetailScreen.test.tsx \"says plainly when no copy has the chosen language\" (\"None of your sources has Hindi audio.\", Play still enabled, Hindi still selected); both seen to fail with the unmet text removed. Real window 2026-11-06: Nosferatu (1922) detail page offers Quality Best/720p/SD from the Internet Archive and re-plans on choice (CDP + PrintWindow)."
         },
         {
           "id": "E3",
           "text": "Selecting 4K plays genuine 4K, or explains why it can't.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "92d4d71: crates/playback/tests/plan.rs choosing_4k_opens_the_4k_copy_or_says_there_is_none (4K chosen opens the UHD copy; Tier 0 with nothing chosen gets 1080p; with no 4K copy, unmet = \"1080p, not 4K\", shown as \"None of your sources has this in 4K.\"); \"genuine\" by crates/selection/tests/fixtures.rs a_700_mb_4k_file_is_a_lie (a fake 4K is sunk and never offered: the_choices_offered_are_what_honest_copies_carry)."
         },
         {
           "id": "E4",
@@ -1274,8 +1274,8 @@
         {
           "id": "9.3",
           "text": "Language and quality as first-class choices: the detail page lists the audio languages the candidates actually carry and the qualities on offer (defaulting to the best the hardware and connection support), with dub/sub distinction for anime; choosing one re-plans to a candidate that carries it, or says plainly that none does.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "92d4d71"
         },
         {
           "id": "9.4",
@@ -2108,7 +2108,7 @@
       ]
     }
   ],
-  "next_action": "Phase 9 subtask 9.3 (docs/phases/phase-09-intelligent-source-selection.md): language and quality as first-class choices. Make sinephile_playback::plan_with return the ranked list with scores (Vec<(SourceCandidate, Score)>) alongside the opened plan; add a Tauri command that lists the audio languages and resolutions the candidates carry; on the detail page add a Language and a Quality picker (focus language from src/design-system/focus/, reachable by pad) that re-plan with Context.audio_language / Context.wanted and show Score.unmet plainly when nothing matches. Spec: docs/specs/source-scoring.md. Author checks outstanding: real controller (E5 carried), VPN drop (P7 E7).",
+  "next_action": "Phase 9 subtask 9.4 (docs/phases/phase-09-intelligent-source-selection.md): automatic fallback. PlayPlan.ranked already holds every candidate with its score. In src-tauri/src/commands/player.rs player_open, if no first frame arrives within a start timeout (about 6 s, so a failing first choice plus the next fits in 10 s), resolve the next non-sunk candidate through a new testable crates/playback function (e.g. next_target(&ranked, tried) resolving with the Resolver and torrent engine), open it silently and log why; prove it with a test where the top candidate never produces a frame (a URL that resolves but serves nothing) and the second plays, measuring time to first frame. Author checks outstanding: real controller (E5 carried), VPN drop (P7 E7).",
   "blockers": [],
   "decisions_pending": [
     {
@@ -2709,6 +2709,11 @@
       "id": "D67",
       "phase_raised": 9,
       "text": "sinephile_playback::machine assumes no AV1 hardware decode and no HDR display (neither is probed), and Context.throughput is None until the torrent engine or HTTP path reports a measured speed. Probe both via DXGI/D3D11 video decoder profiles in crates/tiers and feed a measured speed in 9.4."
+    },
+    {
+      "id": "D68",
+      "phase_raised": 9,
+      "text": "original_language is filled only for anime matched to AniList, and only on an ingest or refresh after 92d4d71; IMDb films have none, so they show no original/dub labels. Fill it from TMDB (original_language) when a key is present (Phase 11 enrichment), and re-run the AniList pass on existing catalogues."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."
