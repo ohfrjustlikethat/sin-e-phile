@@ -5460,6 +5460,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "sinephile-subtitles"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sinephile-metadata-api",
+ "sinephile-persistence",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
 name = "sinephile-tiers"
 version = "0.1.0"
 dependencies = [
