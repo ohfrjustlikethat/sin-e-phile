@@ -345,6 +345,90 @@ impl Player {
         self.prop("sub-delay", &format!("{seconds:.3}"))
     }
 
+    /// Shift the sound: positive plays it later (Phase 11's audio delay).
+    pub fn set_audio_delay(&self, seconds: f64) -> Result<(), PlayerError> {
+        self.prop("audio-delay", &format!("{seconds:.3}"))
+    }
+
+    pub fn audio_delay(&self) -> f64 {
+        self.num("audio-delay").unwrap_or(0.0)
+    }
+
+    /// Picture adjustments for a badly encoded source, each −100…100, 0 untouched.
+    pub fn set_picture(
+        &self,
+        brightness: i64,
+        contrast: i64,
+        saturation: i64,
+    ) -> Result<(), PlayerError> {
+        self.prop("brightness", &brightness.clamp(-100, 100).to_string())?;
+        self.prop("contrast", &contrast.clamp(-100, 100).to_string())?;
+        self.prop("saturation", &saturation.clamp(-100, 100).to_string())
+    }
+
+    /// What the stats overlay shows: (property, value) in display order, only those mpv
+    /// reports for this file.
+    pub fn stats(&self) -> Vec<(&'static str, String)> {
+        let mut out = Vec::new();
+        let mut put = |k: &'static str, v: Option<String>| {
+            if let Some(v) = v.filter(|v| !v.is_empty()) {
+                out.push((k, v));
+            }
+        };
+        put("Video", self.get("current-tracks/video/codec"));
+        put(
+            "Size",
+            self.num("video-params/w")
+                .zip(self.num("video-params/h"))
+                .map(|(w, h)| format!("{w}×{h}")),
+        );
+        put(
+            "Frame rate",
+            self.num("container-fps").map(|f| format!("{f:.3} fps")),
+        );
+        put(
+            "Decoder",
+            Some(
+                self.get("hwdec-current")
+                    .filter(|h| h != "no")
+                    .unwrap_or_else(|| "software".into()),
+            ),
+        );
+        put(
+            "Video bitrate",
+            self.num("video-bitrate")
+                .map(|b| format!("{:.1} Mbit/s", b / 1e6)),
+        );
+        put("Audio", self.get("audio-codec-name"));
+        put(
+            "Audio bitrate",
+            self.num("audio-bitrate")
+                .map(|b| format!("{:.0} kbit/s", b / 1e3)),
+        );
+        put(
+            "Dropped frames",
+            self.num("frame-drop-count").map(|n| format!("{n}")),
+        );
+        put(
+            "Decoder drops",
+            self.num("decoder-frame-drop-count").map(|n| format!("{n}")),
+        );
+        put(
+            "Buffered ahead",
+            self.num("demuxer-cache-duration")
+                .map(|s| format!("{s:.1} s")),
+        );
+        put(
+            "Audio delay",
+            Some(format!("{:+.0} ms", self.audio_delay() * 1000.0)),
+        );
+        put(
+            "Subtitle delay",
+            Some(format!("{:+.0} ms", self.subtitle_delay() * 1000.0)),
+        );
+        out
+    }
+
     pub fn subtitle_delay(&self) -> f64 {
         self.num("sub-delay").unwrap_or(0.0)
     }

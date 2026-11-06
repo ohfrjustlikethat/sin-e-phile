@@ -17,6 +17,14 @@ export type Intent =
   | { kind: "subtitle_delay"; ms: number }
   /** The previous or next episode of a series (SPEC.md Phase 11). */
   | { kind: "episode"; next: boolean }
+  /** Phase 11's controls: the pad's player menu, stats, the shortcuts list, picture-in-
+   * picture, the in-app mini player (ADR-0043), and the sound's delay. */
+  | { kind: "player_menu" }
+  | { kind: "stats" }
+  | { kind: "shortcuts" }
+  | { kind: "pip" }
+  | { kind: "mini" }
+  | { kind: "audio_delay"; ms: number }
   | { kind: "audio_menu" }
   | { kind: "back" };
 
@@ -26,7 +34,22 @@ export type Intent =
  * other shortcuts still work.
  */
 export function keyIntent(e: Pick<KeyboardEvent, "key" | "shiftKey" | "ctrlKey" | "altKey" | "metaKey">): Intent | null {
-  if (e.ctrlKey || e.altKey || e.metaKey) return null;
+  if (e.altKey || e.metaKey) return null;
+  if (e.ctrlKey) {
+    // Phase 11: the few chords the player owns.
+    switch (e.key.toLowerCase()) {
+      case "p":
+        return { kind: "pip" };
+      case "m":
+        return { kind: "mini" };
+      case "[":
+        return { kind: "audio_delay", ms: -100 };
+      case "]":
+        return { kind: "audio_delay", ms: 100 };
+      default:
+        return null;
+    }
+  }
   switch (e.key) {
     case " ":
     case "k":
@@ -77,6 +100,11 @@ export function keyIntent(e: Pick<KeyboardEvent, "key" | "shiftKey" | "ctrlKey" 
     case "p":
     case "P":
       return { kind: "episode", next: false };
+    case "i":
+    case "I":
+      return { kind: "stats" };
+    case "?":
+      return { kind: "shortcuts" };
     case "Escape":
       return { kind: "back" };
     default:
@@ -103,3 +131,48 @@ export function clock(seconds: number | null | undefined): string {
   const ss = String(s % 60).padStart(2, "0");
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 }
+
+/**
+ * The shortcuts overlay's table (`?`, Phase 11 E4). Each row names the keys and the pad
+ * button as a person reads them, and carries one real key event: a test checks that
+ * `keyIntent` turns that event into the row's intent, so this list cannot drift from
+ * what the keys do.
+ */
+export interface Shortcut {
+  keys: string;
+  pad: string | null;
+  does: string;
+  sample: Pick<KeyboardEvent, "key" | "shiftKey" | "ctrlKey" | "altKey" | "metaKey">;
+  intent: Intent;
+}
+
+const k = (key: string, mods: Partial<Pick<KeyboardEvent, "shiftKey" | "ctrlKey">> = {}) => ({
+  key,
+  shiftKey: false,
+  ctrlKey: false,
+  altKey: false,
+  metaKey: false,
+  ...mods,
+});
+
+export const SHORTCUTS: Shortcut[] = [
+  { keys: "Space or K", pad: "A", does: "Play or pause", sample: k(" "), intent: { kind: "toggle_pause" } },
+  { keys: "← / →", pad: "D-pad ← / →", does: "Back or forward 5 s (10 s on the pad)", sample: k("ArrowLeft"), intent: { kind: "seek", seconds: -5 } },
+  { keys: "Shift + ← / →", pad: null, does: "Back or forward a minute", sample: k("ArrowRight", { shiftKey: true }), intent: { kind: "seek", seconds: 60 } },
+  { keys: "J / L", pad: "LT / RT", does: "Back or forward 10 s (30 s on the pad)", sample: k("j"), intent: { kind: "seek", seconds: -10 } },
+  { keys: "↑ / ↓", pad: "D-pad ↑ / ↓", does: "Volume", sample: k("ArrowUp"), intent: { kind: "volume", delta: 5 } },
+  { keys: "M", pad: null, does: "Mute", sample: k("m"), intent: { kind: "mute" } },
+  { keys: "F", pad: "View", does: "Full screen", sample: k("f"), intent: { kind: "fullscreen" } },
+  { keys: ", / .", pad: null, does: "One frame back or forward, paused", sample: k(","), intent: { kind: "frame", forward: false } },
+  { keys: "[ / ]", pad: null, does: "Slower or faster", sample: k("]"), intent: { kind: "speed", faster: true } },
+  { keys: "C", pad: "X", does: "Subtitles", sample: k("c"), intent: { kind: "subtitles_menu" } },
+  { keys: "G / H", pad: "LB / RB", does: "Subtitles earlier or later, remembered", sample: k("g"), intent: { kind: "subtitle_delay", ms: -100 } },
+  { keys: "Ctrl + [ / ]", pad: null, does: "Sound earlier or later", sample: k("[", { ctrlKey: true }), intent: { kind: "audio_delay", ms: -100 } },
+  { keys: "N / P", pad: "Click right / left stick", does: "Next or previous episode", sample: k("n"), intent: { kind: "episode", next: true } },
+  { keys: "I", pad: null, does: "Statistics", sample: k("i"), intent: { kind: "stats" } },
+  { keys: "Ctrl + M", pad: null, does: "Keep watching in a corner while you browse", sample: k("m", { ctrlKey: true }), intent: { kind: "mini" } },
+  { keys: "Ctrl + P", pad: null, does: "Picture in picture, over other windows", sample: k("p", { ctrlKey: true }), intent: { kind: "pip" } },
+  { keys: "?", pad: null, does: "This list", sample: k("?"), intent: { kind: "shortcuts" } },
+  { keys: "Esc", pad: "B", does: "Back", sample: k("Escape"), intent: { kind: "back" } },
+  { keys: "", pad: "Menu", does: "The player menu: everything above, by pad", sample: k(""), intent: { kind: "player_menu" } },
+];

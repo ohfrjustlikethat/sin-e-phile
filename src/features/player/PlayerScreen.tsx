@@ -6,6 +6,7 @@ import { useUi } from "@/lib/store";
 import { clock, keyIntent, nextSpeed, type Intent } from "./intents";
 import { onPlayerIntent } from "./intentBus";
 import { PauseOverlay } from "./PauseOverlay";
+import { PlayerMenu, ShortcutsPanel, StatsPanel, type Picture } from "./PlayerPanels";
 import { EndCard, NextEpisodeCard } from "./WhatNext";
 import { moment } from "./endCard";
 import { previewLeft, tileAt } from "./scrubPreview";
@@ -61,7 +62,7 @@ async function setFullscreen(on: boolean) {
   await getCurrentWindow().setFullscreen(on);
 }
 
-export function PlayerScreen() {
+export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
   const playing = useUi((s) => s.playing);
   const stopPlaying = useUi((s) => s.stopPlaying);
   const openDetail = useUi((s) => s.openDetail);
@@ -157,6 +158,19 @@ export function PlayerScreen() {
     });
   }, [wanted]);
   const preview = useRef<HTMLDivElement>(null);
+
+  // Phase 11's controls: the pad's menu, the shortcuts list, statistics, picture,
+  // the sound's timing, picture-in-picture and the mini player.
+  const setMini = useUi((s) => s.setMini);
+  const [panel, setPanel] = useState<"menu" | "shortcuts" | null>(null);
+  const [stats, setStats] = useState(false);
+  const [picture, setPicture] = useState<Picture>({ brightness: 0, contrast: 0, saturation: 0 });
+  const [audioDelayMs, setAudioDelayMs] = useState(0);
+  const menuPanel = useRef<HTMLDivElement>(null);
+  const statsPanel = useRef<HTMLDivElement>(null);
+  const shortcutsPanel = useRef<HTMLDivElement>(null);
+  const pipFrom = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [pip, setPip] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Every copy was tried and none would start (SPEC.md Phase 9: fallback is silent
   // until there is nothing left to fall back to).
@@ -216,6 +230,9 @@ export function PlayerScreen() {
       ...(chrome && !paused ? [top.current, bottom.current] : []),
       ...(showNextCard ? [card.current] : []),
       ...(hover && chrome ? [preview.current] : []),
+      ...(panel === "menu" ? [menuPanel.current] : []),
+      ...(panel === "shortcuts" ? [shortcutsPanel.current] : []),
+      ...(stats ? [statsPanel.current] : []),
     ];
     const cutouts = panels
       .filter((el): el is HTMLDivElement => !!el)
@@ -230,7 +247,7 @@ export function PlayerScreen() {
         };
       });
     void commands.playerLayout(s.x, s.y, s.width, s.height, window.devicePixelRatio, cutouts);
-  }, [chrome, paused, showNextCard, hover]);
+  }, [chrome, paused, showNextCard, hover, panel, stats, mini]);
 
   useLayoutEffect(() => {
     layout();
@@ -278,11 +295,85 @@ export function PlayerScreen() {
     stopPlaying();
   }, [stopPlaying]);
 
+  /** Picture-in-picture (Ctrl+P): the window small, on top, in the corner; again restores. */
+  const togglePip = useCallback(async () => {
+    if (!inTauri()) return;
+    const { getCurrentWindow, currentMonitor, PhysicalPosition, PhysicalSize, LogicalSize } = await import(
+      "@tauri-apps/api/window"
+    );
+    const w = getCurrentWindow();
+    const from = pipFrom.current;
+    if (from) {
+      pipFrom.current = null;
+      setPip(false);
+      await w.setAlwaysOnTop(false);
+      await w.setMinSize(new LogicalSize(1024, 640));
+      await w.setSize(new PhysicalSize(from.w, from.h));
+      await w.setPosition(new PhysicalPosition(from.x, from.y));
+      return;
+    }
+    if (fullscreen) {
+      setFs(false);
+      await setFullscreen(false);
+    }
+    const pos = await w.outerPosition();
+    const size = await w.outerSize();
+    pipFrom.current = { x: pos.x, y: pos.y, w: size.width, h: size.height };
+    setPip(true);
+    const m = await currentMonitor();
+    const sf = m?.scaleFactor ?? 1;
+    const width = Math.round(480 * sf);
+    const height = Math.round(270 * sf);
+    await w.setMinSize(null);
+    await w.setAlwaysOnTop(true);
+    await w.setSize(new PhysicalSize(width, height));
+    if (m) {
+      await w.setPosition(
+        new PhysicalPosition(
+          m.position.x + m.size.width - width - Math.round(24 * sf),
+          m.position.y + m.size.height - height - Math.round(72 * sf),
+        ),
+      );
+    }
+  }, [fullscreen]);
+
+  /** Returns false to decline an intent: the mini player declines everything so the
+   * app can be browsed; with a panel open, the D-pad and A move focus within it. */
   const run = useCallback(
-    (intent: Intent) => {
+    (intent: Intent): boolean => {
+      if (mini) return false;
+      if (panel) {
+        if (intent.kind === "back" || intent.kind === "player_menu" || intent.kind === "shortcuts") {
+          setPanel(null);
+          return true;
+        }
+        if (intent.kind === "seek" || intent.kind === "volume" || intent.kind === "toggle_pause") return false;
+      }
       wake();
       const s = state;
       switch (intent.kind) {
+        case "player_menu":
+          setPanel("menu");
+          break;
+        case "shortcuts":
+          setPanel("shortcuts");
+          break;
+        case "stats":
+          setStats((v) => !v);
+          break;
+        case "pip":
+          void togglePip();
+          break;
+        case "mini":
+          if (paused) void resume();
+          setMini(true);
+          break;
+        case "audio_delay": {
+          const next = audioDelayMs + intent.ms;
+          setAudioDelayMs(next);
+          act({ kind: "audio_delay", seconds: next / 1000 });
+          break;
+        }
         case "toggle_pause":
           // With the next-episode card up, A plays it.
           if (showNextCard && next) {
@@ -346,16 +437,20 @@ export function PlayerScreen() {
           } else leave();
           break;
       }
+      return true;
     },
-    [act, fullscreen, goTo, leave, menu, neighbours.data, next, pause, paused, resume, showNextCard, state, wake],
+    [
+      act, audioDelayMs, fullscreen, goTo, leave, menu, mini, neighbours.data, next, panel, pause, paused,
+      resume, setMini, showNextCard, state, togglePip, wake,
+    ],
   );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (mini) return; // the app is being browsed; its keys are its own
       const intent = keyIntent(e);
       if (!intent) return;
-      e.preventDefault();
-      run(intent);
+      if (run(intent)) e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     const off = onPlayerIntent(run);
@@ -363,13 +458,41 @@ export function PlayerScreen() {
       window.removeEventListener("keydown", onKey);
       off();
     };
-  }, [run]);
+  }, [run, mini]);
 
   if (!playing) return null;
   const duration = state?.duration ?? 0;
   const position = state?.position ?? 0;
   const tracks = state?.tracks ?? [];
-  const showChrome = chrome || paused || !!menu;
+  const showChrome = !mini && (chrome || paused || !!menu || !!panel);
+
+  if (mini) {
+    // The mini player (ADR-0043): the video in a corner, a slim bar under it.
+    return (
+      <div
+        className="flex h-full w-full flex-col overflow-hidden rounded-md bg-black text-ink"
+        aria-label={`Playing ${playing.title}`}
+      >
+        <div ref={stage} className="relative min-h-0 flex-1" />
+        <div className="flex items-center gap-2 bg-surface px-3 py-2 text-[12px]">
+          <span className="flex-1 truncate text-ink">{playing.title}</span>
+          <button
+            type="button"
+            className="px-2 py-1 text-ink-muted hover:text-ink"
+            onClick={() => act({ kind: "pause", paused: !state?.paused })}
+          >
+            {state?.paused ? "Play" : "Pause"}
+          </button>
+          <button type="button" className="px-2 py-1 text-ink-muted hover:text-ink" onClick={() => setMini(false)}>
+            Expand
+          </button>
+          <button type="button" className="px-2 py-1 text-ink-muted hover:text-ink" onClick={leave} aria-label="Stop">
+            ✕
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -394,6 +517,37 @@ export function PlayerScreen() {
           }}
         />
       )}
+
+      {panel === "menu" && (
+        <PlayerMenu
+          ref={menuPanel}
+          tracks={tracks}
+          picture={picture}
+          audioDelayMs={audioDelayMs}
+          stats={stats}
+          onAudio={(id) => act({ kind: "audio", id })}
+          onSubtitles={(id) => act({ kind: "subtitles", id })}
+          onSubtitleDelay={(ms) => run({ kind: "subtitle_delay", ms })}
+          onAudioDelay={(ms) => run({ kind: "audio_delay", ms })}
+          onPicture={(p) => {
+            setPicture(p);
+            act({ kind: "picture", ...p });
+          }}
+          onStats={() => setStats((v) => !v)}
+          onMini={() => {
+            setPanel(null);
+            setMini(true);
+          }}
+          onPip={() => {
+            setPanel(null);
+            void togglePip();
+          }}
+          onShortcuts={() => setPanel("shortcuts")}
+          onClose={() => setPanel(null)}
+        />
+      )}
+      {panel === "shortcuts" && <ShortcutsPanel ref={shortcutsPanel} onClose={() => setPanel(null)} />}
+      {stats && <StatsPanel ref={statsPanel} />}
 
       {hover && showChrome && (() => {
         const w = sheets.data?.tile_width ?? 0;
@@ -476,6 +630,7 @@ export function PlayerScreen() {
 
       {showChrome && (
         <>
+          {!pip && (
           <div
             ref={top}
             data-tauri-drag-region
@@ -490,6 +645,7 @@ export function PlayerScreen() {
               {playing.title}
             </span>
           </div>
+          )}
 
           <div ref={bottom} className="absolute inset-x-3 bottom-3 rounded-md bg-surface px-4 pt-3 pb-2.5">
             <Scrub
@@ -513,6 +669,13 @@ export function PlayerScreen() {
                 {clock(position)} / {clock(duration)}
               </span>
               <div className="flex-1" />
+              {pip ? (
+                // Picture-in-picture is 480 px wide: play, the time, and the way back.
+                <button type="button" onClick={() => void togglePip()} className="px-2 py-1 text-ink-muted hover:text-ink">
+                  Back to the window
+                </button>
+              ) : (
+              <>
               {state?.hwdec && <span className="label text-ink-faint">{state.hwdec}</span>}
               {(state?.speed ?? 1) !== 1 && <span className="tabular-nums">{state?.speed}×</span>}
               {nudge && (
@@ -532,6 +695,8 @@ export function PlayerScreen() {
               <button type="button" onClick={() => run({ kind: "fullscreen" })} className="px-2 py-1 text-ink-muted hover:text-ink">
                 {fullscreen ? "Exit full screen" : "Full screen"}
               </button>
+              </>
+              )}
             </div>
           </div>
         </>

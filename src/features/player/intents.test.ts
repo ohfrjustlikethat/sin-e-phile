@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clock, keyIntent, nextSpeed } from "./intents";
+import { clock, keyIntent, nextSpeed, SHORTCUTS } from "./intents";
 
 const key = (k: string, mods: Partial<{ shiftKey: boolean; ctrlKey: boolean }> = {}) =>
   keyIntent({ key: k, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...mods });
@@ -44,3 +44,17 @@ describe("player keys (SPEC.md Phase 8)", () => {
     expect(clock(null)).toBe("0:00");
   });
 });
+
+describe("the shortcuts list (Phase 11 E4)", () => {
+  it("says what each key really does", () => {
+    for (const row of SHORTCUTS.filter((r) => r.keys !== "")) {
+      expect(keyIntent(row.sample), row.keys).toEqual(row.intent);
+    }
+  });
+
+  it("names a pad button for everything the keyboard can do, or the player menu", () => {
+    // ADR-0041: what the keyboard reaches, the pad reaches; the rest goes through Menu.
+    expect(SHORTCUTS.some((r) => r.pad === "Menu")).toBe(true);
+  });
+});
+

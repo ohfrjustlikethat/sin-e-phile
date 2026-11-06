@@ -243,6 +243,22 @@ fn thumbnail_sheets_are_made_from_a_file() {
 }
 
 #[test]
+fn audio_delay_picture_and_stats_are_set_and_reported() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = player();
+    p.load(clip(dir.path()).to_str().unwrap(), None).unwrap();
+    p.wait_first_frame(Duration::from_secs(10)).unwrap();
+    p.set_audio_delay(0.25).unwrap();
+    assert!((p.audio_delay() - 0.25).abs() < 1e-6);
+    p.set_picture(10, -5, 200).unwrap(); // saturation clamped to 100
+    let stats = p.stats();
+    let get = |k: &str| stats.iter().find(|(n, _)| *n == k).map(|(_, v)| v.clone());
+    assert_eq!(get("Video").as_deref(), Some("h264"), "{stats:?}");
+    assert_eq!(get("Size").as_deref(), Some("640×360"));
+    assert_eq!(get("Audio delay").as_deref(), Some("+250 ms"));
+}
+
+#[test]
 fn an_exact_seek_lands_on_the_frame_asked_for() {
     // Phase 8 E3: "Seeking is frame-accurate and responsive."
     let dir = tempfile::tempdir().unwrap();

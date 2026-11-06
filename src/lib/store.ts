@@ -24,6 +24,9 @@ interface UiState {
   destination: Destination;
   settingsOpen: boolean;
   playing: Playing | null;
+  /** The in-app mini player (ADR-0043): watching in a corner while browsing. */
+  mini: boolean;
+  setMini: (mini: boolean) => void;
   /** The catalogue item whose detail page is open. */
   detail: number | null;
   setDestination: (d: Destination) => void;
@@ -40,13 +43,15 @@ export const useUi = create<UiState>()(
       destination: "home",
       settingsOpen: false,
       playing: null,
+      mini: false,
+      setMini: (mini) => set({ mini }),
       detail: null,
       setDestination: (destination) => set({ destination, detail: null }),
       setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
       play: (playing) => set({ playing }),
       openDetail: (detail) => set({ detail, settingsOpen: false }),
       closeDetail: () => set({ detail: null }),
-      stopPlaying: () => set({ playing: null }),
+      stopPlaying: () => set({ playing: null, mini: false }),
     }),
     {
       name: "sin-e-phile.ui",

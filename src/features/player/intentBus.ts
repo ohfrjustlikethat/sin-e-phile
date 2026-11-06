@@ -5,7 +5,9 @@ import type { Intent } from "./intents";
  * drive the player without knowing about it. The player subscribes while it is on
  * screen; nothing is delivered when it is not.
  */
-type Listener = (intent: Intent) => void;
+/** Returns `false` to decline an intent (the player's menu is open, or it is the mini
+ * player), so the caller falls back to ordinary navigation. */
+type Listener = (intent: Intent) => boolean | void;
 const listeners = new Set<Listener>();
 
 export function onPlayerIntent(l: Listener): () => void {
@@ -13,8 +15,11 @@ export function onPlayerIntent(l: Listener): () => void {
   return () => listeners.delete(l);
 }
 
-/** Returns whether anything was listening, so a caller can fall back otherwise. */
+/** Returns whether the player took it, so a caller can fall back otherwise. */
 export function sendPlayerIntent(intent: Intent): boolean {
-  listeners.forEach((l) => l(intent));
-  return listeners.size > 0;
+  let taken = false;
+  listeners.forEach((l) => {
+    if (l(intent) !== false) taken = true;
+  });
+  return taken;
 }

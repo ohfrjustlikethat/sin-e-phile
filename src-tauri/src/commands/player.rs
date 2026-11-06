@@ -230,15 +230,43 @@ pub async fn player_layout(
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PlayerAction {
-    Pause { paused: bool },
-    SeekTo { seconds: f64 },
-    SeekBy { seconds: f64 },
-    FrameStep { forward: bool },
-    Volume { percent: f64 },
-    Mute { muted: bool },
-    Speed { speed: f64 },
-    Audio { id: i32 },
-    Subtitles { id: Option<i32> },
+    Pause {
+        paused: bool,
+    },
+    SeekTo {
+        seconds: f64,
+    },
+    SeekBy {
+        seconds: f64,
+    },
+    FrameStep {
+        forward: bool,
+    },
+    Volume {
+        percent: f64,
+    },
+    Mute {
+        muted: bool,
+    },
+    Speed {
+        speed: f64,
+    },
+    Audio {
+        id: i32,
+    },
+    Subtitles {
+        id: Option<i32>,
+    },
+    /// Seconds; positive plays the sound later.
+    AudioDelay {
+        seconds: f64,
+    },
+    /// Each −100…100.
+    Picture {
+        brightness: i32,
+        contrast: i32,
+        saturation: i32,
+    },
 }
 
 #[tauri::command]
@@ -256,6 +284,16 @@ pub async fn player_action(state: State<'_, AppState>, action: PlayerAction) -> 
         PlayerAction::Speed { speed } => p.set_speed(speed),
         PlayerAction::Audio { id } => p.set_audio(i64::from(id)),
         PlayerAction::Subtitles { id } => p.set_subtitles(id.map(i64::from)),
+        PlayerAction::AudioDelay { seconds } => p.set_audio_delay(seconds),
+        PlayerAction::Picture {
+            brightness,
+            contrast,
+            saturation,
+        } => p.set_picture(
+            i64::from(brightness),
+            i64::from(contrast),
+            i64::from(saturation),
+        ),
     }
     .map_err(err)
 }
@@ -277,6 +315,47 @@ pub async fn player_pause_still(state: State<'_, AppState>) -> Result<String, St
         .capture_still(&path, std::time::Duration::from_millis(500))
         .map_err(err)?;
     Ok(sinephile_player::still::data_uri(&jpeg))
+}
+
+/// One line of the stats overlay (Phase 11: "statistics for nerds").
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct StatView {
+    pub name: String,
+    pub value: String,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn player_stats(state: State<'_, AppState>) -> Result<Vec<StatView>, String> {
+    let rt = state.player().ok_or("nothing is playing")?;
+    let mut out: Vec<StatView> = rt
+        .player
+        .stats()
+        .into_iter()
+        .map(|(name, value)| StatView {
+            name: name.into(),
+            value,
+        })
+        .collect();
+    // A torrent stream: the swarm, as the engine counts it.
+    if let Some(torrent) = state.torrent_if_started() {
+        for t in torrent
+            .engine
+            .list()
+            .into_iter()
+            .filter(|t| t.state == sinephile_torrent::State::Live && !t.finished)
+        {
+            out.push(StatView {
+                name: "Swarm".into(),
+                value: format!(
+                    "{} peers · {:.1} MB/s down",
+                    t.live_peers,
+                    t.download_bps / 1e6
+                ),
+            });
+        }
+    }
+    Ok(out)
 }
 
 /// A chapter mark, for the scrub bar and the pause overlay.

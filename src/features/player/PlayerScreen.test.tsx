@@ -33,6 +33,7 @@ const commands = {
   rateTitle: vi.fn(() => ok(null)),
   scrubThumbs: vi.fn(() => ok({ interval: 10, cols: 10, rows: 10, tile_width: 160, tile_height: 90, count: 1 })),
   scrubSheet: vi.fn(() => ok("data:image/jpeg;base64,AAAA")),
+  playerStats: vi.fn(() => ok([{ name: "Decoder", value: "d3d11va" }, { name: "Dropped frames", value: "0" }])),
   titleRating: vi.fn(() => ok(null)),
 };
 vi.mock("@/lib/ipc", () => ({ commands }));
@@ -49,11 +50,19 @@ vi.mock("@tauri-apps/api/window", () => ({
 }));
 const { PlayerScreen: Bare } = await import("./PlayerScreen");
 /** The player inside the query client the app gives it. */
+// Fresh for each test (beforeEach), shared by a test's rerenders.
+let client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 function PlayerScreen(): ReactElement {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
     <QueryClientProvider client={client}>
       <Bare />
+    </QueryClientProvider>
+  );
+}
+function MiniPlayerScreen(): ReactElement {
+  return (
+    <QueryClientProvider client={client}>
+      <Bare mini />
     </QueryClientProvider>
   );
 }
@@ -69,6 +78,7 @@ beforeAll(() => {
 
 describe("PlayerScreen (SPEC.md Phase 8)", () => {
   beforeEach(() => {
+    client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     vi.clearAllMocks();
     useUi.setState({ playing: { target: "https://films.example/a.mp4", title: "Nosferatu", mediaItemId: 1, start: 42 } });
   });
@@ -264,6 +274,49 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
       fireEvent.click(screen.getByRole("radio", { name: "4 out of 5" }));
       expect(commands.rateTitle).toHaveBeenCalledWith(1, 4);
     });
+  });
+
+  it("Menu opens the player menu; inside it the D-pad moves focus instead of seeking (Phase 11)", async () => {
+    render(<PlayerScreen />);
+    act(() => void sendPlayerIntent({ kind: "player_menu" }));
+    const menu = await screen.findByRole("dialog", { name: "Player menu" });
+    expect(menu).toHaveTextContent("Keep watching while browsing");
+    // Declined, so the app's focus movement handles it; nothing seeks.
+    let taken = true;
+    act(() => {
+      taken = sendPlayerIntent({ kind: "seek", seconds: 10 });
+    });
+    expect(taken).toBe(false);
+    expect(commands.playerAction).not.toHaveBeenCalledWith({ kind: "seek_by", seconds: 10 });
+    fireEvent.click(screen.getByRole("button", { name: "More brightness" }));
+    expect(commands.playerAction).toHaveBeenCalledWith({ kind: "picture", brightness: 10, contrast: 0, saturation: 0 });
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Player menu" })).not.toBeInTheDocument();
+    expect(useUi.getState().playing).not.toBeNull();
+  });
+
+  it("? lists the shortcuts, I shows statistics, Ctrl+[ moves the sound", async () => {
+    render(<PlayerScreen />);
+    fireEvent.keyDown(window, { key: "?" });
+    const list = await screen.findByRole("dialog", { name: "Shortcuts" });
+    expect(list).toHaveTextContent("Next or previous episode");
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(window, { key: "i" });
+    expect(await screen.findByLabelText("Statistics")).toHaveTextContent("d3d11va");
+    fireEvent.keyDown(window, { key: "[", ctrlKey: true });
+    expect(commands.playerAction).toHaveBeenCalledWith({ kind: "audio_delay", seconds: -0.1 });
+  });
+
+  it("Ctrl+M shrinks to the mini player, which leaves the keys to the app", async () => {
+    const { rerender } = render(<PlayerScreen />);
+    fireEvent.keyDown(window, { key: "m", ctrlKey: true });
+    expect(useUi.getState().mini).toBe(true);
+    rerender(<MiniPlayerScreen />);
+    commands.playerPauseStill.mockClear();
+    fireEvent.keyDown(window, { key: " " });
+    expect(commands.playerPauseStill).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Expand" })).toBeInTheDocument();
+    useUi.setState({ mini: false });
   });
 });
 

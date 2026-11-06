@@ -42,12 +42,18 @@ function focusedTile(): HTMLElement | null {
 const DESIGN_ROUTE = import.meta.env.DEV && window.location.hash === "#design";
 
 const LABELS: Record<Destination, string> = {
-  home: "Home", films: "Films", tv: "TV Shows", watchlist: "Watchlist", live: "Live Channels",
+  home: "Home",
+  films: "Films",
+  tv: "TV Shows",
+  watchlist: "Watchlist",
+  live: "Live Channels",
 };
 
 export function App() {
-  const { destination, settingsOpen, setDestination, setSettingsOpen } = useUi();
+  const { destination, settingsOpen, setDestination, setSettingsOpen } =
+    useUi();
   const playing = useUi((s) => s.playing);
+  const mini = useUi((s) => s.mini);
   const detail = useUi((s) => s.detail);
   useDropToPlay();
   const [palette, setPalette] = useState(false);
@@ -63,9 +69,10 @@ export function App() {
 
   // TV mode's scale must not apply while the player positions its native window.
   useEffect(() => {
-    if (playing) document.documentElement.dataset["playing"] = "";
+    // The mini player leaves the app as it is, TV scale included.
+    if (playing && !mini) document.documentElement.dataset["playing"] = "";
     else delete document.documentElement.dataset["playing"];
-  }, [playing]);
+  }, [playing, mini]);
 
   // ADR-0041: an Xbox controller as a remote. The player takes its intents while it is
   // on screen; everywhere else the pad moves focus and acts on it.
@@ -85,12 +92,18 @@ export function App() {
               break;
             case "back":
               if (closePadKeyboard()) break;
-              window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+              window.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Escape" }),
+              );
               break;
             case "tab": {
               const ui = useUi.getState();
               const i = DESTINATIONS.indexOf(ui.destination);
-              const next = DESTINATIONS[(i + (action.next ? 1 : DESTINATIONS.length - 1)) % DESTINATIONS.length];
+              const next =
+                DESTINATIONS[
+                  (i + (action.next ? 1 : DESTINATIONS.length - 1)) %
+                    DESTINATIONS.length
+                ];
               if (next) ui.setDestination(next);
               setSearching(false);
               break;
@@ -117,7 +130,8 @@ export function App() {
         },
         view: () => void fullscreen(),
         pickup: () => {
-          if (useControllerSettings.getState().fullscreenOnPickup) void fullscreen(true);
+          if (useControllerSettings.getState().fullscreenOnPickup)
+            void fullscreen(true);
         },
       }),
     [],
@@ -144,7 +158,10 @@ export function App() {
         return;
       }
       if (typing) return;
-      if (event.key === "/" || (event.key.toLowerCase() === "f" && event.ctrlKey)) {
+      if (
+        event.key === "/" ||
+        (event.key.toLowerCase() === "f" && event.ctrlKey)
+      ) {
         event.preventDefault();
         openSearch();
       }
@@ -160,10 +177,24 @@ export function App() {
       id: `go-${d}`,
       label: `Go to ${LABELS[d]}`,
       group: "Navigate",
-      run: () => { setSettingsOpen(false); setDestination(d); },
+      run: () => {
+        setSettingsOpen(false);
+        setDestination(d);
+      },
     })),
-    { id: "settings", label: "Open settings", group: "Settings", run: () => setSettingsOpen(true) },
-    { id: "search", label: "Search", group: "Navigate", hint: "/", run: openSearch },
+    {
+      id: "settings",
+      label: "Open settings",
+      group: "Settings",
+      run: () => setSettingsOpen(true),
+    },
+    {
+      id: "search",
+      label: "Search",
+      group: "Navigate",
+      hint: "/",
+      run: openSearch,
+    },
   ];
 
   if (DESIGN_ROUTE) {
@@ -178,32 +209,48 @@ export function App() {
   // The player is immersive: no masthead, its own top bar (with a drag region). Its
   // chrome sits under a native video window, so it keeps per-element outlines rather
   // than the drawn ring, and TV mode's scale is off while it is open (focus.css).
-  if (playing) {
-    return (
-      <div className="h-full bg-black text-ink" data-no-focus-ring>
-        <PlayerScreen />
-        <FocusLayer />
-      </div>
-    );
-  }
-
+  //
+  // The mini player (ADR-0043) keeps the SAME PlayerScreen mounted in a corner over the
+  // app: the slot below never moves, so shrinking or expanding does not reopen the film.
+  const full = playing !== null && !mini;
   return (
-    <div className="flex h-full flex-col bg-base text-ink">
-      <Masthead searching={searching} onSearchChange={setSearching} />
-      <main className="min-h-0 min-w-0 flex-1 overflow-auto">
-        {settingsOpen ? (
-          <SettingsScreen />
-        ) : detail !== null ? (
-          <DetailScreen />
-        ) : searching ? (
-          <SearchScreen />
-        ) : (
-          <Placeholder destination={destination} />
-        )}
-      </main>
-      <CommandPalette commands={commands} open={palette} onOpenChange={setPalette} />
-      <PadKeyboard />
-      <FocusLayer />
-    </div>
+    <>
+      {!full && (
+        <div className="flex h-full flex-col bg-base text-ink">
+          <Masthead searching={searching} onSearchChange={setSearching} />
+          <main className="min-h-0 min-w-0 flex-1 overflow-auto">
+            {settingsOpen ? (
+              <SettingsScreen />
+            ) : detail !== null ? (
+              <DetailScreen />
+            ) : searching ? (
+              <SearchScreen />
+            ) : (
+              <Placeholder destination={destination} />
+            )}
+          </main>
+          <CommandPalette
+            commands={commands}
+            open={palette}
+            onOpenChange={setPalette}
+          />
+          <PadKeyboard />
+          <FocusLayer />
+        </div>
+      )}
+      {playing && (
+        <div
+          className={
+            full
+              ? "fixed inset-0 bg-black text-ink"
+              : "fixed right-4 bottom-4 z-40 h-[262px] w-[400px] shadow-none"
+          }
+          data-no-focus-ring
+        >
+          <PlayerScreen mini={mini} />
+          {full && <FocusLayer />}
+        </div>
+      )}
+    </>
   );
 }

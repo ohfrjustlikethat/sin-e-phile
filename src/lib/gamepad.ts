@@ -78,8 +78,10 @@ export function newlyPressed(prev: PadFrame | null, now: PadFrame): number[] {
 export function playerIntent(button: number): Intent | null {
   switch (button) {
     case BUTTON.A:
-    case BUTTON.MENU:
       return { kind: "toggle_pause" };
+    // The player menu: every control the keyboard has, reachable by D-pad (ADR-0041).
+    case BUTTON.MENU:
+      return { kind: "player_menu" };
     case BUTTON.B:
       return { kind: "back" };
     case BUTTON.X:

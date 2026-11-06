@@ -185,6 +185,7 @@ export const commands = {
 	/**  A cast or crew member's other work, from the overlay. */
 	filmography: (personId: number) => typedError<TitleView[], string>(__TAURI_INVOKE("filmography", { personId })),
 	playerChapters: () => typedError<ChapterView[], string>(__TAURI_INVOKE("player_chapters")),
+	playerStats: () => typedError<StatView[], string>(__TAURI_INVOKE("player_stats")),
 	/**  The playing film's sheets, once made. */
 	scrubThumbs: () => typedError<{
 	interval: number | null,
@@ -450,7 +451,11 @@ export type PlayPlanView = {
  *  One control action. A single command for all of them keeps the IPC surface small;
  *  each maps to one `Player` method.
  */
-export type PlayerAction = { kind: "pause"; paused: boolean } | { kind: "seek_to"; seconds: number | null } | { kind: "seek_by"; seconds: number | null } | { kind: "frame_step"; forward: boolean } | { kind: "volume"; percent: number | null } | { kind: "mute"; muted: boolean } | { kind: "speed"; speed: number | null } | { kind: "audio"; id: number } | { kind: "subtitles"; id: number | null };
+export type PlayerAction = { kind: "pause"; paused: boolean } | { kind: "seek_to"; seconds: number | null } | { kind: "seek_by"; seconds: number | null } | { kind: "frame_step"; forward: boolean } | { kind: "volume"; percent: number | null } | { kind: "mute"; muted: boolean } | { kind: "speed"; speed: number | null } | { kind: "audio"; id: number } | { kind: "subtitles"; id: number | null } | 
+/**  Seconds; positive plays the sound later. */
+{ kind: "audio_delay"; seconds: number | null } | 
+/**  Each −100…100. */
+{ kind: "picture"; brightness: number; contrast: number; saturation: number };
 
 /**  The player as the chrome draws it, a few times a second. */
 export type PlayerStateView = {
@@ -574,6 +579,12 @@ export type SourcesView = {
 	sources: SourceInfo[],
 	/**  Installed addons whose stored manifest no longer passes the checks. */
 	refused_addons: string[],
+};
+
+/**  One line of the stats overlay (Phase 11: "statistics for nerds"). */
+export type StatView = {
+	name: string,
+	value: string,
 };
 
 /**  The viewer's subtitle settings, per profile. */

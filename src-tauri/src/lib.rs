@@ -88,6 +88,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::overlay::pause_details,
             commands::overlay::filmography,
             commands::player::player_chapters,
+            commands::player::player_stats,
             commands::thumbs::scrub_thumbs,
             commands::thumbs::scrub_sheet,
         ])
