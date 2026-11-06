@@ -12,15 +12,15 @@
 
 **Phase 9 — Intelligent Source Selection** (`in_progress`, branch `phase/09-intelligent-source-selection`)
 
-0 of 7 exit criteria met with evidence.
+1 of 7 exit criteria met with evidence.
 
 > Opened 2026-11-06 when Phase 8 merged (5e5558f, tag phase-08); planned under ADR-0040. Carried in from Phase 8: E5's one-time real-controller check (author); from Phase 7: E7's VPN-drop check (author). Release-group reputation is structural only: no group names in the repo (2.1). ADR-0042 (spec 3.1.0) adds the TV focus language to this phase as subtask 9.0, built first.
 
-### Subtasks — 1/7 complete
+### Subtasks — 3/7 complete
 
 - [x] **9.0** The TV focus language (ADR-0042) in src/design-system/focus/: the white ring with hairline and oxblood halo as one gliding element (critically damped spring ~200 ms), grow 1.06 and lift on tiles, left-stick tilt up to 6 degrees with a following sheen, A press-down 0.97x, TV mode with a pad (125% scale, 5% safe margin, button-hints footer, Web Audio ticks, ~20 ms rumble on select, View toggles full screen and picking up the pad enters it), settings for sounds, rumble and auto full screen, reduced motion honoured; extended tools/uiaudit/controller.mjs proves it. · `1be4948`
-- [ ] **9.1** crates/selection: score(candidate, context) -> Score{total, terms[]} as a pure function over SourceCandidate plus a Context (title runtime, hardware tier and decode caps, preferred audio language, wanted quality, measured throughput). Terms: local availability, swarm health, size-versus-quality plausibility, encoding signals, codec/HDR compatibility, audio language, subtitles. Unit tests over a fixture set of candidate lists and property tests (ordering invariants).
-- [ ] **9.2** Fake and mislabel detection: bytes-per-minute against the claimed resolution and codec, and duration against the catalogue runtime; a 700 MB '4K' or a 60-minute file for a 140-minute film is flagged and sunk, with the reason kept. 'Release-group reputation' is implemented as structural signals only (naming consistency, encode tags, plausibility); no release-group or indexer names appear anywhere in the repo (SPEC.md 2.1).
+- [x] **9.1** crates/selection: score(candidate, context) -> Score{total, terms[]} as a pure function over SourceCandidate plus a Context (title runtime, hardware tier and decode caps, preferred audio language, wanted quality, measured throughput). Terms: local availability, swarm health, size-versus-quality plausibility, encoding signals, codec/HDR compatibility, audio language, subtitles. Unit tests over a fixture set of candidate lists and property tests (ordering invariants). · `0db6420`
+- [x] **9.2** Fake and mislabel detection: bytes-per-minute against the claimed resolution and codec, and duration against the catalogue runtime; a 700 MB '4K' or a 60-minute file for a 140-minute film is flagged and sunk, with the reason kept. 'Release-group reputation' is implemented as structural signals only (naming consistency, encode tags, plausibility); no release-group or indexer names appear anywhere in the repo (SPEC.md 2.1). · `0db6420`
 - [ ] **9.3** Language and quality as first-class choices: the detail page lists the audio languages the candidates actually carry and the qualities on offer (defaulting to the best the hardware and connection support), with dub/sub distinction for anime; choosing one re-plans to a candidate that carries it, or says plainly that none does.
 - [ ] **9.4** Automatic fallback: the plan returns the ranked list; if the chosen candidate has no first frame within a start timeout, the player silently opens the next one and logs why, within 10 s of Play in total for a failing first choice.
 - [ ] **9.5** The expert panel (Ctrl+Shift+S, and a Settings toggle): every candidate ranked with each score term and its weight, matching the code; and a one-line 'why this source' under Play.
@@ -28,7 +28,8 @@
 
 ### Exit criteria
 
-- [ ] **E1** Scoring is a pure function with unit and property tests over a fixture set of candidate lists.
+- [x] **E1** Scoring is a pure function with unit and property tests over a fixture set of candidate lists.
+      - *Evidence:* 0db6420: crates/selection score() is pure (no clock, disk or network; depends only on source-protocol). cargo test -p sinephile-selection: tests/fixtures.rs 18 fixture lists (a_700_mb_4k_file_is_a_lie, a_60_minute_file_for_a_140_minute_film_is_a_lie, your_own_file_beats_a_better_stream, choosing_hindi_plays_hindi_even_at_lower_quality, ...) and tests/properties.rs 7 properties over 1,000-2,000 seeded random lists each (ranking_is_a_permutation, the_order_does_not_depend_on_the_order_given, a_sunk_copy_is_never_ahead_of_an_honest_one, an_honest_local_file_that_meets_the_choice_is_first, the_total_is_the_sum_of_the_terms_and_every_value_is_bounded, more_seeders_never_lower_a_score, carrying_the_chosen_language_never_hurts). Seen to fail: reversing the local, sunk and total rules each failed its property; plan test the_scorer_chooses_not_the_order_sources_answer_in fails with the duration floor at 0.1.
 - [ ] **E2** Selecting "Hindi" plays a source with a Hindi audio track, or clearly reports that none is available.
 - [ ] **E3** Selecting 4K plays genuine 4K, or explains why it can't.
 - [ ] **E4** A deliberately-failing top candidate falls back within 10 s with no user action.
@@ -40,7 +41,7 @@
 
 ## What's next
 
-Phase 9 subtask 9.1 (docs/phases/phase-09-intelligent-source-selection.md): create crates/selection with score(candidate, &Context) -> Score { total, terms: Vec<Term{name, value, weight, why}> } as a pure function over source_protocol::SourceCandidate; start with local availability, swarm health and size-versus-quality plausibility, fixture lists in crates/selection/tests/fixtures.rs, then wire it into crates/playback::rank in place of the fixed transport order. Author checks outstanding: real controller (E5 carried), VPN drop (P7 E7).
+Phase 9 subtask 9.3 (docs/phases/phase-09-intelligent-source-selection.md): language and quality as first-class choices. Make sinephile_playback::plan_with return the ranked list with scores (Vec<(SourceCandidate, Score)>) alongside the opened plan; add a Tauri command that lists the audio languages and resolutions the candidates carry; on the detail page add a Language and a Quality picker (focus language from src/design-system/focus/, reachable by pad) that re-plan with Context.audio_language / Context.wanted and show Score.unmet plainly when nothing matches. Spec: docs/specs/source-scoring.md. Author checks outstanding: real controller (E5 carried), VPN drop (P7 E7).
 
 ---
 
@@ -65,7 +66,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 6/6 |
 | [x] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 6/8 |
 | [x] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 5/7 |
-| [~] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 0/7 |
+| [~] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 1/7 |
 | [ ] | 10 | Subtitle Pipeline | B | 8 | 2 | 0/6 |
 | [ ] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 0/5 |
 | [ ] | 12 | Local Library Engine | B | 4 | 2–3 | 0/6 |
@@ -157,6 +158,7 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D64** (raised in Phase 8) When another application holds the default audio device exclusively, WASAPI retries for ~1.3 s before mpv plays silently; first frame waits for it. Consider audio init that does not block video, and telling the user the device is busy.
 - **D65** (raised in Phase 8) libmpv-2.dll is fetched by tools/mpv/fetch.py for development and CI; the release bundle must ship it (and its licence notice) - Phase 27's packaging.
 - **D66** (raised in Phase 8) ADR-0036 says PROGRESS.md lists carried criteria in their own section; tools/state/validate_state.py do_progress does not. Add the section (carried, and discharged) so a carry cannot hide among met criteria.
+- **D67** (raised in Phase 9) sinephile_playback::machine assumes no AV1 hardware decode and no HDR display (neither is probed), and Context.throughput is None until the torrent engine or HTTP path reports a measured speed. Probe both via DXGI/D3D11 video decoder profiles in crates/tiers and feed a measured speed in 9.4.
 
 ---
 

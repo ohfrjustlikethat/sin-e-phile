@@ -15,7 +15,7 @@ A scoring function over `SourceCandidate`s combining: swarm health (seeders, pee
 
 ## Exit criteria
 
-- [ ] **E1** Scoring is a pure function with unit and property tests over a fixture set of candidate lists.
+- [x] **E1** Scoring is a pure function with unit and property tests over a fixture set of candidate lists.
 - [ ] **E2** Selecting "Hindi" plays a source with a Hindi audio track, or clearly reports that none is available.
 - [ ] **E3** Selecting 4K plays genuine 4K, or explains why it can't.
 - [ ] **E4** A deliberately-failing top candidate falls back within 10 s with no user action.
@@ -26,8 +26,8 @@ A scoring function over `SourceCandidate`s combining: swarm health (seeders, pee
 ## Subtasks
 
 - [x] **9.0** The TV focus language (ADR-0042) in src/design-system/focus/: the white ring with hairline and oxblood halo as one gliding element (critically damped spring ~200 ms), grow 1.06 and lift on tiles, left-stick tilt up to 6 degrees with a following sheen, A press-down 0.97x, TV mode with a pad (125% scale, 5% safe margin, button-hints footer, Web Audio ticks, ~20 ms rumble on select, View toggles full screen and picking up the pad enters it), settings for sounds, rumble and auto full screen, reduced motion honoured; extended tools/uiaudit/controller.mjs proves it.
-- [ ] **9.1** crates/selection: score(candidate, context) -> Score{total, terms[]} as a pure function over SourceCandidate plus a Context (title runtime, hardware tier and decode caps, preferred audio language, wanted quality, measured throughput). Terms: local availability, swarm health, size-versus-quality plausibility, encoding signals, codec/HDR compatibility, audio language, subtitles. Unit tests over a fixture set of candidate lists and property tests (ordering invariants).
-- [ ] **9.2** Fake and mislabel detection: bytes-per-minute against the claimed resolution and codec, and duration against the catalogue runtime; a 700 MB '4K' or a 60-minute file for a 140-minute film is flagged and sunk, with the reason kept. 'Release-group reputation' is implemented as structural signals only (naming consistency, encode tags, plausibility); no release-group or indexer names appear anywhere in the repo (SPEC.md 2.1).
+- [x] **9.1** crates/selection: score(candidate, context) -> Score{total, terms[]} as a pure function over SourceCandidate plus a Context (title runtime, hardware tier and decode caps, preferred audio language, wanted quality, measured throughput). Terms: local availability, swarm health, size-versus-quality plausibility, encoding signals, codec/HDR compatibility, audio language, subtitles. Unit tests over a fixture set of candidate lists and property tests (ordering invariants).
+- [x] **9.2** Fake and mislabel detection: bytes-per-minute against the claimed resolution and codec, and duration against the catalogue runtime; a 700 MB '4K' or a 60-minute file for a 140-minute film is flagged and sunk, with the reason kept. 'Release-group reputation' is implemented as structural signals only (naming consistency, encode tags, plausibility); no release-group or indexer names appear anywhere in the repo (SPEC.md 2.1).
 - [ ] **9.3** Language and quality as first-class choices: the detail page lists the audio languages the candidates actually carry and the qualities on offer (defaulting to the best the hardware and connection support), with dub/sub distinction for anime; choosing one re-plans to a candidate that carries it, or says plainly that none does.
 - [ ] **9.4** Automatic fallback: the plan returns the ranked list; if the chosen candidate has no first frame within a start timeout, the player silently opens the next one and logs why, within 10 s of Play in total for a failing first choice.
 - [ ] **9.5** The expert panel (Ctrl+Shift+S, and a Settings toggle): every candidate ranked with each score term and its weight, matching the code; and a one-line 'why this source' under Play.
@@ -43,3 +43,5 @@ Designing a scoring function; why weights need justification and testing; the fa
 
 ## Work log
 - **9.0** The TV focus language (ADR-0042) in src/design-system/focus/: the white ring with hairline and o · `1be4948`
+- **9.1** crates/selection: score(candidate, context) -> Score{total, terms[]} as a pure function over Sou · `0db6420`
+- **9.2** Fake and mislabel detection: bytes-per-minute against the claimed resolution and codec, and dura · `0db6420`

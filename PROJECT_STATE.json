@@ -21,14 +21,14 @@
       {
         "id": "9.1",
         "text": "crates/selection: score(candidate, context) -> Score{total, terms[]} as a pure function over SourceCandidate plus a Context (title runtime, hardware tier and decode caps, preferred audio language, wanted quality, measured throughput). Terms: local availability, swarm health, size-versus-quality plausibility, encoding signals, codec/HDR compatibility, audio language, subtitles. Unit tests over a fixture set of candidate lists and property tests (ordering invariants).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "0db6420"
       },
       {
         "id": "9.2",
         "text": "Fake and mislabel detection: bytes-per-minute against the claimed resolution and codec, and duration against the catalogue runtime; a 700 MB '4K' or a 60-minute file for a 140-minute film is flagged and sunk, with the reason kept. 'Release-group reputation' is implemented as structural signals only (naming consistency, encode tags, plausibility); no release-group or indexer names appear anywhere in the repo (SPEC.md 2.1).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "0db6420"
       },
       {
         "id": "9.3",
@@ -59,8 +59,8 @@
       {
         "id": "E1",
         "text": "Scoring is a pure function with unit and property tests over a fixture set of candidate lists.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "0db6420: crates/selection score() is pure (no clock, disk or network; depends only on source-protocol). cargo test -p sinephile-selection: tests/fixtures.rs 18 fixture lists (a_700_mb_4k_file_is_a_lie, a_60_minute_file_for_a_140_minute_film_is_a_lie, your_own_file_beats_a_better_stream, choosing_hindi_plays_hindi_even_at_lower_quality, ...) and tests/properties.rs 7 properties over 1,000-2,000 seeded random lists each (ranking_is_a_permutation, the_order_does_not_depend_on_the_order_given, a_sunk_copy_is_never_ahead_of_an_honest_one, an_honest_local_file_that_meets_the_choice_is_first, the_total_is_the_sum_of_the_terms_and_every_value_is_bounded, more_seeders_never_lower_a_score, carrying_the_chosen_language_never_hurts). Seen to fail: reversing the local, sunk and total rules each failed its property; plan test the_scorer_chooses_not_the_order_sources_answer_in fails with the duration floor at 0.1."
       },
       {
         "id": "E2",
@@ -1212,8 +1212,8 @@
         {
           "id": "E1",
           "text": "Scoring is a pure function with unit and property tests over a fixture set of candidate lists.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "0db6420: crates/selection score() is pure (no clock, disk or network; depends only on source-protocol). cargo test -p sinephile-selection: tests/fixtures.rs 18 fixture lists (a_700_mb_4k_file_is_a_lie, a_60_minute_file_for_a_140_minute_film_is_a_lie, your_own_file_beats_a_better_stream, choosing_hindi_plays_hindi_even_at_lower_quality, ...) and tests/properties.rs 7 properties over 1,000-2,000 seeded random lists each (ranking_is_a_permutation, the_order_does_not_depend_on_the_order_given, a_sunk_copy_is_never_ahead_of_an_honest_one, an_honest_local_file_that_meets_the_choice_is_first, the_total_is_the_sum_of_the_terms_and_every_value_is_bounded, more_seeders_never_lower_a_score, carrying_the_chosen_language_never_hurts). Seen to fail: reversing the local, sunk and total rules each failed its property; plan test the_scorer_chooses_not_the_order_sources_answer_in fails with the duration floor at 0.1."
         },
         {
           "id": "E2",
@@ -1262,14 +1262,14 @@
         {
           "id": "9.1",
           "text": "crates/selection: score(candidate, context) -> Score{total, terms[]} as a pure function over SourceCandidate plus a Context (title runtime, hardware tier and decode caps, preferred audio language, wanted quality, measured throughput). Terms: local availability, swarm health, size-versus-quality plausibility, encoding signals, codec/HDR compatibility, audio language, subtitles. Unit tests over a fixture set of candidate lists and property tests (ordering invariants).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "0db6420"
         },
         {
           "id": "9.2",
           "text": "Fake and mislabel detection: bytes-per-minute against the claimed resolution and codec, and duration against the catalogue runtime; a 700 MB '4K' or a 60-minute file for a 140-minute film is flagged and sunk, with the reason kept. 'Release-group reputation' is implemented as structural signals only (naming consistency, encode tags, plausibility); no release-group or indexer names appear anywhere in the repo (SPEC.md 2.1).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "0db6420"
         },
         {
           "id": "9.3",
@@ -2108,7 +2108,7 @@
       ]
     }
   ],
-  "next_action": "Phase 9 subtask 9.1 (docs/phases/phase-09-intelligent-source-selection.md): create crates/selection with score(candidate, &Context) -> Score { total, terms: Vec<Term{name, value, weight, why}> } as a pure function over source_protocol::SourceCandidate; start with local availability, swarm health and size-versus-quality plausibility, fixture lists in crates/selection/tests/fixtures.rs, then wire it into crates/playback::rank in place of the fixed transport order. Author checks outstanding: real controller (E5 carried), VPN drop (P7 E7).",
+  "next_action": "Phase 9 subtask 9.3 (docs/phases/phase-09-intelligent-source-selection.md): language and quality as first-class choices. Make sinephile_playback::plan_with return the ranked list with scores (Vec<(SourceCandidate, Score)>) alongside the opened plan; add a Tauri command that lists the audio languages and resolutions the candidates carry; on the detail page add a Language and a Quality picker (focus language from src/design-system/focus/, reachable by pad) that re-plan with Context.audio_language / Context.wanted and show Score.unmet plainly when nothing matches. Spec: docs/specs/source-scoring.md. Author checks outstanding: real controller (E5 carried), VPN drop (P7 E7).",
   "blockers": [],
   "decisions_pending": [
     {
@@ -2704,6 +2704,11 @@
       "id": "D66",
       "phase_raised": 8,
       "text": "ADR-0036 says PROGRESS.md lists carried criteria in their own section; tools/state/validate_state.py do_progress does not. Add the section (carried, and discharged) so a carry cannot hide among met criteria."
+    },
+    {
+      "id": "D67",
+      "phase_raised": 9,
+      "text": "sinephile_playback::machine assumes no AV1 hardware decode and no HDR display (neither is probed), and Context.throughput is None until the torrent engine or HTTP path reports a measured speed. Probe both via DXGI/D3D11 video decoder profiles in crates/tiers and feed a measured speed in 9.4."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."
