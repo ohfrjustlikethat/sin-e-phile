@@ -2109,14 +2109,7 @@
     }
   ],
   "next_action": "Phase 9 subtask 9.6 then close (docs/phases/phase-09-intelligent-source-selection.md): trim docs/learning/phase-09-notes.md section 4 to the phase's five questions; record E7 (TV focus language) with the controller-flow evidence from 1be4948/93ad89e; run the rule-13 regression check (cargo run --release -p eval -- all twice, -- vector --report) and record it in docs/eval-results.md; update README status and docs/HOW_IT_WORKS.md (source selection stub); SESSION_LOG entry with the Phase 9 retrospective; then /closephase 9 (merge --no-ff to main, CI green on main, tag phase-09) and open Phase 10.",
-  "blockers": [
-    {
-      "id": "B10",
-      "raised": "2026-11-06T07:00:00Z",
-      "needs_user": false,
-      "description": "CI run 42176797589 failed in 'Controller flow (simulated Xbox pad)': the harness's fake prepare_play still returned the Phase 8 PlayPlanView, so the detail page threw on the missing language/quality fields and Play never took focus. Fixed by updating the fake (and adding pad checks for the Audio row), which also exposed a spatial-navigation bug (Up from an option skipped the wide Play button) fixed in src/lib/gamepad.ts nearest(). Clears when CI on the branch is green."
-    }
-  ],
+  "blockers": [],
   "decisions_pending": [
     {
       "id": "P1",

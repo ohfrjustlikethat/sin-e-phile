@@ -52,7 +52,7 @@ Phase 9 subtask 9.6 then close (docs/phases/phase-09-intelligent-source-selectio
 
 ## Blockers
 
-- **B10** CI run 42176797589 failed in 'Controller flow (simulated Xbox pad)': the harness's fake prepare_play still returned the Phase 8 PlayPlanView, so the detail page threw on the missing language/quality fields and Play never took focus. Fixed by updating the fake (and adding pad checks for the Audio row), which also exposed a spatial-navigation bug (Up from an option skipped the wide Play button) fixed in src/lib/gamepad.ts nearest(). Clears when CI on the branch is green.
+None.
 
 ---
 
