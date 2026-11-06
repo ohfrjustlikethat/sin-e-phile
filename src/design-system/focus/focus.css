@@ -1,0 +1,137 @@
+/* The TV focus language — ADR-0042, docs/specs/tv-focus.md.
+ *
+ * THE ONLY PLACE in the app where shadow, glow, gradient and 3D transforms are
+ * allowed (SPEC.md §9.0, the scoped exception). Everything here is about the focused
+ * element; nothing here may style anything else. */
+
+/* ── The ring ─────────────────────────────────────────────────────────────────
+ * Positioned and sized every frame by FocusRing.tsx. White, a dark hairline inside
+ * and out so it holds on white artwork, and a tight oxblood halo. */
+.focus-ring {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 2147483000;
+  pointer-events: none;
+  border: 3px solid var(--focus-ring);
+  border-radius: var(--radius-sm);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.6),
+    inset 0 0 0 1px rgb(0 0 0 / 0.6),
+    0 0 18px 2px rgb(196 67 79 / 0.35);
+  opacity: 0;
+  transition: opacity 100ms linear;
+  will-change: transform, width, height;
+}
+
+/* With the ring mounted, the per-element outline steps aside — except where a
+ * subtree opts out of the ring (the player's chrome sits under a native video
+ * window, where a drawn ring would be hidden), which keeps a white outline. */
+html[data-focus-ring] :focus-visible,
+html[data-focus-ring][data-input="pad"] :focus {
+  outline: none;
+}
+html[data-focus-ring] [data-no-focus-ring] :focus-visible,
+html[data-focus-ring][data-input="pad"] [data-no-focus-ring] :focus {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── Tiles ────────────────────────────────────────────────────────────────────
+ * Grow, lift, tilt (from the left stick, via --tilt-x/--tilt-y), sheen, press. */
+[data-focus-tile] {
+  position: relative;
+  transform: perspective(800px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg))
+    scale(var(--tile-scale, 1));
+  transition:
+    transform 200ms var(--ease-focus),
+    box-shadow 200ms var(--ease-focus);
+}
+html[data-focus-visible="true"] [data-focus-tile]:focus {
+  --tile-scale: 1.06;
+  z-index: 2;
+  box-shadow: 0 18px 40px rgb(0 0 0 / 0.55);
+}
+html[data-focus-visible="true"] [data-focus-tile][data-pressed]:focus {
+  --tile-scale: 1.028; /* 0.97 of the focused 1.06 */
+  transition-duration: 80ms;
+}
+[data-focus-tile]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(115deg, transparent 35%, rgb(255 255 255 / 0.12) 50%, transparent 65%)
+    no-repeat;
+  background-size: 250% 100%;
+  background-position: 150% 0;
+  opacity: 0;
+}
+html[data-focus-visible="true"] [data-focus-tile]:focus::after {
+  opacity: 1;
+  animation: focus-sheen 600ms var(--ease-focus) forwards;
+}
+@keyframes focus-sheen {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: calc(60% - var(--sheen-shift, 0%)) 0;
+  }
+}
+
+/* ── TV mode ──────────────────────────────────────────────────────────────────
+ * With a pad, the app is read from a couch: 125% inside a 5% safe margin. CSS zoom
+ * scales lengths but not percentages, so #root keeps width and height 100% and still
+ * fills the window exactly; the 4vw/4vh padding is scaled by the zoom to 5%. Off while
+ * the player is open: it positions a native window from page coordinates. */
+html[data-input="pad"]:not([data-playing]) #root {
+  zoom: 1.25;
+  padding: 4vh 4vw;
+}
+
+.hints-bar {
+  position: fixed;
+  right: 5vw;
+  bottom: 3.5vh;
+  z-index: 2147482000;
+  display: flex;
+  gap: 28px;
+  padding: 10px 18px;
+  background: var(--void);
+  border: 1px solid var(--line-subtle);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  color: var(--ink-muted);
+  pointer-events: none;
+}
+.hint-glyph {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1.5px solid var(--ink-muted);
+  border-radius: 13px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+html[data-playing] .hints-bar {
+  display: none;
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────────────
+ * Every transform goes; the ring stays and cross-fades (FocusRing snaps). */
+@media (prefers-reduced-motion: reduce) {
+  [data-focus-tile],
+  html[data-focus-visible="true"] [data-focus-tile]:focus {
+    transform: none;
+    transition: none;
+    box-shadow: none;
+  }
+  [data-focus-tile]::after {
+    display: none;
+  }
+}

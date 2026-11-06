@@ -65,6 +65,8 @@
   --oxblood-text: #cb5863; /* the accent carrying SMALL TEXT — spine numbers (4.5:1) */
   --oxblood-deep: #4e171c; /* pressed, deep fills */
   --oxblood-wash: rgba(142, 43, 52, 0.16);
+  /* The focus ring (ADR-0042): the one pure white in the system, used only for it. */
+  --focus-ring: #ffffff;
   /* Two accent tokens, deliberately. WCAG asks 3:1 of a focus ring and 4.5:1 of
    * small text, and the design uses oxblood for both. One token cannot satisfy
    * both without either failing the text or over-brightening the ring into pink. */
@@ -114,6 +116,8 @@
 
   /* ── Motion — §9.3 ──────────────────────────────────────────────────────── */
   --ease-standard: cubic-bezier(0.32, 0.72, 0, 1);
+  /* Focus (ADR-0042): a critically damped curve, quick and with no overshoot. */
+  --ease-focus: cubic-bezier(0.22, 0.9, 0.3, 1);
   --dur-fast: 120ms;
   --dur-standard: 180ms;
   --dur-slow: 400ms;

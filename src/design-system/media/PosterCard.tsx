@@ -58,6 +58,7 @@ export function PosterCard({
     <article data-poster-card className={["shrink-0", width].join(" ")}>
       <button
         type="button"
+        data-focus-tile
         onClick={() => onOpen?.(film.id)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}

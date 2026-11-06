@@ -18,6 +18,7 @@ export function ChannelCard({ channel, onOpen }: { channel: Channel; onOpen?: (i
   return (
     <article className="w-[152px] shrink-0">
       <button
+        data-focus-tile
         type="button"
         onClick={() => onOpen?.(channel.id)}
         aria-label={channel.name}

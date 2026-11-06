@@ -1,0 +1,64 @@
+# Phase 9 — Learning notes
+
+**Intelligent source selection, and the TV focus language that every later screen
+inherits.** Four sections per ADR-0016 (A4). Written as the phase goes; 9.0 first.
+
+---
+
+## 1. What we built
+
+- **The TV focus language** (9.0, ADR-0042) — `src/design-system/focus/`: one white ring
+  that glides between targets, tiles that grow, lift, tilt under the left stick, catch a
+  sheen and press in; TV mode with a pad (125% scale, safe margin, button hints, quiet
+  sounds and rumble, View for full screen); Settings → Controller.
+- **Proof in a real browser** — `tools/uiaudit/controller.mjs` now checks the ring's
+  colour and position, the glide frame by frame, the scale and margin, the tile effects,
+  and that reduced motion removes them.
+
+## 2. Why
+
+- **One ring element instead of an outline per element**, so it can *move*: an outline
+  can only appear and disappear, and a glide is what makes focus feel alive.
+- **A critically damped spring** is the fastest motion that never overshoots: the ring
+  arrives without bouncing past and coming back.
+- **CSS for the tiles, JavaScript for the ring.** A tile's effects are states of one
+  element, which CSS transitions do well; the ring has to follow a target that may be
+  moving (scrolling, growing), so it is recomputed every frame.
+- **The exception is confined to one folder** so the design rules can still be enforced
+  everywhere else by a lint, rather than by memory.
+
+## 3. New concepts
+
+- **Critically damped spring** — `src/design-system/focus/spring.ts:24`: the exact solution
+  x(t) = (x0 + (v0 + ωx0)t)e^(−ωt); exact rather than stepped, so a slow frame cannot
+  overshoot.
+- **`requestAnimationFrame` loop that reads layout** — `FocusLayer.tsx` `FocusRing`: read
+  `getBoundingClientRect`, step the spring, write a transform; one read and one write per
+  frame.
+- **`useSyncExternalStore` over a `MutationObserver`** — `FocusLayer.tsx` `usePadMode`: React
+  re-renders when an attribute on `<html>` changes, without polling.
+- **CSS custom properties as animation inputs** — `focus.css` `--tilt-x`, `--tilt-y`,
+  `--tile-scale`: JavaScript sets one variable, the transform and its transition do the
+  rest.
+- **CSS `zoom` scales lengths, not percentages** — `focus.css` TV mode: dividing the width
+  by the zoom left the app in 80% of the window; the audit now measures that it fills it.
+- **Web Audio synthesis** — `feedback.ts`: an oscillator and a gain envelope make a tick,
+  with no audio files to ship or license.
+- **`vibrationActuator`** — `feedback.ts` `rumble`: the Gamepad API's rumble, used if present.
+- **Tauri capabilities** — `src-tauri/capabilities/default.json`: a window call the app is
+  not granted fails silently; the player's full-screen button had never worked.
+
+## 4. The questions
+
+Written, not asked — Phase 9 is not a tier boundary (§10.10).
+
+1. Why does the ring use a spring with damping ratio exactly 1, and what would a user see
+   at 0.5 and at 2?
+2. The ring is drawn outside `#root`, but the elements it follows are inside a zoomed
+   `#root`. Why does its position still come out right?
+3. A focused tile grows to 1.06 using `transform`, not `width`. Why does that keep its
+   neighbours still?
+4. Why does leaving TV mode need 32px of mouse movement, when entering it needs one
+   press?
+5. Under reduced motion the ring still moves to the new target. What exactly is removed,
+   and why is the ring itself kept?

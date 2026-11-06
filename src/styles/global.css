@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./tokens.css";
+@import "../design-system/focus/focus.css";
 
 /* ─── Fonts, self-hosted ──────────────────────────────────────────────────────
  * SPEC.md §9.2: ship font files locally. No network font requests, ever — which
@@ -147,7 +148,7 @@ body {
  * globally, because full keyboard navigation is a Phase 2 requirement and a
  * per-component ring is a ring somebody eventually forgets. */
 :focus-visible {
-  outline: 2px solid var(--oxblood-bright);
+  outline: 3px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
@@ -155,13 +156,12 @@ body {
 :focus:not(:focus-visible) {
   outline: none;
 }
-/* ADR-0041: driven by an Xbox controller, the viewer is across the room. Focus gets a
- * thicker ring and a wash around it, readable at ten feet. `data-input="pad"` is set by
- * src/lib/gamepad.ts on pad input and cleared on mouse or keyboard input. */
+/* ADR-0041/0042: with a pad the viewer is across the room. The focus ring itself is
+ * src/design-system/focus/ (white, gliding); this outline is only its fallback when
+ * the ring is not mounted. `data-input="pad"` is set by src/lib/gamepad.ts. */
 [data-input="pad"] :focus {
-  outline: 3px solid var(--oxblood-bright);
-  outline-offset: 4px;
-  box-shadow: 0 0 0 9px var(--oxblood-wash);
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 [data-input="pad"] body {
   cursor: none;
