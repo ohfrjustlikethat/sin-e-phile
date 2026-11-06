@@ -193,6 +193,10 @@ ws.addEventListener("message", (e) => {
 });
 await send("Page.enable");
 await send("Runtime.enable");
+// The machine's own setting must not decide the result: Windows Server (the CI runner)
+// reports reduced motion, which correctly switched the glide and the grow off. Motion is
+// asserted with it off, then again with it on, explicitly.
+await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "no-preference" }] });
 const errors = [];
 ws.addEventListener("message", (e) => {
   const m = JSON.parse(e.data);
