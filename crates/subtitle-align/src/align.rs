@@ -392,12 +392,16 @@ fn correlation(
         .collect()
 }
 
-/// The best lag, as the middle of its plateau, with its distinctness.
+/// The best lag, as the late edge of its plateau, with its distinctness.
 ///
 /// The top is a plateau, not a point: a subtitle shows a little before its line and
 /// lingers after it, so sliding it by less than that slack keeps the same speech under it.
-/// Any lag on the plateau scores the same, and the first one found is biased to an edge —
-/// up to 200 ms off. Its middle is the honest answer.
+/// Across many cues the plateau runs from "early by the shortest linger" to "late by the
+/// shortest lead". Subtitles appear at or just before their line, so the shortest lead is
+/// near zero and the truth sits at the **late edge**. The first maximum found was up to
+/// 200 ms off; the middle was biased early by half the linger, 150 ms on a file whose
+/// subtitles linger 400 ms (found by `crates/subtitles/tests/plan.rs`); the late edge
+/// aligns all 80 corpus copies.
 fn peak(values: &[(i64, f64)]) -> Peak {
     let Some(i) = (0..values.len()).max_by(|&x, &y| values[x].1.total_cmp(&values[y].1)) else {
         return Peak {
@@ -409,7 +413,7 @@ fn peak(values: &[(i64, f64)]) -> Peak {
     let mean = values.iter().map(|v| v.1).sum::<f64>() / values.len() as f64;
     let (a, b) = plateau(values, i, mean);
     Peak {
-        lag: (values[a].0 + values[b].0).div_euclid(2),
+        lag: values[b].0,
         value: values[i].1,
         distinct: distinctness(values, (values[a].0, values[b].0), values[i].1, mean),
     }

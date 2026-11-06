@@ -2362,3 +2362,10 @@ real matches) → distinctness 72.9% → corpus fix (no cue moved before zero) 7
 realistic intros 85.4% → per-window candidate offsets 91.7% → prefer no stretch 97.9% →
 film time runs forward (and a corpus fix: a cue moves whole) 100% on the tuned films.
 
+### E1 again: the plateau's late edge
+
+2026-11-06, same command: **80/80** (tuned 48/48, **held out 32/32**), false accepts 0/10.
+Taking the plateau's late edge instead of its middle (`crates/subtitle-align/src/align.rs`
+`peak`): the middle was biased early by half the subtitles' linger, found when
+`crates/subtitles/tests/plan.rs` aligned a file lingering 400 ms to 160 ms off.
+

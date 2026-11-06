@@ -43,8 +43,13 @@ Mono PCM in, one bool per 10 ms out. Pure Rust, no model to download:
   **cross-correlation** with speech, at every shift up to ±10 minutes, comes from one
   FFT. The best per-subtitle-frame score picks the scale.
 - **The top is a plateau.** A subtitle appears a little before its line and lingers
-  after, so a few hundred milliseconds of shift keep the same speech under it. Taking the
-  first maximum put answers up to 200 ms off; the **middle of the plateau** is used.
+  after, so a few hundred milliseconds of shift keep the same speech under it. Across
+  many cues the plateau runs from "early by the shortest linger" to "late by the shortest
+  lead", and since subtitles appear at or just before their line, the shortest lead is
+  near zero: the truth is the **late edge**. The first maximum put answers up to 200 ms
+  off; the middle was biased early by half the linger (150 ms on a file whose subtitles
+  linger 400 ms). A file whose subtitles start *after* the speech is moved to the onset,
+  which is the better sync anyway.
 - **No stretch unless clearly better.** Over a few minutes a 0.1% stretch (24 to 23.976)
   fits noise slightly better than none; a stretched fit must beat the unstretched one by
   2% to be believed. A real conversion (4%, or seconds of drift over a feature) wins by
@@ -109,9 +114,9 @@ corpus is built (`tools/subcorpus/build.py`):
 A copy **aligns** when 95% of its cues land within 150 ms of the true file. The target
 is more than 90% of copies (SPEC.md §12.2), with no false accepts.
 
-**Measured** (2026-11-06, `docs/eval-results.md`): 79/80 = **98.8%**; tuned-on 48/48,
-**held out 31/32 = 96.9%**; false accepts **0/10**. The miss is a split whose second
-part lands 156 ms off: the plateau's slack, just over the line. The speech detector agrees
+**Measured** (2026-11-06, `docs/eval-results.md`): **80/80**; tuned-on 48/48, **held
+out 32/32**; false accepts **0/10**. Before the late-edge change: 79/80, the miss a split
+whose second part landed 156 ms off. The speech detector agrees
 with when lines were really spoken on 93.8–97.9% of frames (recall 89.5–96.1%,
 precision 95.5–99.5%).
 

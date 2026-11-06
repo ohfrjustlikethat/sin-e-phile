@@ -17,6 +17,7 @@ pub mod fetch;
 pub mod files;
 pub mod hash;
 pub mod opensubtitles;
+pub mod plan;
 
 /// Where a subtitle is.
 #[derive(Debug, Clone, PartialEq, Eq)]

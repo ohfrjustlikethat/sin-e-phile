@@ -38,8 +38,8 @@ How it works, and why each choice: [`docs/specs/subtitle-alignment.md`](../../do
 ## Measured
 
 On the project's corpus (`fixtures/subtitles/`, ten films, eighty damaged subtitle
-files, `cargo run --release -p eval -- subs`): **98.8%** aligned to within 150 ms
-(96.9% on films held out from tuning), **0** false accepts against the wrong film.
+files, `cargo run --release -p eval -- subs`): **80/80** aligned to within 150 ms,
+including the films held out from tuning, and **0** false accepts against the wrong film.
 
 ## Licence
 
