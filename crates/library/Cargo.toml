@@ -1,0 +1,18 @@
+[package]
+name = "sinephile-library"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "Point it at a folder: it finds the films and episodes, says what each one is, and asks only when it is not sure (SPEC.md Phase 12)."
+
+# Identification is logic, so it lives here and is tested here (ADR-0022). src-tauri only
+# starts the scan and relays its progress.
+
+[dependencies]
+sinephile-persistence = { path = "../persistence" }
+filename-parser = { path = "../filename-parser" }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+sqlx = { version = "=0.8.6", default-features = false, features = ["runtime-tokio", "sqlite"] }

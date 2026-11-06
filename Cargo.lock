@@ -1430,11 +1430,13 @@ dependencies = [
 name = "eval"
 version = "0.1.0"
 dependencies = [
+ "filename-parser",
  "serde",
  "serde_json",
  "sinephile-catalogue",
  "sinephile-embedder",
  "sinephile-embedding",
+ "sinephile-library",
  "sinephile-persistence",
  "sinephile-search-engine",
  "sinephile-vector-index",
@@ -5368,6 +5370,16 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "sinephile-library"
+version = "0.1.0"
+dependencies = [
+ "filename-parser",
+ "sinephile-persistence",
+ "sqlx",
+ "tokio",
 ]
 
 [[package]]

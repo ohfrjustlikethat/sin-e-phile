@@ -128,6 +128,19 @@ pub struct Candidate {
     pub score: f64,
 }
 
+/// A catalogue item as identification weighs it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CandidateFacts {
+    pub media_item_id: i64,
+    pub kind: String,
+    pub primary_title: String,
+    pub release_year: Option<i64>,
+    pub runtime_minutes: Option<i64>,
+    pub rating_votes: Option<i64>,
+    /// Every title variant, the primary included.
+    pub titles: Vec<String>,
+}
+
 const FILE_COLUMNS: &str = "id, folder_id, path, size_bytes, modified_at, content_hash,
     duration_seconds, video_codec, audio_codec, width, height, audio_languages,
     container_title, probed_at, missing_since";
@@ -569,6 +582,51 @@ impl<'a> LibraryRepository<'a> {
         .fetch_all(self.db.pool())
         .await?;
         Ok(rows.iter().map(file).collect::<Result<_, _>>()?)
+    }
+
+    /// What identification weighs for each candidate, in two queries however many there
+    /// are: its facts, and every title it is known by.
+    pub async fn candidate_facts(&self, ids: &[i64]) -> Result<Vec<CandidateFacts>, DbError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let list = ids.iter().map(i64::to_string).collect::<Vec<_>>().join(",");
+        let rows = sqlx::query(&format!(
+            "SELECT id, kind, primary_title, release_year, runtime_minutes, rating_votes
+             FROM media_items WHERE id IN ({list})"
+        ))
+        .fetch_all(self.db.pool())
+        .await?;
+        let titles: Vec<(i64, String)> = sqlx::query_as(&format!(
+            "SELECT media_item_id, title FROM titles WHERE media_item_id IN ({list})"
+        ))
+        .fetch_all(self.db.pool())
+        .await?;
+        let mut out = Vec::with_capacity(rows.len());
+        for r in &rows {
+            let id: i64 = r.try_get("id")?;
+            let primary: String = r.try_get("primary_title")?;
+            let mut known: Vec<String> = titles
+                .iter()
+                .filter(|(m, _)| *m == id)
+                .map(|(_, t)| t.clone())
+                .collect();
+            if !known.contains(&primary) {
+                known.push(primary.clone());
+            }
+            out.push(CandidateFacts {
+                media_item_id: id,
+                kind: r.try_get("kind")?,
+                primary_title: primary,
+                release_year: r.try_get("release_year")?,
+                runtime_minutes: r.try_get("runtime_minutes")?,
+                rating_votes: r.try_get("rating_votes")?,
+                titles: known,
+            });
+        }
+        // In the order asked for.
+        out.sort_by_key(|f| ids.iter().position(|i| *i == f.media_item_id));
+        Ok(out)
     }
 
     // ---- the user's decisions ---------------------------------------------------

@@ -1431,6 +1431,18 @@ async fn library_repository_surface() {
     repo.delete_file(id).await.expect("delete");
     assert_eq!(repo.file(id).await.unwrap(), None);
 
+    // candidate_facts: facts and every title, in the order asked
+    media
+        .add_title(heat, "Heat (US title)", TitleVariant::Alternative, None)
+        .await
+        .expect("variant");
+    let facts = repo.candidate_facts(&[other, heat]).await.unwrap();
+    assert_eq!(facts[0].media_item_id, other);
+    assert_eq!(facts[1].release_year, Some(1995));
+    assert!(facts[1].titles.contains(&"Heat (US title)".to_string()));
+    assert!(facts[1].titles.contains(&"Heat".to_string()));
+    assert!(repo.candidate_facts(&[]).await.unwrap().is_empty());
+
     // remember / recall
     assert_eq!(repo.recall("heat|1995|movie").await.unwrap(), None);
     repo.remember("heat|1995|movie", other).await.unwrap();

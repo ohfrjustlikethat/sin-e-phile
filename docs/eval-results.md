@@ -2442,3 +2442,42 @@ Then `heldout.psv`, 109 names written after the tuning and run once: **109/109**
 caveat: the held-out names were written by the same hand that tuned the parser, so they test what it
 was not tuned on but not what its writer did not think of. Real libraries are the check that remains;
 the identification harness and the review queue are where a miss would show.
+
+### Identification, first run (E1, E2)
+
+2026-11-07, `cargo run --release -p eval -- identify` against the full catalogue (2.7M titles), before
+tuning. Tuning set 547 names (2 labels not in the catalogue, left out): **top-1 513/519 = 98.84%**;
+held out **108/108 = 100%**. The lowest threshold with fewer than 1% wrong among accepted names is
+**0.895**: 0/361 accepted wrong, but **34.0%** of names would be asked (37.6% held out). Below it the
+wrong share is 1.8–4.7%. And **452.6 ms per name**: 10,000 files would take over an hour. Two problems
+to fix: confidence that separates right from wrong earlier, and speed.
+
+### Identification after tuning: E1 and E2 met
+
+2026-11-07, `cargo run --release -p eval -- identify` (`--timing` for the per-query costs, `--report` for
+every miss). Steps, each measured:
+
+1. **Speed.** The trigram search cost 437.9 ms of the 452.6 ms per name (`--timing`: exact title 0.3 ms,
+   words 9.3 ms, candidate facts 0.8 ms). Run only when the exact and word searches find nothing close:
+   **43.4 ms per name**, accuracy unchanged.
+2. **Kind over runtime.** *Westworld* S01E10 (a 90-minute finale) went to the 1973 film. Weights now
+   title .40, year .22, kind .18, runtime .12, popularity .08; a series that has the claimed episode
+   gains .08; a series runtime is judged loosely. A trailing country ("The Office (UK)") is also searched
+   without it. Top-1 99.04%, asked 16.6%.
+3. **Confidence.** It was the best score times the lead, which capped a runaway winner with no year in
+   its name near 0.85. Now the lead times a plausibility that is full from a score of 0.80. Fansub
+   naming makes a live-action namesake less likely (*One Piece* 1999 over 2023). Asked 8.6%.
+4. **Labels corrected (9 of 549).** Every wrong acceptance in steps 2–3 was a row I had labelled `?`
+   (cannot be identified) that the catalogue does identify. Four were seasons or episodes of single IMDb
+   series whose episode was found (*Shingeki no Kyojin* S2E05, *Re Zero* S2E25, *Futurama* 2x01, *Spy x
+   Family* 25), one film exists that I assumed did not (*Web of Lies*, 2009), and four rows carry a
+   duration that names the film (*Arrival* x3 at 116 minutes, *Tokyo Story* at 136). They were relabelled.
+   *Ookami to Koushinryou* 13 stays `?`: the 2008 series and its 2024 remake share the title and both
+   have an episode 13. Accepting it is a real false-confident miss and is counted as one.
+5. **The threshold.** The lowest with under 1% wrong among accepted was 0.615, at 0.97%: too close to
+   the line. The library accepts at **0.75** (`sinephile_library::ACCEPT_AT`).
+
+At 0.75, tuning set 549 names (2 labels not in the catalogue): **E1 top-1 523/528 = 99.05%**; **E2 2/510
+accepted wrong = 0.39%** (0.37% of all names); **6.8%** asked. Held out, 109 names: **108/108 = 100%**,
+**0/103** accepted wrong, **5.5%** asked. **43.7 ms per name.** Caveat: the held-out names were seen in
+`--report` output during this tuning, though no parameter was set from them and none was relabelled.

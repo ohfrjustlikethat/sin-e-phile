@@ -23,8 +23,8 @@ pub use catalogue::{
 pub use credentials::{CredentialRepository, TmdbAccess};
 pub use episodes::{EpisodeRepository, EpisodeRow};
 pub use library::{
-    Candidate, FileMatch, LibraryFolder, LibraryRepository, LocalFile, MatchMethod, NewLocalFile,
-    Probe, Upserted,
+    Candidate, CandidateFacts, FileMatch, LibraryFolder, LibraryRepository, LocalFile, MatchMethod,
+    NewLocalFile, Probe, Upserted,
 };
 pub use media::{Appearance, Credit, MediaRepository};
 pub use profiles::ProfileRepository;

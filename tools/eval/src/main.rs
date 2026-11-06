@@ -5,13 +5,14 @@
 //! evidence. §10.12 compares each phase's numbers against the previous phase's before a
 //! merge, and that comparison is only possible if the numbers are re-derivable.
 //!
-//! Subcommands arrive with the phases that need them. Today: `search`, `vector`, `embed`
-//! and `subs`.
+//! Subcommands arrive with the phases that need them. Today: `search`, `vector`, `embed`,
+//! `subs` and `identify`.
 
 use std::path::Path;
 
 mod embed;
 mod error;
+mod identify;
 mod relevance;
 mod search;
 mod subs;
@@ -68,14 +69,21 @@ async fn main() {
                 .and_then(|i| args.get(i + 1))
                 .map(String::as_str),
         ),
+        "identify" if args.iter().any(|a| a == "--timing") => {
+            identify::timing(Path::new(&data_dir)).await
+        }
+        "identify" => identify::run(Path::new(&data_dir), report).await,
         "all" => match search::run(Path::new(&data_dir), report).await {
             // Every harness runs even when an earlier one misses its target — stopping
             // at the first failure hides the rest, and §10.12 compares ALL the numbers
             // against the previous phase before a merge.
             Ok(searched) => match vector::run(Path::new(&data_dir), report, false, None).await {
-                Ok(vectored) => {
-                    subs::run(report, None).map(|subbed| searched && vectored && subbed)
-                }
+                Ok(vectored) => match subs::run(report, None) {
+                    Ok(subbed) => identify::run(Path::new(&data_dir), report)
+                        .await
+                        .map(|identified| searched && vectored && subbed && identified),
+                    Err(e) => Err(e),
+                },
                 Err(e) => Err(e),
             },
             Err(e) => Err(e),
@@ -92,6 +100,7 @@ async fn main() {
                  \n                           re-embedded document still matches the artefact\
                  \n  eval subs [--report]     subtitle alignment over fixtures/subtitles\
                  \n       --trace <wav> <out> the speech trace of a 16-bit mono WAV\
+                 \n  eval identify [--report] what each name in fixtures/filenames is (Phase 12)\
                  \n  eval all [--report]      every harness that exists\
                  \n\
                  \nReads the catalogue from $SINEPHILE_DATA_DIR, default ./data.\n"
