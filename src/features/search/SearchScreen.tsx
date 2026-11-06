@@ -246,6 +246,14 @@ export function SearchScreen() {
         block: "nearest",
       });
     }
+    // The arrows only highlight; Enter opens what is highlighted.
+    if (event.key === "Enter") {
+      const hit = hits[focused];
+      if (hit) {
+        event.preventDefault();
+        openDetail(hit.id);
+      }
+    }
   }
 
   return (
