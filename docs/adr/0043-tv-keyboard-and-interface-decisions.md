@@ -32,6 +32,11 @@ The author chose each of these from presented options.
   keys), Menu submits.
 - **Voice:** Windows' own offline speech recognition on every tier; Whisper instead on
   Tier 2, for accuracy. Nothing leaves the PC (§2.7).
+- **Opening it** (decided in building it, 11.7): the search field opens the keyboard as soon
+  as it is focused, as on Netflix. Any other field opens it on A, because a keyboard popping
+  up at every field the D-pad passes made walking Settings impossible (found by the
+  controller flow). Done from search moves down to the results; from any other field focus
+  stays on it.
 
 **The interface.**
 - **Pause overlay:** a right-side panel (Prime X-Ray style). The dimmed frame stays visible

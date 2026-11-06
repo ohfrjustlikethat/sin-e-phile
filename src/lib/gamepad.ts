@@ -271,6 +271,17 @@ function frameOf(pad: Gamepad): PadFrame {
   };
 }
 
+let claim: ((button: number) => boolean) | null = null;
+
+/** Take buttons before the player and navigation do; `fn` returns true for each it
+ * handled. Returns the release. One claimant at a time: the newest wins. */
+export function claimButtons(fn: (button: number) => boolean): () => void {
+  claim = fn;
+  return () => {
+    if (claim === fn) claim = null;
+  };
+}
+
 /**
  * Read the first connected pad every animation frame and dispatch. Returns a stop
  * function. Mouse or keyboard input switches the ten-foot focus treatment off again.
@@ -312,6 +323,9 @@ export function startGamepad(handlers: GamepadHandlers): () => void {
       if (aNow !== !!prev?.pressed[BUTTON.A] && (aNow || prev)) handlers.press?.(aNow);
       if (pressed.includes(BUTTON.VIEW)) handlers.view?.();
       for (const b of pressed) {
+        // Something on screen may own a button outright: the on-screen keyboard's X, Y,
+        // triggers, bumpers and Menu (ADR-0043).
+        if (claim?.(b)) continue;
         const intent = playerIntent(b);
         if (intent && handlers.player(intent)) continue;
         const action = navAction(b);
