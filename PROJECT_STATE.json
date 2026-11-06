@@ -39,8 +39,8 @@
       {
         "id": "11.5",
         "text": "Player controls: picture-in-picture (small always-on-top window, Ctrl+P), audio delay (Ctrl+[ / Ctrl+]), brightness/contrast/saturation in a Picture menu, a stats-for-nerds overlay (I: decode path, dropped frames, bitrate, cache, swarm peers/speed), and a shortcuts overlay (?) generated from the same key map the player uses.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "656441e"
       },
       {
         "id": "11.7",
@@ -77,8 +77,8 @@
       {
         "id": "E4",
         "text": "All player features are keyboard-accessible and documented in a shortcuts overlay (`?`).",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "656441e: every player feature has a key: src/features/player/intents.ts SHORTCUTS (19 rows: play/pause, seeks, volume, mute, full screen, frame step, speed, subtitles, subtitle timing, sound timing, episodes, statistics, mini player, picture-in-picture, shortcuts, back, and the pad's player menu); intents.test.ts 'says what each key really does' turns each row's real key event through keyIntent and must get the row's intent; the '?' overlay renders that same table (PlayerScreen.test.tsx '? lists the shortcuts, I shows statistics, Ctrl+[ moves the sound'). The pad reaches the rest through Menu (PlayerScreen.test.tsx 'Menu opens the player menu; inside it the D-pad moves focus instead of seeking'). Real window 2026-11-07: Ctrl+M mini player and Ctrl+P picture-in-picture (480x270, restored to 1455x909) screenshotted."
       },
       {
         "id": "E5",
@@ -1406,8 +1406,8 @@
         {
           "id": "E4",
           "text": "All player features are keyboard-accessible and documented in a shortcuts overlay (`?`).",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "656441e: every player feature has a key: src/features/player/intents.ts SHORTCUTS (19 rows: play/pause, seeks, volume, mute, full screen, frame step, speed, subtitles, subtitle timing, sound timing, episodes, statistics, mini player, picture-in-picture, shortcuts, back, and the pad's player menu); intents.test.ts 'says what each key really does' turns each row's real key event through keyIntent and must get the row's intent; the '?' overlay renders that same table (PlayerScreen.test.tsx '? lists the shortcuts, I shows statistics, Ctrl+[ moves the sound'). The pad reaches the rest through Menu (PlayerScreen.test.tsx 'Menu opens the player menu; inside it the D-pad moves focus instead of seeking'). Real window 2026-11-07: Ctrl+M mini player and Ctrl+P picture-in-picture (480x270, restored to 1455x909) screenshotted."
         },
         {
           "id": "E5",
@@ -1450,8 +1450,8 @@
         {
           "id": "11.5",
           "text": "Player controls: picture-in-picture (small always-on-top window, Ctrl+P), audio delay (Ctrl+[ / Ctrl+]), brightness/contrast/saturation in a Picture menu, a stats-for-nerds overlay (I: decode path, dropped frames, bitrate, cache, swarm peers/speed), and a shortcuts overlay (?) generated from the same key map the player uses.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "656441e"
         },
         {
           "id": "11.7",
@@ -2190,7 +2190,7 @@
       ]
     }
   ],
-  "next_action": "Phase 11 subtask 11.5 (docs/phases/phase-11-player-experience-layer.md): player controls. Picture-in-picture (Ctrl+P: the main window small, always on top, in the corner, chrome hidden; again restores), audio delay (Ctrl+[ / Ctrl+] via mpv audio-delay), a Picture menu with brightness/contrast/saturation sliders (mpv properties, reset), a stats overlay (I: hwdec, dropped frames, bitrate from mpv video-bitrate/audio-bitrate, cache, swarm peers/speed from the torrent engine for a torrent), and a shortcuts overlay (?) generated from keyIntent's own table; plus the ADR-0043 in-app mini player (keep watching in a corner while browsing: the player shrinks to a corner window region and the app shows behind).",
+  "next_action": "Phase 11 subtask 11.7 (docs/phases/phase-11-player-experience-layer.md): the TV keyboard (ADR-0043). Rework src/app/PadKeyboard.tsx into the Netflix-TV grid (a-z/0-9 block, 6 columns, space and backspace keys below) attached to EVERY text field in pad mode, with Xbox buttons (A type, B close, X backspace, Y space, LT/RT cursor, LB/RB letters vs symbols incl. upper case, Menu submit), a row of title suggestions from the catalogue (search command, top 5) and word completion, recent searches before typing (persisted, last 8), and a hidden voice key for Phase 20. Extend tools/uiaudit/controller.mjs to type a settings field (the OpenSubtitles key, with upper case) with the pad alone.",
   "blockers": [],
   "decisions_pending": [
     {
