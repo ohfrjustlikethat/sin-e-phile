@@ -49,7 +49,7 @@ Phase 11 subtask 11.7 (docs/phases/phase-11-player-experience-layer.md): the TV 
 
 ## Blockers
 
-None.
+- **B11** CI failed on phase/11 at the 11.4 state commit: crates/catalogue/tests/movielens.rs ratings_are_counted_without_being_stored asserted that no table named like '%rating%' exists (a guard against storing MovieLens's 25M ratings), and migration 0020 added the viewer's own per-profile ratings table. The test now asserts the only rating table is the per-profile one. Root cause on our side: pushes since 11.2 ran the touched crates' tests rather than the whole workspace. Clears when CI on the branch is green.
 
 ---
 
