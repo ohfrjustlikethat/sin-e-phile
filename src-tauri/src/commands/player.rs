@@ -1,11 +1,13 @@
 //! The player IPC surface (SPEC.md Phase 8). **Thin**: libmpv, the video window and its
 //! cutouts are `crates/player`; these hold one player and forward calls to it.
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
+use sinephile_playback::fallback::{self, FallbackError, Patience, Screen};
 use sinephile_player::{Options, Placement, Player, VideoHost};
 
 use crate::state::AppState;
@@ -67,32 +69,99 @@ pub async fn player_open(
     let rt = runtime(&app, &state)
         .inspect_err(|e| tracing::error!(error = %e, "player could not start"))?;
     let ready_ms = t0.elapsed().as_millis();
+    let generation = OPENS.fetch_add(1, Ordering::SeqCst) + 1;
     // The video window stays hidden until there is a picture to show: until then the
     // page underneath says what is opening, instead of a black rectangle.
     rt.host.lock().expect("host").hide();
-    rt.player.load(&target, start).map_err(err)?;
-    // §2.3's play → first frame budget, measured where it is spent.
-    let waiting = rt.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        match waiting
-            .player
-            .wait_first_frame(std::time::Duration::from_secs(60))
-        {
-            Ok(_) => {
+    // What to fall back to, if this is what the last plan chose (SPEC.md Phase 9, 9.4).
+    let planned = crate::commands::playback::PLANNED
+        .lock()
+        .expect("planned")
+        .take_if(|p| p.open == target);
+    let (backend, fallbacks) = planned
+        .map(|p| (p.backend, p.fallbacks))
+        .unwrap_or_else(|| ("this source".into(), vec![]));
+    let screen = Arc::new(AppScreen {
+        rt: rt.clone(),
+        generation,
+    });
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<AppState>();
+        // Only built if there is somewhere to fall back to.
+        let sources = if fallbacks.is_empty() {
+            None
+        } else {
+            crate::commands::playback::resolver(&state).await.ok()
+        };
+        let torrent = if fallbacks.is_empty() {
+            None
+        } else {
+            state.torrent().await.ok()
+        };
+        let empty = sinephile_sources::Resolver::new(vec![]);
+        let resolver = sources.as_ref().map(|(r, _)| r).unwrap_or(&empty);
+        let started = fallback::start(
+            screen.clone(),
+            (target, backend),
+            fallbacks,
+            resolver,
+            torrent.as_ref().map(|t| (&t.engine, &t.server)),
+            start,
+            Patience::default(),
+        )
+        .await;
+        match started {
+            Ok(s) => {
                 // Not over a pause overlay, if Pause came first.
-                if !waiting.player.state().paused {
-                    waiting.host.lock().expect("host").show();
+                if !screen.superseded() && !screen.rt.player.state().paused {
+                    screen.rt.host.lock().expect("host").show();
                 }
+                // §2.3's play → first frame budget, measured where it is spent.
                 tracing::info!(
                     ready_ms,
                     first_frame_ms = t0.elapsed().as_millis(),
+                    backend = %s.backend,
+                    skipped = s.failed.len(),
                     "first frame"
-                )
+                );
             }
-            Err(e) => tracing::warn!(error = %e, "no first frame"),
+            Err(FallbackError::Superseded) => {}
+            Err(e) => {
+                tracing::warn!(error = %e, "no first frame");
+                let _ = app.emit("player-failed", e.to_string());
+            }
         }
     });
     Ok(())
+}
+
+/// Every `player_open` and `player_close` counts up; a fallback loop from an older one
+/// sees the count move and stops, so it never opens a copy over the next film.
+static OPENS: AtomicU64 = AtomicU64::new(0);
+
+/// The app's player as the fallback loop sees it.
+struct AppScreen {
+    rt: Arc<PlayerRuntime>,
+    generation: u64,
+}
+
+impl Screen for AppScreen {
+    fn open(&self, target: &str, start: Option<f64>) -> Result<(), String> {
+        self.rt.player.load(target, start).map_err(err)
+    }
+    fn wait_loaded(&self, timeout: std::time::Duration) -> Result<(), String> {
+        self.rt.player.wait_loaded(timeout).map_err(err)
+    }
+    fn wait_first_frame(&self, timeout: std::time::Duration) -> Result<(), String> {
+        self.rt
+            .player
+            .wait_first_frame(timeout)
+            .map(|_| ())
+            .map_err(err)
+    }
+    fn superseded(&self) -> bool {
+        OPENS.load(Ordering::SeqCst) != self.generation
+    }
 }
 
 /// A chrome panel's silhouette in CSS pixels; the page converts nothing, this does.
@@ -206,6 +275,7 @@ pub async fn player_resume_video(state: State<'_, AppState>) -> Result<(), Strin
 #[tauri::command]
 #[specta::specta]
 pub async fn player_close(state: State<'_, AppState>) -> Result<(), String> {
+    OPENS.fetch_add(1, Ordering::SeqCst);
     if let Some(rt) = state.player() {
         rt.host.lock().expect("host").hide();
         rt.player.stop().map_err(err)?;

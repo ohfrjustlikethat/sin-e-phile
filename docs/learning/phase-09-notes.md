@@ -23,6 +23,9 @@ inherits.** Four sections per ADR-0016 (A4). Written as the phase goes; 9.0 firs
 - **Language and quality choices** (9.3) — `src/features/detail/ChoiceRow.tsx`: Audio and
   Quality rows under Play, offering only what honest copies carry, labelled original or
   dub, remembered across films, and saying plainly when no copy has the choice.
+- **Automatic fallback** (9.4) — `crates/playback/src/fallback.rs`: a copy that errors is left
+  at once, one that never loads after 8 s, one that loads is given 30 s; the next copy is
+  resolved on demand; a newer Play stops an old loop.
 
 ## 2. Why
 
@@ -82,6 +85,13 @@ inherits.** Four sections per ADR-0016 (A4). Written as the phase goes; 9.0 firs
   several, announced correctly, and every option a focus stop for the pad.
 - **`COALESCE(?, column)` in an UPDATE** — `crates/catalogue/src/anime.rs`: write a value
   only when there is one, never erase a known one with NULL.
+
+- **A trait as a seam** — `crates/playback/src/fallback.rs` `Screen`: the loop is tested with a
+  scripted fake player and with the real one, and the app adds `superseded`.
+- **`spawn_blocking`** — `fallback.rs` `try_one`: the player's waits block a thread, so they
+  run on tokio's blocking pool, never on the async workers.
+- **A generation counter (`AtomicU64`)** — `src-tauri/src/commands/player.rs` `OPENS`: each
+  Play counts up; an older loop sees the count move and stops.
 
 ## 4. The questions
 

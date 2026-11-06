@@ -1,6 +1,8 @@
 //! The detail page and Play (SPEC.md Phase 8). **Thin**: what plays and from where is
 //! `crates/playback`; this gathers the pieces it needs and converts types.
 
+use std::sync::Mutex;
+
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
@@ -88,6 +90,36 @@ pub struct PlayPlanView {
     pub unmet: Option<String>,
 }
 
+/// What the last plan would fall back to, for `player_open` (SPEC.md Phase 9, 9.4). Kept
+/// here rather than sent through the page: the page only ever needs the address.
+pub(crate) struct Planned {
+    pub open: String,
+    pub backend: String,
+    pub fallbacks: Vec<source_protocol::SourceCandidate>,
+}
+
+pub(crate) static PLANNED: Mutex<Option<Planned>> = Mutex::new(None);
+
+/// The sources as configured now: the same resolver the plan used.
+pub(crate) async fn resolver(
+    state: &AppState,
+) -> Result<
+    (
+        sinephile_sources::Resolver,
+        sinephile_sources::backends::Context,
+    ),
+    String,
+> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let (ctx, _) = overview::context_from(&db, state.http.clone(), state.untrusted_http.clone())
+        .await
+        .map_err(|e| e.to_string())?;
+    let resolver = sinephile_sources::registry::resolver_from(&db, all(&ctx))
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok((resolver, ctx))
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn prepare_play(
@@ -97,12 +129,7 @@ pub async fn prepare_play(
     quality: Option<String>,
 ) -> Result<PlayPlanView, String> {
     let db = state.db().ok_or("the library is still opening")?;
-    let (ctx, _) = overview::context_from(&db, state.http.clone(), state.untrusted_http.clone())
-        .await
-        .map_err(|e| e.to_string())?;
-    let resolver = sinephile_sources::registry::resolver_from(&db, all(&ctx))
-        .await
-        .map_err(|e| e.to_string())?;
+    let (resolver, ctx) = resolver(&state).await?;
     // The engine starts here if a swarm might be needed; a failure to start it only
     // means swarms are skipped, not that nothing can play.
     let rt = state.torrent().await.ok();
@@ -122,6 +149,11 @@ pub async fn prepare_play(
     let plan = sinephile_playback::plan_with(&db, &resolver, torrent, i64::from(id), choice)
         .await
         .map_err(|e| e.to_string())?;
+    *PLANNED.lock().expect("planned") = Some(Planned {
+        open: plan.open.clone(),
+        backend: plan.backend.clone(),
+        fallbacks: plan.fallbacks(),
+    });
     Ok(PlayPlanView {
         from: overview::display_name(&plan.backend, &ctx.addons),
         title: plan.title,

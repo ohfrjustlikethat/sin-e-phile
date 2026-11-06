@@ -1,6 +1,6 @@
 # Source scoring
 
-**Status:** built in Phase 9 (subtasks 9.1–9.3) · **Code:** `crates/selection/` ·
+**Status:** built in Phase 9 (subtasks 9.1–9.4) · **Code:** `crates/selection/` ·
 **Tests:** `crates/selection/tests/fixtures.rs`, `crates/selection/tests/properties.rs`
 
 Which copy plays when the viewer presses Play. Every candidate the sources return, whether
@@ -123,12 +123,33 @@ and with the bytes.
   so: "None of your sources has Hindi audio." The chosen option stays visible and
   selected, so it can be changed. Play is never disabled for want of a choice.
 
-## 6. Known limits
+## 6. Fallback (9.4)
+
+`crates/playback/src/fallback.rs`. The plan keeps every candidate with its score and
+which one it opened; `PlayPlan::fallbacks()` is every **honest** copy ranked below it. A
+sunk copy is never tried, even last: a fake is worse than saying nothing would start.
+
+| Signal | Action |
+|---|---|
+| mpv reports an error (404, refused, not a video) | next copy at once |
+| nothing loaded within **8 s** | next copy |
+| loaded, no frame within **30 s** more | next copy |
+
+The 8 s is the budget: a dead first choice plus the next copy's start fits E4's 10 s
+(measured 8.1 s). A copy that *has* loaded is downloading, and slow is not broken: the
+Internet Archive takes up to 8 s to a first frame. Each next copy is resolved only when
+needed, so a swarm nobody plays is never joined. A newer Play or a close stops an old
+loop before it opens anything (a generation counter in `src-tauri`). Each skip is logged
+with its reason; the viewer sees nothing unless every copy fails, and then the player
+shows every reason.
+
+## 7. Known limits
 
 - A film genuinely titled with a camera tag as a word (*Cam*, 2018) takes the −1
   `encoding` term. It is not sunk, and a local copy still comes first.
 - `original_language` is filled only for anime matched to AniList, and only on an
   ingest or refresh after this change. Films from IMDb have none, so they show no
   original/dub labels.
+- A swarm abandoned by fallback stays in the torrent engine until it is cleaned up.
 - Throughput is a term with no measurement behind it yet. `Context.throughput` is
   `None` until the engine reports a speed.

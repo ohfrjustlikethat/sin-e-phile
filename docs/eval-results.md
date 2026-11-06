@@ -2307,3 +2307,20 @@ where no peer connected for 62 s. With no head start the Phase 7 figures stand (
 **6.4 / 15.8 ms** (cold first run 12.4 / 32.6 ms, as in Phases 6 and 7); HNSW recall@10
 **0.9760** (164/200 perfect). Unchanged from Phase 7 within run-to-run noise. Rust tests
 557 passed, 0 failed; frontend 52 passed; controller flow 8/8.
+
+## Phase 9 — Intelligent source selection
+
+### E4: a dead first choice falls back within 10 s
+
+2026-11-06, `cargo test -p sinephile-playback --test fallback a_dead_first_choice -- --nocapture`
+(headless libmpv, the app's real `Patience`): the top choice is a loopback server that accepts
+the connection and never answers; the next is a local file. Play → first frame of the
+fallback: **8.11 s** (budget 10 s). Seen to fail at 11.17 s with the load patience raised
+to 11 s.
+
+### Play through the fallback path (real window, debug build)
+
+2026-11-06, search → *Nosferatu* (1922) → Play, `first frame` log line:
+**5615 ms**, `backend=internet-archive skipped=0`, resuming at 0:52. Normal playback is
+unchanged by the new path (Phase 8: 5533–7859 ms).
+

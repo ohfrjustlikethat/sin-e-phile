@@ -15,10 +15,10 @@ const commands = {
 };
 vi.mock("@/lib/ipc", () => ({ commands }));
 // Inert unless a test marks the page as inside Tauri.
-const events = vi.hoisted(() => ({ push: undefined as ((e: { payload: unknown }) => void) | undefined }));
+const events = vi.hoisted(() => ({ on: {} as Record<string, (e: { payload: unknown }) => void> }));
 vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn((_: string, cb: (e: { payload: unknown }) => void) => {
-    events.push = cb;
+  listen: vi.fn((name: string, cb: (e: { payload: unknown }) => void) => {
+    events.on[name] = cb;
     return Promise.resolve(() => {});
   }),
 }));
@@ -82,14 +82,14 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
   });
 
   it("saves the position it reached on the way out (Phase 8 E4)", async () => {
-    events.push = undefined;
+    events.on = {};
     const w = window as unknown as Record<string, unknown>;
     w.__TAURI_INTERNALS__ = {};
     try {
       const { unmount } = render(<PlayerScreen />);
-      await waitFor(() => expect(events.push).toBeDefined());
+      await waitFor(() => expect(events.on["player-state"]).toBeDefined());
       act(() =>
-        events.push?.({
+        events.on["player-state"]?.({
           payload: {
             position: 2712.4, duration: 5700, paused: false, buffered_until: null, volume: 100,
             muted: false, speed: 1, hwdec: null, ended: false, started: true, tracks: [],
@@ -109,5 +109,19 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
     expect(useUi.getState().playing).toBeNull();
     unmount();
     expect(commands.playerClose).toHaveBeenCalled();
+  });
+
+  it("says so when no copy would start, after trying them all (Phase 9)", async () => {
+    const w = window as unknown as { __TAURI_INTERNALS__?: object };
+    w.__TAURI_INTERNALS__ = {};
+    try {
+      render(<PlayerScreen />);
+      await waitFor(() => expect(events.on["player-failed"]).toBeDefined());
+      act(() => events.on["player-failed"]?.({ payload: "no copy would start: echo: did not load: 404" }));
+      expect(await screen.findByText("no copy would start: echo: did not load: 404")).toBeInTheDocument();
+      expect(screen.queryByText("Resuming from 0:42")).not.toBeInTheDocument();
+    } finally {
+      delete w.__TAURI_INTERNALS__;
+    }
   });
 });

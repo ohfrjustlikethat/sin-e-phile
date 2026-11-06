@@ -13,6 +13,8 @@
 
 use std::sync::Arc;
 
+pub mod fallback;
+
 use sinephile_persistence::repositories::{MediaRepository, ProfileRepository};
 use sinephile_persistence::{Db, DbError, MediaKind};
 pub use sinephile_selection::{Context, Machine, Offers, Score};
@@ -55,6 +57,21 @@ pub struct PlayPlan {
     pub original_language: Option<String>,
     /// Every candidate, best first, with its score: for the expert panel and fallback.
     pub ranked: Vec<(SourceCandidate, Score)>,
+    /// Which of `ranked` is the one that opens.
+    pub chosen: usize,
+}
+
+impl PlayPlan {
+    /// What to fall back to, in order: every honest copy ranked below the chosen one.
+    /// A sunk copy is never tried, even last: a fake is worse than "nothing would start".
+    pub fn fallbacks(&self) -> Vec<SourceCandidate> {
+        self.ranked
+            .iter()
+            .skip(self.chosen + 1)
+            .filter(|(_, s)| s.sunk.is_none())
+            .map(|(c, _)| c.clone())
+            .collect()
+    }
 }
 
 /// The catalogue item as the query sources receive.
@@ -85,6 +102,32 @@ pub async fn query_for(db: &Db, media_item_id: i64) -> Result<Option<MediaQuery>
         season: None,
         episode: None,
     }))
+}
+
+/// Resolve one candidate to what the player opens: a URL, or a path. A torrent becomes
+/// the local streaming server's address, which needs the engine.
+pub(crate) async fn target_for(
+    resolver: &Resolver,
+    torrent: Option<(&Arc<Engine>, &StreamServer)>,
+    candidate: &SourceCandidate,
+) -> Result<String, String> {
+    use source_protocol::PlayableStream;
+    let stream = resolver
+        .resolve(candidate)
+        .await
+        .map_err(|e| e.to_string())?;
+    let opened = match (&stream, torrent) {
+        (PlayableStream::Torrent { .. }, None) => {
+            return Err("a torrent, but the torrent engine is not running".into())
+        }
+        (_, Some((engine, server))) => target(engine, server, &stream, Wanted::default()).await,
+        (PlayableStream::Http { url, .. }, None) => Ok(Target::Url(url.clone())),
+        (PlayableStream::File { path }, None) => Ok(Target::File(path.into())),
+    };
+    match opened.map_err(|e| e.to_string())? {
+        Target::Url(u) => Ok(u),
+        Target::File(p) => Ok(p.to_string_lossy().into_owned()),
+    }
 }
 
 /// What this machine plays well, from what `tiers.rs` permits and found. AV1 decode and
@@ -155,29 +198,9 @@ pub async fn plan_with(
     let offered = ranked.len();
     let offers = sinephile_selection::offers(&ranked);
     let mut reasons = Vec::new();
-    for (candidate, score) in ranked.clone() {
-        let stream = match resolver.resolve(&candidate).await {
-            Ok(s) => s,
-            Err(e) => {
-                reasons.push(format!("{}: {e}", candidate.provenance.backend));
-                continue;
-            }
-        };
-        let opened = match (&stream, torrent) {
-            (source_protocol::PlayableStream::Torrent { .. }, None) => {
-                reasons.push("a torrent, but the torrent engine is not running".into());
-                continue;
-            }
-            (_, Some((engine, server))) => target(engine, server, &stream, Wanted::default()).await,
-            (_, None) => match &stream {
-                source_protocol::PlayableStream::Http { url, .. } => Ok(Target::Url(url.clone())),
-                source_protocol::PlayableStream::File { path } => Ok(Target::File(path.into())),
-                source_protocol::PlayableStream::Torrent { .. } => unreachable!("handled above"),
-            },
-        };
-        let open = match opened {
-            Ok(Target::Url(u)) => u,
-            Ok(Target::File(p)) => p.to_string_lossy().into_owned(),
+    for (chosen, (candidate, score)) in ranked.iter().enumerate() {
+        let open = match target_for(resolver, torrent, candidate).await {
+            Ok(open) => open,
             Err(e) => {
                 reasons.push(format!("{}: {e}", candidate.provenance.backend));
                 continue;
@@ -193,11 +216,12 @@ pub async fn plan_with(
             title: query.title,
             open,
             start,
-            backend: candidate.provenance.backend,
+            backend: candidate.provenance.backend.clone(),
             offered,
-            score,
+            score: score.clone(),
             offers,
             original_language,
+            chosen,
             ranked,
         });
     }
