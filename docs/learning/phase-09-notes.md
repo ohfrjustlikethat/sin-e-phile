@@ -106,22 +106,13 @@ inherits.** Four sections per ADR-0016 (A4). Written as the phase goes; 9.0 firs
 
 Written, not asked — Phase 9 is not a tier boundary (§10.10).
 
-1. Why does the ring use a spring with damping ratio exactly 1, and what would a user see
-   at 0.5 and at 2?
-2. The ring is drawn outside `#root`, but the elements it follows are inside a zoomed
-   `#root`. Why does its position still come out right?
-3. A focused tile grows to 1.06 using `transform`, not `width`. Why does that keep its
-   neighbours still?
-4. Why does leaving TV mode need 32px of mouse movement, when entering it needs one
-   press?
-5. Under reduced motion the ring still moves to the new target. What exactly is removed,
-   and why is the ring itself kept?
-
-Source scoring (9.1–9.2):
-
-6. Why is "a local file always wins" a step in the order rather than a large weight?
-7. A copy states no audio languages; another states English. The viewer chose Hindi.
-   Which ranks higher, and why is that the honest choice?
-8. Why are `quality` and `plausibility` given the same weight?
-9. Why does the bytes-per-minute floor use 60% for an unknown codec rather than 100%?
-10. Why is a camera recording scored −1 but not sunk, while a ".exe" is sunk?
+1. Why does the focus ring use a spring with damping ratio exactly 1, and what would a
+   user see at 0.5 and at 2?
+2. Why is "a local file always wins" a step in the ranking's order rather than a large
+   weight, and what would go wrong with the weight?
+3. The viewer chose Hindi. One copy states no languages, another states English. Which
+   ranks higher, and why is that the honest order?
+4. The bytes-per-minute floor gives an unknown codec H.265's allowance, not H.264's. Why
+   is the lenient assumption the right one here?
+5. Fallback leaves a copy that has not loaded after 8 s but gives one that has loaded
+   30 s more. What does "loaded" tell you, and what measurement set the 8?

@@ -4,12 +4,14 @@
 local film library behind one semantic search engine and a discovery-first
 recommender.**
 
-> **Status: Phases 0–8 of 28 closed — Tier A, the first working vertical slice.** The
+> **Status: Phases 0–9 of 28 closed — Tier A complete, Tier B under way.** The
 > catalogue is real: 2.7 million titles ingested offline from public datasets, with no
 > API key of any kind, searchable by title, person, filter and meaning. And now it plays:
 > search, open a film, press Play, and it streams — from the Internet Archive's
 > public-domain films, a torrent, or a file you drop on the window — in an embedded
-> player with hardware decoding, drivable end to end with an Xbox controller.
+> player with hardware decoding, drivable end to end with an Xbox controller. Every copy
+> a source offers is now scored and ranked — fakes caught, your language and quality
+> honoured, a broken copy replaced by the next without a word.
 > This README describes what is being built and is updated at
 > the end of every phase that changes what the app can do. It is never allowed to
 > over-claim; the [feature list](#what-actually-works-today) below says exactly what
@@ -225,8 +227,8 @@ off means the pause overlay shows the full cast list, beautifully.
 
 ## What actually works today
 
-**Phases 0–8 — the shell, the design system, the catalogue, search, sources, torrents,
-and the player.** Honestly:
+**Phases 0–9 — the shell, the design system, the catalogue, search, sources, torrents,
+the player, and choosing a source.** Honestly:
 
 - ✅ Posture guard, secret scanner, and prerequisite doctor — all three verified by
   deliberately planted failures
@@ -293,6 +295,15 @@ and the player.** Honestly:
   presses, B goes back, the triggers seek, and an on-screen keyboard appears for search.
   The whole flow — search, open, play, pause, seek, leave — is driven by a simulated pad
   in CI.
+- ✅ **The TV look**: a white focus ring that glides between items on a spring, tiles that
+  grow and lift, 125% scale with a pad, button hints, quiet ticks and rumble — and none of
+  the motion under Windows' reduce-motion setting. Checked frame by frame in CI.
+- ✅ **Choosing the copy.** Every copy is scored on nine terms and ranked: a "4K" file too
+  small to be 4K, a 60-minute file for a 140-minute film, a name that contradicts its
+  listing or an `.exe` are ranked last; your own file comes first. Pick an audio language
+  or a quality and it plays a copy that has it, or says none does. A copy that will not
+  start is replaced by the next — 8.1 s from a dead first choice to the next copy's
+  picture. Ctrl+Shift+S shows the whole arithmetic.
 - ❌ **"Search, click and watch" a file on this machine** waits for the library scanner in
   Phase 12; until then a local file plays by dropping it on the window. Carried there.
 - ⬜ Everything else described above this section

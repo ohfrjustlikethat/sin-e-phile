@@ -172,7 +172,7 @@ children.push(
       "--no-first-run",
       `--remote-debugging-port=${CDP_PORT}`,
       `--user-data-dir=${resolve(tmpdir(), `sinephile-controller-${process.pid}`)}`,
-      "--window-size=1440,900",
+      "--window-size=1920,1080", // Phase 9 E7: the TV focus language at 1920×1080
       `http://127.0.0.1:${PORT}/`,
     ],
     { stdio: "ignore" },
@@ -340,6 +340,24 @@ try {
   await waitFor(async () => (await active())?.text === "Play", "Play to take focus", 25);
   check((await calls("prepare_play")).length === 1, "A opens the film; its sources are asked before Play");
   await shoot("04-detail");
+
+  // Phase 9 E7: the ring is visible on EVERY focus stop of the page, not just one.
+  const stops = await evalJs(`(async () => {
+    const sel = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const all = [...document.querySelectorAll(sel)].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+    const misses = [];
+    for (const el of all) {
+      el.scrollIntoView({ block: "center" }); el.focus();
+      await new Promise((r) => setTimeout(r, 350));
+      const ring = document.querySelector("[data-focus-ring-el]"); const rb = ring.getBoundingClientRect(); const eb = el.getBoundingClientRect();
+      const encloses = rb.left <= eb.left + 1 && rb.top <= eb.top + 1 && rb.right >= eb.right - 1 && rb.bottom >= eb.bottom - 1;
+      if (Number(getComputedStyle(ring).opacity) !== 1 || !encloses) misses.push((el.getAttribute("aria-label") || el.textContent || el.tagName).trim().slice(0, 30));
+    }
+    document.getElementById("detail-play").focus();
+    return { count: all.length, misses };
+  })()`);
+  check(stops.count >= 10 && stops.misses.length === 0, `the ring surrounds every focus stop on the film page (${stops.count} stops; missed: ${stops.misses.join(", ") || "none"})`);
+  await sleep(300);
 
   // Phase 9: the language choice is reachable with the pad, and choosing re-plans.
   await press(B.DOWN);

@@ -2324,3 +2324,12 @@ to 11 s.
 **5615 ms**, `backend=internet-archive skipped=0`, resuming at 0:52. Normal playback is
 unchanged by the new path (Phase 8: 5533–7859 ms).
 
+### Regression check before merging Phase 9 (rule 13)
+
+2026-11-06, release build at `653dc57`, `cargo run --release -p eval -- all` twice and
+`-- vector --report`: E2 **43/43**; E3 meaning **0.0472**, filter **1.0000**; E1 warm p50 / p95
+**5.9 / 14.9 ms** (cold first run 13.1 / 43.7 ms; Phase 8's cold run was 12.4 / 32.6, the
+first run after a rebuild pays the disk cache); HNSW recall@10 **0.9760**, index p95 1.39 ms.
+Unchanged from Phase 8. Rust tests 602 passed, 0 failed; frontend 70 passed; controller
+flow 19/19.
+
