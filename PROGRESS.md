@@ -10,44 +10,35 @@
 
 ## Where we are right now
 
-**Phase 9 — Intelligent Source Selection** (`in_progress`, branch `phase/09-intelligent-source-selection`)
+**Phase 10 — Subtitle Pipeline** (`in_progress`, branch `phase/10-subtitle-pipeline`)
 
-7 of 7 exit criteria met with evidence.
+0 of 6 exit criteria met with evidence.
 
-> Opened 2026-11-06 when Phase 8 merged (5e5558f, tag phase-08); planned under ADR-0040. Carried in from Phase 8: E5's one-time real-controller check (author); from Phase 7: E7's VPN-drop check (author). Release-group reputation is structural only: no group names in the repo (2.1). ADR-0042 (spec 3.1.0) adds the TV focus language to this phase as subtask 9.0, built first.
+> Opened 2026-11-06 when Phase 9 merged (63d00d9, tag phase-09); planned under ADR-0040, run as part of the author's five-phase request (9-13). Decisions: a pure-Rust VAD rather than a model download (the crate must stay free of FFmpeg and artefacts, ADR-0017); the corpus is synthetic speech with known timings, because real subtitles of real films are neither ours to commit nor timed against a known truth; "other providers" are a trait with no named provider shipped, since each needs its own legal review (2.1). Author checks still outstanding: real controller (Phase 8 E5), VPN drop (Phase 7 E7).
 
-### Subtasks — 7/7 complete
+### Subtasks — 0/6 complete
 
-- [x] **9.0** The TV focus language (ADR-0042) in src/design-system/focus/: the white ring with hairline and oxblood halo as one gliding element (critically damped spring ~200 ms), grow 1.06 and lift on tiles, left-stick tilt up to 6 degrees with a following sheen, A press-down 0.97x, TV mode with a pad (125% scale, 5% safe margin, button-hints footer, Web Audio ticks, ~20 ms rumble on select, View toggles full screen and picking up the pad enters it), settings for sounds, rumble and auto full screen, reduced motion honoured; extended tools/uiaudit/controller.mjs proves it. · `1be4948`
-- [x] **9.1** crates/selection: score(candidate, context) -> Score{total, terms[]} as a pure function over SourceCandidate plus a Context (title runtime, hardware tier and decode caps, preferred audio language, wanted quality, measured throughput). Terms: local availability, swarm health, size-versus-quality plausibility, encoding signals, codec/HDR compatibility, audio language, subtitles. Unit tests over a fixture set of candidate lists and property tests (ordering invariants). · `0db6420`
-- [x] **9.2** Fake and mislabel detection: bytes-per-minute against the claimed resolution and codec, and duration against the catalogue runtime; a 700 MB '4K' or a 60-minute file for a 140-minute film is flagged and sunk, with the reason kept. 'Release-group reputation' is implemented as structural signals only (naming consistency, encode tags, plausibility); no release-group or indexer names appear anywhere in the repo (SPEC.md 2.1). · `0db6420`
-- [x] **9.3** Language and quality as first-class choices: the detail page lists the audio languages the candidates actually carry and the qualities on offer (defaulting to the best the hardware and connection support), with dub/sub distinction for anime; choosing one re-plans to a candidate that carries it, or says plainly that none does. · `92d4d71`
-- [x] **9.4** Automatic fallback: the plan returns the ranked list; if the chosen candidate has no first frame within a start timeout, the player silently opens the next one and logs why, within 10 s of Play in total for a failing first choice. · `0f18990`
-- [x] **9.5** The expert panel (Ctrl+Shift+S, and a Settings toggle): every candidate ranked with each score term and its weight, matching the code; and a one-line 'why this source' under Play. · `5b50da9`
-- [x] **9.6** docs/specs/source-scoring.md: every term, its weight and its justification; learning note; evidence for E1-E6 including a deliberately failing top candidate in a test. · `91595da`
+- [ ] **10.1** crates/subtitle-align (MIT/Apache, no FFmpeg): cue timings read and rewritten in place for SRT, WebVTT and ASS/SSA (styling preserved); a pure-Rust band-energy VAD with a syllable-modulation test; offset and framerate scale solved together by FFT cross-correlation over the 23.976/24/25 scale set, the plateau's centre taken; two-part split for inserted or removed intros; a distinctness confidence that refuses rather than guess; Tier 0 duration heuristic. Unit tests on synthetic dialogue.
+- [ ] **10.2** fixtures/subtitles/ corpus (tools/subcorpus: Windows speech synthesis over room, street and music beds, traces from the app's own VAD, eight damaged copies per film: offsets, 23.976<->25 and 24->25 scales, intros removed and added) plus negative controls (one film's subtitles against another's speech must be refused); cargo run -p eval -- subs reports aligned share (>90% target, a copy aligns when 95% of its cues land within 150 ms), refusals, false accepts and VAD agreement.
+- [ ] **10.3** The subtitle chain in a testable crate (crates/subtitles): embedded tracks first (from the player's track list, no network), then sidecar files next to the media (same stem, language suffixes) or in the torrent's file list, then OpenSubtitles by movie hash with the user's own key (no key ships), a persisted daily quota budget that is never exceeded and a cache, then other providers behind a trait; language preference ordering per profile. A test proves an embedded track is used with zero network requests.
+- [ ] **10.4** Wiring in the app: audio extracted with FFmpeg (16 kHz mono, first 20 minutes) for alignment on Tier 1+, the duration heuristic on Tier 0; an aligned or found subtitle loaded into mpv (sub-add); ASS rendered as authored; Settings shows OpenSubtitles key and quota state and subtitle style (font, size, position, background).
+- [ ] **10.5** The nudge: G and H (and the pad) shift subtitles by 100 ms in the player, persisted per file and per subtitle in the database (migration + repository method + repository_surface test) and reapplied on the next open.
+- [ ] **10.6** docs/specs/subtitle-alignment.md, crates/subtitle-align README as a standalone crate, learning note, evidence for E1-E6, regression check, close.
 
 ### Exit criteria
 
-- [x] **E1** Scoring is a pure function with unit and property tests over a fixture set of candidate lists.
-      - *Evidence:* 0db6420: crates/selection score() is pure (no clock, disk or network; depends only on source-protocol). cargo test -p sinephile-selection: tests/fixtures.rs 18 fixture lists (a_700_mb_4k_file_is_a_lie, a_60_minute_file_for_a_140_minute_film_is_a_lie, your_own_file_beats_a_better_stream, choosing_hindi_plays_hindi_even_at_lower_quality, ...) and tests/properties.rs 7 properties over 1,000-2,000 seeded random lists each (ranking_is_a_permutation, the_order_does_not_depend_on_the_order_given, a_sunk_copy_is_never_ahead_of_an_honest_one, an_honest_local_file_that_meets_the_choice_is_first, the_total_is_the_sum_of_the_terms_and_every_value_is_bounded, more_seeders_never_lower_a_score, carrying_the_chosen_language_never_hurts). Seen to fail: reversing the local, sunk and total rules each failed its property; plan test the_scorer_chooses_not_the_order_sources_answer_in fails with the duration floor at 0.1.
-- [x] **E2** Selecting "Hindi" plays a source with a Hindi audio track, or clearly reports that none is available.
-      - *Evidence:* 92d4d71: crates/playback/tests/plan.rs choosing_hindi_opens_the_copy_with_hindi_audio (plan_with opens the Hindi copy over a higher-resolution English one; with no Hindi copy, score.unmet = "carries en, not hi"); src/features/detail/DetailScreen.test.tsx "says plainly when no copy has the chosen language" ("None of your sources has Hindi audio.", Play still enabled, Hindi still selected); both seen to fail with the unmet text removed. Real window 2026-11-06: Nosferatu (1922) detail page offers Quality Best/720p/SD from the Internet Archive and re-plans on choice (CDP + PrintWindow).
-- [x] **E3** Selecting 4K plays genuine 4K, or explains why it can't.
-      - *Evidence:* 92d4d71: crates/playback/tests/plan.rs choosing_4k_opens_the_4k_copy_or_says_there_is_none (4K chosen opens the UHD copy; Tier 0 with nothing chosen gets 1080p; with no 4K copy, unmet = "1080p, not 4K", shown as "None of your sources has this in 4K."); "genuine" by crates/selection/tests/fixtures.rs a_700_mb_4k_file_is_a_lie (a fake 4K is sunk and never offered: the_choices_offered_are_what_honest_copies_carry).
-- [x] **E4** A deliberately-failing top candidate falls back within 10 s with no user action.
-      - *Evidence:* 0f18990: crates/playback/tests/fallback.rs a_dead_first_choice_falls_back_within_ten_seconds — headless libmpv with the app's Patience::default(), top choice a loopback server that accepts and never answers, next a local file: Play -> fallback's first frame 8.11 s (< 10 s); seen to fail at 11.17 s with the load patience at 11 s. Rules: a_failing_first_choice_falls_through_to_the_next, slow_is_not_broken, an_unresolvable_fallback_is_skipped_and_recorded, when_nothing_starts_every_reason_is_kept, a_newer_play_stops_the_old_fallback, only_honest_copies_below_the_chosen_one_are_fallbacks. Real window: normal Play through the new path, first frame 5615 ms, skipped=0 (docs/eval-results.md).
-- [x] **E5** The expert panel's score breakdown is legible and matches the code.
-      - *Evidence:* 5b50da9: src/features/detail/DetailScreen.test.tsx 'Ctrl+Shift+S shows every source with the arithmetic of its score (E5)' — points render as value x weight (+4.00, +1.50) and the shown total (+5.50) is the backend's Score.total; seen to fail when the panel printed value instead of points. The panel shows the backend's Score.terms verbatim (CandidateView/TermView in src-tauri/src/commands/playback.rs). Legible: real-window screenshot 2026-11-06 of Nosferatu (1922), six Internet Archive candidates ranked with source, quality, codec, transport, total and nine term rows each. 'Why this source' line: crates/selection/tests/explained.rs (4 tests).
-- [x] **E6** `docs/specs/source-scoring.md` documents every term in the scoring function and its weight, with justification.
-      - *Evidence:* 5b50da9: docs/specs/source-scoring.md documents all nine terms (§2 table: weight, +1/0/-1 meanings), each weight's justification (§2 'Why these weights'), fakes (§3), choices (§5), fallback (§6) and explanation (§7). crates/selection/tests/explained.rs the_specs_weights_are_the_codes_weights parses the table and fails on any mismatch with selection::weight (seen to fail with health documented as 3).
-- [x] **E7** The TV focus language (ADR-0042) is in the design system, and `tools/uiaudit` proves it in TV mode: the white ring is visible on every focus stop, the ring glides rather than jumps, the 125% scale and safe margin hold at 1920×1080, and under reduced motion no transform remains.
-      - *Evidence:* 1be4948 (9.0) + 91595da: tools/uiaudit/controller.mjs in CI ('Controller flow (simulated Xbox pad)') at --window-size=1920,1080 with a simulated pad: 'the focus ring is white, 3px and showing'; 'the ring surrounds every focus stop on the film page (19 stops; missed: none)' (seen to fail naming six stops when the choice rows opted out); 'the ring glides to the next key: 9 frames in between, overshoot 0.00px' (seen to fail with the spring removed, 9.0); 'TV mode renders the app at 125%' and 'the scaled app fills the window, with a 5% safe margin' (seen to fail when the zoom shrank the app, 9.0); 'under reduced motion a focused tile has no transform or shadow' and 'the ring moves without gliding (0 frames in between)'. 19/19 locally 2026-11-06.
+- [ ] **E1** > 90% of the fixture corpus aligns to within 150 ms.
+- [ ] **E2** A 23.976 vs 25 fps mismatch is detected and corrected, not just offset.
+- [ ] **E3** Embedded tracks are found and used without any network request.
+- [ ] **E4** The OpenSubtitles daily quota is respected and never exceeded; quota state is visible in Settings.
+- [ ] **E5** The manual nudge persists across sessions for the same file.
+- [ ] **E6** `crates/subtitle-align` is independently testable and documented as a standalone crate.
 
 ---
 
 ## What's next
 
-Close Phase 9 (/closephase 9): CI green on phase/09-intelligent-source-selection, merge --no-ff into main, CI green on main, tag phase-09, write completion_commit, then python tools/phasedoc/generate.py --open 10 and plan Phase 10 (subtitles) from SPEC.md §15.
+Phase 10 subtask 10.1 (docs/phases/phase-10-subtitle-pipeline.md): finish crates/subtitle-align on branch phase/10-subtitle-pipeline (work in progress is in git stash "phase 10 wip"): replace the z-score confidence with distinctness (best peak over the best peak at least 3 s away), use it for split windows, add negative controls to tools/eval/src/subs.rs, and reach > 90% on cargo run --release -p eval -- subs.
 
 ---
 
@@ -72,8 +63,8 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 6/6 |
 | [x] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 6/8 |
 | [x] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 5/7 |
-| [~] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 7/7 |
-| [ ] | 10 | Subtitle Pipeline | B | 8 | 2 | 0/6 |
+| [x] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 7/7 |
+| [~] | 10 | Subtitle Pipeline | B | 8 | 2 | 0/6 |
 | [ ] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 0/5 |
 | [ ] | 12 | Local Library Engine | B | 4 | 2–3 | 0/6 |
 | [ ] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 0/8 |
