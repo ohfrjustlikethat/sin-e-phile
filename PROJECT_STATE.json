@@ -39,8 +39,8 @@
       {
         "id": "9.4",
         "text": "Automatic fallback: the plan returns the ranked list; if the chosen candidate has no first frame within a start timeout, the player silently opens the next one and logs why, within 10 s of Play in total for a failing first choice.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "0f18990"
       },
       {
         "id": "9.5",
@@ -77,8 +77,8 @@
       {
         "id": "E4",
         "text": "A deliberately-failing top candidate falls back within 10 s with no user action.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "0f18990: crates/playback/tests/fallback.rs a_dead_first_choice_falls_back_within_ten_seconds — headless libmpv with the app's Patience::default(), top choice a loopback server that accepts and never answers, next a local file: Play -> fallback's first frame 8.11 s (< 10 s); seen to fail at 11.17 s with the load patience at 11 s. Rules: a_failing_first_choice_falls_through_to_the_next, slow_is_not_broken, an_unresolvable_fallback_is_skipped_and_recorded, when_nothing_starts_every_reason_is_kept, a_newer_play_stops_the_old_fallback, only_honest_copies_below_the_chosen_one_are_fallbacks. Real window: normal Play through the new path, first frame 5615 ms, skipped=0 (docs/eval-results.md)."
       },
       {
         "id": "E5",
@@ -1230,8 +1230,8 @@
         {
           "id": "E4",
           "text": "A deliberately-failing top candidate falls back within 10 s with no user action.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "0f18990: crates/playback/tests/fallback.rs a_dead_first_choice_falls_back_within_ten_seconds — headless libmpv with the app's Patience::default(), top choice a loopback server that accepts and never answers, next a local file: Play -> fallback's first frame 8.11 s (< 10 s); seen to fail at 11.17 s with the load patience at 11 s. Rules: a_failing_first_choice_falls_through_to_the_next, slow_is_not_broken, an_unresolvable_fallback_is_skipped_and_recorded, when_nothing_starts_every_reason_is_kept, a_newer_play_stops_the_old_fallback, only_honest_copies_below_the_chosen_one_are_fallbacks. Real window: normal Play through the new path, first frame 5615 ms, skipped=0 (docs/eval-results.md)."
         },
         {
           "id": "E5",
@@ -1280,8 +1280,8 @@
         {
           "id": "9.4",
           "text": "Automatic fallback: the plan returns the ranked list; if the chosen candidate has no first frame within a start timeout, the player silently opens the next one and logs why, within 10 s of Play in total for a failing first choice.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "0f18990"
         },
         {
           "id": "9.5",
@@ -2108,7 +2108,7 @@
       ]
     }
   ],
-  "next_action": "Phase 9 subtask 9.4 (docs/phases/phase-09-intelligent-source-selection.md): automatic fallback. PlayPlan.ranked already holds every candidate with its score. In src-tauri/src/commands/player.rs player_open, if no first frame arrives within a start timeout (about 6 s, so a failing first choice plus the next fits in 10 s), resolve the next non-sunk candidate through a new testable crates/playback function (e.g. next_target(&ranked, tried) resolving with the Resolver and torrent engine), open it silently and log why; prove it with a test where the top candidate never produces a frame (a URL that resolves but serves nothing) and the second plays, measuring time to first frame. Author checks outstanding: real controller (E5 carried), VPN drop (P7 E7).",
+  "next_action": "Phase 9 subtask 9.5 (docs/phases/phase-09-intelligent-source-selection.md): the expert panel and the 'why this source' line. Add a pure crates/selection function why(&Score) -> String (the strongest positive terms in words, e.g. '1080p · Hindi audio · 120 seeders'); carry it and the ranked list (key, backend, title, total, sunk, unmet, terms) in PlayPlanView; on the detail page show the why line under Play and a Ctrl+Shift+S overlay (also a Settings toggle 'Show source details') listing every candidate with each term's value, weight and contribution; pad-reachable. Test that the panel's numbers equal Score.terms (E5). Then 9.6 and close Phase 9.",
   "blockers": [],
   "decisions_pending": [
     {
@@ -2714,6 +2714,11 @@
       "id": "D68",
       "phase_raised": 9,
       "text": "original_language is filled only for anime matched to AniList, and only on an ingest or refresh after 92d4d71; IMDb films have none, so they show no original/dub labels. Fill it from TMDB (original_language) when a key is present (Phase 11 enrichment), and re-run the AniList pass on existing catalogues."
+    },
+    {
+      "id": "D69",
+      "text": "A swarm abandoned by fallback (9.4) stays in the torrent engine; remove or pause it when fallback moves past a torrent candidate (crates/playback/src/fallback.rs, sinephile_torrent::Engine).",
+      "phase_raised": 9
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

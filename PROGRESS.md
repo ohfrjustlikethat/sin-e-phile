@@ -12,17 +12,17 @@
 
 **Phase 9 — Intelligent Source Selection** (`in_progress`, branch `phase/09-intelligent-source-selection`)
 
-3 of 7 exit criteria met with evidence.
+4 of 7 exit criteria met with evidence.
 
 > Opened 2026-11-06 when Phase 8 merged (5e5558f, tag phase-08); planned under ADR-0040. Carried in from Phase 8: E5's one-time real-controller check (author); from Phase 7: E7's VPN-drop check (author). Release-group reputation is structural only: no group names in the repo (2.1). ADR-0042 (spec 3.1.0) adds the TV focus language to this phase as subtask 9.0, built first.
 
-### Subtasks — 4/7 complete
+### Subtasks — 5/7 complete
 
 - [x] **9.0** The TV focus language (ADR-0042) in src/design-system/focus/: the white ring with hairline and oxblood halo as one gliding element (critically damped spring ~200 ms), grow 1.06 and lift on tiles, left-stick tilt up to 6 degrees with a following sheen, A press-down 0.97x, TV mode with a pad (125% scale, 5% safe margin, button-hints footer, Web Audio ticks, ~20 ms rumble on select, View toggles full screen and picking up the pad enters it), settings for sounds, rumble and auto full screen, reduced motion honoured; extended tools/uiaudit/controller.mjs proves it. · `1be4948`
 - [x] **9.1** crates/selection: score(candidate, context) -> Score{total, terms[]} as a pure function over SourceCandidate plus a Context (title runtime, hardware tier and decode caps, preferred audio language, wanted quality, measured throughput). Terms: local availability, swarm health, size-versus-quality plausibility, encoding signals, codec/HDR compatibility, audio language, subtitles. Unit tests over a fixture set of candidate lists and property tests (ordering invariants). · `0db6420`
 - [x] **9.2** Fake and mislabel detection: bytes-per-minute against the claimed resolution and codec, and duration against the catalogue runtime; a 700 MB '4K' or a 60-minute file for a 140-minute film is flagged and sunk, with the reason kept. 'Release-group reputation' is implemented as structural signals only (naming consistency, encode tags, plausibility); no release-group or indexer names appear anywhere in the repo (SPEC.md 2.1). · `0db6420`
 - [x] **9.3** Language and quality as first-class choices: the detail page lists the audio languages the candidates actually carry and the qualities on offer (defaulting to the best the hardware and connection support), with dub/sub distinction for anime; choosing one re-plans to a candidate that carries it, or says plainly that none does. · `92d4d71`
-- [ ] **9.4** Automatic fallback: the plan returns the ranked list; if the chosen candidate has no first frame within a start timeout, the player silently opens the next one and logs why, within 10 s of Play in total for a failing first choice.
+- [x] **9.4** Automatic fallback: the plan returns the ranked list; if the chosen candidate has no first frame within a start timeout, the player silently opens the next one and logs why, within 10 s of Play in total for a failing first choice. · `0f18990`
 - [ ] **9.5** The expert panel (Ctrl+Shift+S, and a Settings toggle): every candidate ranked with each score term and its weight, matching the code; and a one-line 'why this source' under Play.
 - [ ] **9.6** docs/specs/source-scoring.md: every term, its weight and its justification; learning note; evidence for E1-E6 including a deliberately failing top candidate in a test.
 
@@ -34,7 +34,8 @@
       - *Evidence:* 92d4d71: crates/playback/tests/plan.rs choosing_hindi_opens_the_copy_with_hindi_audio (plan_with opens the Hindi copy over a higher-resolution English one; with no Hindi copy, score.unmet = "carries en, not hi"); src/features/detail/DetailScreen.test.tsx "says plainly when no copy has the chosen language" ("None of your sources has Hindi audio.", Play still enabled, Hindi still selected); both seen to fail with the unmet text removed. Real window 2026-11-06: Nosferatu (1922) detail page offers Quality Best/720p/SD from the Internet Archive and re-plans on choice (CDP + PrintWindow).
 - [x] **E3** Selecting 4K plays genuine 4K, or explains why it can't.
       - *Evidence:* 92d4d71: crates/playback/tests/plan.rs choosing_4k_opens_the_4k_copy_or_says_there_is_none (4K chosen opens the UHD copy; Tier 0 with nothing chosen gets 1080p; with no 4K copy, unmet = "1080p, not 4K", shown as "None of your sources has this in 4K."); "genuine" by crates/selection/tests/fixtures.rs a_700_mb_4k_file_is_a_lie (a fake 4K is sunk and never offered: the_choices_offered_are_what_honest_copies_carry).
-- [ ] **E4** A deliberately-failing top candidate falls back within 10 s with no user action.
+- [x] **E4** A deliberately-failing top candidate falls back within 10 s with no user action.
+      - *Evidence:* 0f18990: crates/playback/tests/fallback.rs a_dead_first_choice_falls_back_within_ten_seconds — headless libmpv with the app's Patience::default(), top choice a loopback server that accepts and never answers, next a local file: Play -> fallback's first frame 8.11 s (< 10 s); seen to fail at 11.17 s with the load patience at 11 s. Rules: a_failing_first_choice_falls_through_to_the_next, slow_is_not_broken, an_unresolvable_fallback_is_skipped_and_recorded, when_nothing_starts_every_reason_is_kept, a_newer_play_stops_the_old_fallback, only_honest_copies_below_the_chosen_one_are_fallbacks. Real window: normal Play through the new path, first frame 5615 ms, skipped=0 (docs/eval-results.md).
 - [ ] **E5** The expert panel's score breakdown is legible and matches the code.
 - [ ] **E6** `docs/specs/source-scoring.md` documents every term in the scoring function and its weight, with justification.
 - [ ] **E7** The TV focus language (ADR-0042) is in the design system, and `tools/uiaudit` proves it in TV mode: the white ring is visible on every focus stop, the ring glides rather than jumps, the 125% scale and safe margin hold at 1920×1080, and under reduced motion no transform remains.
@@ -43,7 +44,7 @@
 
 ## What's next
 
-Phase 9 subtask 9.4 (docs/phases/phase-09-intelligent-source-selection.md): automatic fallback. PlayPlan.ranked already holds every candidate with its score. In src-tauri/src/commands/player.rs player_open, if no first frame arrives within a start timeout (about 6 s, so a failing first choice plus the next fits in 10 s), resolve the next non-sunk candidate through a new testable crates/playback function (e.g. next_target(&ranked, tried) resolving with the Resolver and torrent engine), open it silently and log why; prove it with a test where the top candidate never produces a frame (a URL that resolves but serves nothing) and the second plays, measuring time to first frame. Author checks outstanding: real controller (E5 carried), VPN drop (P7 E7).
+Phase 9 subtask 9.5 (docs/phases/phase-09-intelligent-source-selection.md): the expert panel and the 'why this source' line. Add a pure crates/selection function why(&Score) -> String (the strongest positive terms in words, e.g. '1080p · Hindi audio · 120 seeders'); carry it and the ranked list (key, backend, title, total, sunk, unmet, terms) in PlayPlanView; on the detail page show the why line under Play and a Ctrl+Shift+S overlay (also a Settings toggle 'Show source details') listing every candidate with each term's value, weight and contribution; pad-reachable. Test that the panel's numbers equal Score.terms (E5). Then 9.6 and close Phase 9.
 
 ---
 
@@ -68,7 +69,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 6/6 |
 | [x] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 6/8 |
 | [x] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 5/7 |
-| [~] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 3/7 |
+| [~] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 4/7 |
 | [ ] | 10 | Subtitle Pipeline | B | 8 | 2 | 0/6 |
 | [ ] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 0/5 |
 | [ ] | 12 | Local Library Engine | B | 4 | 2–3 | 0/6 |
@@ -162,6 +163,7 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D66** (raised in Phase 8) ADR-0036 says PROGRESS.md lists carried criteria in their own section; tools/state/validate_state.py do_progress does not. Add the section (carried, and discharged) so a carry cannot hide among met criteria.
 - **D67** (raised in Phase 9) sinephile_playback::machine assumes no AV1 hardware decode and no HDR display (neither is probed), and Context.throughput is None until the torrent engine or HTTP path reports a measured speed. Probe both via DXGI/D3D11 video decoder profiles in crates/tiers and feed a measured speed in 9.4.
 - **D68** (raised in Phase 9) original_language is filled only for anime matched to AniList, and only on an ingest or refresh after 92d4d71; IMDb films have none, so they show no original/dub labels. Fill it from TMDB (original_language) when a key is present (Phase 11 enrichment), and re-run the AniList pass on existing catalogues.
+- **D69** (raised in Phase 9) A swarm abandoned by fallback (9.4) stays in the torrent engine; remove or pause it when fallback moves past a torrent candidate (crates/playback/src/fallback.rs, sinephile_torrent::Engine).
 
 ---
 
