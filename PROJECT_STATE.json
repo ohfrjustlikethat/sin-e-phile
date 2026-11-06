@@ -27,20 +27,20 @@
       {
         "id": "10.3",
         "text": "The subtitle chain in a testable crate (crates/subtitles): embedded tracks first (from the player's track list, no network), then sidecar files next to the media (same stem, language suffixes) or in the torrent's file list, then OpenSubtitles by movie hash with the user's own key (no key ships), a persisted daily quota budget that is never exceeded and a cache, then other providers behind a trait; language preference ordering per profile. A test proves an embedded track is used with zero network requests.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "ece5de6"
       },
       {
         "id": "10.4",
         "text": "Wiring in the app: audio extracted with FFmpeg (16 kHz mono, first 20 minutes) for alignment on Tier 1+, the duration heuristic on Tier 0; an aligned or found subtitle loaded into mpv (sub-add); ASS rendered as authored; Settings shows OpenSubtitles key and quota state and subtitle style (font, size, position, background).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "2c331de"
       },
       {
         "id": "10.5",
         "text": "The nudge: G and H (and the pad) shift subtitles by 100 ms in the player, persisted per file and per subtitle in the database (migration + repository method + repository_surface test) and reapplied on the next open.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "2c331de"
       },
       {
         "id": "10.6",
@@ -65,20 +65,20 @@
       {
         "id": "E3",
         "text": "Embedded tracks are found and used without any network request.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "ece5de6/2c331de: crates/subtitles/tests/chain.rs an_embedded_track_is_used_without_a_single_request (FakeTransport.request_count()==0; seen to fail when pick always fetches); crates/subtitles/tests/plan.rs an_embedded_track_in_your_language_is_shown_as_it_is (embedded beats the file beside it). The app path (src-tauri/src/commands/subtitles.rs open_for) builds the provider only from the profile's own key and calls plan, which calls pick first."
       },
       {
         "id": "E4",
         "text": "The OpenSubtitles daily quota is respected and never exceeded; quota state is visible in Settings.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "ece5de6/2c331de: crates/subtitles/tests/chain.rs the_daily_quota_is_never_exceeded (after FREE_DAILY=5 downloads no further request is made; seen to fail with the budget check off by one), the_providers_own_count_wins_when_it_is_lower, a_failed_attempt_gives_its_reservation_back; persistence repository_surface subtitle_repository_surface (reserve is one conditional UPDATE). Visible in Settings: src/features/settings/SubtitlesSection.test.tsx 'shows how much of today's quota is left' ('3 of 5 downloads left today') and 'believes OpenSubtitles when it says fewer are left'."
       },
       {
         "id": "E5",
         "text": "The manual nudge persists across sessions for the same file.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "2c331de: crates/persistence/tests/repository_surface.rs subtitle_repository_surface (per file and subtitle; zero clears); crates/subtitles/tests/plan.rs the_nudge_from_last_time_comes_back (keyed by the file's hash); real window 2026-11-06: three subtitle_nudge(-100) on Garden.mkv gave -300, the app was closed and reopened on the same file, and the nudge in force was -300."
       },
       {
         "id": "E6",
@@ -1309,20 +1309,20 @@
         {
           "id": "E3",
           "text": "Embedded tracks are found and used without any network request.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "ece5de6/2c331de: crates/subtitles/tests/chain.rs an_embedded_track_is_used_without_a_single_request (FakeTransport.request_count()==0; seen to fail when pick always fetches); crates/subtitles/tests/plan.rs an_embedded_track_in_your_language_is_shown_as_it_is (embedded beats the file beside it). The app path (src-tauri/src/commands/subtitles.rs open_for) builds the provider only from the profile's own key and calls plan, which calls pick first."
         },
         {
           "id": "E4",
           "text": "The OpenSubtitles daily quota is respected and never exceeded; quota state is visible in Settings.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "ece5de6/2c331de: crates/subtitles/tests/chain.rs the_daily_quota_is_never_exceeded (after FREE_DAILY=5 downloads no further request is made; seen to fail with the budget check off by one), the_providers_own_count_wins_when_it_is_lower, a_failed_attempt_gives_its_reservation_back; persistence repository_surface subtitle_repository_surface (reserve is one conditional UPDATE). Visible in Settings: src/features/settings/SubtitlesSection.test.tsx 'shows how much of today's quota is left' ('3 of 5 downloads left today') and 'believes OpenSubtitles when it says fewer are left'."
         },
         {
           "id": "E5",
           "text": "The manual nudge persists across sessions for the same file.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "2c331de: crates/persistence/tests/repository_surface.rs subtitle_repository_surface (per file and subtitle; zero clears); crates/subtitles/tests/plan.rs the_nudge_from_last_time_comes_back (keyed by the file's hash); real window 2026-11-06: three subtitle_nudge(-100) on Garden.mkv gave -300, the app was closed and reopened on the same file, and the nudge in force was -300."
         },
         {
           "id": "E6",
@@ -1347,20 +1347,20 @@
         {
           "id": "10.3",
           "text": "The subtitle chain in a testable crate (crates/subtitles): embedded tracks first (from the player's track list, no network), then sidecar files next to the media (same stem, language suffixes) or in the torrent's file list, then OpenSubtitles by movie hash with the user's own key (no key ships), a persisted daily quota budget that is never exceeded and a cache, then other providers behind a trait; language preference ordering per profile. A test proves an embedded track is used with zero network requests.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "ece5de6"
         },
         {
           "id": "10.4",
           "text": "Wiring in the app: audio extracted with FFmpeg (16 kHz mono, first 20 minutes) for alignment on Tier 1+, the duration heuristic on Tier 0; an aligned or found subtitle loaded into mpv (sub-add); ASS rendered as authored; Settings shows OpenSubtitles key and quota state and subtitle style (font, size, position, background).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "2c331de"
         },
         {
           "id": "10.5",
           "text": "The nudge: G and H (and the pad) shift subtitles by 100 ms in the player, persisted per file and per subtitle in the database (migration + repository method + repository_surface test) and reapplied on the next open.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "2c331de"
         },
         {
           "id": "10.6",
@@ -2134,7 +2134,7 @@
       ]
     }
   ],
-  "next_action": "Phase 10 subtask 10.3 (docs/phases/phase-10-subtitle-pipeline.md): finish crates/subtitles (started, untracked: hash.rs and files.rs written): add lib.rs with Found/Origin and rank(found, language prefs) (embedded > sidecar > torrent > downloaded, forced tracks only when nothing else), an OpenSubtitles client over sinephile_metadata_api::Transport (GET /subtitles?moviehash=&languages=, POST /download, Api-Key header with the profile's own key) and a fetcher that checks SubtitleRepository::cached, reserves quota before downloading (release on failure), writes under data/cache/subtitles and remembers it; test with FakeTransport including 'an embedded track is used with zero requests' (E3) and 'the quota is never exceeded' (E4); add to the workspace.",
+  "next_action": "Phase 10 subtask 10.6 then close (docs/phases/phase-10-subtitle-pipeline.md): learning note docs/learning/phase-10-notes.md (four sections, five questions); HOW_IT_WORKS subtitles section and README; SESSION_LOG entry with the Phase 10 retrospective; rule-13 regression check (cargo run --release -p eval -- all twice, -- vector --report); record debt (torrent subtitle files not fetched, OpenSubtitles hash for streams); then /closephase 10 and open Phase 11 from SPEC.md section 15.",
   "blockers": [],
   "decisions_pending": [
     {
