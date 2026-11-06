@@ -5274,6 +5274,7 @@ dependencies = [
  "sinephile-search-engine",
  "sinephile-selection",
  "sinephile-sources",
+ "sinephile-subtitles",
  "sinephile-tiers",
  "sinephile-torrent",
  "sinephile-vector-index",

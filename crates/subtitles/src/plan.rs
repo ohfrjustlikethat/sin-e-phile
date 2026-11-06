@@ -228,7 +228,9 @@ fn in_step(
         }
     };
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("srt");
-    let name: String = format!("{file_key}-{}", found.origin.key())
+    let key = found.origin.key();
+    let key = key.strip_suffix(&format!(".{ext}")).unwrap_or(&key);
+    let name: String = format!("{file_key}-{key}")
         .chars()
         .map(|c| {
             if c.is_ascii_alphanumeric() || c == '-' || c == '.' {

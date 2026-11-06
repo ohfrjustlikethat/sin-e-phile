@@ -31,6 +31,9 @@ describe("gamepad decisions", () => {
     expect(playerIntent(BUTTON.X)).toEqual({ kind: "subtitles_menu" });
     expect(playerIntent(BUTTON.RT)).toEqual({ kind: "seek", seconds: 30 });
     expect(playerIntent(BUTTON.LEFT)).toEqual({ kind: "seek", seconds: -10 });
+    // Phase 10: the bumpers nudge the subtitles, as G and H do.
+    expect(playerIntent(BUTTON.LB)).toEqual({ kind: "subtitle_delay", ms: -100 });
+    expect(playerIntent(BUTTON.RB)).toEqual({ kind: "subtitle_delay", ms: 100 });
   });
 
   it("maps browsing buttons to navigation", () => {

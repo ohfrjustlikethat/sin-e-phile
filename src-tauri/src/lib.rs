@@ -75,6 +75,11 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::playback::item_detail,
             commands::playback::prepare_play,
             commands::playback::save_position,
+            commands::subtitles::subtitle_settings,
+            commands::subtitles::set_subtitle_settings,
+            commands::subtitles::set_opensubtitles_key,
+            commands::subtitles::clear_opensubtitles_key,
+            commands::subtitles::subtitle_nudge,
         ])
         // `AssetProgress` travels as an EVENT payload, so no command signature mentions it
         // and specta would not export it. Registered explicitly rather than hand-written in

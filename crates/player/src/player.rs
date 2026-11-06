@@ -68,6 +68,9 @@ pub struct Track {
     /// A forced subtitle: only the foreign-language lines.
     #[serde(default)]
     pub forced: bool,
+    /// Loaded from a separate file rather than inside the media.
+    #[serde(default)]
+    pub external: bool,
 }
 
 /// How plain subtitles look (Settings → Subtitles).
@@ -138,6 +141,9 @@ impl Player {
         set("keep-open", "yes")?;
         set("hr-seek", "yes")?;
         set("cache", "yes")?;
+        // mpv would load a subtitle beside the file by itself, unaligned, and report it as
+        // a track. The subtitle chain (crates/subtitles) finds, aligns and loads those.
+        set("sub-auto", "no")?;
         set("demuxer-max-bytes", "256MiB")?;
         set("hwdec", if options.hwdec { "auto-safe" } else { "no" })?;
         if options.headless {
@@ -421,6 +427,7 @@ impl Player {
                     codec: p("codec"),
                     selected: p("selected").as_deref() == Some("yes"),
                     forced: p("forced").as_deref() == Some("yes"),
+                    external: p("external").as_deref() == Some("yes"),
                 }
             })
             .collect()

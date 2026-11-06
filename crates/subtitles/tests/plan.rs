@@ -172,7 +172,11 @@ async fn a_file_beside_the_film_is_aligned_to_its_speech() {
         .zip(&truth)
         .filter(|(a, b)| (a.start - b.start).abs() <= 150)
         .count();
-    assert!(landed * 100 >= truth.len() * 95, "{landed}/{} ({note})", truth.len());
+    assert!(
+        landed * 100 >= truth.len() * 95,
+        "{landed}/{} ({note})",
+        truth.len()
+    );
     // The original is untouched.
     assert_eq!(
         std::fs::read_to_string(dir.path().join("Sunrise.1927.en.srt")).unwrap(),

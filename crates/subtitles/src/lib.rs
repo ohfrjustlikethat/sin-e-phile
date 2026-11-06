@@ -105,6 +105,21 @@ pub fn worth_fetching(found: &[Found], languages: &[String]) -> bool {
     choose(found, languages).is_none_or(|f| f.forced)
 }
 
+/// The UTC date of a Unix time, `YYYY-MM-DD`: the day a provider's quota counts in.
+/// (Howard Hinnant's civil-from-days; no date library for one function.)
+pub fn utc_day(unix_seconds: i64) -> String {
+    let z = unix_seconds.div_euclid(86_400) + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -166,6 +181,14 @@ mod tests {
             "a forced track is not enough"
         );
         assert!(!worth_fetching(&all, &langs(&["en"])));
+    }
+
+    #[test]
+    fn the_quota_day_is_the_utc_date() {
+        assert_eq!(utc_day(0), "1970-01-01");
+        assert_eq!(utc_day(951_782_400), "2000-02-29");
+        assert_eq!(utc_day(1_794_009_599), "2026-11-06"); // 23:59:59 UTC
+        assert_eq!(utc_day(1_794_009_600), "2026-11-07");
     }
 
     #[test]
