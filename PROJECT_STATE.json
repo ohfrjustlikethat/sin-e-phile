@@ -15,8 +15,8 @@
       {
         "id": "12.1",
         "text": "crates/filename-parser (MIT/Apache, pure, no I/O): title, year, season, episode (S01E02, 1x02, multi-episode ranges), absolute episode for anime-style 'Title - 059', resolution, source, codec, audio, language, release group (bracket prefix or dash suffix, recognised by position, never by a list of names). fixtures/filenames/: 500+ hand-labelled names covering scene, anime fansub, multi-episode, messy and adversarial cases; every group name invented (2.1); a per-field accuracy test. Documented with a runnable README example (E6).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "8c3a377"
       },
       {
         "id": "12.2",
@@ -83,8 +83,8 @@
       {
         "id": "E6",
         "text": "`crates/filename-parser` is documented and independently useful.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "8c3a377: crates/filename-parser (MIT OR Apache-2.0, one dependency: regex =1.13.1, no I/O) documented by README.md included as the crate doc, whose example runs as a doctest (cargo test -p filename-parser: 1 doctest passed), plus examples/parse.rs for the command line. Measured: tests/corpus.rs the_corpus_reads_as_a_human_reads_it, 549 hand-labelled names in fixtures/filenames/names.psv, 100% on every field after tuning (98.36% before); names_it_was_never_tuned_on_read_as_well, 109 names in heldout.psv written after tuning, 109/109 on the first run; tests/fields.rs (7 tests: languages, edition, flags, audio, dates, episode titles, extension, comparable). Seen to fail: dropping the year made both corpus tests fail (year 32.24% < 97%). Release groups in the fixtures are invented (2.1)."
       }
     ]
   },
@@ -1503,16 +1503,16 @@
         {
           "id": "E6",
           "text": "`crates/filename-parser` is documented and independently useful.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "8c3a377: crates/filename-parser (MIT OR Apache-2.0, one dependency: regex =1.13.1, no I/O) documented by README.md included as the crate doc, whose example runs as a doctest (cargo test -p filename-parser: 1 doctest passed), plus examples/parse.rs for the command line. Measured: tests/corpus.rs the_corpus_reads_as_a_human_reads_it, 549 hand-labelled names in fixtures/filenames/names.psv, 100% on every field after tuning (98.36% before); names_it_was_never_tuned_on_read_as_well, 109 names in heldout.psv written after tuning, 109/109 on the first run; tests/fields.rs (7 tests: languages, edition, flags, audio, dates, episode titles, extension, comparable). Seen to fail: dropping the year made both corpus tests fail (year 32.24% < 97%). Release groups in the fixtures are invented (2.1)."
         }
       ],
       "subtasks": [
         {
           "id": "12.1",
           "text": "crates/filename-parser (MIT/Apache, pure, no I/O): title, year, season, episode (S01E02, 1x02, multi-episode ranges), absolute episode for anime-style 'Title - 059', resolution, source, codec, audio, language, release group (bracket prefix or dash suffix, recognised by position, never by a list of names). fixtures/filenames/: 500+ hand-labelled names covering scene, anime fansub, multi-episode, messy and adversarial cases; every group name invented (2.1); a per-field accuracy test. Documented with a runnable README example (E6).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "8c3a377"
         },
         {
           "id": "12.2",
@@ -2222,7 +2222,7 @@
       ]
     }
   ],
-  "next_action": "Phase 12 subtask 12.1 (docs/phases/phase-12-local-library-engine.md): crates/filename-parser/src/lib.rs parse(name) -> Parsed; tokenise on separators, take bracketed group and tags first, then SxxEyy / 1x02 / ranges / \" - NNN\" absolute, year as the last plausible 19xx/20xx before the tags, title as the text before the first tag; fixtures/filenames/names.tsv hand-labelled, tests/corpus.rs per-field accuracy.",
+  "next_action": "Phase 12 subtask 12.2 (docs/phases/phase-12-local-library-engine.md): migration 0021_library in crates/persistence/migrations: library_folders (id, path UNIQUE, added_at), local_files gains folder_id REFERENCES library_folders ON DELETE CASCADE and missing_since TEXT; match_memory (pattern TEXT PRIMARY KEY = comparable title, media_item_id, decided_at). crates/persistence/src/repositories/library.rs LibraryRepository: add_folder, folders, remove_folder, upsert_file, file_by_path, mark_missing, move_file, set_match, match_of, unmatched, remember, recall; a line per method in tests/repository_surface.rs; portability test allow-list gains library_folders.path with its reason.",
   "blockers": [],
   "decisions_pending": [
     {

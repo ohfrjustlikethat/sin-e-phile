@@ -20,11 +20,11 @@ Folder registration with recursive scanning and live filesystem monitoring (`Rea
 - [ ] **E3** Scanning 10,000 files completes in under 3 minutes and does not block the UI.
 - [ ] **E4** Renaming a file outside the app is detected and does not create a duplicate.
 - [ ] **E5** The review queue is genuinely pleasant to use — resolving 20 ambiguous items takes under a minute.
-- [ ] **E6** `crates/filename-parser` is documented and independently useful.
+- [x] **E6** `crates/filename-parser` is documented and independently useful.
 
 ## Subtasks
 
-- [ ] **12.1** crates/filename-parser (MIT/Apache, pure, no I/O): title, year, season, episode (S01E02, 1x02, multi-episode ranges), absolute episode for anime-style 'Title - 059', resolution, source, codec, audio, language, release group (bracket prefix or dash suffix, recognised by position, never by a list of names). fixtures/filenames/: 500+ hand-labelled names covering scene, anime fansub, multi-episode, messy and adversarial cases; every group name invented (2.1); a per-field accuracy test. Documented with a runnable README example (E6).
+- [x] **12.1** crates/filename-parser (MIT/Apache, pure, no I/O): title, year, season, episode (S01E02, 1x02, multi-episode ranges), absolute episode for anime-style 'Title - 059', resolution, source, codec, audio, language, release group (bracket prefix or dash suffix, recognised by position, never by a list of names). fixtures/filenames/: 500+ hand-labelled names covering scene, anime fansub, multi-episode, messy and adversarial cases; every group name invented (2.1); a per-field accuracy test. Documented with a runnable README example (E6).
 - [ ] **12.2** Migration 0021 library: library_folders (the user's own roots, machine-specific like local_files.path; the portability test's allow-list grows by that column with the reason), local_files gains folder_id and a missing_since for moves; match_memory (a normalised name pattern -> media item, from the user's decisions). LibraryRepository with a repository_surface line per method.
 - [ ] **12.3** crates/library identification: candidates from the catalogue by title (FTS) and year, scored on independent weak signals (title similarity, year, duration vs runtime from FFprobe, episode exists, folder and sibling context, remembered decisions), a confidence in [0,1], auto-accepted above a threshold set from measurement (DECISIONS_PENDING), else the review queue. tools/eval 'identify' harness over fixtures/filenames labelled with catalogue ids: top-1 (E1 > 95%) and false-confident (E2 < 1%); numbers to docs/eval-results.md.
 - [ ] **12.4** Scanner and watcher: register a folder, walk it recursively, probe only what identification needs, in parallel, off the UI thread with progress events; the notify crate (ReadDirectoryChangesW) applies creates, deletes, renames and moves without a rescan; a rename or move keeps the row (no duplicate, E4). Measured: 10,000 files under 3 minutes with the UI responsive (E3).
@@ -40,4 +40,4 @@ Parsing messy real-world input; why multiple weak signals beat one strong one; c
 <!-- subtask log: appended during the phase -->
 
 ## Work log
-
+- **12.1** crates/filename-parser (MIT/Apache, pure, no I/O): title, year, season, episode (S01E02, 1x02, m · `0097432`

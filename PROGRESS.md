@@ -12,13 +12,13 @@
 
 **Phase 12 — Local Library Engine** (`in_progress`, branch `phase/12-local-library-engine`)
 
-0 of 6 exit criteria met with evidence.
+1 of 6 exit criteria met with evidence.
 
 > Opened 2026-11-07 when Phase 11 merged (cc3ca3c, tag phase-11). Inherits: absolute_number is NULL by design (ADR-0031), so an anime-style absolute number goes to the review queue rather than a lookup; Phase 8's carried criterion (search, click and watch a local file) is discharged by 12.5; the confidence threshold is measured, not chosen (DECISIONS_PENDING). Release-group names in fixtures are invented: real ones would be naming content sources by the back door (2.1). Author checks still outstanding: real controller (Phase 8 E5), VPN drop (Phase 7 E7), both carried to 13.
 
-### Subtasks — 0/6 complete
+### Subtasks — 1/6 complete
 
-- [ ] **12.1** crates/filename-parser (MIT/Apache, pure, no I/O): title, year, season, episode (S01E02, 1x02, multi-episode ranges), absolute episode for anime-style 'Title - 059', resolution, source, codec, audio, language, release group (bracket prefix or dash suffix, recognised by position, never by a list of names). fixtures/filenames/: 500+ hand-labelled names covering scene, anime fansub, multi-episode, messy and adversarial cases; every group name invented (2.1); a per-field accuracy test. Documented with a runnable README example (E6).
+- [x] **12.1** crates/filename-parser (MIT/Apache, pure, no I/O): title, year, season, episode (S01E02, 1x02, multi-episode ranges), absolute episode for anime-style 'Title - 059', resolution, source, codec, audio, language, release group (bracket prefix or dash suffix, recognised by position, never by a list of names). fixtures/filenames/: 500+ hand-labelled names covering scene, anime fansub, multi-episode, messy and adversarial cases; every group name invented (2.1); a per-field accuracy test. Documented with a runnable README example (E6). · `8c3a377`
 - [ ] **12.2** Migration 0021 library: library_folders (the user's own roots, machine-specific like local_files.path; the portability test's allow-list grows by that column with the reason), local_files gains folder_id and a missing_since for moves; match_memory (a normalised name pattern -> media item, from the user's decisions). LibraryRepository with a repository_surface line per method.
 - [ ] **12.3** crates/library identification: candidates from the catalogue by title (FTS) and year, scored on independent weak signals (title similarity, year, duration vs runtime from FFprobe, episode exists, folder and sibling context, remembered decisions), a confidence in [0,1], auto-accepted above a threshold set from measurement (DECISIONS_PENDING), else the review queue. tools/eval 'identify' harness over fixtures/filenames labelled with catalogue ids: top-1 (E1 > 95%) and false-confident (E2 < 1%); numbers to docs/eval-results.md.
 - [ ] **12.4** Scanner and watcher: register a folder, walk it recursively, probe only what identification needs, in parallel, off the UI thread with progress events; the notify crate (ReadDirectoryChangesW) applies creates, deletes, renames and moves without a rescan; a rename or move keeps the row (no duplicate, E4). Measured: 10,000 files under 3 minutes with the UI responsive (E3).
@@ -32,13 +32,14 @@
 - [ ] **E3** Scanning 10,000 files completes in under 3 minutes and does not block the UI.
 - [ ] **E4** Renaming a file outside the app is detected and does not create a duplicate.
 - [ ] **E5** The review queue is genuinely pleasant to use — resolving 20 ambiguous items takes under a minute.
-- [ ] **E6** `crates/filename-parser` is documented and independently useful.
+- [x] **E6** `crates/filename-parser` is documented and independently useful.
+      - *Evidence:* 8c3a377: crates/filename-parser (MIT OR Apache-2.0, one dependency: regex =1.13.1, no I/O) documented by README.md included as the crate doc, whose example runs as a doctest (cargo test -p filename-parser: 1 doctest passed), plus examples/parse.rs for the command line. Measured: tests/corpus.rs the_corpus_reads_as_a_human_reads_it, 549 hand-labelled names in fixtures/filenames/names.psv, 100% on every field after tuning (98.36% before); names_it_was_never_tuned_on_read_as_well, 109 names in heldout.psv written after tuning, 109/109 on the first run; tests/fields.rs (7 tests: languages, edition, flags, audio, dates, episode titles, extension, comparable). Seen to fail: dropping the year made both corpus tests fail (year 32.24% < 97%). Release groups in the fixtures are invented (2.1).
 
 ---
 
 ## What's next
 
-Phase 12 subtask 12.1 (docs/phases/phase-12-local-library-engine.md): crates/filename-parser/src/lib.rs parse(name) -> Parsed; tokenise on separators, take bracketed group and tags first, then SxxEyy / 1x02 / ranges / " - NNN" absolute, year as the last plausible 19xx/20xx before the tags, title as the text before the first tag; fixtures/filenames/names.tsv hand-labelled, tests/corpus.rs per-field accuracy.
+Phase 12 subtask 12.2 (docs/phases/phase-12-local-library-engine.md): migration 0021_library in crates/persistence/migrations: library_folders (id, path UNIQUE, added_at), local_files gains folder_id REFERENCES library_folders ON DELETE CASCADE and missing_since TEXT; match_memory (pattern TEXT PRIMARY KEY = comparable title, media_item_id, decided_at). crates/persistence/src/repositories/library.rs LibraryRepository: add_folder, folders, remove_folder, upsert_file, file_by_path, mark_missing, move_file, set_match, match_of, unmatched, remember, recall; a line per method in tests/repository_surface.rs; portability test allow-list gains library_folders.path with its reason.
 
 ---
 
@@ -66,7 +67,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 7/7 |
 | [x] | 10 | Subtitle Pipeline | B | 8 | 2 | 6/6 |
 | [x] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 6/6 |
-| [~] | 12 | Local Library Engine | B | 4 | 2–3 | 0/6 |
+| [~] | 12 | Local Library Engine | B | 4 | 2–3 | 1/6 |
 | [ ] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 0/8 |
 | [ ] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 0/6 |
 | [ ] | 15 | Taste Model | B | 5, 14 | 2 | 0/5 |
