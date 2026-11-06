@@ -15,8 +15,8 @@
       {
         "id": "9.0",
         "text": "The TV focus language (ADR-0042) in src/design-system/focus/: the white ring with hairline and oxblood halo as one gliding element (critically damped spring ~200 ms), grow 1.06 and lift on tiles, left-stick tilt up to 6 degrees with a following sheen, A press-down 0.97x, TV mode with a pad (125% scale, 5% safe margin, button-hints footer, Web Audio ticks, ~20 ms rumble on select, View toggles full screen and picking up the pad enters it), settings for sounds, rumble and auto full screen, reduced motion honoured; extended tools/uiaudit/controller.mjs proves it.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "1be4948"
       },
       {
         "id": "9.1",
@@ -1256,8 +1256,8 @@
         {
           "id": "9.0",
           "text": "The TV focus language (ADR-0042) in src/design-system/focus/: the white ring with hairline and oxblood halo as one gliding element (critically damped spring ~200 ms), grow 1.06 and lift on tiles, left-stick tilt up to 6 degrees with a following sheen, A press-down 0.97x, TV mode with a pad (125% scale, 5% safe margin, button-hints footer, Web Audio ticks, ~20 ms rumble on select, View toggles full screen and picking up the pad enters it), settings for sounds, rumble and auto full screen, reduced motion honoured; extended tools/uiaudit/controller.mjs proves it.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "1be4948"
         },
         {
           "id": "9.1",
@@ -2108,7 +2108,7 @@
       ]
     }
   ],
-  "next_action": "Phase 9 subtask 9.0 (docs/specs/tv-focus.md, ADR-0042): build src/design-system/focus/ — a FocusRing overlay that follows document focus and glides on a critically damped spring, tile effects (grow/lift/tilt/sheen/press) applied via a data-focus-tile attribute, TV mode (pad: 125% zoom, safe margin, HintsBar, ticks, rumble, View->fullscreen) driven from src/lib/gamepad.ts; then extend tools/uiaudit/controller.mjs to assert the white ring, the glide and reduced motion. Then 9.1, crates/selection.",
+  "next_action": "Phase 9 subtask 9.1 (docs/phases/phase-09-intelligent-source-selection.md): create crates/selection with score(candidate, &Context) -> Score { total, terms: Vec<Term{name, value, weight, why}> } as a pure function over source_protocol::SourceCandidate; start with local availability, swarm health and size-versus-quality plausibility, fixture lists in crates/selection/tests/fixtures.rs, then wire it into crates/playback::rank in place of the fixed transport order. Author checks outstanding: real controller (E5 carried), VPN drop (P7 E7).",
   "blockers": [],
   "decisions_pending": [
     {

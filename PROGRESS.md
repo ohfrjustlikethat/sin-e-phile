@@ -16,9 +16,9 @@
 
 > Opened 2026-11-06 when Phase 8 merged (5e5558f, tag phase-08); planned under ADR-0040. Carried in from Phase 8: E5's one-time real-controller check (author); from Phase 7: E7's VPN-drop check (author). Release-group reputation is structural only: no group names in the repo (2.1). ADR-0042 (spec 3.1.0) adds the TV focus language to this phase as subtask 9.0, built first.
 
-### Subtasks — 0/7 complete
+### Subtasks — 1/7 complete
 
-- [ ] **9.0** The TV focus language (ADR-0042) in src/design-system/focus/: the white ring with hairline and oxblood halo as one gliding element (critically damped spring ~200 ms), grow 1.06 and lift on tiles, left-stick tilt up to 6 degrees with a following sheen, A press-down 0.97x, TV mode with a pad (125% scale, 5% safe margin, button-hints footer, Web Audio ticks, ~20 ms rumble on select, View toggles full screen and picking up the pad enters it), settings for sounds, rumble and auto full screen, reduced motion honoured; extended tools/uiaudit/controller.mjs proves it.
+- [x] **9.0** The TV focus language (ADR-0042) in src/design-system/focus/: the white ring with hairline and oxblood halo as one gliding element (critically damped spring ~200 ms), grow 1.06 and lift on tiles, left-stick tilt up to 6 degrees with a following sheen, A press-down 0.97x, TV mode with a pad (125% scale, 5% safe margin, button-hints footer, Web Audio ticks, ~20 ms rumble on select, View toggles full screen and picking up the pad enters it), settings for sounds, rumble and auto full screen, reduced motion honoured; extended tools/uiaudit/controller.mjs proves it. · `1be4948`
 - [ ] **9.1** crates/selection: score(candidate, context) -> Score{total, terms[]} as a pure function over SourceCandidate plus a Context (title runtime, hardware tier and decode caps, preferred audio language, wanted quality, measured throughput). Terms: local availability, swarm health, size-versus-quality plausibility, encoding signals, codec/HDR compatibility, audio language, subtitles. Unit tests over a fixture set of candidate lists and property tests (ordering invariants).
 - [ ] **9.2** Fake and mislabel detection: bytes-per-minute against the claimed resolution and codec, and duration against the catalogue runtime; a 700 MB '4K' or a 60-minute file for a 140-minute film is flagged and sunk, with the reason kept. 'Release-group reputation' is implemented as structural signals only (naming consistency, encode tags, plausibility); no release-group or indexer names appear anywhere in the repo (SPEC.md 2.1).
 - [ ] **9.3** Language and quality as first-class choices: the detail page lists the audio languages the candidates actually carry and the qualities on offer (defaulting to the best the hardware and connection support), with dub/sub distinction for anime; choosing one re-plans to a candidate that carries it, or says plainly that none does.
@@ -40,7 +40,7 @@
 
 ## What's next
 
-Phase 9 subtask 9.0 (docs/specs/tv-focus.md, ADR-0042): build src/design-system/focus/ — a FocusRing overlay that follows document focus and glides on a critically damped spring, tile effects (grow/lift/tilt/sheen/press) applied via a data-focus-tile attribute, TV mode (pad: 125% zoom, safe margin, HintsBar, ticks, rumble, View->fullscreen) driven from src/lib/gamepad.ts; then extend tools/uiaudit/controller.mjs to assert the white ring, the glide and reduced motion. Then 9.1, crates/selection.
+Phase 9 subtask 9.1 (docs/phases/phase-09-intelligent-source-selection.md): create crates/selection with score(candidate, &Context) -> Score { total, terms: Vec<Term{name, value, weight, why}> } as a pure function over source_protocol::SourceCandidate; start with local availability, swarm health and size-versus-quality plausibility, fixture lists in crates/selection/tests/fixtures.rs, then wire it into crates/playback::rank in place of the fixed transport order. Author checks outstanding: real controller (E5 carried), VPN drop (P7 E7).
 
 ---
 
