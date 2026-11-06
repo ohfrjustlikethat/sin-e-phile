@@ -4,14 +4,15 @@
 local film library behind one semantic search engine and a discovery-first
 recommender.**
 
-> **Status: Phases 0–9 of 28 closed — Tier A complete, Tier B under way.** The
+> **Status: Phases 0–10 of 28 closed — Tier A complete, Tier B under way.** The
 > catalogue is real: 2.7 million titles ingested offline from public datasets, with no
 > API key of any kind, searchable by title, person, filter and meaning. And now it plays:
 > search, open a film, press Play, and it streams — from the Internet Archive's
 > public-domain films, a torrent, or a file you drop on the window — in an embedded
 > player with hardware decoding, drivable end to end with an Xbox controller. Every copy
 > a source offers is now scored and ranked — fakes caught, your language and quality
-> honoured, a broken copy replaced by the next without a word.
+> honoured, a broken copy replaced by the next without a word. Subtitles find themselves
+> and line themselves up with the film's speech.
 > This README describes what is being built and is updated at
 > the end of every phase that changes what the app can do. It is never allowed to
 > over-claim; the [feature list](#what-actually-works-today) below says exactly what
@@ -227,8 +228,8 @@ off means the pause overlay shows the full cast list, beautifully.
 
 ## What actually works today
 
-**Phases 0–9 — the shell, the design system, the catalogue, search, sources, torrents,
-the player, and choosing a source.** Honestly:
+**Phases 0–10 — the shell, the design system, the catalogue, search, sources, torrents,
+the player, choosing a source, and subtitles.** Honestly:
 
 - ✅ Posture guard, secret scanner, and prerequisite doctor — all three verified by
   deliberately planted failures
@@ -304,6 +305,14 @@ the player, and choosing a source.** Honestly:
   or a quality and it plays a copy that has it, or says none does. A copy that will not
   start is replaced by the next — 8.1 s from a dead first choice to the next copy's
   picture. Ctrl+Shift+S shows the whole arithmetic.
+- ✅ **Subtitles in step.** The film's own track if it has one in your language (no
+  network at all); else a file beside it; else OpenSubtitles with your own key and a
+  daily budget it cannot overspend. Anything not embedded is aligned to the film's speech
+  — offset, framerate drift (23.976↔25) and an intro added or cut — or left alone when the
+  aligner is not sure. 80/80 damaged files fixed to within 150 ms on the corpus, 0
+  accepted against the wrong film; in the app a file 82 s late was fixed to within 67 ms,
+  0.6 s after the first frame. G and H nudge them, and the film remembers.
+  `crates/subtitle-align` is its own MIT/Apache crate.
 - ❌ **"Search, click and watch" a file on this machine** waits for the library scanner in
   Phase 12; until then a local file plays by dropping it on the window. Carried there.
 - ⬜ Everything else described above this section

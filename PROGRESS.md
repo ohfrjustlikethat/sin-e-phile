@@ -164,6 +164,9 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D67** (raised in Phase 9) sinephile_playback::machine assumes no AV1 hardware decode and no HDR display (neither is probed), and Context.throughput is None until the torrent engine or HTTP path reports a measured speed. Probe both via DXGI/D3D11 video decoder profiles in crates/tiers and feed a measured speed in 9.4.
 - **D68** (raised in Phase 9) original_language is filled only for anime matched to AniList, and only on an ingest or refresh after 92d4d71; IMDb films have none, so they show no original/dub labels. Fill it from TMDB (original_language) when a key is present (Phase 11 enrichment), and re-run the AniList pass on existing catalogues.
 - **D69** (raised in Phase 9) A swarm abandoned by fallback (9.4) stays in the torrent engine; remove or pause it when fallback moves past a torrent candidate (crates/playback/src/fallback.rs, sinephile_torrent::Engine).
+- **D70** (raised in Phase 10) Subtitle files inside a torrent are found (crates/subtitles/src/files.rs in_torrent) but not fetched: plan() returns Off for Origin::Torrent. Fetch the file through the engine (select the file index) and treat it as a sidecar.
+- **D71** (raised in Phase 10) The OpenSubtitles hash, and so downloads and hash-keyed nudges, need a local file; a stream (Internet Archive, torrent) is keyed by its address and gets no download. Hash a stream from HTTP range requests for the first and last 64 KiB (the streaming server supports ranges).
+- **D72** (raised in Phase 10) The subtitle corpus is synthetic speech (Windows' synthesiser) over synthetic beds. Add a handful of real public-domain film clips with hand-timed subtitles we write ourselves, to measure the VAD on a real mix (SPEC.md R6).
 
 ---
 

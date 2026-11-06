@@ -2369,3 +2369,10 @@ Taking the plateau's late edge instead of its middle (`crates/subtitle-align/src
 `peak`): the middle was biased early by half the subtitles' linger, found when
 `crates/subtitles/tests/plan.rs` aligned a file lingering 400 ms to 160 ms off.
 
+### Regression check before merging Phase 10 (rule 13)
+
+2026-11-06, release build at `9d84655`, `cargo run --release -p eval -- all` twice (now including
+`subs`) and `-- vector --report`: E2 **43/43**; E3 meaning **0.0472**, filter **1.0000**; E1 p50 / p95
+**6.5 / 15.3** and **6.1 / 14.8 ms**; HNSW recall@10 **0.9760**; subtitles **80/80**, false accepts
+**0/10**. Unchanged from Phase 9. Rust tests 646 passed, 0 failed; frontend 76; controller flow 19/19.
+
