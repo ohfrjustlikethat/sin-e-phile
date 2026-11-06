@@ -1,5 +1,5 @@
 {
-  "spec_version": "3.0.0",
+  "spec_version": "3.1.0",
   "project": "sin-e-phile",
   "last_updated": "2026-11-06",
   "sessions_completed": 21,
@@ -10,8 +10,14 @@
     "status": "in_progress",
     "branch": "phase/09-intelligent-source-selection",
     "started_at": "2026-11-06T04:00:00Z",
-    "note": "Opened 2026-11-06 when Phase 8 merged (5e5558f, tag phase-08); planned under ADR-0040. Carried in from Phase 8: E5's one-time real-controller check (author); from Phase 7: E7's VPN-drop check (author). Release-group reputation is structural only: no group names in the repo (2.1).",
+    "note": "Opened 2026-11-06 when Phase 8 merged (5e5558f, tag phase-08); planned under ADR-0040. Carried in from Phase 8: E5's one-time real-controller check (author); from Phase 7: E7's VPN-drop check (author). Release-group reputation is structural only: no group names in the repo (2.1). ADR-0042 (spec 3.1.0) adds the TV focus language to this phase as subtask 9.0, built first.",
     "subtasks": [
+      {
+        "id": "9.0",
+        "text": "The TV focus language (ADR-0042) in src/design-system/focus/: the white ring with hairline and oxblood halo as one gliding element (critically damped spring ~200 ms), grow 1.06 and lift on tiles, left-stick tilt up to 6 degrees with a following sheen, A press-down 0.97x, TV mode with a pad (125% scale, 5% safe margin, button-hints footer, Web Audio ticks, ~20 ms rumble on select, View toggles full screen and picking up the pad enters it), settings for sounds, rumble and auto full screen, reduced motion honoured; extended tools/uiaudit/controller.mjs proves it.",
+        "status": "not_started",
+        "commit": null
+      },
       {
         "id": "9.1",
         "text": "crates/selection: score(candidate, context) -> Score{total, terms[]} as a pure function over SourceCandidate plus a Context (title runtime, hardware tier and decode caps, preferred audio language, wanted quality, measured throughput). Terms: local availability, swarm health, size-versus-quality plausibility, encoding signals, codec/HDR compatibility, audio language, subtitles. Unit tests over a fixture set of candidate lists and property tests (ordering invariants).",
@@ -83,6 +89,12 @@
       {
         "id": "E6",
         "text": "`docs/specs/source-scoring.md` documents every term in the scoring function and its weight, with justification.",
+        "met": false,
+        "evidence": null
+      },
+      {
+        "id": "E7",
+        "text": "The TV focus language (ADR-0042) is in the design system, and `tools/uiaudit` proves it in TV mode: the white ring is visible on every focus stop, the ring glides rather than jumps, the 125% scale and safe margin hold at 1920×1080, and under reduced motion no transform remains.",
         "met": false,
         "evidence": null
       }
@@ -1232,9 +1244,21 @@
           "text": "`docs/specs/source-scoring.md` documents every term in the scoring function and its weight, with justification.",
           "met": false,
           "evidence": null
+        },
+        {
+          "id": "E7",
+          "text": "The TV focus language (ADR-0042) is in the design system, and `tools/uiaudit` proves it in TV mode: the white ring is visible on every focus stop, the ring glides rather than jumps, the 125% scale and safe margin hold at 1920×1080, and under reduced motion no transform remains.",
+          "met": false,
+          "evidence": null
         }
       ],
       "subtasks": [
+        {
+          "id": "9.0",
+          "text": "The TV focus language (ADR-0042) in src/design-system/focus/: the white ring with hairline and oxblood halo as one gliding element (critically damped spring ~200 ms), grow 1.06 and lift on tiles, left-stick tilt up to 6 degrees with a following sheen, A press-down 0.97x, TV mode with a pad (125% scale, 5% safe margin, button-hints footer, Web Audio ticks, ~20 ms rumble on select, View toggles full screen and picking up the pad enters it), settings for sounds, rumble and auto full screen, reduced motion honoured; extended tools/uiaudit/controller.mjs proves it.",
+          "status": "not_started",
+          "commit": null
+        },
         {
           "id": "9.1",
           "text": "crates/selection: score(candidate, context) -> Score{total, terms[]} as a pure function over SourceCandidate plus a Context (title runtime, hardware tier and decode caps, preferred audio language, wanted quality, measured throughput). Terms: local availability, swarm health, size-versus-quality plausibility, encoding signals, codec/HDR compatibility, audio language, subtitles. Unit tests over a fixture set of candidate lists and property tests (ordering invariants).",
@@ -1702,18 +1726,24 @@
         },
         {
           "id": "E8",
-          "text": "Every screen is usable with an Xbox controller alone, search included through an on-screen keyboard built for the D-pad (ADR-0041).",
+          "text": "Every screen is usable with an Xbox controller alone, search included through an on-screen keyboard built for the D-pad (ADR-0041), in TV mode with the focus language of ADR-0042.",
           "met": false,
           "evidence": null
         },
         {
           "id": "E9",
-          "text": "The design lint passes in CI, and each of its rules has been seen to fail.",
+          "text": "Home's billboard shows the focused film's artwork backdrop with a TMDB key and the designed tint without one, cross-fading in under 300 ms as focus moves, at 60 fps.",
           "met": false,
           "evidence": null
         },
         {
           "id": "E10",
+          "text": "The design lint passes in CI, and each of its rules has been seen to fail.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E11",
           "text": "The author signs off the screenshot review set (every surface, both sizes, with and without artwork) against §9.0's test: `manual: <what they reviewed and said>`. This set supplies the README's screenshots.",
           "met": false,
           "evidence": null
@@ -2078,7 +2108,7 @@
       ]
     }
   ],
-  "next_action": "Phase 9 (docs/phases/phase-09-intelligent-source-selection.md), subtask 9.1: create crates/selection with score(candidate, &Context) -> Score { total, terms: Vec<Term{name, value, weight, why}> } as a pure function over source_protocol::SourceCandidate; start with local availability, swarm health and size-versus-quality plausibility, fixture lists in crates/selection/tests/fixtures.rs, then wire it into crates/playback::rank in place of the fixed transport order.",
+  "next_action": "Phase 9 subtask 9.0 (docs/specs/tv-focus.md, ADR-0042): build src/design-system/focus/ — a FocusRing overlay that follows document focus and glides on a critically damped spring, tile effects (grow/lift/tilt/sheen/press) applied via a data-focus-tile attribute, TV mode (pad: 125% zoom, safe margin, HintsBar, ticks, rumble, View->fullscreen) driven from src/lib/gamepad.ts; then extend tools/uiaudit/controller.mjs to assert the white ring, the glide and reduced motion. Then 9.1, crates/selection.",
   "blockers": [],
   "decisions_pending": [
     {

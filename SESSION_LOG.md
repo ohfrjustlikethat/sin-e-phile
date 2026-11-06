@@ -1810,3 +1810,18 @@ the hung capture scripts were the threading bug all along, and that should have 
 suspected the first time a call to the app's window did not return.
 
 **Carry forward.** E1 → 12, E5 → 9 (author), Phase 7 E7 → 9 (author). D63–D66.
+
+### Session 22, continued (2026-11-06) — the TV focus language (spec 3.1.0)
+
+The author asked for the Netflix-on-Xbox white focus rectangle, a "tv feel", and Apple
+TV's responsiveness, and asked to be questioned first. Researched (Microsoft's Xbox and
+TV guidance, Apple's tvOS focus and selection, Android TV's focus system, user reports on
+white borders vanishing on light posters) and put twelve choices to the author in three
+rounds with previews. Their answers became ADR-0042 and amendment A32: a white ring with
+a dark hairline and an oxblood halo for keyboard and pad; grow, lift, stick tilt, sheen
+and press; a gliding ring on a critically damped spring ("a combination" of springy and
+crisp); TV mode with a pad (125%, safe margin, hints, quiet ticks and rumble, View for full
+screen); the masthead kept; a typographic billboard with the full artwork backdrop in
+Phase 18. §9.0's bans gain one exception, confined to `src/design-system/focus/`. The
+focus language is built first in Phase 9 (subtask 9.0); `docs/specs/tv-focus.md` is the
+build input.

@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 3.0.0** · 21 session(s) completed · last updated 2026-11-06
+**Spec version 3.1.0** · 21 session(s) completed · last updated 2026-11-06
 
 ---
 
@@ -12,12 +12,13 @@
 
 **Phase 9 — Intelligent Source Selection** (`in_progress`, branch `phase/09-intelligent-source-selection`)
 
-0 of 6 exit criteria met with evidence.
+0 of 7 exit criteria met with evidence.
 
-> Opened 2026-11-06 when Phase 8 merged (5e5558f, tag phase-08); planned under ADR-0040. Carried in from Phase 8: E5's one-time real-controller check (author); from Phase 7: E7's VPN-drop check (author). Release-group reputation is structural only: no group names in the repo (2.1).
+> Opened 2026-11-06 when Phase 8 merged (5e5558f, tag phase-08); planned under ADR-0040. Carried in from Phase 8: E5's one-time real-controller check (author); from Phase 7: E7's VPN-drop check (author). Release-group reputation is structural only: no group names in the repo (2.1). ADR-0042 (spec 3.1.0) adds the TV focus language to this phase as subtask 9.0, built first.
 
-### Subtasks — 0/6 complete
+### Subtasks — 0/7 complete
 
+- [ ] **9.0** The TV focus language (ADR-0042) in src/design-system/focus/: the white ring with hairline and oxblood halo as one gliding element (critically damped spring ~200 ms), grow 1.06 and lift on tiles, left-stick tilt up to 6 degrees with a following sheen, A press-down 0.97x, TV mode with a pad (125% scale, 5% safe margin, button-hints footer, Web Audio ticks, ~20 ms rumble on select, View toggles full screen and picking up the pad enters it), settings for sounds, rumble and auto full screen, reduced motion honoured; extended tools/uiaudit/controller.mjs proves it.
 - [ ] **9.1** crates/selection: score(candidate, context) -> Score{total, terms[]} as a pure function over SourceCandidate plus a Context (title runtime, hardware tier and decode caps, preferred audio language, wanted quality, measured throughput). Terms: local availability, swarm health, size-versus-quality plausibility, encoding signals, codec/HDR compatibility, audio language, subtitles. Unit tests over a fixture set of candidate lists and property tests (ordering invariants).
 - [ ] **9.2** Fake and mislabel detection: bytes-per-minute against the claimed resolution and codec, and duration against the catalogue runtime; a 700 MB '4K' or a 60-minute file for a 140-minute film is flagged and sunk, with the reason kept. 'Release-group reputation' is implemented as structural signals only (naming consistency, encode tags, plausibility); no release-group or indexer names appear anywhere in the repo (SPEC.md 2.1).
 - [ ] **9.3** Language and quality as first-class choices: the detail page lists the audio languages the candidates actually carry and the qualities on offer (defaulting to the best the hardware and connection support), with dub/sub distinction for anime; choosing one re-plans to a candidate that carries it, or says plainly that none does.
@@ -33,12 +34,13 @@
 - [ ] **E4** A deliberately-failing top candidate falls back within 10 s with no user action.
 - [ ] **E5** The expert panel's score breakdown is legible and matches the code.
 - [ ] **E6** `docs/specs/source-scoring.md` documents every term in the scoring function and its weight, with justification.
+- [ ] **E7** The TV focus language (ADR-0042) is in the design system, and `tools/uiaudit` proves it in TV mode: the white ring is visible on every focus stop, the ring glides rather than jumps, the 125% scale and safe margin hold at 1920×1080, and under reduced motion no transform remains.
 
 ---
 
 ## What's next
 
-Phase 9 (docs/phases/phase-09-intelligent-source-selection.md), subtask 9.1: create crates/selection with score(candidate, &Context) -> Score { total, terms: Vec<Term{name, value, weight, why}> } as a pure function over source_protocol::SourceCandidate; start with local availability, swarm health and size-versus-quality plausibility, fixture lists in crates/selection/tests/fixtures.rs, then wire it into crates/playback::rank in place of the fixed transport order.
+Phase 9 subtask 9.0 (docs/specs/tv-focus.md, ADR-0042): build src/design-system/focus/ — a FocusRing overlay that follows document focus and glides on a critically damped spring, tile effects (grow/lift/tilt/sheen/press) applied via a data-focus-tile attribute, TV mode (pad: 125% zoom, safe margin, HintsBar, ticks, rumble, View->fullscreen) driven from src/lib/gamepad.ts; then extend tools/uiaudit/controller.mjs to assert the white ring, the glide and reduced motion. Then 9.1, crates/selection.
 
 ---
 
@@ -63,7 +65,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 6/6 |
 | [x] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 6/8 |
 | [x] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 5/7 |
-| [~] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 0/6 |
+| [~] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 0/7 |
 | [ ] | 10 | Subtitle Pipeline | B | 8 | 2 | 0/6 |
 | [ ] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 0/5 |
 | [ ] | 12 | Local Library Engine | B | 4 | 2–3 | 0/6 |
@@ -72,7 +74,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [ ] | 15 | Taste Model | B | 5, 14 | 2 | 0/5 |
 | [ ] | 16 | Recommendation Engine | B | 15 | 2–3 | 0/6 |
 | [ ] | 17 | Discovery Engine | B | 16 | 2 | 0/6 |
-| [ ] | 18 | Browsing Surfaces 🏁 | B | 17 | 4–5 | 0/10 |
+| [ ] | 18 | Browsing Surfaces 🏁 | B | 17 | 4–5 | 0/11 |
 | [ ] | 19 | Watchlist and External Sync | C | 18 | 1–2 | 0/5 |
 | [ ] | 20 | Windows Platform Integration | C | 12, 18 | 2–3 | 0/5 |
 | [ ] | 21 | Performance Engineering and the Low-End Path | B | 18 (20 optional) | 2 | 0/4 |
