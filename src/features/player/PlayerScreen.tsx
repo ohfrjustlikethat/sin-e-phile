@@ -1,9 +1,11 @@
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { commands, type PlayerStateView, type TrackView } from "@/lib/ipc";
+import { useQuery } from "@tanstack/react-query";
+import { commands, type ChapterView, type PlayerStateView, type TrackView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
 import { clock, keyIntent, nextSpeed, type Intent } from "./intents";
 import { onPlayerIntent } from "./intentBus";
+import { PauseOverlay } from "./PauseOverlay";
 
 /**
  * The player — SPEC.md Phase 8, ADR-0020 (solid chrome through cutouts) and ADR-0021
@@ -58,12 +60,34 @@ async function setFullscreen(on: boolean) {
 export function PlayerScreen() {
   const playing = useUi((s) => s.playing);
   const stopPlaying = useUi((s) => s.stopPlaying);
+  const openDetail = useUi((s) => s.openDetail);
   const state = usePlayerState();
+  // The pause overlay's data, fetched as playback starts so pausing only paints.
+  const details = useQuery({
+    queryKey: ["pause-details", playing?.mediaItemId],
+    queryFn: async () => {
+      const r = await commands.pauseDetails(playing?.mediaItemId ?? 0);
+      if (r.status === "error") throw new Error(r.error);
+      return r.data;
+    },
+    enabled: playing?.mediaItemId != null,
+    staleTime: Infinity,
+  });
+  // Chapters, once the file is open: their titles for the overlay, their marks for the bar.
+  const [chapters, setChapters] = useState<ChapterView[]>([]);
+  useEffect(() => {
+    if (!state?.started) return;
+    void commands.playerChapters().then((r) => setChapters(r.status === "ok" ? r.data : []));
+  }, [state?.started]);
+  const chapterTitle = state?.chapter != null ? (chapters[state.chapter]?.title ?? null) : null;
   const [error, setError] = useState<string | null>(null);
   // Every copy was tried and none would start (SPEC.md Phase 9: fallback is silent
   // until there is nothing left to fall back to).
   useTauriEvent<string>("player-failed", setError);
   const [still, setStill] = useState<string | null>(null);
+  // Paused, as the page shows it: true the moment pause is pressed, before the still
+  // frame arrives (Phase 11: the overlay in < 200 ms).
+  const [paused, setPaused] = useState(false);
   const [chrome, setChrome] = useState(true);
   const [menu, setMenu] = useState<"audio" | "sub" | null>(null);
   // The last nudge, shown for a moment in the controls (G/H, LB/RB).
@@ -111,7 +135,7 @@ export function PlayerScreen() {
   const layout = useCallback(() => {
     const s = stage.current?.getBoundingClientRect();
     if (!s) return;
-    const panels = chrome && !still ? [top.current, bottom.current] : [];
+    const panels = chrome && !paused ? [top.current, bottom.current] : [];
     const cutouts = panels
       .filter((el): el is HTMLDivElement => !!el)
       .map((el) => {
@@ -125,7 +149,7 @@ export function PlayerScreen() {
         };
       });
     void commands.playerLayout(s.x, s.y, s.width, s.height, window.devicePixelRatio, cutouts);
-  }, [chrome, still]);
+  }, [chrome, paused]);
 
   useLayoutEffect(() => {
     layout();
@@ -156,6 +180,8 @@ export function PlayerScreen() {
   }, []);
 
   const pause = useCallback(async () => {
+    (window as { __pausedAt?: number }).__pausedAt = performance.now();
+    setPaused(true);
     const r = await commands.playerPauseStill();
     if (r.status === "ok") setStill(r.data);
     else act({ kind: "pause", paused: true });
@@ -163,6 +189,7 @@ export function PlayerScreen() {
 
   const resume = useCallback(async () => {
     setStill(null);
+    setPaused(false);
     await commands.playerResumeVideo();
   }, []);
 
@@ -176,11 +203,11 @@ export function PlayerScreen() {
       const s = state;
       switch (intent.kind) {
         case "toggle_pause":
-          if (still || s?.paused) void resume();
+          if (paused || s?.paused) void resume();
           else void pause();
           break;
         case "seek":
-          if (still) void resume();
+          if (paused) void resume();
           act({ kind: "seek_by", seconds: intent.seconds });
           break;
         case "volume":
@@ -228,7 +255,7 @@ export function PlayerScreen() {
           break;
       }
     },
-    [act, fullscreen, leave, menu, pause, resume, state, still, wake],
+    [act, fullscreen, leave, menu, pause, paused, resume, state, wake],
   );
 
   useEffect(() => {
@@ -250,7 +277,7 @@ export function PlayerScreen() {
   const duration = state?.duration ?? 0;
   const position = state?.position ?? 0;
   const tracks = state?.tracks ?? [];
-  const showChrome = chrome || !!still || !!menu;
+  const showChrome = chrome || paused || !!menu;
 
   return (
     <div
@@ -260,29 +287,25 @@ export function PlayerScreen() {
       style={{ cursor: showChrome ? "default" : "none" }}
       aria-label={`Playing ${playing.title}`}
     >
-      {still && (
-        <>
-          <img src={still} alt="" className="absolute inset-0 h-full w-full object-contain" />
-          <div className="absolute inset-0 bg-black/55" />
-          <div className="absolute inset-x-0 top-[34%] flex flex-col items-center gap-5 text-center">
-            <p className="label text-ink-muted">Paused · {clock(position)} of {clock(duration)}</p>
-            <h1 className="max-w-[70%] font-display text-[44px] leading-[1.05] font-semibold tracking-[-0.03em]">
-              {playing.title}
-            </h1>
-            <button
-              type="button"
-              onClick={() => void resume()}
-              className="mt-2 rounded-sm border border-line-strong px-6 py-2.5 text-[12px] tracking-[0.12em] uppercase hover:bg-raised"
-            >
-              Resume
-            </button>
-          </div>
-        </>
+      {paused && (
+        <PauseOverlay
+          title={playing.title}
+          still={still}
+          position={position}
+          duration={duration}
+          chapter={chapterTitle}
+          details={details.data}
+          onResume={() => void resume()}
+          onOpen={(id) => {
+            stopPlaying();
+            openDetail(id);
+          }}
+        />
       )}
 
       {/* Until the first frame: what is opening, not a black rectangle. The video
           window stays hidden until then (src-tauri player_open). */}
-      {!still && !error && !state?.started && (
+      {!paused && !error && !state?.started && (
         <div className="absolute inset-x-0 top-[36%] flex flex-col items-center gap-4 text-center">
           <p className="label text-ink-muted">
             {playing.start ? `Resuming from ${clock(playing.start)}` : "Opening"}
@@ -333,10 +356,10 @@ export function PlayerScreen() {
               <button
                 type="button"
                 onClick={() => run({ kind: "toggle_pause" })}
-                aria-label={still || state?.paused ? "Play" : "Pause"}
+                aria-label={paused || state?.paused ? "Play" : "Pause"}
                 className="grid h-8 w-8 place-items-center rounded-sm hover:bg-raised"
               >
-                {still || state?.paused ? <PlayGlyph /> : <PauseGlyph />}
+                {paused || state?.paused ? <PlayGlyph /> : <PauseGlyph />}
               </button>
               <span className="tabular-nums text-ink-muted">
                 {clock(position)} / {clock(duration)}

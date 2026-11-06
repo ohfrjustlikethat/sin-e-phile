@@ -265,13 +265,38 @@ pub async fn player_action(state: State<'_, AppState>, action: PlayerAction) -> 
 pub async fn player_pause_still(state: State<'_, AppState>) -> Result<String, String> {
     let rt = state.player().ok_or("nothing is playing")?;
     rt.player.set_paused(true).map_err(err)?;
+    // The video window first, so the page (and the pause overlay) shows at once (Phase
+    // 11: the overlay in < 200 ms). mpv captures the decoded frame, not the window, so
+    // hiding it first does not blank the still, which fades in when it arrives.
+    rt.host.lock().expect("host").hide();
     let path = std::env::temp_dir().join(format!("sinephile-still-{}.jpg", std::process::id()));
     let jpeg = rt
         .player
         .capture_still(&path, std::time::Duration::from_millis(500))
         .map_err(err)?;
-    rt.host.lock().expect("host").hide();
     Ok(sinephile_player::still::data_uri(&jpeg))
+}
+
+/// A chapter mark, for the scrub bar and the pause overlay.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct ChapterView {
+    pub time: f64,
+    pub title: Option<String>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn player_chapters(state: State<'_, AppState>) -> Result<Vec<ChapterView>, String> {
+    let rt = state.player().ok_or("nothing is playing")?;
+    Ok(rt
+        .player
+        .chapters()
+        .into_iter()
+        .map(|c| ChapterView {
+            time: c.time,
+            title: c.title,
+        })
+        .collect())
 }
 
 /// Show the video again after the pause overlay.
@@ -318,6 +343,8 @@ pub struct PlayerStateView {
     pub ended: bool,
     /// The first frame is up; before it the page shows what is opening.
     pub started: bool,
+    /// The chapter playing, an index into `player_chapters`.
+    pub chapter: Option<i32>,
     pub tracks: Vec<TrackView>,
 }
 
@@ -334,6 +361,7 @@ fn view(rt: &PlayerRuntime) -> PlayerStateView {
         hwdec: s.hwdec,
         ended: s.ended,
         started: s.started,
+        chapter: s.chapter.map(|c| c as i32),
         tracks: rt
             .player
             .tracks()

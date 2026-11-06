@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { useUi } from "@/lib/store";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
 
 const ok = <T,>(data: T) => Promise.resolve({ status: "ok" as const, data });
 
@@ -13,6 +15,16 @@ const commands = {
   playerResumeVideo: vi.fn(() => ok(null)),
   savePosition: vi.fn(() => ok(null)),
   subtitleNudge: vi.fn((ms: number) => ok(ms * 3)),
+  pauseDetails: vi.fn(() =>
+    ok({
+      cast: [{ person_id: 5, name: "Max Schreck", part: "Count Orlok" }],
+      crew: [{ person_id: 6, name: "F. W. Murnau", part: "director" }],
+      ratings: [{ source: "IMDb", score: 7.9, votes: 120000 }],
+      more_like_this: [{ id: 9, title: "Vampyr", year: 1932, kind: "film", part: null }],
+    }),
+  ),
+  filmography: vi.fn(() => ok([{ id: 11, title: "Faust", year: 1926, kind: "film", part: "Mephisto" }])),
+  playerChapters: vi.fn(() => ok([])),
 };
 vi.mock("@/lib/ipc", () => ({ commands }));
 // Inert unless a test marks the page as inside Tauri.
@@ -26,7 +38,16 @@ vi.mock("@tauri-apps/api/event", () => ({
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({ setFullscreen: () => Promise.resolve() }),
 }));
-const { PlayerScreen } = await import("./PlayerScreen");
+const { PlayerScreen: Bare } = await import("./PlayerScreen");
+/** The player inside the query client the app gives it. */
+function PlayerScreen(): ReactElement {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return (
+    <QueryClientProvider client={client}>
+      <Bare />
+    </QueryClientProvider>
+  );
+}
 const { sendPlayerIntent } = await import("./intentBus");
 
 beforeAll(() => {
@@ -132,4 +153,30 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
     expect(commands.subtitleNudge).toHaveBeenCalledWith(-100);
     expect(await screen.findByText("Subtitles −0.3 s")).toBeInTheDocument();
   });
+
+  it("the pause panel shows who is in it and who made it, before the still arrives (Phase 11)", async () => {
+    commands.playerPauseStill.mockImplementationOnce(() => new Promise(() => {}));
+    render(<PlayerScreen />);
+    await waitFor(() => expect(commands.pauseDetails).toHaveBeenCalledWith(1));
+    fireEvent.keyDown(window, { key: " " });
+    // No still yet: the overlay is already there.
+    const panel = await screen.findByRole("complementary", { name: "About this film" });
+    expect(panel).toHaveTextContent("Max Schreck");
+    expect(panel).toHaveTextContent("Count Orlok");
+    expect(panel).toHaveTextContent("Directed by F. W. Murnau");
+    expect(panel).toHaveTextContent("IMDb 7.9");
+    expect(panel).toHaveTextContent("Vampyr");
+  });
+
+  it("a cast member opens their films, and a film leaves the player for its page", async () => {
+    render(<PlayerScreen />);
+    await waitFor(() => expect(commands.pauseDetails).toHaveBeenCalled());
+    fireEvent.keyDown(window, { key: " " });
+    fireEvent.click(await screen.findByRole("button", { name: /Max Schreck/ }));
+    expect(commands.filmography).toHaveBeenCalledWith(5);
+    fireEvent.click(await screen.findByRole("button", { name: /Faust/ }));
+    expect(useUi.getState().playing).toBeNull();
+    expect(useUi.getState().detail).toBe(11);
+  });
 });
+

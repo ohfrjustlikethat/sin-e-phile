@@ -73,6 +73,14 @@ pub struct Track {
     pub external: bool,
 }
 
+/// A chapter mark.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Chapter {
+    /// Seconds from the start.
+    pub time: f64,
+    pub title: Option<String>,
+}
+
 /// How plain subtitles look (Settings → Subtitles).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SubtitleStyle {
@@ -114,6 +122,9 @@ pub struct State {
     /// A seek is still in progress. mpv reports the TARGET as `position` as soon as a
     /// seek starts, so "done" is `!seeking`, not "the position reads right".
     pub seeking: bool,
+    /// The chapter playing, as an index into [`Player::chapters`].
+    #[serde(default)]
+    pub chapter: Option<i64>,
     /// The first frame of what was last loaded is on screen. Until then the screen is
     /// the page's "opening" state, not a black video window.
     pub started: bool,
@@ -411,7 +422,22 @@ impl Player {
             ended: self.flag("eof-reached"),
             seeking: self.flag("seeking"),
             started: self.seen.0.lock().expect("seen").first_frame_at.is_some(),
+            chapter: self.num("chapter").filter(|c| *c >= 0.0).map(|c| c as i64),
         }
+    }
+
+    /// The file's chapters, in order (Phase 11: the scrub bar's marks and the overlay's
+    /// "current chapter").
+    pub fn chapters(&self) -> Vec<Chapter> {
+        let n = self.num("chapter-list/count").unwrap_or(0.0) as usize;
+        (0..n)
+            .map(|i| Chapter {
+                time: self.num(&format!("chapter-list/{i}/time")).unwrap_or(0.0),
+                title: self
+                    .get(&format!("chapter-list/{i}/title"))
+                    .filter(|t| !t.is_empty()),
+            })
+            .collect()
     }
 
     pub fn tracks(&self) -> Vec<Track> {

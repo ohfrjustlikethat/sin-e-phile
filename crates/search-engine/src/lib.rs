@@ -102,6 +102,41 @@ impl Engine {
         self.semantic.is_some()
     }
 
+    /// "More like this" (SPEC.md Phase 11): the nearest neighbours of a title's own
+    /// catalogue document, embedded the way the artefact embedded it — so a film finds
+    /// the films the index already places near it, not ones that share a word of its
+    /// title. `None` without the semantic index (Tier 0 before the artefact): the caller
+    /// shows nothing rather than a weaker guess.
+    pub async fn similar(
+        &mut self,
+        db: &Db,
+        document: &str,
+        exclude: i64,
+        limit: usize,
+    ) -> Result<Option<Vec<Hit>>, SearchError> {
+        let Some(semantic) = self.semantic.as_mut() else {
+            return Ok(None);
+        };
+        let vector = semantic.embedder.embed_document(document)?;
+        let quantised = sinephile_embedding::quantise::quantise(&vector);
+        let ids: Vec<i64> = semantic
+            .index
+            .search(&quantised.values, limit + 1)?
+            .into_iter()
+            .map(|n| n.media_item_id)
+            .filter(|&id| id != exclude)
+            .take(limit)
+            .collect();
+        let described = SearchRepository::new(db)
+            .describe(&ids, MatchReason::Semantic)
+            .await?;
+        Ok(Some(
+            ids.iter()
+                .filter_map(|id| described.iter().find(|h| h.media_item_id == *id).cloned())
+                .collect(),
+        ))
+    }
+
     pub async fn search(
         &mut self,
         db: &Db,

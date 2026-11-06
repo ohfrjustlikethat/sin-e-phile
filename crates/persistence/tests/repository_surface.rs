@@ -1200,6 +1200,44 @@ async fn detail_and_default_profile_surface() {
     assert_eq!(credits[0].character, None, "an empty character is None");
     assert_eq!(media.credits(film, 2).await.unwrap().len(), 2, "limit");
 
+    // filmography (Phase 11) — from a credit's person id; films, not episodes; newest first
+    let gaynor = credits[2].person_id;
+    let later = media
+        .insert(&NewMediaItem::film("Seventh Heaven", 1927))
+        .await
+        .unwrap();
+    let newer = media
+        .insert(&NewMediaItem::film("A Star Is Born", 1937))
+        .await
+        .unwrap();
+    for (item, character) in [(later, "Diane"), (newer, "Esther")] {
+        sqlx::query("INSERT INTO credits (media_item_id, person_id, role, character) VALUES (?, ?, 'actor', ?)")
+            .bind(item)
+            .bind(gaynor)
+            .bind(character)
+            .execute(db.pool())
+            .await
+            .unwrap();
+    }
+    let films = media.filmography(gaynor, 10).await.expect("filmography");
+    assert_eq!(
+        films
+            .iter()
+            .map(|a| (a.title.as_str(), a.year))
+            .collect::<Vec<_>>(),
+        [
+            ("A Star Is Born", Some(1937)),
+            ("Seventh Heaven", Some(1927)),
+            ("Sunrise", Some(1927))
+        ]
+    );
+    assert_eq!(films[0].character.as_deref(), Some("Esther"));
+    assert_eq!(
+        media.filmography(gaynor, 1).await.unwrap().len(),
+        1,
+        "limit"
+    );
+
     // external_id
     media
         .add_external_id(film, IdSource::Imdb, "tt0018455", 1.0)

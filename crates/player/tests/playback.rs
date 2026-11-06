@@ -187,6 +187,49 @@ Un sous-titre.
 }
 
 #[test]
+fn chapters_are_listed_and_the_current_one_is_known() {
+    let dir = tempfile::tempdir().unwrap();
+    let meta = dir.path().join("chapters.txt");
+    std::fs::write(
+        &meta,
+        ";FFMETADATA1
+[CHAPTER]
+TIMEBASE=1/1000
+START=0
+END=3000
+title=Opening
+[CHAPTER]
+TIMEBASE=1/1000
+START=3000
+END=6000
+title=The Storm
+",
+    )
+    .unwrap();
+    let out = dir.path().join("chaptered.mkv");
+    let ok = Command::new("ffmpeg")
+        .args(["-v", "error", "-y", "-i"])
+        .arg(clip(dir.path()))
+        .arg("-i")
+        .arg(&meta)
+        .args(["-map_metadata", "1", "-map_chapters", "1", "-c", "copy"])
+        .arg(&out)
+        .status()
+        .unwrap()
+        .success();
+    assert!(ok);
+    let p = player();
+    p.load(out.to_str().unwrap(), None).unwrap();
+    p.wait_first_frame(Duration::from_secs(10)).unwrap();
+    let chapters = p.chapters();
+    assert_eq!(chapters.len(), 2, "{chapters:?}");
+    assert_eq!(chapters[1].title.as_deref(), Some("The Storm"));
+    assert!((chapters[1].time - 3.0).abs() < 0.01);
+    p.seek_to_and_wait(4.0, Duration::from_secs(10)).unwrap();
+    assert_eq!(p.state().chapter, Some(1));
+}
+
+#[test]
 fn an_exact_seek_lands_on_the_frame_asked_for() {
     // Phase 8 E3: "Seeking is frame-accurate and responsive."
     let dir = tempfile::tempdir().unwrap();

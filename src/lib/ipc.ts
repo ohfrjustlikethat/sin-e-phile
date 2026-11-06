@@ -143,6 +143,8 @@ export const commands = {
 	ended: boolean,
 	/**  The first frame is up; before it the page shows what is opening. */
 	started: boolean,
+	/**  The chapter playing, an index into `player_chapters`. */
+	chapter: number | null,
 	tracks: TrackView[],
 } | null, string>(__TAURI_INVOKE("player_state")),
 	/**
@@ -174,6 +176,10 @@ export const commands = {
 	seriesDetail: (id: number) => typedError<SeriesView, string>(__TAURI_INVOKE("series_detail", { id })),
 	seasonEpisodes: (id: number, season: number | null) => typedError<EpisodeView[], string>(__TAURI_INVOKE("season_episodes", { id, season })),
 	episodeNeighbours: (id: number) => typedError<Neighbours, string>(__TAURI_INVOKE("episode_neighbours", { id })),
+	pauseDetails: (id: number) => typedError<PauseDetails, string>(__TAURI_INVOKE("pause_details", { id })),
+	/**  A cast or crew member's other work, from the overlay. */
+	filmography: (personId: number) => typedError<TitleView[], string>(__TAURI_INVOKE("filmography", { personId })),
+	playerChapters: () => typedError<ChapterView[], string>(__TAURI_INVOKE("player_chapters")),
 };
 
 /* Types */
@@ -301,6 +307,12 @@ export type CatalogueView = {
 	addons: CatalogueItem[],
 };
 
+/**  A chapter mark, for the scrub bar and the pause overlay. */
+export type ChapterView = {
+	time: number | null,
+	title: string | null,
+};
+
 export type CreditView = {
 	name: string,
 	role: string,
@@ -381,6 +393,21 @@ export type OptionalAsset = {
 	unusable_reason: string | null,
 };
 
+export type PauseDetails = {
+	cast: PersonView[],
+	crew: PersonView[],
+	ratings: RatingView[],
+	/**  Empty without the semantic index (Tier 0 before it is downloaded). */
+	more_like_this: TitleView[],
+};
+
+export type PersonView = {
+	person_id: number,
+	name: string,
+	/**  For the cast: who they play. For the crew: what they did. */
+	part: string | null,
+};
+
 /**  What Play will open, decided now (see `sinephile_playback::plan`). */
 export type PlayPlanView = {
 	title: string,
@@ -422,7 +449,16 @@ export type PlayerStateView = {
 	ended: boolean,
 	/**  The first frame is up; before it the page shows what is opening. */
 	started: boolean,
+	/**  The chapter playing, an index into `player_chapters`. */
+	chapter: number | null,
 	tracks: TrackView[],
+};
+
+export type RatingView = {
+	source: string,
+	/**  Out of ten. */
+	score: number | null,
+	votes: number | null,
 };
 
 /**
@@ -552,6 +588,15 @@ export type Tier =
 "standard" | 
 /**  >= 16 GB RAM, discrete GPU or strong iGPU, >= 6 cores. */
 "capable";
+
+export type TitleView = {
+	id: number,
+	title: string,
+	year: number | null,
+	kind: string,
+	/**  Their part in it, in a filmography. */
+	part: string | null,
+};
 
 /**  Every torrent's progress, once a second while the engine runs. */
 export type TorrentProgress = {
