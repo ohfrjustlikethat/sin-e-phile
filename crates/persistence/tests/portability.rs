@@ -150,7 +150,8 @@ async fn the_original_still_works_after_being_copied() {
 async fn nothing_in_the_database_records_where_it_lives() {
     // The structural reason a copy works: no absolute path is ever stored, except
     // in `local_files`, where the path IS the data and is expected to be machine
-    // specific.
+    // specific. `subtitle_cache.relative_path` (Phase 10) is relative to the data
+    // folder, and its repository refuses an absolute one.
     let dir = tempfile::tempdir().expect("tempdir");
     let db = Db::open_in(dir.path()).await.expect("open");
 
@@ -167,7 +168,10 @@ async fn nothing_in_the_database_records_where_it_lives() {
 
     assert_eq!(
         columns,
-        vec!["local_files.path".to_string()],
+        vec![
+            "local_files.path".to_string(),
+            "subtitle_cache.relative_path".to_string()
+        ],
         "a new path-shaped column appeared; if it holds an absolute path, copying \
          the app folder no longer preserves it (SPEC.md §2.4, Phase 3 E4)"
     );
