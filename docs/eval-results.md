@@ -2420,3 +2420,25 @@ why `all` exits 1, as before); E1 p50 / p95 **14.1 / 44.1 ms** on the first run,
 release build with cold caches, and **6.4 / 14.8 ms** warm; HNSW recall@10 **0.9760**; subtitles
 **80/80** (held out 32/32), false accepts **0/10**. Unchanged from Phase 10. Rust tests 654 passed,
 0 failed; frontend 104.
+
+## Phase 12 — Local library engine
+
+### The filename parser, first run on the corpus
+
+2026-11-07, `cargo test -p filename-parser --test corpus -- --nocapture`, 549 hand-labelled names
+(`fixtures/filenames/names.psv`), before any tuning: title **98.54%**, year **100%**, season **99.45%**,
+episodes **99.45%**, absolute **99.82%**, resolution **100%**, source **100%**, codec **100%**, group
+**99.82%**; every field right on **98.36%** of names. The misses: S02E01E02 (the boundary was checked
+before the continuation was read), a site prefix followed by `_`, a spaced ` - GROUP`, a film called
+*Episode 50*, and three bare-number names whose labels broke the corpus's own convention
+(`Episode 3.mkv` is labelled episode 3; `05.mkv` was not). Those three labels were corrected.
+
+### The filename parser after tuning, and on names it never saw
+
+2026-11-07, same command. After the fixes above (continuation read before the boundary check,
+separators trimmed from a title's ends, ` - GROUP` after a technical tag, an opening "Episode N"
+followed by a year is a title, a bare number is an episode): **549/549** names right on every field.
+Then `heldout.psv`, 109 names written after the tuning and run once: **109/109** on every field. The
+caveat: the held-out names were written by the same hand that tuned the parser, so they test what it
+was not tuned on but not what its writer did not think of. Real libraries are the check that remains;
+the identification harness and the review queue are where a miss would show.
