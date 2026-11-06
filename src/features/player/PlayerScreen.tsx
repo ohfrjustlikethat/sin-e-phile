@@ -169,7 +169,7 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
   const menuPanel = useRef<HTMLDivElement>(null);
   const statsPanel = useRef<HTMLDivElement>(null);
   const shortcutsPanel = useRef<HTMLDivElement>(null);
-  const pipFrom = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+  const pipFrom = useRef<{ x: number; y: number; w: number; h: number; maximized: boolean } | null>(null);
   const [pip, setPip] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Every copy was tried and none would start (SPEC.md Phase 9: fallback is silent
@@ -310,15 +310,20 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
       await w.setMinSize(new LogicalSize(1024, 640));
       await w.setSize(new PhysicalSize(from.w, from.h));
       await w.setPosition(new PhysicalPosition(from.x, from.y));
+      if (from.maximized) await w.maximize();
       return;
     }
     if (fullscreen) {
       setFs(false);
       await setFullscreen(false);
     }
+    // setSize sets the INNER size, so the inner size is what comes back; saving the outer
+    // one grew the window by its frame on every round trip (found in the Phase 11 E5 run).
+    const maximized = await w.isMaximized();
+    if (maximized) await w.unmaximize();
     const pos = await w.outerPosition();
-    const size = await w.outerSize();
-    pipFrom.current = { x: pos.x, y: pos.y, w: size.width, h: size.height };
+    const size = await w.innerSize();
+    pipFrom.current = { x: pos.x, y: pos.y, w: size.width, h: size.height, maximized };
     setPip(true);
     const m = await currentMonitor();
     const sf = m?.scaleFactor ?? 1;
@@ -337,11 +342,16 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
     }
   }, [fullscreen]);
 
-  /** Returns false to decline an intent: the mini player declines everything so the
-   * app can be browsed; with a panel open, the D-pad and A move focus within it. */
+  /** Returns false to decline an intent: the mini player declines everything but its own
+   * toggle (Ctrl+M back to full) so the app can be browsed; with a panel open, the D-pad
+   * and A move focus within it. */
   const run = useCallback(
     (intent: Intent): boolean => {
-      if (mini) return false;
+      if (mini) {
+        if (intent.kind !== "mini") return false;
+        setMini(false);
+        return true;
+      }
       if (panel) {
         if (intent.kind === "back" || intent.kind === "player_menu" || intent.kind === "shortcuts") {
           setPanel(null);
@@ -447,9 +457,9 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (mini) return; // the app is being browsed; its keys are its own
       const intent = keyIntent(e);
       if (!intent) return;
+      // The app is being browsed in mini; its keys are its own (run declines all but Ctrl+M).
       if (run(intent)) e.preventDefault();
     };
     window.addEventListener("keydown", onKey);

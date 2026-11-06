@@ -394,17 +394,9 @@ impl Player {
                     .unwrap_or_else(|| "software".into()),
             ),
         );
-        put(
-            "Video bitrate",
-            self.num("video-bitrate")
-                .map(|b| format!("{:.1} Mbit/s", b / 1e6)),
-        );
+        put("Video bitrate", self.num("video-bitrate").map(bitrate));
         put("Audio", self.get("audio-codec-name"));
-        put(
-            "Audio bitrate",
-            self.num("audio-bitrate")
-                .map(|b| format!("{:.0} kbit/s", b / 1e3)),
-        );
+        put("Audio bitrate", self.num("audio-bitrate").map(bitrate));
         put(
             "Dropped frames",
             self.num("frame-drop-count").map(|n| format!("{n}")),
@@ -596,5 +588,29 @@ fn pump(mpv: &Mpv, seen: &(Mutex<Seen>, Condvar)) {
             _ => {}
         }
         seen.1.notify_all();
+    }
+}
+
+/// A bitrate for the stats panel, in bits per second: Mbit/s from one megabit up,
+/// kbit/s below it. A still or near-static picture encodes to a few kbit/s, which
+/// one-decimal Mbit/s printed as a misleading "0.0".
+pub fn bitrate(bits_per_second: f64) -> String {
+    if bits_per_second >= 1e6 {
+        format!("{:.1} Mbit/s", bits_per_second / 1e6)
+    } else {
+        format!("{:.0} kbit/s", bits_per_second / 1e3)
+    }
+}
+
+#[cfg(test)]
+mod bitrate_tests {
+    use super::bitrate;
+
+    #[test]
+    fn a_low_bitrate_reads_in_kilobits_not_as_zero() {
+        assert_eq!(bitrate(4_200_000.0), "4.2 Mbit/s");
+        assert_eq!(bitrate(1_000_000.0), "1.0 Mbit/s");
+        assert_eq!(bitrate(38_400.0), "38 kbit/s");
+        assert_eq!(bitrate(128_000.0), "128 kbit/s");
     }
 }

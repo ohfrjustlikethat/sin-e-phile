@@ -187,6 +187,15 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
     expect(panel).toHaveTextContent("Vampyr");
   });
 
+  it("a file the catalogue does not know pauses without an empty panel (Phase 11 E5 run)", async () => {
+    useUi.setState({ playing: { target: "C:/films/Garden.mkv", title: "Garden", mediaItemId: null, start: null } });
+    render(<PlayerScreen />);
+    fireEvent.keyDown(window, { key: " " });
+    expect(await screen.findByRole("dialog", { name: "Paused" })).toHaveTextContent("Garden");
+    expect(screen.queryByRole("complementary", { name: "About this film" })).toBeNull();
+    expect(commands.pauseDetails).not.toHaveBeenCalled();
+  });
+
   it("a cast member opens their films, and a film leaves the player for its page", async () => {
     render(<PlayerScreen />);
     await waitFor(() => expect(commands.pauseDetails).toHaveBeenCalled());
@@ -307,7 +316,7 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
     expect(commands.playerAction).toHaveBeenCalledWith({ kind: "audio_delay", seconds: -0.1 });
   });
 
-  it("Ctrl+M shrinks to the mini player, which leaves the keys to the app", async () => {
+  it("Ctrl+M shrinks to the mini player, which leaves the keys to the app, and back", async () => {
     const { rerender } = render(<PlayerScreen />);
     fireEvent.keyDown(window, { key: "m", ctrlKey: true });
     expect(useUi.getState().mini).toBe(true);
@@ -316,7 +325,8 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
     fireEvent.keyDown(window, { key: " " });
     expect(commands.playerPauseStill).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Expand" })).toBeInTheDocument();
-    useUi.setState({ mini: false });
+    fireEvent.keyDown(window, { key: "m", ctrlKey: true }); // and Ctrl+M brings it back
+    expect(useUi.getState().mini).toBe(false);
   });
 });
 
