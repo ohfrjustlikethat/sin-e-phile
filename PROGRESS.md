@@ -12,14 +12,14 @@
 
 **Phase 10 — Subtitle Pipeline** (`in_progress`, branch `phase/10-subtitle-pipeline`)
 
-0 of 6 exit criteria met with evidence.
+3 of 6 exit criteria met with evidence.
 
 > Opened 2026-11-06 when Phase 9 merged (63d00d9, tag phase-09); planned under ADR-0040, run as part of the author's five-phase request (9-13). Decisions: a pure-Rust VAD rather than a model download (the crate must stay free of FFmpeg and artefacts, ADR-0017); the corpus is synthetic speech with known timings, because real subtitles of real films are neither ours to commit nor timed against a known truth; "other providers" are a trait with no named provider shipped, since each needs its own legal review (2.1). Author checks still outstanding: real controller (Phase 8 E5), VPN drop (Phase 7 E7).
 
-### Subtasks — 0/6 complete
+### Subtasks — 2/6 complete
 
-- [ ] **10.1** crates/subtitle-align (MIT/Apache, no FFmpeg): cue timings read and rewritten in place for SRT, WebVTT and ASS/SSA (styling preserved); a pure-Rust band-energy VAD with a syllable-modulation test; offset and framerate scale solved together by FFT cross-correlation over the 23.976/24/25 scale set, the plateau's centre taken; two-part split for inserted or removed intros; a distinctness confidence that refuses rather than guess; Tier 0 duration heuristic. Unit tests on synthetic dialogue.
-- [ ] **10.2** fixtures/subtitles/ corpus (tools/subcorpus: Windows speech synthesis over room, street and music beds, traces from the app's own VAD, eight damaged copies per film: offsets, 23.976<->25 and 24->25 scales, intros removed and added) plus negative controls (one film's subtitles against another's speech must be refused); cargo run -p eval -- subs reports aligned share (>90% target, a copy aligns when 95% of its cues land within 150 ms), refusals, false accepts and VAD agreement.
+- [x] **10.1** crates/subtitle-align (MIT/Apache, no FFmpeg): cue timings read and rewritten in place for SRT, WebVTT and ASS/SSA (styling preserved); a pure-Rust band-energy VAD with a syllable-modulation test; offset and framerate scale solved together by FFT cross-correlation over the 23.976/24/25 scale set, the plateau's centre taken; two-part split for inserted or removed intros; a distinctness confidence that refuses rather than guess; Tier 0 duration heuristic. Unit tests on synthetic dialogue. · `09cdd8d`
+- [x] **10.2** fixtures/subtitles/ corpus (tools/subcorpus: Windows speech synthesis over room, street and music beds, traces from the app's own VAD, eight damaged copies per film: offsets, 23.976<->25 and 24->25 scales, intros removed and added) plus negative controls (one film's subtitles against another's speech must be refused); cargo run -p eval -- subs reports aligned share (>90% target, a copy aligns when 95% of its cues land within 150 ms), refusals, false accepts and VAD agreement. · `09cdd8d`
 - [ ] **10.3** The subtitle chain in a testable crate (crates/subtitles): embedded tracks first (from the player's track list, no network), then sidecar files next to the media (same stem, language suffixes) or in the torrent's file list, then OpenSubtitles by movie hash with the user's own key (no key ships), a persisted daily quota budget that is never exceeded and a cache, then other providers behind a trait; language preference ordering per profile. A test proves an embedded track is used with zero network requests.
 - [ ] **10.4** Wiring in the app: audio extracted with FFmpeg (16 kHz mono, first 20 minutes) for alignment on Tier 1+, the duration heuristic on Tier 0; an aligned or found subtitle loaded into mpv (sub-add); ASS rendered as authored; Settings shows OpenSubtitles key and quota state and subtitle style (font, size, position, background).
 - [ ] **10.5** The nudge: G and H (and the pad) shift subtitles by 100 ms in the player, persisted per file and per subtitle in the database (migration + repository method + repository_surface test) and reapplied on the next open.
@@ -27,18 +27,21 @@
 
 ### Exit criteria
 
-- [ ] **E1** > 90% of the fixture corpus aligns to within 150 ms.
-- [ ] **E2** A 23.976 vs 25 fps mismatch is detected and corrected, not just offset.
+- [x] **E1** > 90% of the fixture corpus aligns to within 150 ms.
+      - *Evidence:* 09cdd8d: cargo run --release -p eval -- subs --report over fixtures/subtitles (10 films of synthesised dialogue over room/street/music beds, traces from the app's VAD, 80 damaged copies): 79/80 = 98.8% of copies have >=95% of cues within 150 ms (target >90%); 4 films held out from tuning: 31/32 = 96.9%; false accepts against the wrong film 0/10. Seen to fail: scales reduced to 1.0 gives 48.8%. docs/eval-results.md Phase 10.
+- [x] **E2** A 23.976 vs 25 fps mismatch is detected and corrected, not just offset.
+      - *Evidence:* 09cdd8d: crates/subtitle-align/tests/align.rs a_framerate_mismatch_is_a_scale_not_an_offset (23.976->25 found as scale 25/23.976, >97% of cues land; with offsets only, it refuses or lands <50%); eval subs: every scaled copy aligned, 30/30 (23.976->25, 25->23.976, 24->25) and 10/10 intro-added-and-scaled.
 - [ ] **E3** Embedded tracks are found and used without any network request.
 - [ ] **E4** The OpenSubtitles daily quota is respected and never exceeded; quota state is visible in Settings.
 - [ ] **E5** The manual nudge persists across sessions for the same file.
-- [ ] **E6** `crates/subtitle-align` is independently testable and documented as a standalone crate.
+- [x] **E6** `crates/subtitle-align` is independently testable and documented as a standalone crate.
+      - *Evidence:* 09cdd8d: crates/subtitle-align is its own MIT/Apache crate with no app or FFmpeg dependency (Cargo.toml: rustfft only); cargo test -p subtitle-align runs 8 unit + 7 integration tests on synthetic dialogue and the README's usage example as a doctest; README documents use, modules, measured numbers and licence; docs/specs/subtitle-alignment.md the method.
 
 ---
 
 ## What's next
 
-Phase 10 subtask 10.1 (docs/phases/phase-10-subtitle-pipeline.md): finish crates/subtitle-align on branch phase/10-subtitle-pipeline (work in progress is in git stash "phase 10 wip"): replace the z-score confidence with distinctness (best peak over the best peak at least 3 s away), use it for split windows, add negative controls to tools/eval/src/subs.rs, and reach > 90% on cargo run --release -p eval -- subs.
+Phase 10 subtask 10.3 (docs/phases/phase-10-subtitle-pipeline.md): finish crates/subtitles (started, untracked: hash.rs and files.rs written): add lib.rs with Found/Origin and rank(found, language prefs) (embedded > sidecar > torrent > downloaded, forced tracks only when nothing else), an OpenSubtitles client over sinephile_metadata_api::Transport (GET /subtitles?moviehash=&languages=, POST /download, Api-Key header with the profile's own key) and a fetcher that checks SubtitleRepository::cached, reserves quota before downloading (release on failure), writes under data/cache/subtitles and remembers it; test with FakeTransport including 'an embedded track is used with zero requests' (E3) and 'the quota is never exceeded' (E4); add to the workspace.
 
 ---
 
@@ -64,7 +67,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 6/8 |
 | [x] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 5/7 |
 | [x] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 7/7 |
-| [~] | 10 | Subtitle Pipeline | B | 8 | 2 | 0/6 |
+| [~] | 10 | Subtitle Pipeline | B | 8 | 2 | 3/6 |
 | [ ] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 0/5 |
 | [ ] | 12 | Local Library Engine | B | 4 | 2–3 | 0/6 |
 | [ ] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 0/8 |

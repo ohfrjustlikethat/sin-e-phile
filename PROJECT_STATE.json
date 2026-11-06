@@ -15,14 +15,14 @@
       {
         "id": "10.1",
         "text": "crates/subtitle-align (MIT/Apache, no FFmpeg): cue timings read and rewritten in place for SRT, WebVTT and ASS/SSA (styling preserved); a pure-Rust band-energy VAD with a syllable-modulation test; offset and framerate scale solved together by FFT cross-correlation over the 23.976/24/25 scale set, the plateau's centre taken; two-part split for inserted or removed intros; a distinctness confidence that refuses rather than guess; Tier 0 duration heuristic. Unit tests on synthetic dialogue.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "09cdd8d"
       },
       {
         "id": "10.2",
         "text": "fixtures/subtitles/ corpus (tools/subcorpus: Windows speech synthesis over room, street and music beds, traces from the app's own VAD, eight damaged copies per film: offsets, 23.976<->25 and 24->25 scales, intros removed and added) plus negative controls (one film's subtitles against another's speech must be refused); cargo run -p eval -- subs reports aligned share (>90% target, a copy aligns when 95% of its cues land within 150 ms), refusals, false accepts and VAD agreement.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "09cdd8d"
       },
       {
         "id": "10.3",
@@ -53,14 +53,14 @@
       {
         "id": "E1",
         "text": "> 90% of the fixture corpus aligns to within 150 ms.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "09cdd8d: cargo run --release -p eval -- subs --report over fixtures/subtitles (10 films of synthesised dialogue over room/street/music beds, traces from the app's VAD, 80 damaged copies): 79/80 = 98.8% of copies have >=95% of cues within 150 ms (target >90%); 4 films held out from tuning: 31/32 = 96.9%; false accepts against the wrong film 0/10. Seen to fail: scales reduced to 1.0 gives 48.8%. docs/eval-results.md Phase 10."
       },
       {
         "id": "E2",
         "text": "A 23.976 vs 25 fps mismatch is detected and corrected, not just offset.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "09cdd8d: crates/subtitle-align/tests/align.rs a_framerate_mismatch_is_a_scale_not_an_offset (23.976->25 found as scale 25/23.976, >97% of cues land; with offsets only, it refuses or lands <50%); eval subs: every scaled copy aligned, 30/30 (23.976->25, 25->23.976, 24->25) and 10/10 intro-added-and-scaled."
       },
       {
         "id": "E3",
@@ -83,8 +83,8 @@
       {
         "id": "E6",
         "text": "`crates/subtitle-align` is independently testable and documented as a standalone crate.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "09cdd8d: crates/subtitle-align is its own MIT/Apache crate with no app or FFmpeg dependency (Cargo.toml: rustfft only); cargo test -p subtitle-align runs 8 unit + 7 integration tests on synthetic dialogue and the README's usage example as a doctest; README documents use, modules, measured numbers and licence; docs/specs/subtitle-alignment.md the method."
       }
     ]
   },
@@ -1297,14 +1297,14 @@
         {
           "id": "E1",
           "text": "> 90% of the fixture corpus aligns to within 150 ms.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "09cdd8d: cargo run --release -p eval -- subs --report over fixtures/subtitles (10 films of synthesised dialogue over room/street/music beds, traces from the app's VAD, 80 damaged copies): 79/80 = 98.8% of copies have >=95% of cues within 150 ms (target >90%); 4 films held out from tuning: 31/32 = 96.9%; false accepts against the wrong film 0/10. Seen to fail: scales reduced to 1.0 gives 48.8%. docs/eval-results.md Phase 10."
         },
         {
           "id": "E2",
           "text": "A 23.976 vs 25 fps mismatch is detected and corrected, not just offset.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "09cdd8d: crates/subtitle-align/tests/align.rs a_framerate_mismatch_is_a_scale_not_an_offset (23.976->25 found as scale 25/23.976, >97% of cues land; with offsets only, it refuses or lands <50%); eval subs: every scaled copy aligned, 30/30 (23.976->25, 25->23.976, 24->25) and 10/10 intro-added-and-scaled."
         },
         {
           "id": "E3",
@@ -1327,22 +1327,22 @@
         {
           "id": "E6",
           "text": "`crates/subtitle-align` is independently testable and documented as a standalone crate.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "09cdd8d: crates/subtitle-align is its own MIT/Apache crate with no app or FFmpeg dependency (Cargo.toml: rustfft only); cargo test -p subtitle-align runs 8 unit + 7 integration tests on synthetic dialogue and the README's usage example as a doctest; README documents use, modules, measured numbers and licence; docs/specs/subtitle-alignment.md the method."
         }
       ],
       "subtasks": [
         {
           "id": "10.1",
           "text": "crates/subtitle-align (MIT/Apache, no FFmpeg): cue timings read and rewritten in place for SRT, WebVTT and ASS/SSA (styling preserved); a pure-Rust band-energy VAD with a syllable-modulation test; offset and framerate scale solved together by FFT cross-correlation over the 23.976/24/25 scale set, the plateau's centre taken; two-part split for inserted or removed intros; a distinctness confidence that refuses rather than guess; Tier 0 duration heuristic. Unit tests on synthetic dialogue.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "09cdd8d"
         },
         {
           "id": "10.2",
           "text": "fixtures/subtitles/ corpus (tools/subcorpus: Windows speech synthesis over room, street and music beds, traces from the app's own VAD, eight damaged copies per film: offsets, 23.976<->25 and 24->25 scales, intros removed and added) plus negative controls (one film's subtitles against another's speech must be refused); cargo run -p eval -- subs reports aligned share (>90% target, a copy aligns when 95% of its cues land within 150 ms), refusals, false accepts and VAD agreement.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "09cdd8d"
         },
         {
           "id": "10.3",
@@ -2134,7 +2134,7 @@
       ]
     }
   ],
-  "next_action": "Phase 10 subtask 10.1 (docs/phases/phase-10-subtitle-pipeline.md): finish crates/subtitle-align on branch phase/10-subtitle-pipeline (work in progress is in git stash \"phase 10 wip\"): replace the z-score confidence with distinctness (best peak over the best peak at least 3 s away), use it for split windows, add negative controls to tools/eval/src/subs.rs, and reach > 90% on cargo run --release -p eval -- subs.",
+  "next_action": "Phase 10 subtask 10.3 (docs/phases/phase-10-subtitle-pipeline.md): finish crates/subtitles (started, untracked: hash.rs and files.rs written): add lib.rs with Found/Origin and rank(found, language prefs) (embedded > sidecar > torrent > downloaded, forced tracks only when nothing else), an OpenSubtitles client over sinephile_metadata_api::Transport (GET /subtitles?moviehash=&languages=, POST /download, Api-Key header with the profile's own key) and a fetcher that checks SubtitleRepository::cached, reserves quota before downloading (release on failure), writes under data/cache/subtitles and remembers it; test with FakeTransport including 'an embedded track is used with zero requests' (E3) and 'the quota is never exceeded' (E4); add to the workspace.",
   "blockers": [],
   "decisions_pending": [
     {
