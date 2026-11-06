@@ -129,6 +129,14 @@ jobs:
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
         if: steps.detect.outputs.present == 'true'
 
+      # The player's tests play a real clip headless (Phase 8): FFmpeg builds the clip,
+      # and libmpv is the pinned, checksum-verified build developers fetch the same way.
+      - name: FFmpeg and libmpv for the player tests
+        if: steps.detect.outputs.present == 'true'
+        run: |
+          choco install ffmpeg --no-progress -y
+          python tools/mpv/fetch.py
+
       - run: cargo test --workspace --all-features
         if: steps.detect.outputs.present == 'true'
 
@@ -191,6 +199,14 @@ jobs:
           UIAUDIT_INJECT_STALL: ${{ inputs.uiaudit_inject_stall }}
         run: node tools/uiaudit/run.mjs --ci
 
+      # Phase 8 E5 (ADR-0041). The built app, a fake backend and a simulated Xbox
+      # controller: Y to search, the D-pad and A on the on-screen keyboard, A on the
+      # result, A on Play, A to pause, RT to seek, B to leave — buttons only, with
+      # real layout, so the spatial navigation is the real one.
+      - name: Controller flow (simulated Xbox pad)
+        if: steps.detect.outputs.present == 'true'
+        run: node tools/uiaudit/controller.mjs
+
   # ───────────────────────────────────────────────────────────────────────────
   # E1 — a fresh clone on a clean runner produces a working dev environment.
   #
@@ -221,6 +237,12 @@ jobs:
       # MSVC but NOT FFmpeg - which the first run of this job caught, correctly.
       - name: Install FFmpeg per docs/SETUP.md
         run: choco install ffmpeg --no-progress -y
+
+      # Phase 8: the player's native library, pinned and checksum-verified, per
+      # docs/SETUP.md. The same command a developer runs.
+      - name: Fetch libmpv per docs/SETUP.md
+        working-directory: fresh
+        run: python tools/mpv/fetch.py
 
       - name: doctor reports a working environment
         working-directory: fresh

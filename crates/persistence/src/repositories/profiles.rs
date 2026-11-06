@@ -59,6 +59,16 @@ impl<'a> ProfileRepository<'a> {
         row.map(map_profile).transpose()
     }
 
+    /// The default profile's id, creating one if there is none. Profiles proper arrive
+    /// in Phase 14; until then everything personal — resume points first — belongs to
+    /// this one, and Phase 14's first real profile can adopt it.
+    pub async fn ensure_default(&self) -> Result<i64, DbError> {
+        if let Some(p) = self.default_profile().await? {
+            return Ok(p.id);
+        }
+        self.create("You", true).await
+    }
+
     pub async fn all(&self) -> Result<Vec<Profile>, DbError> {
         let rows = sqlx::query("SELECT id, name, is_default FROM profiles ORDER BY id")
             .fetch_all(self.db.pool())

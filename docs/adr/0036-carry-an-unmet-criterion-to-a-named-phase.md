@@ -84,3 +84,17 @@ measured evidence. The real `PROJECT_STATE.json` still validates unchanged.
 Found on the way: `anyOf` and `oneOf` were listed as known schema keywords but never
 evaluated, so a rule written with either would have passed silently. Nothing used them
 yet. Both are now evaluated.
+
+## Addendum, 2026-11-06 (Phase 8): discharging a carried criterion
+
+The decision said the receiving phase "must meet it", but nothing could record that it
+had: a carried criterion is `met: false` by schema, and a carry whose destination is
+complete is rejected. So Phase 7 E1, met in Phase 8, would have blocked Phase 8's own
+closing. A carried criterion may now carry `discharged_in_phase` (equal to
+`carried_to_phase`) and `discharged_evidence` (an artefact, §10.8). It stays `met: false`
+on the phase that carried it — that phase did not meet it — and the validator accepts
+its destination being closed. Both rules were seen to fail: a discharge without
+evidence, and one naming a different phase.
+
+Also found: the Consequences above say `PROGRESS.md` lists carried criteria in their own
+section. It does not; that is recorded as debt rather than claimed.

@@ -135,7 +135,7 @@ def merge(generated: list[dict], existing: list[dict]) -> list[dict]:
                 # ADR-0036's fields. Dropping them silently turned three carried
                 # Phase 5 criteria into plain unmet ones the first time the table was
                 # rebuilt after carrying existed (spec_version 3.0.0).
-                for key in ("carried_to_phase", "carried_reason"):
+                for key in ("carried_to_phase", "carried_reason", "discharged_in_phase", "discharged_evidence"):
                     if key in prior:
                         criterion[key] = prior[key]
     return generated

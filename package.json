@@ -14,6 +14,7 @@
     "test:watch": "vitest",
     "tauri": "tauri",
     "audit:ui": "node tools/uiaudit/run.mjs",
+    "audit:controller": "node tools/uiaudit/controller.mjs",
     "audit:contrast": "python tools/contrast/audit.py"
   },
   "dependencies": {

@@ -37,6 +37,7 @@ pub fn offline_config(dir: &Path) -> EngineConfig {
     c.dht = false;
     c.trackers = false;
     c.lsd = false;
+    c.loopback_only = true;
     c.dead_swarm_after = Duration::from_secs(5);
     c
 }

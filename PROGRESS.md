@@ -12,25 +12,43 @@
 
 **Phase 8 — Player Core — MILESTONE: FIRST DEMOABLE BUILD** (`in_progress`, branch `phase/08-player-core`)
 
-0 of 7 exit criteria met with evidence.
+4 of 7 exit criteria met with evidence.
 
 > Opened 2026-11-06 when Phase 7 merged (125a0a2). Carried in from Phase 7: E1 (start under 8 s; D61) and E7 (the live VPN-drop check, which needs the author).
+
+### Subtasks — 9/9 complete
+
+- [x] **8.1** libmpv as a pinned dependency: tools/mpv/fetch.py downloads shinchiro's mpv-dev-x86_64 20261021 build (baseline x86-64, not v3, so Tier 0 CPUs without AVX2 work), verifies its SHA-256, and places libmpv-2.dll beside the app; doctor checks for it; the bundle ships it. · `a3b2079`
+- [x] **8.2** crates/player: libmpv loaded dynamically (no import library, as Spike A), a safe wrapper — options, commands, properties, an event thread — and tests against an FFmpeg-generated clip: load, play, pause, exact seek (frame-accurate), tracks, speed. · `54396ea`
+- [x] **8.3** Embedding: libmpv renders into a child HWND of the main window (Spike A step 2), resized with it; play/pause/seek/volume/track/speed/stop commands; player state streamed to the frontend. · `e2fd2c8`
+- [x] **8.4** The player chrome (ADR-0020/0021): scrub bar with buffered ranges and torrent progress, volume, time, fullscreen, audio and subtitle tracks, speed; full keyboard control; auto-hide; still frame on pause. · `02684b6`
+- [x] **8.5** Xbox controller (ADR-0041): a gamepad layer over the focus system, the player mappings, the ten-foot focus treatment; tested with a simulated gamepad. · `5506006`
+- [x] **8.6** Position saving on exit and resume on reopen, per profile, across restarts. · `63ded9f`
+- [x] **8.7** A minimal detail page — title, year, synopsis, cast, a Play button through the resolver — with the torrent started as soon as the page opens (Phase 7 E1, D61). · `63ded9f`
+- [x] **8.8** Search -> detail -> resolve -> play end to end, from a local file, the Internet Archive, and a P2P source. · `973efe0`
+- [x] **8.9** Evidence: 4K HEVC HDR on hardware decode (log and CPU), frame-accurate seek, resume across restarts, play-to-first-frame timings, the demo GIF in the README; the carried Phase 7 E1; the author's batched manual checks (controller, VPN drop). · `e0e5872`
 
 ### Exit criteria
 
 - [ ] **E1** A user can search, click, and watch — from a local file, from the Internet Archive backend, and from a configured P2P source.
-- [ ] **E2** Playback of 4K HEVC HDR uses hardware decode (verified in logs and by CPU usage).
-- [ ] **E3** Seeking is frame-accurate and responsive.
-- [ ] **E4** Position resume works across app restarts.
+      - *Evidence:* MEASURED 2026-11-06, carried (ADR-0036): the Internet Archive and P2P paths are tested from catalogue row to first frame - crates/playback/tests/end_to_end.rs::search_to_first_frame_over_a_swarm (offline swarm) and ::live_archive_search_to_first_frame (live), and in the real window search -> detail -> Play -> picture in 5.5-7.9 s from the Internet Archive (docs/eval-results.md, docs/media/phase-08-demo.gif). A local file plays by drag-and-drop (src/features/player/useDropToPlay.ts) but cannot be searched for: LocalFileBackend::find is a stub until the library scanner.
+- [x] **E2** Playback of 4K HEVC HDR uses hardware decode (verified in logs and by CPU usage).
+      - *Evidence:* cargo run --release -p sinephile-player --example hwdec -- hdr4k.mp4 8 (3840x2160 HEVC Main10 PQ/BT.2020): hwdec-current=d3d11va-copy at 18.2% of one core vs forced software 35.9%, both real-time; RTX 5070 Ti Laptop, 2026-11-06, docs/eval-results.md Phase 8 E2
+- [x] **E3** Seeking is frame-accurate and responsive.
+      - *Evidence:* crates/player/tests/playback.rs::an_exact_seek_lands_on_the_frame_asked_for: paused exact seeks to 3.52 / 1.08 / 5.2 s (3.52 between keyframes) land at 3.520 / 1.080 / 5.200 in 4.5 / 2.3 / 2.8 ms (cargo test --release -p sinephile-player --test playback an_exact_seek -- --nocapture, 2026-11-06), then a frame step to 5.24; seek_to_and_wait waits on playback-restart so the landing is real; passed 25/25 runs
+- [x] **E4** Position resume works across app restarts.
+      - *Evidence:* Three links, each tested: the player saves on the way out (src/features/player/PlayerScreen.test.tsx 'saves the position it reached on the way out', seen to fail with the unmount save removed); the position survives closing and reopening the database file (crates/playback/tests/plan.rs::the_position_survives_a_restart, seen to fail against a fresh file); the player starts there (crates/player/tests/playback.rs::resuming_starts_where_it_left_off)
 - [ ] **E5** With only an Xbox controller, a user can browse to a film, start it, pause, seek and leave the player — tested with a simulated gamepad in CI and confirmed once by the author with a real controller.
-- [ ] **E6** A demo GIF of this flow exists and is in the README.
+      - *Evidence:* Simulated half met: tools/uiaudit/controller.mjs (npm run audit:controller, CI step 'Controller flow (simulated Xbox pad)') drives the built app in headless Chrome with only pad buttons - Y, D-pad+A on the new on-screen keyboard (src/app/PadKeyboard.tsx), A result, A Play, A pause, RT seek, B leave - 8/8 checks pass 2026-11-06; seen to fail with Play's focus effect removed. Outstanding: the author's one-time check with a real controller (one is paired over Bluetooth on the dev machine).
+- [x] **E6** A demo GIF of this flow exists and is in the README.
+      - *Evidence:* docs/media/phase-08-demo.gif (960x600, 88 frames, 1.2 MB), recorded 2026-11-06 from the real window with PrintWindow: search 'nosferatu', open the 1922 film, Resume from 0:52 from the Internet Archive, picture; embedded at the top of README.md
 - [ ] **E7** Tag `phase-08`, and celebrate — this is the first thing worth showing anyone.
 
 ---
 
 ## What's next
 
-Plan Phase 8 (player core) per SPEC.md §15 Phase 8 and ADR-0020/0021/0041: libmpv embedded into a child HWND (spikes/spike-a-libmpv), custom chrome with region cutouts and still-frame-on-pause, keyboard and Xbox-controller control, position resume, a minimal detail page, and search -> detail -> resolve -> play end to end. Write the subtasks into PROJECT_STATE.json and start (ADR-0040). Carried in: Phase 7 E1 (start the torrent when the detail page opens; D61) and E7 (author's VPN-drop check). Author actions outstanding: publish embeddings-v3; retake case-study shots; E7.
+Finish Phase 8 (docs/phases/phase-08-player-core.md): (1) 8.8/E1 - a search->detail->play check per source kind: local file, the Internet Archive (crates/playback/tests/end_to_end.rs live test) and P2P (the offline-swarm test), plus one real-window run of each through SINEPHILE_AUTOPLAY; (2) the carried Phase 7 E1 (torrent start < 8 s) measured from the detail page opening, since prepare_play starts the torrent then (D61); (3) E6 - record the demo GIF from the real window with the scratchpad PrintWindow method (PrintWindow PW_RENDERFULLCONTENT, never desktop capture) and put it in README.md; (4) learning note docs/learning/phase-08-notes.md, HOW_IT_WORKS stub, SESSION_LOG retrospective, regression check against Phase 7's numbers, then /closephase 8 and fire the Tier A understanding gate. Author batch: real-controller check for E5 (a controller is paired), VPN-drop check (Phase 7 E7), embeddings-v3 release.
 
 ---
 
@@ -54,7 +72,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 5 | Semantic Search Engine | A | 4 | 2 | 2/5 |
 | [x] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 6/6 |
 | [x] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 6/8 |
-| [~] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 0/7 |
+| [~] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 4/7 |
 | [ ] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 0/6 |
 | [ ] | 10 | Subtitle Pipeline | B | 8 | 2 | 0/6 |
 | [ ] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 0/5 |
@@ -143,6 +161,10 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D60** (raised in Phase 7) Phase 3's sources_config table (migration 0004) was superseded by Phase 6's source_backends and addons (migration 0015) and is unused. Drop it in a migration when the schema is next touched.
 - **D61** (raised in Phase 7) Phase 7 E1 is carried to Phase 8: first-peer discovery takes 2-55 s on this network. Levers for Phase 8: start the torrent when the detail page opens, and persist DHT state sooner than librqbit's 60 s dump so a warm routing table survives short sessions.
 - **D62** (raised in Phase 7) tools/bench/qbittorrent_compare.py assumes qBittorrent at C:\Program Files\qBittorrent and Web UI port 18081; it is a measurement script, not a product feature, and ADR-0029's qBittorrent backend (Phase 13) must not reuse its throwaway-profile approach.
+- **D63** (raised in Phase 8) Pressing Play the instant a film page opens still waits on torrent peer discovery (2-55 s on this network). Persist DHT state sooner than librqbit's 60 s dump, and consider prestarting the top P2P candidate from search results.
+- **D64** (raised in Phase 8) When another application holds the default audio device exclusively, WASAPI retries for ~1.3 s before mpv plays silently; first frame waits for it. Consider audio init that does not block video, and telling the user the device is busy.
+- **D65** (raised in Phase 8) libmpv-2.dll is fetched by tools/mpv/fetch.py for development and CI; the release bundle must ship it (and its licence notice) - Phase 27's packaging.
+- **D66** (raised in Phase 8) ADR-0036 says PROGRESS.md lists carried criteria in their own section; tools/state/validate_state.py do_progress does not. Add the section (carried, and discharged) so a carry cannot hide among met criteria.
 
 ---
 

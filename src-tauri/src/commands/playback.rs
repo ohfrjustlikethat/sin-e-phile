@@ -1,0 +1,134 @@
+//! The detail page and Play (SPEC.md Phase 8). **Thin**: what plays and from where is
+//! `crates/playback`; this gathers the pieces it needs and converts types.
+
+use serde::{Deserialize, Serialize};
+use tauri::State;
+
+use sinephile_persistence::repositories::profiles::PlaybackPosition;
+use sinephile_persistence::repositories::{MediaRepository, ProfileRepository};
+use sinephile_sources::backends::all;
+use sinephile_sources::overview;
+
+use crate::state::AppState;
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct CreditView {
+    pub name: String,
+    pub role: String,
+    pub character: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct ItemDetail {
+    #[specta(type = i32)]
+    pub id: i64,
+    pub title: String,
+    #[specta(type = Option<i32>)]
+    pub year: Option<i64>,
+    pub kind: String,
+    #[specta(type = Option<i32>)]
+    pub runtime_minutes: Option<i64>,
+    pub synopsis: Option<String>,
+    pub credits: Vec<CreditView>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn item_detail(
+    state: State<'_, AppState>,
+    id: i32,
+) -> Result<Option<ItemDetail>, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let media = MediaRepository::new(&db);
+    let Some(item) = media
+        .by_id(i64::from(id))
+        .await
+        .map_err(|e| e.to_string())?
+    else {
+        return Ok(None);
+    };
+    let credits = media
+        .credits(item.id, 14)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(Some(ItemDetail {
+        id: item.id,
+        title: item.primary_title,
+        year: item.release_year,
+        kind: item.kind.as_str().to_string(),
+        runtime_minutes: item.runtime_minutes,
+        synopsis: item.synopsis,
+        credits: credits
+            .into_iter()
+            .map(|c| CreditView {
+                name: c.name,
+                role: c.role,
+                character: c.character,
+            })
+            .collect(),
+    }))
+}
+
+/// What Play will open, decided now (see `sinephile_playback::plan`).
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct PlayPlanView {
+    pub title: String,
+    pub open: String,
+    pub start: Option<f64>,
+    /// The source's display name.
+    pub from: String,
+    pub offered: u32,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn prepare_play(state: State<'_, AppState>, id: i32) -> Result<PlayPlanView, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let (ctx, _) = overview::context_from(&db, state.http.clone(), state.untrusted_http.clone())
+        .await
+        .map_err(|e| e.to_string())?;
+    let resolver = sinephile_sources::registry::resolver_from(&db, all(&ctx))
+        .await
+        .map_err(|e| e.to_string())?;
+    // The engine starts here if a swarm might be needed; a failure to start it only
+    // means swarms are skipped, not that nothing can play.
+    let rt = state.torrent().await.ok();
+    let torrent = rt.as_ref().map(|r| (&r.engine, &r.server));
+    let plan = sinephile_playback::plan(&db, &resolver, torrent, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(PlayPlanView {
+        from: overview::display_name(&plan.backend, &ctx.addons),
+        title: plan.title,
+        open: plan.open,
+        start: plan.start,
+        offered: plan.offered as u32,
+    })
+}
+
+/// Remember where the viewer is, for resume. Called periodically and on leaving.
+#[tauri::command]
+#[specta::specta]
+pub async fn save_position(
+    state: State<'_, AppState>,
+    id: i32,
+    position: f64,
+    duration: Option<f64>,
+) -> Result<(), String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let profiles = ProfileRepository::new(&db);
+    let profile = profiles.ensure_default().await.map_err(|e| e.to_string())?;
+    profiles
+        .save_position(
+            profile,
+            &PlaybackPosition {
+                media_item_id: i64::from(id),
+                position_seconds: position.max(0.0) as i64,
+                duration_seconds: duration.map(|d| d as i64),
+                audio_language: None,
+                subtitle_language: None,
+            },
+        )
+        .await
+        .map_err(|e| e.to_string())
+}

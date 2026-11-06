@@ -53,6 +53,9 @@ pub struct EngineConfig {
     pub data_dir: PathBuf,
     /// `None` picks a free port.
     pub listen_port: Option<u16>,
+    /// Accept peers only from this machine. Tests set it, so a test swarm never asks
+    /// Windows Firewall for permission to listen on the network.
+    pub loopback_only: bool,
     pub dht: bool,
     pub trackers: bool,
     /// Local service discovery (other peers on the same network).
@@ -76,6 +79,7 @@ impl EngineConfig {
         Self {
             data_dir: data_dir.into(),
             listen_port: None,
+            loopback_only: false,
             dht: true,
             trackers: true,
             lsd: true,
@@ -201,7 +205,11 @@ impl Engine {
             }),
             listen: Some(ListenerOptions {
                 listen_addr: (
-                    std::net::Ipv4Addr::UNSPECIFIED,
+                    if config.loopback_only {
+                        std::net::Ipv4Addr::LOCALHOST
+                    } else {
+                        std::net::Ipv4Addr::UNSPECIFIED
+                    },
                     config.listen_port.unwrap_or(0),
                 )
                     .into(),

@@ -8,6 +8,15 @@ use sqlx::Row;
 use crate::db::{Db, DbError};
 use crate::model::{IdSource, MediaItem, MediaKind, NewMediaItem, Title, TitleVariant};
 
+/// One credit as the detail page lists it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Credit {
+    pub name: String,
+    /// `director`, `creator`, `writer`, `actor`, …
+    pub role: String,
+    pub character: Option<String>,
+}
+
 pub struct MediaRepository<'a> {
     db: &'a Db,
 }
@@ -187,6 +196,47 @@ impl<'a> MediaRepository<'a> {
                 })
             })
             .collect()
+    }
+
+    /// This item's id at one external source (`imdb`, `tmdb`, `anilist`, …).
+    pub async fn external_id(
+        &self,
+        media_item_id: i64,
+        source: &str,
+    ) -> Result<Option<String>, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT external_id FROM external_ids WHERE media_item_id = ? AND source = ?",
+        )
+        .bind(media_item_id)
+        .bind(source)
+        .fetch_optional(self.db.pool())
+        .await?)
+    }
+
+    /// Who made it and who is in it, for the detail page: directors and creators first,
+    /// then the cast in billing order (unbilled last).
+    pub async fn credits(&self, media_item_id: i64, limit: i64) -> Result<Vec<Credit>, DbError> {
+        let rows: Vec<(String, String, String)> = sqlx::query_as(
+            "SELECT p.name, c.role, c.character
+               FROM credits c JOIN people p ON p.id = c.person_id
+              WHERE c.media_item_id = ?
+              ORDER BY CASE c.role WHEN 'director' THEN 0 WHEN 'creator' THEN 1
+                                   WHEN 'writer' THEN 2 ELSE 3 END,
+                       c.billing IS NULL, c.billing, p.name
+              LIMIT ?",
+        )
+        .bind(media_item_id)
+        .bind(limit)
+        .fetch_all(self.db.pool())
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|(name, role, character)| Credit {
+                name,
+                role,
+                character: (!character.is_empty()).then_some(character),
+            })
+            .collect())
     }
 
     pub async fn count(&self) -> Result<i64, DbError> {

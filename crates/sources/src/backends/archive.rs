@@ -96,7 +96,9 @@ impl SourceBackend for InternetArchiveBackend {
         let docs = parse_search(&body)?;
         let wanted: Vec<Doc> = docs
             .into_iter()
-            .filter(|d| title_matches(&words, &d.title) && year_agrees(query.year, d.year))
+            .filter(|d| {
+                title_matches(&words, &d.title) && year_agrees(query.year, d.year, &d.title)
+            })
             .take(ITEMS_PER_QUERY)
             .collect();
 
@@ -300,11 +302,18 @@ fn title_matches(words: &str, title: &str) -> bool {
     words.split(' ').all(|w| have.contains(&w))
 }
 
-/// A year on both sides must agree; an item with no year is not ruled out by one.
-fn year_agrees(wanted: Option<u16>, have: Option<u16>) -> bool {
+/// Whether an item is the film of the year asked for.
+///
+/// Both years known: they must agree. An item with no year matches only if the year is
+/// unknown or the item's title names it ("Nosferatu (1922) Colorized"). Letting a
+/// year-less item through matched the 1922 Nosferatu to the 2024 one, so Play on the
+/// 2024 film would have shown the 1922 film: a confidently wrong film is worse than a
+/// missed copy, and well-catalogued films have copies that do carry a year.
+fn year_agrees(wanted: Option<u16>, have: Option<u16>, title: &str) -> bool {
     match (wanted, have) {
         (Some(a), Some(b)) => a == b,
-        _ => true,
+        (Some(a), None) => title.contains(&a.to_string()),
+        (None, _) => true,
     }
 }
 
@@ -407,5 +416,15 @@ mod tests {
         assert_eq!(year_of(Some(&serde_json::json!("1922-03-04"))), Some(1922));
         assert_eq!(year_of(Some(&serde_json::json!(["1922"]))), Some(1922));
         assert_eq!(year_of(Some(&serde_json::json!("unknown"))), None);
+    }
+
+    #[test]
+    fn a_year_less_copy_is_not_another_years_film() {
+        // The 2024 Nosferatu must not be offered the Archive's year-less 1922 copies.
+        assert!(!year_agrees(Some(2024), None, "Nosferatu"));
+        assert!(!year_agrees(Some(2024), Some(1922), "Nosferatu (1922)"));
+        assert!(year_agrees(Some(1922), None, "Nosferatu (1922) Colorized"));
+        assert!(year_agrees(Some(1922), Some(1922), "Nosferatu"));
+        assert!(year_agrees(None, None, "Nosferatu"));
     }
 }

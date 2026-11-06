@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { Masthead } from "@/app/Masthead";
+import { PlayerScreen } from "@/features/player/PlayerScreen";
+import { DetailScreen } from "@/features/detail/DetailScreen";
+import { useDropToPlay } from "@/features/player/useDropToPlay";
+import { sendPlayerIntent } from "@/features/player/intentBus";
+import { moveFocus, startGamepad } from "@/lib/gamepad";
 import { Placeholder } from "@/app/Placeholder";
+import { PadKeyboard, closePadKeyboard } from "@/app/PadKeyboard";
 import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { SearchScreen } from "@/features/search/SearchScreen";
 import { DesignGallery } from "@/features/design/DesignGallery";
@@ -20,8 +26,49 @@ const LABELS: Record<Destination, string> = {
 
 export function App() {
   const { destination, settingsOpen, setDestination, setSettingsOpen } = useUi();
+  const playing = useUi((s) => s.playing);
+  const detail = useUi((s) => s.detail);
+  useDropToPlay();
   const [palette, setPalette] = useState(false);
   const [searching, setSearching] = useState(false);
+
+  // ADR-0041: an Xbox controller as a remote. The player takes its intents while it is
+  // on screen; everywhere else the pad moves focus and acts on it.
+  useEffect(
+    () =>
+      startGamepad({
+        player: sendPlayerIntent,
+        nav: (action) => {
+          switch (action.kind) {
+            case "move":
+              moveFocus(action.direction);
+              break;
+            case "activate":
+              (document.activeElement as HTMLElement | null)?.click();
+              break;
+            case "back":
+              if (closePadKeyboard()) break;
+              window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+              break;
+            case "tab": {
+              const ui = useUi.getState();
+              const i = DESTINATIONS.indexOf(ui.destination);
+              const next = DESTINATIONS[(i + (action.next ? 1 : DESTINATIONS.length - 1)) % DESTINATIONS.length];
+              if (next) ui.setDestination(next);
+              setSearching(false);
+              break;
+            }
+            case "search":
+              setSearching(true);
+              break;
+            case "settings":
+              useUi.getState().setSettingsOpen(true);
+              break;
+          }
+        },
+      }),
+    [],
+  );
 
   // SEARCH IS A MODE, NOT A DESTINATION. §3.1 names five top-level surfaces and the rail
   // comment is explicit that the navigation shape must never change under the user, so
@@ -76,12 +123,23 @@ export function App() {
     );
   }
 
+  // The player is immersive: no masthead, its own top bar (with a drag region).
+  if (playing) {
+    return (
+      <div className="h-full bg-black text-ink">
+        <PlayerScreen />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full flex-col bg-base text-ink">
       <Masthead searching={searching} onSearchChange={setSearching} />
       <main className="min-h-0 min-w-0 flex-1 overflow-auto">
         {settingsOpen ? (
           <SettingsScreen />
+        ) : detail !== null ? (
+          <DetailScreen />
         ) : searching ? (
           <SearchScreen />
         ) : (
@@ -89,6 +147,7 @@ export function App() {
         )}
       </main>
       <CommandPalette commands={commands} open={palette} onOpenChange={setPalette} />
+      <PadKeyboard />
     </div>
   );
 }

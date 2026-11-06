@@ -1,0 +1,89 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  BUTTON, heldDirections, navAction, nearest, newlyPressed, playerIntent, shouldRepeat,
+  startGamepad, type Box, type PadFrame,
+} from "./gamepad";
+
+/** ADR-0041: an Xbox controller drives the app like a remote. */
+
+const frame = (down: number[] = [], stickX = 0, stickY = 0): PadFrame => {
+  const pressed = Array(17).fill(false) as boolean[];
+  down.forEach((b) => (pressed[b] = true));
+  return { pressed, stickX, stickY };
+};
+
+describe("gamepad decisions", () => {
+  it("a held button fires once, on the frame it went down", () => {
+    expect(newlyPressed(null, frame([BUTTON.A]))).toEqual([BUTTON.A]);
+    expect(newlyPressed(frame([BUTTON.A]), frame([BUTTON.A]))).toEqual([]);
+    expect(newlyPressed(frame([BUTTON.A]), frame([BUTTON.A, BUTTON.B]))).toEqual([BUTTON.B]);
+  });
+
+  it("the D-pad and the stick both steer, past a deadzone", () => {
+    expect([...heldDirections(frame([BUTTON.DOWN]))]).toEqual(["down"]);
+    expect([...heldDirections(frame([], 0.9, 0))]).toEqual(["right"]);
+    expect(heldDirections(frame([], 0.3, -0.2)).size).toBe(0);
+  });
+
+  it("maps the player buttons as ADR-0041's table says", () => {
+    expect(playerIntent(BUTTON.A)).toEqual({ kind: "toggle_pause" });
+    expect(playerIntent(BUTTON.B)).toEqual({ kind: "back" });
+    expect(playerIntent(BUTTON.X)).toEqual({ kind: "subtitles_menu" });
+    expect(playerIntent(BUTTON.RT)).toEqual({ kind: "seek", seconds: 30 });
+    expect(playerIntent(BUTTON.LEFT)).toEqual({ kind: "seek", seconds: -10 });
+  });
+
+  it("maps browsing buttons to navigation", () => {
+    expect(navAction(BUTTON.A)).toEqual({ kind: "activate" });
+    expect(navAction(BUTTON.RB)).toEqual({ kind: "tab", next: true });
+    expect(navAction(BUTTON.Y)).toEqual({ kind: "search" });
+  });
+
+  it("repeats a held direction only after a delay", () => {
+    expect(shouldRepeat(0, 0, 300)).toBe(false);
+    expect(shouldRepeat(0, 0, 450)).toBe(true);
+    expect(shouldRepeat(0, 450, 500)).toBe(false);
+  });
+
+  it("spatial navigation prefers what is directly in the direction asked", () => {
+    const from: Box = { x: 100, y: 100, width: 100, height: 40 };
+    const below: Box = { x: 100, y: 200, width: 100, height: 40 };
+    const belowButFarSide: Box = { x: 600, y: 160, width: 100, height: 40 };
+    const above: Box = { x: 100, y: 20, width: 100, height: 40 };
+    expect(nearest(from, [belowButFarSide, below, above], "down")).toBe(1);
+    expect(nearest(from, [belowButFarSide, below, above], "up")).toBe(2);
+    expect(nearest(from, [below, above], "left")).toBe(-1);
+  });
+});
+
+describe("startGamepad, with a simulated pad", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("sends player intents when the player takes them, navigation otherwise", () => {
+    let pad = { connected: true, buttons: Array(17).fill({ pressed: false, value: 0 }), axes: [0, 0] };
+    vi.stubGlobal("navigator", { getGamepads: () => [pad] });
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => frames.push(cb));
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+    const player = vi.fn(() => true);
+    const nav = vi.fn();
+    const stop = startGamepad({ player, nav });
+
+    const press = (b: number) => {
+      const buttons = Array(17).fill({ pressed: false, value: 0 });
+      buttons[b] = { pressed: true, value: 1 };
+      pad = { ...pad, buttons };
+    };
+    press(BUTTON.A);
+    frames.shift()?.(16);
+    expect(player).toHaveBeenCalledWith({ kind: "toggle_pause" });
+    expect(document.documentElement.dataset.input).toBe("pad");
+
+    player.mockReturnValue(false); // the player is not on screen
+    press(BUTTON.RB);
+    frames.shift()?.(32);
+    expect(nav).toHaveBeenCalledWith({ kind: "tab", next: true });
+    stop();
+    expect(document.documentElement.dataset.input).toBeUndefined();
+  });
+});

@@ -314,6 +314,16 @@ fast failure for dead swarms, and adapter binding so a dropped VPN stops traffic
 instead of leaking it. Tested against a real two-engine swarm built on loopback for each
 test. How it schedules: `docs/specs/streaming-scheduler.md`.
 
+### The player ✅ `Phase 8`
+
+`crates/player` wraps libmpv (loaded at run time, one pinned build) and the native
+window it draws into; `crates/playback` turns a catalogue row into "open this, from
+here" by asking the sources, ranking what they offer and resuming from the saved
+position. The app's controls are HTML drawn over the video through holes cut in the
+video window, and pausing swaps the video for a still frame so the pause screen can dim
+it. A keyboard and an Xbox controller send the same intents. How the window, the holes
+and the threads fit together: `docs/specs/player-embedding.md`.
+
 ### The posture guard ✅ `Phase 0`
 
 The app ships **no content sources** — that is architectural, not a disclaimer

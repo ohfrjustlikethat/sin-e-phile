@@ -217,6 +217,15 @@ def check_windows_sdk() -> Result:
     return Result("Windows 10/11 SDK", True, match.group(1) if match else "present")
 
 
+def check_libmpv() -> Result:
+    """The player (Phase 8). Fetched and checksum-verified, never committed."""
+    code, out = run(sys.executable, str(REPO_ROOT / "tools" / "mpv" / "fetch.py"), "--check")
+    if code == 0:
+        return Result("libmpv (player)", True, "lib/libmpv-2.dll, checksum verified")
+    return Result("libmpv (player)", False, "missing or does not match its pinned checksum",
+                  "python tools/mpv/fetch.py")
+
+
 def check_hooks(fix_it: bool) -> Result:
     """Verify — and optionally perform — the core.hooksPath bootstrap."""
     code, out = run("git", "-C", str(REPO_ROOT), "config", "--get", "core.hooksPath")
@@ -304,6 +313,7 @@ def main() -> int:
         check_webview2(),
         check_command("FFmpeg", "ffmpeg", ("-version",),
                       "Install FFmpeg and put it on PATH: https://ffmpeg.org/download.html"),
+        check_libmpv(),
         check_hooks(fix_it=not args.no_fix),
     ]
 

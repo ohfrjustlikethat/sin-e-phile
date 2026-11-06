@@ -15,17 +15,25 @@ libmpv embedded and rendering into the Tauri window, with hardware decoding enab
 
 ## Exit criteria
 
-- [ ] **E1** A user can search, click, and watch — from a local file, from the Internet Archive backend, and from a configured P2P source.
-- [ ] **E2** Playback of 4K HEVC HDR uses hardware decode (verified in logs and by CPU usage).
-- [ ] **E3** Seeking is frame-accurate and responsive.
-- [ ] **E4** Position resume works across app restarts.
-- [ ] **E5** With only an Xbox controller, a user can browse to a film, start it, pause, seek and leave the player — tested with a simulated gamepad in CI and confirmed once by the author with a real controller.
-- [ ] **E6** A demo GIF of this flow exists and is in the README.
+- [ ] **E1** A user can search, click, and watch — from a local file, from the Internet Archive backend, and from a configured P2P source. — *carried to Phase 12*
+- [x] **E2** Playback of 4K HEVC HDR uses hardware decode (verified in logs and by CPU usage).
+- [x] **E3** Seeking is frame-accurate and responsive.
+- [x] **E4** Position resume works across app restarts.
+- [ ] **E5** With only an Xbox controller, a user can browse to a film, start it, pause, seek and leave the player — tested with a simulated gamepad in CI and confirmed once by the author with a real controller. — *carried to Phase 9*
+- [x] **E6** A demo GIF of this flow exists and is in the README.
 - [ ] **E7** Tag `phase-08`, and celebrate — this is the first thing worth showing anyone.
 
 ## Subtasks
 
-_none authored yet — write them when the phase is planned._
+- [x] **8.1** libmpv as a pinned dependency: tools/mpv/fetch.py downloads shinchiro's mpv-dev-x86_64 20261021 build (baseline x86-64, not v3, so Tier 0 CPUs without AVX2 work), verifies its SHA-256, and places libmpv-2.dll beside the app; doctor checks for it; the bundle ships it.
+- [x] **8.2** crates/player: libmpv loaded dynamically (no import library, as Spike A), a safe wrapper — options, commands, properties, an event thread — and tests against an FFmpeg-generated clip: load, play, pause, exact seek (frame-accurate), tracks, speed.
+- [x] **8.3** Embedding: libmpv renders into a child HWND of the main window (Spike A step 2), resized with it; play/pause/seek/volume/track/speed/stop commands; player state streamed to the frontend.
+- [x] **8.4** The player chrome (ADR-0020/0021): scrub bar with buffered ranges and torrent progress, volume, time, fullscreen, audio and subtitle tracks, speed; full keyboard control; auto-hide; still frame on pause.
+- [x] **8.5** Xbox controller (ADR-0041): a gamepad layer over the focus system, the player mappings, the ten-foot focus treatment; tested with a simulated gamepad.
+- [x] **8.6** Position saving on exit and resume on reopen, per profile, across restarts.
+- [x] **8.7** A minimal detail page — title, year, synopsis, cast, a Play button through the resolver — with the torrent started as soon as the page opens (Phase 7 E1, D61).
+- [x] **8.8** Search -> detail -> resolve -> play end to end, from a local file, the Internet Archive, and a P2P source.
+- [x] **8.9** Evidence: 4K HEVC HDR on hardware decode (log and CPU), frame-accurate seek, resume across restarts, play-to-first-frame timings, the demo GIF in the README; the carried Phase 7 E1; the author's batched manual checks (controller, VPN drop).
 
 ## Risks named by this phase
 
@@ -40,4 +48,12 @@ How video playback actually works — container, streams, codecs, decode, presen
 <!-- subtask log: appended during the phase -->
 
 ## Work log
-
+- **8.1** libmpv as a pinned dependency: tools/mpv/fetch.py downloads shinchiro's mpv-dev-x86_64 20261021  · `a3b2079`
+- **8.2** crates/player: libmpv loaded dynamically (no import library, as Spike A), a safe wrapper — optio · `54396ea`
+- **8.3** Embedding: libmpv renders into a child HWND of the main window (Spike A step 2), resized with it · `e2fd2c8`
+- **8.6** Position saving on exit and resume on reopen, per profile, across restarts. · `63ded9f`
+- **8.7** A minimal detail page — title, year, synopsis, cast, a Play button through the resolver — with t · `63ded9f`
+- **8.5** Xbox controller (ADR-0041): a gamepad layer over the focus system, the player mappings, the ten- · `5506006`
+- **8.4** The player chrome (ADR-0020/0021): scrub bar with buffered ranges and torrent progress, volume,  · `02684b6`
+- **8.8** Search -> detail -> resolve -> play end to end, from a local file, the Internet Archive, and a P · `973efe0`
+- **8.9** Evidence: 4K HEVC HDR on hardware decode (log and CPU), frame-accurate seek, resume across resta · `e0e5872`

@@ -43,6 +43,7 @@ All free. Verified **2026-08-30**.
 | **Node.js** | 20 LTS+ | The frontend | [nodejs.org](https://nodejs.org) |
 | **WebView2 Runtime** | Evergreen | Tauri renders the entire frontend in it | [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) — preinstalled on current Windows 11 |
 | **FFmpeg** | 6+ | Media probing, VAD extraction, thumbnails | [ffmpeg.org](https://ffmpeg.org/download.html), or `winget install Gyan.FFmpeg` |
+| **libmpv** | pinned build | The player (Phase 8) | `python tools/mpv/fetch.py` — downloads one pinned build, verifies its SHA-256, puts `lib/libmpv-2.dll` in place (git-ignored) |
 
 Optional: **GitHub CLI** (`gh`) and **gitleaks**. Without gitleaks the pre-commit
 hook uses `tools/guard/secretscan.py`; CI runs a pinned gitleaks either way.

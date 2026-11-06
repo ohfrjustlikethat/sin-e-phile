@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SearchResponse } from "@/lib/ipc";
+import { useUi } from "@/lib/store";
 
 /** ADR-0030 layer 3 on the search screen: a miss is put to the sources after it shows. */
 
@@ -56,6 +57,22 @@ describe("SearchScreen backfill", () => {
     fireEvent.change(screen.getByLabelText("Search the catalogue"), { target: { value: "zzzz" } });
     await waitFor(() => expect(screen.getByText("Nothing found")).toBeInTheDocument());
     expect(screen.getByText(/none of your sources has it/)).toBeInTheDocument();
+  });
+
+  it("Enter in the field opens the highlighted result", async () => {
+    commands.search.mockReturnValue(ok({ ...FOUND, hits: [...FOUND.hits, { ...FOUND.hits[0]!, id: 10, title: "Häxan" }] }));
+    useUi.setState({ detail: null });
+    Element.prototype.scrollIntoView = () => {}; // jsdom has no layout
+    render(<SearchScreen />);
+    const field = screen.getByLabelText("Search the catalogue");
+    fireEvent.change(field, { target: { value: "carriage" } });
+    await screen.findByText("Häxan");
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(useUi.getState().detail).toBeNull(); // nothing highlighted yet
+    fireEvent.keyDown(field, { key: "ArrowDown" });
+    fireEvent.keyDown(field, { key: "ArrowDown" });
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(useUi.getState().detail).toBe(10);
   });
 
   it("does not ask the sources while the catalogue is still being built", async () => {

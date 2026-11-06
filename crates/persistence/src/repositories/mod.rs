@@ -20,7 +20,7 @@ pub use catalogue::{
 };
 pub use credentials::{CredentialRepository, TmdbAccess};
 pub use episodes::EpisodeRepository;
-pub use media::MediaRepository;
+pub use media::{Credit, MediaRepository};
 pub use profiles::ProfileRepository;
 pub use search::{Hit, HitDetail, MatchReason, SearchRepository};
 pub use sources::{

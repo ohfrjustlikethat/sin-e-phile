@@ -54,6 +54,8 @@ pub struct AppState {
     /// The torrent engine and its streaming server, started the first time anything
     /// needs them — never on the cold-start path (SPEC.md §2.3).
     torrent: tokio::sync::OnceCell<Arc<TorrentRuntime>>,
+    /// The player and its video window, created on the first play (Phase 8).
+    player: RwLock<Option<Arc<crate::commands::player::PlayerRuntime>>>,
 }
 
 pub struct TorrentRuntime {
@@ -89,6 +91,7 @@ impl AppState {
             pending_addons: Mutex::new(HashMap::new()),
             data_dir: RwLock::new(None),
             torrent: tokio::sync::OnceCell::new(),
+            player: RwLock::new(None),
         }
     }
 
@@ -119,6 +122,14 @@ impl AppState {
     /// "never", and a UI thread waiting on a disk is how a splash screen becomes a hang.
     pub fn db(&self) -> Option<Arc<Db>> {
         self.db.read().expect("db lock poisoned").clone()
+    }
+
+    pub fn player(&self) -> Option<Arc<crate::commands::player::PlayerRuntime>> {
+        self.player.read().expect("player lock poisoned").clone()
+    }
+
+    pub fn set_player(&self, rt: Arc<crate::commands::player::PlayerRuntime>) {
+        *self.player.write().expect("player lock poisoned") = Some(rt);
     }
 
     pub fn set_data_dir(&self, dir: PathBuf) {
