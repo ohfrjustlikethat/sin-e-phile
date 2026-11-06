@@ -10,41 +10,34 @@
 
 ## Where we are right now
 
-**Phase 10 — Subtitle Pipeline** (`in_progress`, branch `phase/10-subtitle-pipeline`)
+**Phase 11 — Player Experience Layer** (`in_progress`, branch `phase/11-player-experience-layer`)
 
-6 of 6 exit criteria met with evidence.
+0 of 5 exit criteria met with evidence.
 
-> Opened 2026-11-06 when Phase 9 merged (63d00d9, tag phase-09); planned under ADR-0040, run as part of the author's five-phase request (9-13). Decisions: a pure-Rust VAD rather than a model download (the crate must stay free of FFmpeg and artefacts, ADR-0017); the corpus is synthetic speech with known timings, because real subtitles of real films are neither ours to commit nor timed against a known truth; "other providers" are a trait with no named provider shipped, since each needs its own legal review (2.1). Author checks still outstanding: real controller (Phase 8 E5), VPN drop (Phase 7 E7).
+> Opened 2026-11-06 when Phase 10 merged (c48c546, tag phase-10); part of the author's five-phase request (9-13). No series page existed, so 11.1 builds a minimal one (airing awareness needs somewhere to show). Trivia, goofs and soundtrack have no free, legal source (IMDb's datasets omit them; scraping is out, 2.1): the overlay says so rather than inventing a source. Author checks still outstanding: real controller (Phase 8 E5), VPN drop (Phase 7 E7), both carried to 13.
 
-### Subtasks — 5/6 complete
+### Subtasks — 0/6 complete
 
-- [x] **10.1** crates/subtitle-align (MIT/Apache, no FFmpeg): cue timings read and rewritten in place for SRT, WebVTT and ASS/SSA (styling preserved); a pure-Rust band-energy VAD with a syllable-modulation test; offset and framerate scale solved together by FFT cross-correlation over the 23.976/24/25 scale set, the plateau's centre taken; two-part split for inserted or removed intros; a distinctness confidence that refuses rather than guess; Tier 0 duration heuristic. Unit tests on synthetic dialogue. · `09cdd8d`
-- [x] **10.2** fixtures/subtitles/ corpus (tools/subcorpus: Windows speech synthesis over room, street and music beds, traces from the app's own VAD, eight damaged copies per film: offsets, 23.976<->25 and 24->25 scales, intros removed and added) plus negative controls (one film's subtitles against another's speech must be refused); cargo run -p eval -- subs reports aligned share (>90% target, a copy aligns when 95% of its cues land within 150 ms), refusals, false accepts and VAD agreement. · `09cdd8d`
-- [x] **10.3** The subtitle chain in a testable crate (crates/subtitles): embedded tracks first (from the player's track list, no network), then sidecar files next to the media (same stem, language suffixes) or in the torrent's file list, then OpenSubtitles by movie hash with the user's own key (no key ships), a persisted daily quota budget that is never exceeded and a cache, then other providers behind a trait; language preference ordering per profile. A test proves an embedded track is used with zero network requests. · `ece5de6`
-- [x] **10.4** Wiring in the app: audio extracted with FFmpeg (16 kHz mono, first 20 minutes) for alignment on Tier 1+, the duration heuristic on Tier 0; an aligned or found subtitle loaded into mpv (sub-add); ASS rendered as authored; Settings shows OpenSubtitles key and quota state and subtitle style (font, size, position, background). · `2c331de`
-- [x] **10.5** The nudge: G and H (and the pad) shift subtitles by 100 ms in the player, persisted per file and per subtitle in the database (migration + repository method + repository_surface test) and reapplied on the next open. · `2c331de`
-- [ ] **10.6** docs/specs/subtitle-alignment.md, crates/subtitle-align README as a standalone crate, learning note, evidence for E1-E6, regression check, close.
+- [ ] **11.1** Series and airing awareness (ADR-0030): migration 0019 airing_schedule filled from AniList nextAiringEpisode during anime ingest/refresh; EpisodeRepository lists a series' seasons and episodes and its next airing; the detail page of a series shows seasons, episodes (playable) and 'Episode 7 airs Thursday' even with no episode row (a pure, tested wording function).
+- [ ] **11.2** The pause overlay: on pause, over the dimmed still, a panel with the cast (character names; headshots only with the user's TMDB key, else typographic), director and key crew, ratings that exist (IMDb from the catalogue; AniList for anime) and never Rotten Tomatoes, time remaining, the current chapter, 'more like this' from the vector index; a cast member opens their filmography. Data fetched when playback starts so the overlay paints in < 200 ms (measured in the real window). Trivia, goofs and soundtrack have no free legal source and are said to be absent, not scraped.
+- [ ] **11.3** Episodes in the player: previous/next episode (N/P keys, pad), a next-episode card with a countdown in the last 30 s or at a credits chapter, autoplay on by default and switchable in Settings -> Playback; a pure, tested function decides the next episode across season boundaries.
+- [ ] **11.4** The scrub bar: chapter marks from mpv's chapter list; hover thumbnails from FFmpeg sprites generated in a low-priority background process (one frame per 10 s, cached under data/cache/thumbs by file hash), proven not to stutter playback (mpv frame-drop-count unchanged while generating).
+- [ ] **11.5** Player controls: picture-in-picture (small always-on-top window, Ctrl+P), audio delay (Ctrl+[ / Ctrl+]), brightness/contrast/saturation in a Picture menu, a stats-for-nerds overlay (I: decode path, dropped frames, bitrate, cache, swarm peers/speed), and a shortcuts overlay (?) generated from the same key map the player uses.
+- [ ] **11.6** docs/MANUAL_TESTS.md playback plan run on all three tiers via the tier override (screenshots per tier), docs/specs/player-experience.md, learning note, evidence for E1-E5, regression check, close.
 
 ### Exit criteria
 
-- [x] **E1** > 90% of the fixture corpus aligns to within 150 ms.
-      - *Evidence:* 09cdd8d: cargo run --release -p eval -- subs --report over fixtures/subtitles (10 films of synthesised dialogue over room/street/music beds, traces from the app's VAD, 80 damaged copies): 79/80 = 98.8% of copies have >=95% of cues within 150 ms (target >90%); 4 films held out from tuning: 31/32 = 96.9%; false accepts against the wrong film 0/10. Seen to fail: scales reduced to 1.0 gives 48.8%. docs/eval-results.md Phase 10.
-- [x] **E2** A 23.976 vs 25 fps mismatch is detected and corrected, not just offset.
-      - *Evidence:* 09cdd8d: crates/subtitle-align/tests/align.rs a_framerate_mismatch_is_a_scale_not_an_offset (23.976->25 found as scale 25/23.976, >97% of cues land; with offsets only, it refuses or lands <50%); eval subs: every scaled copy aligned, 30/30 (23.976->25, 25->23.976, 24->25) and 10/10 intro-added-and-scaled.
-- [x] **E3** Embedded tracks are found and used without any network request.
-      - *Evidence:* ece5de6/2c331de: crates/subtitles/tests/chain.rs an_embedded_track_is_used_without_a_single_request (FakeTransport.request_count()==0; seen to fail when pick always fetches); crates/subtitles/tests/plan.rs an_embedded_track_in_your_language_is_shown_as_it_is (embedded beats the file beside it). The app path (src-tauri/src/commands/subtitles.rs open_for) builds the provider only from the profile's own key and calls plan, which calls pick first.
-- [x] **E4** The OpenSubtitles daily quota is respected and never exceeded; quota state is visible in Settings.
-      - *Evidence:* ece5de6/2c331de: crates/subtitles/tests/chain.rs the_daily_quota_is_never_exceeded (after FREE_DAILY=5 downloads no further request is made; seen to fail with the budget check off by one), the_providers_own_count_wins_when_it_is_lower, a_failed_attempt_gives_its_reservation_back; persistence repository_surface subtitle_repository_surface (reserve is one conditional UPDATE). Visible in Settings: src/features/settings/SubtitlesSection.test.tsx 'shows how much of today's quota is left' ('3 of 5 downloads left today') and 'believes OpenSubtitles when it says fewer are left'.
-- [x] **E5** The manual nudge persists across sessions for the same file.
-      - *Evidence:* 2c331de: crates/persistence/tests/repository_surface.rs subtitle_repository_surface (per file and subtitle; zero clears); crates/subtitles/tests/plan.rs the_nudge_from_last_time_comes_back (keyed by the file's hash); real window 2026-11-06: three subtitle_nudge(-100) on Garden.mkv gave -300, the app was closed and reopened on the same file, and the nudge in force was -300.
-- [x] **E6** `crates/subtitle-align` is independently testable and documented as a standalone crate.
-      - *Evidence:* 09cdd8d: crates/subtitle-align is its own MIT/Apache crate with no app or FFmpeg dependency (Cargo.toml: rustfft only); cargo test -p subtitle-align runs 8 unit + 7 integration tests on synthetic dialogue and the README's usage example as a doctest; README documents use, modules, measured numbers and licence; docs/specs/subtitle-alignment.md the method.
+- [ ] **E1** The pause overlay is visually excellent and appears in < 200 ms.
+- [ ] **E2** Scrub thumbnails generate without stuttering playback.
+- [ ] **E3** Next-episode autoplay works and is disableable.
+- [ ] **E4** All player features are keyboard-accessible and documented in a shortcuts overlay (`?`).
+- [ ] **E5** Manual test plan for playback passes on all three tiers.
 
 ---
 
 ## What's next
 
-Phase 10 subtask 10.6 then close (docs/phases/phase-10-subtitle-pipeline.md): learning note docs/learning/phase-10-notes.md (four sections, five questions); HOW_IT_WORKS subtitles section and README; SESSION_LOG entry with the Phase 10 retrospective; rule-13 regression check (cargo run --release -p eval -- all twice, -- vector --report); record debt (torrent subtitle files not fetched, OpenSubtitles hash for streams); then /closephase 10 and open Phase 11 from SPEC.md section 15.
+Phase 11 subtask 11.1 (docs/phases/phase-11-player-experience-layer.md): migration 0019 airing_schedule (series media_item_id, episode number, airs_at UTC); write it from crates/catalogue/src/anime.rs where Media.next_airing is seen; EpisodeRepository::seasons/episodes_of/next_airing with repository_surface lines; a series branch on the detail page (src/features/detail) listing seasons and episodes and the airing line from a pure function airsLine(airsAt, now).
 
 ---
 
@@ -70,8 +63,8 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 6/8 |
 | [x] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 5/7 |
 | [x] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 7/7 |
-| [~] | 10 | Subtitle Pipeline | B | 8 | 2 | 6/6 |
-| [ ] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 0/5 |
+| [x] | 10 | Subtitle Pipeline | B | 8 | 2 | 6/6 |
+| [~] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 0/5 |
 | [ ] | 12 | Local Library Engine | B | 4 | 2–3 | 0/6 |
 | [ ] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 0/8 |
 | [ ] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 0/6 |
