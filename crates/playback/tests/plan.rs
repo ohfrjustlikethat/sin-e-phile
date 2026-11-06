@@ -328,3 +328,47 @@ async fn choosing_4k_opens_the_4k_copy_or_says_there_is_none() {
     let p = plan_with(&db, &r, None, id, uhd).await.unwrap();
     assert_eq!(p.score.unmet.as_deref(), Some("1080p, not 4K"));
 }
+
+#[tokio::test]
+async fn an_episode_is_asked_for_as_its_series_season_and_number() {
+    use sinephile_persistence::repositories::EpisodeRepository;
+    use sinephile_persistence::MediaKind as Kind;
+    let db = Db::in_memory().await.unwrap();
+    let media = MediaRepository::new(&db);
+    let show = media
+        .insert(&NewMediaItem {
+            kind: Some(Kind::Series),
+            primary_title: "Twin Peaks".into(),
+            release_year: Some(1990),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let ep = media
+        .insert(&NewMediaItem {
+            kind: Some(Kind::Episode),
+            primary_title: "Lonely Souls".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let eps = EpisodeRepository::new(&db);
+    eps.create_series(show, false).await.unwrap();
+    eps.create_episode(ep, show, None, Some(2), Some(7), None)
+        .await
+        .unwrap();
+    let q = sinephile_playback::query_for(&db, ep)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        (q.kind, q.title.as_str(), q.year, q.season, q.episode),
+        (
+            MediaKind::Episode,
+            "Twin Peaks",
+            Some(1990),
+            Some(2),
+            Some(7)
+        )
+    );
+}

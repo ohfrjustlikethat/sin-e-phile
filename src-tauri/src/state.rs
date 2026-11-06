@@ -82,7 +82,7 @@ impl AppState {
         Self {
             inner: RwLock::new(Inner {
                 detected,
-                override_tier: None,
+                override_tier: dev_tier(),
             }),
             db: RwLock::new(None),
             engine: RwLock::new(None),
@@ -213,6 +213,23 @@ impl AppState {
         }
         tracing::info!(?tier, "tier override changed");
         self.hardware_profile()
+    }
+}
+
+/// Debug builds only: `SINEPHILE_TIER=modest|standard|capable` starts with that tier
+/// override in force, so a tier's behaviour can be checked from the first frame (with
+/// `SINEPHILE_AUTOPLAY`, before any UI could set it). Compiled out of release builds.
+fn dev_tier() -> Option<Tier> {
+    #[cfg(debug_assertions)]
+    {
+        let v = std::env::var("SINEPHILE_TIER").ok()?;
+        let tier = serde_json::from_value(serde_json::Value::String(v)).ok();
+        tracing::info!(?tier, "dev tier override");
+        tier
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        None
     }
 }
 

@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 pub mod fallback;
 
-use sinephile_persistence::repositories::{MediaRepository, ProfileRepository};
+use sinephile_persistence::repositories::{EpisodeRepository, MediaRepository, ProfileRepository};
 use sinephile_persistence::{Db, DbError, MediaKind};
 pub use sinephile_selection::{Context, Machine, Offers, Score};
 use sinephile_sources::{registry, Resolver};
@@ -80,6 +80,24 @@ pub async fn query_for(db: &Db, media_item_id: i64) -> Result<Option<MediaQuery>
     let Some(item) = media.by_id(media_item_id).await? else {
         return Ok(None);
     };
+    // An episode is asked for as its series plus season and episode: that is how
+    // sources know it ("Show S02E05"), not by the episode's own title.
+    if item.kind == MediaKind::Episode {
+        if let Some((series_id, season, episode)) =
+            EpisodeRepository::new(db).placement(media_item_id).await?
+        {
+            if let Some(series) = media.by_id(series_id).await? {
+                return Ok(Some(MediaQuery {
+                    kind: Kind::Episode,
+                    title: series.primary_title,
+                    year: series.release_year.and_then(|y| u16::try_from(y).ok()),
+                    ids: ids_of(&media, series_id).await?,
+                    season: season.and_then(|n| u32::try_from(n).ok()),
+                    episode: episode.and_then(|n| u32::try_from(n).ok()),
+                }));
+            }
+        }
+    }
     let kind = match item.kind {
         MediaKind::Episode => Kind::Episode,
         _ => Kind::Film,
@@ -88,20 +106,24 @@ pub async fn query_for(db: &Db, media_item_id: i64) -> Result<Option<MediaQuery>
         kind,
         title: item.primary_title,
         year: item.release_year.and_then(|y| u16::try_from(y).ok()),
-        ids: ExternalIds {
-            imdb: media.external_id(media_item_id, "imdb").await?,
-            tmdb: media
-                .external_id(media_item_id, "tmdb")
-                .await?
-                .and_then(|v| v.parse().ok()),
-            anilist: media
-                .external_id(media_item_id, "anilist")
-                .await?
-                .and_then(|v| v.parse().ok()),
-        },
+        ids: ids_of(&media, media_item_id).await?,
         season: None,
         episode: None,
     }))
+}
+
+async fn ids_of(media: &MediaRepository<'_>, id: i64) -> Result<ExternalIds, DbError> {
+    Ok(ExternalIds {
+        imdb: media.external_id(id, "imdb").await?,
+        tmdb: media
+            .external_id(id, "tmdb")
+            .await?
+            .and_then(|v| v.parse().ok()),
+        anilist: media
+            .external_id(id, "anilist")
+            .await?
+            .and_then(|v| v.parse().ok()),
+    })
 }
 
 /// Resolve one candidate to what the player opens: a URL, or a path. A torrent becomes

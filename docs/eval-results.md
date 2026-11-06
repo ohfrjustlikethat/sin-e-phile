@@ -2376,3 +2376,47 @@ Taking the plateau's late edge instead of its middle (`crates/subtitle-align/src
 **6.5 / 15.3** and **6.1 / 14.8 ms**; HNSW recall@10 **0.9760**; subtitles **80/80**, false accepts
 **0/10**. Unchanged from Phase 9. Rust tests 646 passed, 0 failed; frontend 76; controller flow 19/19.
 
+## Phase 11 — Player experience layer
+
+### E1: the pause overlay
+
+2026-11-06, real window, *Nosferatu* (1922) from the Internet Archive, Space pressed four times;
+`window.__pauseMs` (the intent to the overlay's first painted frame): **22, 4, 4, 5 ms** (target
+< 200 ms). The overlay used to wait for mpv's still capture (up to 500 ms); the video window is
+now hidden first and the still fades in after.
+
+### E2: scrub thumbnails without stuttering
+
+2026-11-07, real window, a 20-minute 1080p H.264 file (`d3d11va`), `player_state.dropped_frames`
+read 5 s and 35 s after the first frame: **0 → 0 with thumbnail generation running, 0 → 0 with the
+sheets already cached.** Generation itself (`sinephile_player::thumbs::generate`: FFmpeg at
+below-normal priority, one thread, keyframes only) took **970 ms** for the whole 20 minutes
+(two 10×10 sheets). It is light enough that it overlaps only the first second of playback; on
+a Tier 0 machine it would take longer, at the same priority.
+
+### Phase 11 E5 — the playback checklist on every tier
+
+2026-11-07, at `450cca6`, debug build in the real window, `SINEPHILE_TIER` set per run
+(`get_hardware_profile` reported the override), `Garden.mkv` (8:00, H.264 720p, `d3d11va`) with a
+sidecar `.srt` 82 s late, the aligned cache cleared before each run. Procedure:
+`docs/MANUAL_TESTS.md` "Playback, on every tier".
+
+| Tier | Subtitles | Pause overlay (`__pauseMs`) local / stream | Stream first frame |
+|---|---|---|---|
+| modest | loaded as is: fits the length (no speech alignment on Tier 0) | 2.2 ms / 2.3 ms | 359 ms |
+| standard | aligned: scale 1.00000, offset −82180 ms, confidence 1.91 | 2.3 ms / 2.5 ms | 275 ms |
+| capable | aligned: scale 1.00000, offset −82180 ms, confidence 1.91 | 2.4 ms / 3.7 ms | 272 ms |
+
+Every tier: scrub sheets produced, statistics, shortcuts, mini player out and back,
+picture-in-picture 742×418 on top and restored to the exact inner size, 0 `ERROR` lines.
+The stream was the same file from a local HTTP server, so its first-frame times are a floor,
+not a measure of a real network.
+
+### Regression check before merging Phase 11 (rule 13)
+
+2026-11-07, release build at `acf5a85`, `cargo run --release -p eval -- all` twice and
+`-- vector --report`: E2 **43/43**; E3 meaning **0.0472**, filter **1.0000** (the carried miss; it is
+why `all` exits 1, as before); E1 p50 / p95 **14.1 / 44.1 ms** on the first run, straight after the
+release build with cold caches, and **6.4 / 14.8 ms** warm; HNSW recall@10 **0.9760**; subtitles
+**80/80** (held out 32/32), false accepts **0/10**. Unchanged from Phase 10. Rust tests 654 passed,
+0 failed; frontend 104.

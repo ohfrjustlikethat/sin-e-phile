@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **3.1.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **3.2.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -321,6 +321,15 @@ typographic treatment rather than breaking.
   safe margin, button hints, quiet ticks and rumble, View for full screen. Shadow, glow,
   gradient and 3D transforms are allowed **only** in `src/design-system/focus/` — §9.0's
   bans hold everywhere else. Reduced motion removes every transform.
+- **The TV keyboard and the locked interface** (ADR-0043): every text field is fillable by
+  pad from a Netflix-TV grid keyboard (suggestions, recent searches, word completion; A
+  type, B close, X backspace, Y space, LT/RT cursor, LB/RB letters/symbols, Menu submit;
+  voice via Windows speech on every tier, Whisper on Tier 2). Pause panel from the right;
+  credits then an end card for films; an in-app mini player; profile picker only with 2+
+  profiles; Surprise me; mood shelves; ambient screen after 5 idle minutes in TV mode; no
+  launch intro; watch stats. ADR-0043's table says which phase builds each.
+- **Every phase is finished** (ADR-0043): all 28, at full depth, within about two weeks of
+  2026-11-06. No tier is cut; tier boundaries are understanding-gate checkpoints, not stops.
 - **Windows only.** Use Windows APIs directly where they give a better result.
 - **Portable by default.** All data in `./data/` next to the executable. Installed
   mode using `%APPDATA%` is an opt-in, never the default.

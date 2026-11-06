@@ -198,6 +198,75 @@ async fn episode_repository_surface() {
         .expect("resolve_absolute miss")
         .is_none());
 
+    // seasons / episodes_of / next_after / previous_before (Phase 11)
+    let mk = |title: &'static str| NewMediaItem {
+        kind: Some(MediaKind::Episode),
+        primary_title: title.into(),
+        ..Default::default()
+    };
+    let s1e4 = media.insert(&mk("S1E4")).await.unwrap();
+    let s2e1 = media.insert(&mk("S2E1")).await.unwrap();
+    let season2 = repo.create_season(series, 2, None).await.unwrap();
+    repo.create_episode(s1e4, series, Some(season), Some(1), Some(4), None)
+        .await
+        .unwrap();
+    repo.create_episode(s2e1, series, Some(season2), Some(2), Some(1), None)
+        .await
+        .unwrap();
+    assert_eq!(
+        repo.seasons(series).await.expect("seasons"),
+        [(Some(1), 2), (Some(2), 1)]
+    );
+    let first = repo
+        .episodes_of(series, Some(1))
+        .await
+        .expect("episodes_of");
+    assert_eq!(
+        first.iter().map(|e| e.title.as_str()).collect::<Vec<_>>(),
+        ["An Episode", "S1E4"]
+    );
+    assert!(repo.episodes_of(series, None).await.unwrap().is_empty());
+    // Across the season boundary, both ways; nothing past the ends.
+    assert_eq!(
+        repo.next_after(s1e4)
+            .await
+            .expect("next_after")
+            .map(|e| e.media_item_id),
+        Some(s2e1)
+    );
+    assert_eq!(repo.next_after(s2e1).await.unwrap(), None);
+    assert_eq!(
+        repo.previous_before(s2e1)
+            .await
+            .expect("previous_before")
+            .map(|e| e.media_item_id),
+        Some(s1e4)
+    );
+    assert_eq!(repo.previous_before(episode).await.unwrap(), None);
+    // placement
+    assert_eq!(
+        repo.placement(s2e1).await.expect("placement"),
+        Some((series, Some(2), Some(1)))
+    );
+    assert_eq!(
+        repo.placement(series).await.unwrap(),
+        None,
+        "not an episode"
+    );
+
+    // set_next_airing / next_airing — no episode row needed; the newest replaces
+    assert_eq!(repo.next_airing(series).await.expect("next_airing"), None);
+    repo.set_next_airing(series, 7, 1_794_200_000)
+        .await
+        .expect("set");
+    repo.set_next_airing(series, 8, 1_794_800_000)
+        .await
+        .expect("replace");
+    assert_eq!(
+        repo.next_airing(series).await.unwrap(),
+        Some((8, 1_794_800_000))
+    );
+
     // numberings_for
     assert_eq!(
         repo.numberings_for(episode)
@@ -222,6 +291,15 @@ async fn profile_repository_surface() {
 
     // create — including the demote-the-incumbent path
     let first = repo.create("First", true).await.expect("create");
+
+    // rate / rating (Phase 11) — replace, clear, refuse out of range
+    assert_eq!(repo.rating(first, film).await.expect("rating"), None);
+    repo.rate(first, film, Some(4)).await.expect("rate");
+    repo.rate(first, film, Some(5)).await.expect("rate again");
+    assert_eq!(repo.rating(first, film).await.unwrap(), Some(5));
+    assert!(repo.rate(first, film, Some(6)).await.is_err());
+    repo.rate(first, film, None).await.expect("clear");
+    assert_eq!(repo.rating(first, film).await.unwrap(), None);
     let second = repo
         .create("Second", true)
         .await
@@ -1130,6 +1208,44 @@ async fn detail_and_default_profile_surface() {
     assert_eq!(credits[1].character.as_deref(), Some("The Man"));
     assert_eq!(credits[0].character, None, "an empty character is None");
     assert_eq!(media.credits(film, 2).await.unwrap().len(), 2, "limit");
+
+    // filmography (Phase 11) — from a credit's person id; films, not episodes; newest first
+    let gaynor = credits[2].person_id;
+    let later = media
+        .insert(&NewMediaItem::film("Seventh Heaven", 1927))
+        .await
+        .unwrap();
+    let newer = media
+        .insert(&NewMediaItem::film("A Star Is Born", 1937))
+        .await
+        .unwrap();
+    for (item, character) in [(later, "Diane"), (newer, "Esther")] {
+        sqlx::query("INSERT INTO credits (media_item_id, person_id, role, character) VALUES (?, ?, 'actor', ?)")
+            .bind(item)
+            .bind(gaynor)
+            .bind(character)
+            .execute(db.pool())
+            .await
+            .unwrap();
+    }
+    let films = media.filmography(gaynor, 10).await.expect("filmography");
+    assert_eq!(
+        films
+            .iter()
+            .map(|a| (a.title.as_str(), a.year))
+            .collect::<Vec<_>>(),
+        [
+            ("A Star Is Born", Some(1937)),
+            ("Seventh Heaven", Some(1927)),
+            ("Sunrise", Some(1927))
+        ]
+    );
+    assert_eq!(films[0].character.as_deref(), Some("Esther"));
+    assert_eq!(
+        media.filmography(gaynor, 1).await.unwrap().len(),
+        1,
+        "limit"
+    );
 
     // external_id
     media

@@ -263,3 +263,33 @@ pub async fn save_position(
         .await
         .map_err(|e| e.to_string())
 }
+
+/// The viewer's 1–5 rating, from the end card (Phase 11, ADR-0043). `None` clears it.
+#[tauri::command]
+#[specta::specta]
+pub async fn rate_title(
+    state: State<'_, AppState>,
+    id: i32,
+    stars: Option<i32>,
+) -> Result<(), String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let profiles = ProfileRepository::new(&db);
+    let profile = profiles.ensure_default().await.map_err(|e| e.to_string())?;
+    profiles
+        .rate(profile, i64::from(id), stars.map(i64::from))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn title_rating(state: State<'_, AppState>, id: i32) -> Result<Option<i32>, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let profiles = ProfileRepository::new(&db);
+    let profile = profiles.ensure_default().await.map_err(|e| e.to_string())?;
+    Ok(profiles
+        .rating(profile, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())?
+        .map(|s| s as i32))
+}

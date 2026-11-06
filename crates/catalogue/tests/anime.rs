@@ -76,6 +76,42 @@ fn client(transport: FakeTransport) -> Arc<dyn Transport> {
 }
 
 #[tokio::test]
+async fn a_scheduled_episode_is_known_before_it_is_listed() {
+    // ADR-0030, Phase 11: AniList says episode 7 airs at a time; nothing in `episodes`
+    // knows of it, and the series page must still be able to say so.
+    let (_dir, db) = db().await;
+    let frieren = item(&db, "series", "Frieren", Some(2023)).await;
+    let airing = media(
+        2,
+        None,
+        "Sousou no Frieren",
+        "Frieren",
+        "葬送のフリーレン",
+        "TV",
+        Some(2023),
+    )
+    .replace(r#""status":"FINISHED""#, r#""status":"RELEASING""#)
+    .replace(
+        r#""nextAiringEpisode":null"#,
+        r#""nextAiringEpisode":{"airingAt":1794200000,"timeUntilAiring":190400,"episode":7}"#,
+    );
+    let transport = FakeTransport::new();
+    transport.push(page(false, &[airing]));
+    let anilist = Arc::new(AniList::owned(client(transport)).await);
+    let mut job = Job::begin(&db, "anilist").await.expect("begin");
+    anime::ingest(&mut job, anilist, Some(1), None)
+        .await
+        .expect("ingest");
+    job.finish().await.expect("finish");
+
+    let next = sinephile_persistence::repositories::EpisodeRepository::new(&db)
+        .next_airing(frieren)
+        .await
+        .unwrap();
+    assert_eq!(next, Some((7, 1_794_200_000)));
+}
+
+#[tokio::test]
 async fn a_matched_title_is_promoted_and_carries_both_ids() {
     let (_dir, db) = db().await;
     let bebop = item(&db, "series", "Cowboy Bebop", Some(1998)).await;

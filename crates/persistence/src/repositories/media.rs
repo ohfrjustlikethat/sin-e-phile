@@ -11,8 +11,21 @@ use crate::model::{IdSource, MediaItem, MediaKind, NewMediaItem, Title, TitleVar
 /// One credit as the detail page lists it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Credit {
+    /// For their filmography (Phase 11's pause overlay).
+    pub person_id: i64,
     pub name: String,
     /// `director`, `creator`, `writer`, `actor`, …
+    pub role: String,
+    pub character: Option<String>,
+}
+
+/// One line of a filmography.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct Appearance {
+    pub media_item_id: i64,
+    pub title: String,
+    pub year: Option<i64>,
+    pub kind: String,
     pub role: String,
     pub character: Option<String>,
 }
@@ -216,8 +229,8 @@ impl<'a> MediaRepository<'a> {
     /// Who made it and who is in it, for the detail page: directors and creators first,
     /// then the cast in billing order (unbilled last).
     pub async fn credits(&self, media_item_id: i64, limit: i64) -> Result<Vec<Credit>, DbError> {
-        let rows: Vec<(String, String, String)> = sqlx::query_as(
-            "SELECT p.name, c.role, c.character
+        let rows: Vec<(i64, String, String, String)> = sqlx::query_as(
+            "SELECT p.id, p.name, c.role, c.character
                FROM credits c JOIN people p ON p.id = c.person_id
               WHERE c.media_item_id = ?
               ORDER BY CASE c.role WHEN 'director' THEN 0 WHEN 'creator' THEN 1
@@ -231,11 +244,45 @@ impl<'a> MediaRepository<'a> {
         .await?;
         Ok(rows
             .into_iter()
-            .map(|(name, role, character)| Credit {
+            .map(|(person_id, name, role, character)| Credit {
+                person_id,
                 name,
                 role,
                 character: (!character.is_empty()).then_some(character),
             })
+            .collect())
+    }
+
+    /// What a person has been in or made, newest first: the filmography a cast member
+    /// opens to from the pause overlay. Films and series only, not single episodes.
+    pub async fn filmography(
+        &self,
+        person_id: i64,
+        limit: i64,
+    ) -> Result<Vec<Appearance>, DbError> {
+        let rows: Vec<(i64, String, Option<i64>, String, String, String)> = sqlx::query_as(
+            "SELECT m.id, m.primary_title, m.release_year, m.kind, c.role, c.character
+               FROM credits c JOIN media_items m ON m.id = c.media_item_id
+              WHERE c.person_id = ? AND m.kind != 'episode'
+              ORDER BY m.release_year IS NULL, m.release_year DESC, m.primary_title
+              LIMIT ?",
+        )
+        .bind(person_id)
+        .bind(limit)
+        .fetch_all(self.db.pool())
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(
+                |(media_item_id, title, year, kind, role, character)| Appearance {
+                    media_item_id,
+                    title,
+                    year,
+                    kind,
+                    role,
+                    character: (!character.is_empty()).then_some(character),
+                },
+            )
             .collect())
     }
 

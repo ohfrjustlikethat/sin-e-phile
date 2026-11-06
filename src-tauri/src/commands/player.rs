@@ -124,6 +124,8 @@ pub async fn player_open(
                     skipped = s.failed.len(),
                     "first frame"
                 );
+                // Scrub thumbnails for a file on this machine, in the background (Phase 11).
+                crate::commands::thumbs::start_for(&s.open, screen.rt.player.state().video_size);
                 // Then the subtitles (SPEC.md Phase 10), never delaying the picture.
                 let still_this_film = move || OPENS.load(Ordering::SeqCst) == generation;
                 if let Err(e) = crate::commands::subtitles::open_for(
@@ -228,15 +230,43 @@ pub async fn player_layout(
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PlayerAction {
-    Pause { paused: bool },
-    SeekTo { seconds: f64 },
-    SeekBy { seconds: f64 },
-    FrameStep { forward: bool },
-    Volume { percent: f64 },
-    Mute { muted: bool },
-    Speed { speed: f64 },
-    Audio { id: i32 },
-    Subtitles { id: Option<i32> },
+    Pause {
+        paused: bool,
+    },
+    SeekTo {
+        seconds: f64,
+    },
+    SeekBy {
+        seconds: f64,
+    },
+    FrameStep {
+        forward: bool,
+    },
+    Volume {
+        percent: f64,
+    },
+    Mute {
+        muted: bool,
+    },
+    Speed {
+        speed: f64,
+    },
+    Audio {
+        id: i32,
+    },
+    Subtitles {
+        id: Option<i32>,
+    },
+    /// Seconds; positive plays the sound later.
+    AudioDelay {
+        seconds: f64,
+    },
+    /// Each −100…100.
+    Picture {
+        brightness: i32,
+        contrast: i32,
+        saturation: i32,
+    },
 }
 
 #[tauri::command]
@@ -254,6 +284,16 @@ pub async fn player_action(state: State<'_, AppState>, action: PlayerAction) -> 
         PlayerAction::Speed { speed } => p.set_speed(speed),
         PlayerAction::Audio { id } => p.set_audio(i64::from(id)),
         PlayerAction::Subtitles { id } => p.set_subtitles(id.map(i64::from)),
+        PlayerAction::AudioDelay { seconds } => p.set_audio_delay(seconds),
+        PlayerAction::Picture {
+            brightness,
+            contrast,
+            saturation,
+        } => p.set_picture(
+            i64::from(brightness),
+            i64::from(contrast),
+            i64::from(saturation),
+        ),
     }
     .map_err(err)
 }
@@ -265,13 +305,79 @@ pub async fn player_action(state: State<'_, AppState>, action: PlayerAction) -> 
 pub async fn player_pause_still(state: State<'_, AppState>) -> Result<String, String> {
     let rt = state.player().ok_or("nothing is playing")?;
     rt.player.set_paused(true).map_err(err)?;
+    // The video window first, so the page (and the pause overlay) shows at once (Phase
+    // 11: the overlay in < 200 ms). mpv captures the decoded frame, not the window, so
+    // hiding it first does not blank the still, which fades in when it arrives.
+    rt.host.lock().expect("host").hide();
     let path = std::env::temp_dir().join(format!("sinephile-still-{}.jpg", std::process::id()));
     let jpeg = rt
         .player
         .capture_still(&path, std::time::Duration::from_millis(500))
         .map_err(err)?;
-    rt.host.lock().expect("host").hide();
     Ok(sinephile_player::still::data_uri(&jpeg))
+}
+
+/// One line of the stats overlay (Phase 11: "statistics for nerds").
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct StatView {
+    pub name: String,
+    pub value: String,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn player_stats(state: State<'_, AppState>) -> Result<Vec<StatView>, String> {
+    let rt = state.player().ok_or("nothing is playing")?;
+    let mut out: Vec<StatView> = rt
+        .player
+        .stats()
+        .into_iter()
+        .map(|(name, value)| StatView {
+            name: name.into(),
+            value,
+        })
+        .collect();
+    // A torrent stream: the swarm, as the engine counts it.
+    if let Some(torrent) = state.torrent_if_started() {
+        for t in torrent
+            .engine
+            .list()
+            .into_iter()
+            .filter(|t| t.state == sinephile_torrent::State::Live && !t.finished)
+        {
+            out.push(StatView {
+                name: "Swarm".into(),
+                value: format!(
+                    "{} peers · {:.1} MB/s down",
+                    t.live_peers,
+                    t.download_bps / 1e6
+                ),
+            });
+        }
+    }
+    Ok(out)
+}
+
+/// A chapter mark, for the scrub bar and the pause overlay.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct ChapterView {
+    pub time: f64,
+    pub title: Option<String>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn player_chapters(state: State<'_, AppState>) -> Result<Vec<ChapterView>, String> {
+    let rt = state.player().ok_or("nothing is playing")?;
+    Ok(rt
+        .player
+        .chapters()
+        .into_iter()
+        .map(|c| ChapterView {
+            time: c.time,
+            title: c.title,
+        })
+        .collect())
 }
 
 /// Show the video again after the pause overlay.
@@ -318,6 +424,10 @@ pub struct PlayerStateView {
     pub ended: bool,
     /// The first frame is up; before it the page shows what is opening.
     pub started: bool,
+    /// The chapter playing, an index into `player_chapters`.
+    pub chapter: Option<i32>,
+    /// Frames the video output has dropped (the stats overlay; Phase 11 E2).
+    pub dropped_frames: Option<i32>,
     pub tracks: Vec<TrackView>,
 }
 
@@ -334,6 +444,8 @@ fn view(rt: &PlayerRuntime) -> PlayerStateView {
         hwdec: s.hwdec,
         ended: s.ended,
         started: s.started,
+        chapter: s.chapter.map(|c| c as i32),
+        dropped_frames: s.dropped_frames.map(|n| n as i32),
         tracks: rt
             .player
             .tracks()

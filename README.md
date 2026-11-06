@@ -228,12 +228,12 @@ off means the pause overlay shows the full cast list, beautifully.
 
 ## What actually works today
 
-**Phases 0–10 — the shell, the design system, the catalogue, search, sources, torrents,
-the player, choosing a source, and subtitles.** Honestly:
+**Phases 0–11 — the shell, the design system, the catalogue, search, sources, torrents,
+the player, choosing a source, subtitles, and the player experience.** Honestly:
 
 - ✅ Posture guard, secret scanner, and prerequisite doctor — all three verified by
   deliberately planted failures
-- ✅ CI on `windows-latest`; git hooks; GPL-3.0; specification at 3.0.0 with 41 ADRs recorded
+- ✅ CI on `windows-latest`; git hooks; GPL-3.0; specification at 3.2.0 with 43 ADRs recorded
 - ✅ Machine-readable project state for all 28 phases, generated from the spec and
   schema-validated so a criterion cannot be marked done without evidence
 - ✅ A Tauri window that opens, with a top masthead for navigation and hardware tier detection.
@@ -313,6 +313,13 @@ the player, choosing a source, and subtitles.** Honestly:
   accepted against the wrong film; in the app a file 82 s late was fixed to within 67 ms,
   0.6 s after the first frame. G and H nudge them, and the film remembers.
   `crates/subtitle-align` is its own MIT/Apache crate.
+- ✅ **The player as a place to stay.** Series pages with seasons, episodes and "airs
+  Thursday". Pause and a panel shows the cast (a name opens their films), crew, ratings and
+  more like this, painted in under 25 ms. The next episode is offered with a countdown; a
+  film's credits play out before an end card. Scrub thumbnails, made with 0 dropped frames;
+  picture-in-picture; a mini player while you browse; sound timing; statistics; `?` lists
+  every shortcut. With a controller, every text field gets a TV keyboard with suggestions.
+  Checked on all three hardware tiers, locally and streamed.
 - ❌ **"Search, click and watch" a file on this machine** waits for the library scanner in
   Phase 12; until then a local file plays by dropping it on the window. Carried there.
 - ⬜ Everything else described above this section

@@ -5,10 +5,13 @@
 //! handle and reused from somewhere that is not IPC.
 
 pub mod assets;
+pub mod overlay;
 pub mod playback;
 pub mod player;
 pub mod search;
+pub mod series;
 pub mod sources;
 pub mod subtitles;
 pub mod system;
+pub mod thumbs;
 pub mod torrent;

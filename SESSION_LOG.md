@@ -1918,3 +1918,53 @@ reflowing a signature silently defeated a scripted edit twice. Both caught befor
 edits now assert, and the commit subject is checked before staging the next change.
 
 **Carry forward.** Phase 7 E7 and Phase 8 E5 (author checks) to Phase 13. D70–D72.
+
+### Session 22, continued (2026-11-06 → 07) — Phase 11: the player experience layer
+
+**Built.** Series pages with seasons, episodes and the next airing (migration 0019, AniList's
+schedule). The right-hand pause panel (cast → filmography, crew, ratings, more like this), its data
+fetched as playback starts. Next-episode card with a countdown and autoplay; for a film, credits then
+an end card with a rating (migration 0020). Chapter marks and scrub thumbnails (FFmpeg sprite sheets,
+below-normal priority, keyframes only). Player menu, statistics, shortcuts generated from the key
+table, sound timing, picture adjustments, picture-in-picture, the in-app mini player. The TV keyboard
+on every text field (ADR-0043): pages for case and symbols, recent searches, suggestions, word
+completion, pad buttons claimed while it is open. Spec 3.2.0 (A33) locked the interface decisions
+the author made.
+
+**Numbers.** Pause panel painted in 22, 4, 4, 5 ms (streamed film) and 2.2–3.7 ms on every tier.
+Thumbnails: 0 → 0 dropped frames while generating; 970 ms for 20 minutes. E5 on all three tiers:
+Modest loads the late subtitle as is, Standard and Capable align it to −82.18 s; stream first frame
+272–359 ms from a local server. Rust tests 646 → 654; frontend 76 → 104.
+
+**Bugs, and what each teaches.**
+- B11: CI red on a MovieLens test that forbade any ratings table, after I pushed having run only the
+  crates I touched. *The pre-push list says the whole workspace for a reason.*
+- The keyboard popped up on every Settings field the D-pad passed; found by the pad harness. Other
+  fields now open it on A (recorded in ADR-0043).
+- The tier run found four defects unit tests had passed: Ctrl+M could not leave the mini player,
+  picture-in-picture saved the outer size and restored it as the inner one, a bare file paused into
+  an empty panel, a 5 kbit/s stream read "0.0 Mbit/s". *A debug exe embeds the frontend it was
+  compiled with: rebuild the exe after `npm run build`, or the window tests yesterday's code.* That
+  cost one confusing run.
+- Once, a subtitles menu appeared over the pause overlay; not reproduced in any later run. Watching.
+
+**Decisions.** Trivia, goofs and soundtracks are absent rather than scraped (§2.1). Thumbnails only
+for local files (a stream would be downloaded to sample it). Debug builds take `SINEPHILE_TIER` beside
+`SINEPHILE_AUTOPLAY`, both compiled out of release. The mini player declines every intent but its own
+toggle. Picture-in-picture also restores a maximised window.
+
+**Spec amendments.** 3.2.0 (A33, ADR-0043): the TV keyboard and the interface decisions.
+
+**Regression (rule 13).** E2 43/43, E3 0.0472 / 1.0000 (carried), warm p95 14.8 ms, recall@10 0.9760,
+subtitles 80/80 and 0/10 false accepts: unchanged from Phase 10.
+
+#### Phase 11 retrospective
+
+**Went well.** Intents with a "taken" answer made the mini player, the keyboard and the panels
+cooperate without knowing about each other. Running the checklist in the real window per tier was
+worth it: four defects, all invisible to unit tests.
+
+**Went badly.** B11 was self-inflicted by a partial test run before a push. One window run tested a
+stale frontend.
+
+**Carry forward.** Phase 7 E7 and Phase 8 E5 (author checks) to Phase 13. D67–D72.

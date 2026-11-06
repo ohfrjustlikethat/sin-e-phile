@@ -73,6 +73,14 @@ pub struct Track {
     pub external: bool,
 }
 
+/// A chapter mark.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Chapter {
+    /// Seconds from the start.
+    pub time: f64,
+    pub title: Option<String>,
+}
+
 /// How plain subtitles look (Settings → Subtitles).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SubtitleStyle {
@@ -114,6 +122,16 @@ pub struct State {
     /// A seek is still in progress. mpv reports the TARGET as `position` as soon as a
     /// seek starts, so "done" is `!seeking`, not "the position reads right".
     pub seeking: bool,
+    /// Frames the video output dropped since the file opened: the stutter measure
+    /// (Phase 11 E2) and the stats overlay's.
+    #[serde(default)]
+    pub dropped_frames: Option<i64>,
+    /// The decoded picture's size, in pixels.
+    #[serde(default)]
+    pub video_size: Option<(i64, i64)>,
+    /// The chapter playing, as an index into [`Player::chapters`].
+    #[serde(default)]
+    pub chapter: Option<i64>,
     /// The first frame of what was last loaded is on screen. Until then the screen is
     /// the page's "opening" state, not a black video window.
     pub started: bool,
@@ -327,6 +345,82 @@ impl Player {
         self.prop("sub-delay", &format!("{seconds:.3}"))
     }
 
+    /// Shift the sound: positive plays it later (Phase 11's audio delay).
+    pub fn set_audio_delay(&self, seconds: f64) -> Result<(), PlayerError> {
+        self.prop("audio-delay", &format!("{seconds:.3}"))
+    }
+
+    pub fn audio_delay(&self) -> f64 {
+        self.num("audio-delay").unwrap_or(0.0)
+    }
+
+    /// Picture adjustments for a badly encoded source, each −100…100, 0 untouched.
+    pub fn set_picture(
+        &self,
+        brightness: i64,
+        contrast: i64,
+        saturation: i64,
+    ) -> Result<(), PlayerError> {
+        self.prop("brightness", &brightness.clamp(-100, 100).to_string())?;
+        self.prop("contrast", &contrast.clamp(-100, 100).to_string())?;
+        self.prop("saturation", &saturation.clamp(-100, 100).to_string())
+    }
+
+    /// What the stats overlay shows: (property, value) in display order, only those mpv
+    /// reports for this file.
+    pub fn stats(&self) -> Vec<(&'static str, String)> {
+        let mut out = Vec::new();
+        let mut put = |k: &'static str, v: Option<String>| {
+            if let Some(v) = v.filter(|v| !v.is_empty()) {
+                out.push((k, v));
+            }
+        };
+        put("Video", self.get("current-tracks/video/codec"));
+        put(
+            "Size",
+            self.num("video-params/w")
+                .zip(self.num("video-params/h"))
+                .map(|(w, h)| format!("{w}×{h}")),
+        );
+        put(
+            "Frame rate",
+            self.num("container-fps").map(|f| format!("{f:.3} fps")),
+        );
+        put(
+            "Decoder",
+            Some(
+                self.get("hwdec-current")
+                    .filter(|h| h != "no")
+                    .unwrap_or_else(|| "software".into()),
+            ),
+        );
+        put("Video bitrate", self.num("video-bitrate").map(bitrate));
+        put("Audio", self.get("audio-codec-name"));
+        put("Audio bitrate", self.num("audio-bitrate").map(bitrate));
+        put(
+            "Dropped frames",
+            self.num("frame-drop-count").map(|n| format!("{n}")),
+        );
+        put(
+            "Decoder drops",
+            self.num("decoder-frame-drop-count").map(|n| format!("{n}")),
+        );
+        put(
+            "Buffered ahead",
+            self.num("demuxer-cache-duration")
+                .map(|s| format!("{s:.1} s")),
+        );
+        put(
+            "Audio delay",
+            Some(format!("{:+.0} ms", self.audio_delay() * 1000.0)),
+        );
+        put(
+            "Subtitle delay",
+            Some(format!("{:+.0} ms", self.subtitle_delay() * 1000.0)),
+        );
+        out
+    }
+
     pub fn subtitle_delay(&self) -> f64 {
         self.num("sub-delay").unwrap_or(0.0)
     }
@@ -411,7 +505,27 @@ impl Player {
             ended: self.flag("eof-reached"),
             seeking: self.flag("seeking"),
             started: self.seen.0.lock().expect("seen").first_frame_at.is_some(),
+            chapter: self.num("chapter").filter(|c| *c >= 0.0).map(|c| c as i64),
+            dropped_frames: self.num("frame-drop-count").map(|n| n as i64),
+            video_size: self
+                .num("video-params/w")
+                .zip(self.num("video-params/h"))
+                .map(|(w, h)| (w as i64, h as i64)),
         }
+    }
+
+    /// The file's chapters, in order (Phase 11: the scrub bar's marks and the overlay's
+    /// "current chapter").
+    pub fn chapters(&self) -> Vec<Chapter> {
+        let n = self.num("chapter-list/count").unwrap_or(0.0) as usize;
+        (0..n)
+            .map(|i| Chapter {
+                time: self.num(&format!("chapter-list/{i}/time")).unwrap_or(0.0),
+                title: self
+                    .get(&format!("chapter-list/{i}/title"))
+                    .filter(|t| !t.is_empty()),
+            })
+            .collect()
     }
 
     pub fn tracks(&self) -> Vec<Track> {
@@ -474,5 +588,29 @@ fn pump(mpv: &Mpv, seen: &(Mutex<Seen>, Condvar)) {
             _ => {}
         }
         seen.1.notify_all();
+    }
+}
+
+/// A bitrate for the stats panel, in bits per second: Mbit/s from one megabit up,
+/// kbit/s below it. A still or near-static picture encodes to a few kbit/s, which
+/// one-decimal Mbit/s printed as a misleading "0.0".
+pub fn bitrate(bits_per_second: f64) -> String {
+    if bits_per_second >= 1e6 {
+        format!("{:.1} Mbit/s", bits_per_second / 1e6)
+    } else {
+        format!("{:.0} kbit/s", bits_per_second / 1e3)
+    }
+}
+
+#[cfg(test)]
+mod bitrate_tests {
+    use super::bitrate;
+
+    #[test]
+    fn a_low_bitrate_reads_in_kilobits_not_as_zero() {
+        assert_eq!(bitrate(4_200_000.0), "4.2 Mbit/s");
+        assert_eq!(bitrate(1_000_000.0), "1.0 Mbit/s");
+        assert_eq!(bitrate(38_400.0), "38 kbit/s");
+        assert_eq!(bitrate(128_000.0), "128 kbit/s");
     }
 }

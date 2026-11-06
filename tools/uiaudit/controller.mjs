@@ -68,6 +68,8 @@ const FAKE = `(() => {
       qualities: ["full_hd", "hd"], unmet: null, why: "1080p · served directly", candidates: [] }),
     player_pause_still: () => "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
     dev_autoplay: () => null,
+    subtitle_settings: () => ({ settings: { languages: ["en"], always: false, font: "Segoe UI", size: 46,
+      position: 95, background: false }, has_key: false, used_today: 0, budget: 5, server_remaining: null }),
   };
   let nextId = 1;
   window.__calls = [];
@@ -213,7 +215,7 @@ await waitFor(() => evalJs(`!!document.querySelector("header, nav") && !!window.
 });
 
 // ── the pad ─────────────────────────────────────────────────────────────────
-const B = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
+const B = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, MENU: 9, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
 /** Down for a few frames, then up: one press, as a thumb makes it. */
 const press = async (b) => {
   await evalJs(`__padSet(${b}, true)`);
@@ -316,15 +318,15 @@ try {
   const between = xs.filter((x) => x > fromX + 1 && x < toX - 1).length;
   const overshoot = Math.max(...xs) - toX;
   check(between >= 3 && overshoot < 0.5, `the ring glides to the next key: ${between} frames in between, overshoot ${overshoot.toFixed(2)}px`);
-  await press(B.LEFT); // back to "A", where the typing loop expects to start
+  await press(B.LEFT); // back to "a", where the typing loop expects to start
   const tile = await tileProbe();
   check(
     Math.abs(scaleOf(tile.transform) - 1.06) < 0.01 && tile.shadow !== "none",
     `a focused tile grows to 1.06 and lifts (scale ${scaleOf(tile.transform).toFixed(3)})`,
   );
-  await evalJs(`[...document.querySelectorAll('[aria-label="On-screen keyboard"] button')].find((b) => b.textContent.trim() === "A").focus()`);
+  await evalJs(`[...document.querySelectorAll('[aria-label="On-screen keyboard"] button')].find((b) => b.textContent.trim() === "a").focus()`);
 
-  for (const ch of "SUNRISE") {
+  for (const ch of "sunrise") {
     await steerTo(ch);
     await press(B.A);
   }
@@ -393,6 +395,43 @@ try {
   await waitFor(async () => (await calls("player_close")).length > 0, "the player to close", 25);
   check(await evalJs(`document.body.textContent.includes("Sunrise")`), "B leaves the player, back to the film");
   await shoot("07-left");
+
+  // ADR-0043 (Phase 11 E6): every text field, not just search. Menu opens Settings, the
+  // D-pad walks down to the OpenSubtitles key, and the pad types a key with upper case.
+  await press(B.MENU);
+  await waitFor(() => evalJs(`document.body.textContent.includes("OpenSubtitles")`), "Settings", 25);
+  const onKeyField = () =>
+    evalJs(`(() => { const l = [...document.querySelectorAll("label")].find((x) => x.textContent.trim() === "API key");
+      return !!l && document.activeElement === document.getElementById(l.htmlFor); })()`);
+  let onField = false;
+  let popped = false;
+  for (let i = 0; i < 80 && !onField; i++) {
+    await press(B.DOWN);
+    popped ||= await evalJs(`!!document.querySelector('[aria-label="On-screen keyboard"]')`);
+    onField = await onKeyField();
+  }
+  check(onField && !popped, "the D-pad walks Settings to the API key field without a keyboard popping up on the way");
+  await press(B.A);
+  await waitFor(() => evalJs(`!!document.querySelector('[aria-label="On-screen keyboard"]')`), "the keyboard", 20);
+  check(true, "A on the field opens the keyboard");
+  await press(B.RB); // abc -> ABC
+  await steerTo("A");
+  await press(B.A);
+  await press(B.LB); // ABC -> abc
+  await steerTo("b");
+  await press(B.A);
+  await steerTo("9");
+  await press(B.A);
+  await press(B.A); // "99"
+  await press(B.X); // X deletes
+  const key = await evalJs(`(() => { const l = [...document.querySelectorAll("label")].find((x) => x.textContent.trim() === "API key");
+    return document.getElementById(l.htmlFor).value; })()`);
+  check(key === "Ab9", `typed a key with case using the bumpers, and X deleted: "${key}"`);
+  await shoot("07b-api-key");
+  await press(B.MENU); // Menu is Done
+  await waitFor(() => evalJs(`!document.querySelector('[aria-label="On-screen keyboard"]')`), "the keyboard to close", 20);
+  check(await onKeyField(), "Menu closes the keyboard (Done), and focus stays on the field");
+  await press(B.B); // leave Settings
 
   // Reduced motion: every transform goes, the ring stops gliding.
   await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });

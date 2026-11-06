@@ -194,8 +194,13 @@ async fn ratings_are_counted_without_being_stored() {
     .fetch_all(db.pool())
     .await
     .expect("tables");
-    assert!(
-        tables.is_empty(),
-        "no ratings table exists to store them in"
-    );
+    // The one rating table is the viewer's own (migration 0020, Phase 11): a profile's
+    // 1-5 stars, keyed by profile. Nothing shaped like MovieLens's (user, film, score)
+    // rows exists to store 25 million of them in.
+    assert_eq!(tables, ["ratings"], "only the viewer's own ratings");
+    let columns: Vec<String> = sqlx::query_scalar("SELECT name FROM pragma_table_info('ratings')")
+        .fetch_all(db.pool())
+        .await
+        .expect("columns");
+    assert!(columns.contains(&"profile_id".to_string()), "{columns:?}");
 }

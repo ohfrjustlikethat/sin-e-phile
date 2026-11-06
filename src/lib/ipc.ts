@@ -143,6 +143,10 @@ export const commands = {
 	ended: boolean,
 	/**  The first frame is up; before it the page shows what is opening. */
 	started: boolean,
+	/**  The chapter playing, an index into `player_chapters`. */
+	chapter: number | null,
+	/**  Frames the video output has dropped (the stats overlay; Phase 11 E2). */
+	dropped_frames: number | null,
 	tracks: TrackView[],
 } | null, string>(__TAURI_INVOKE("player_state")),
 	/**
@@ -162,6 +166,9 @@ export const commands = {
 	preparePlay: (id: number, language: string | null, quality: string | null) => typedError<PlayPlanView, string>(__TAURI_INVOKE("prepare_play", { id, language, quality })),
 	/**  Remember where the viewer is, for resume. Called periodically and on leaving. */
 	savePosition: (id: number, position: number | null, duration: number | null) => typedError<null, string>(__TAURI_INVOKE("save_position", { id, position, duration })),
+	/**  The viewer's 1–5 rating, from the end card (Phase 11, ADR-0043). `None` clears it. */
+	rateTitle: (id: number, stars: number | null) => typedError<null, string>(__TAURI_INVOKE("rate_title", { id, stars })),
+	titleRating: (id: number) => typedError<number | null, string>(__TAURI_INVOKE("title_rating", { id })),
 	subtitleSettings: () => typedError<SubtitleSettingsView, string>(__TAURI_INVOKE("subtitle_settings")),
 	setSubtitleSettings: (settings: SubtitleSettings) => typedError<null, string>(__TAURI_INVOKE("set_subtitle_settings", { settings })),
 	setOpensubtitlesKey: (key: string) => typedError<null, string>(__TAURI_INVOKE("set_opensubtitles_key", { key })),
@@ -171,6 +178,25 @@ export const commands = {
 	 *  subtitle (Phase 10 E5). Returns the nudge now in force.
 	 */
 	subtitleNudge: (deltaMs: number) => typedError<number, string>(__TAURI_INVOKE("subtitle_nudge", { deltaMs })),
+	seriesDetail: (id: number) => typedError<SeriesView, string>(__TAURI_INVOKE("series_detail", { id })),
+	seasonEpisodes: (id: number, season: number | null) => typedError<EpisodeView[], string>(__TAURI_INVOKE("season_episodes", { id, season })),
+	episodeNeighbours: (id: number) => typedError<Neighbours, string>(__TAURI_INVOKE("episode_neighbours", { id })),
+	pauseDetails: (id: number) => typedError<PauseDetails, string>(__TAURI_INVOKE("pause_details", { id })),
+	/**  A cast or crew member's other work, from the overlay. */
+	filmography: (personId: number) => typedError<TitleView[], string>(__TAURI_INVOKE("filmography", { personId })),
+	playerChapters: () => typedError<ChapterView[], string>(__TAURI_INVOKE("player_chapters")),
+	playerStats: () => typedError<StatView[], string>(__TAURI_INVOKE("player_stats")),
+	/**  The playing film's sheets, once made. */
+	scrubThumbs: () => typedError<{
+	interval: number | null,
+	cols: number,
+	rows: number,
+	tile_width: number,
+	tile_height: number,
+	count: number,
+} | null, string>(__TAURI_INVOKE("scrub_thumbs")),
+	/**  One sheet, as a `data:` URI. */
+	scrubSheet: (index: number) => typedError<string, string>(__TAURI_INVOKE("scrub_sheet", { index })),
 };
 
 /* Types */
@@ -192,6 +218,13 @@ export type AddonPreview = {
 	host: string,
 	homepage: string | null,
 	replaces: boolean,
+};
+
+export type AiringView = {
+	/**  AniList's own number for the episode (ADR-0031: never converted). */
+	episode: number,
+	/**  Unix seconds. */
+	airs_at: number | null,
 };
 
 /**
@@ -291,6 +324,12 @@ export type CatalogueView = {
 	addons: CatalogueItem[],
 };
 
+/**  A chapter mark, for the scrub bar and the pause overlay. */
+export type ChapterView = {
+	time: number | null,
+	title: string | null,
+};
+
 export type CreditView = {
 	name: string,
 	role: string,
@@ -304,6 +343,14 @@ export type CutoutRect = {
 	width: number | null,
 	height: number | null,
 	radius: number | null,
+};
+
+export type EpisodeView = {
+	id: number,
+	season: number | null,
+	episode: number | null,
+	title: string,
+	air_date: string | null,
 };
 
 /**
@@ -346,6 +393,12 @@ export type LinkInfo = {
 	url: string,
 };
 
+/**  The episodes either side of this one, for the player (Phase 11). */
+export type Neighbours = {
+	previous: EpisodeView | null,
+	next: EpisodeView | null,
+};
+
 /**  One optional download, as the consent screen needs it. */
 export type OptionalAsset = {
 	name: string,
@@ -355,6 +408,21 @@ export type OptionalAsset = {
 	/**  `absent`, `present`, or a reason it cannot be used. */
 	state: string,
 	unusable_reason: string | null,
+};
+
+export type PauseDetails = {
+	cast: PersonView[],
+	crew: PersonView[],
+	ratings: RatingView[],
+	/**  Empty without the semantic index (Tier 0 before it is downloaded). */
+	more_like_this: TitleView[],
+};
+
+export type PersonView = {
+	person_id: number,
+	name: string,
+	/**  For the cast: who they play. For the crew: what they did. */
+	part: string | null,
 };
 
 /**  What Play will open, decided now (see `sinephile_playback::plan`). */
@@ -383,7 +451,11 @@ export type PlayPlanView = {
  *  One control action. A single command for all of them keeps the IPC surface small;
  *  each maps to one `Player` method.
  */
-export type PlayerAction = { kind: "pause"; paused: boolean } | { kind: "seek_to"; seconds: number | null } | { kind: "seek_by"; seconds: number | null } | { kind: "frame_step"; forward: boolean } | { kind: "volume"; percent: number | null } | { kind: "mute"; muted: boolean } | { kind: "speed"; speed: number | null } | { kind: "audio"; id: number } | { kind: "subtitles"; id: number | null };
+export type PlayerAction = { kind: "pause"; paused: boolean } | { kind: "seek_to"; seconds: number | null } | { kind: "seek_by"; seconds: number | null } | { kind: "frame_step"; forward: boolean } | { kind: "volume"; percent: number | null } | { kind: "mute"; muted: boolean } | { kind: "speed"; speed: number | null } | { kind: "audio"; id: number } | { kind: "subtitles"; id: number | null } | 
+/**  Seconds; positive plays the sound later. */
+{ kind: "audio_delay"; seconds: number | null } | 
+/**  Each −100…100. */
+{ kind: "picture"; brightness: number; contrast: number; saturation: number };
 
 /**  The player as the chrome draws it, a few times a second. */
 export type PlayerStateView = {
@@ -398,7 +470,18 @@ export type PlayerStateView = {
 	ended: boolean,
 	/**  The first frame is up; before it the page shows what is opening. */
 	started: boolean,
+	/**  The chapter playing, an index into `player_chapters`. */
+	chapter: number | null,
+	/**  Frames the video output has dropped (the stats overlay; Phase 11 E2). */
+	dropped_frames: number | null,
 	tracks: TrackView[],
+};
+
+export type RatingView = {
+	source: string,
+	/**  Out of ten. */
+	score: number | null,
+	votes: number | null,
 };
 
 /**
@@ -459,6 +542,26 @@ export type SearchResponse = {
 	ready: boolean,
 };
 
+export type SeasonView = {
+	/**  `None`: episodes without a season number. */
+	number: number | null,
+	episodes: number,
+};
+
+export type SeriesView = {
+	seasons: SeasonView[],
+	next_airing: AiringView | null,
+};
+
+export type SheetsView = {
+	interval: number | null,
+	cols: number,
+	rows: number,
+	tile_width: number,
+	tile_height: number,
+	count: number,
+};
+
 /**  One row of the Sources list. */
 export type SourceInfo = {
 	id: string,
@@ -476,6 +579,12 @@ export type SourcesView = {
 	sources: SourceInfo[],
 	/**  Installed addons whose stored manifest no longer passes the checks. */
 	refused_addons: string[],
+};
+
+/**  One line of the stats overlay (Phase 11: "statistics for nerds"). */
+export type StatView = {
+	name: string,
+	value: string,
 };
 
 /**  The viewer's subtitle settings, per profile. */
@@ -517,6 +626,15 @@ export type Tier =
 "standard" | 
 /**  >= 16 GB RAM, discrete GPU or strong iGPU, >= 6 cores. */
 "capable";
+
+export type TitleView = {
+	id: number,
+	title: string,
+	year: number | null,
+	kind: string,
+	/**  Their part in it, in a filmography. */
+	part: string | null,
+};
 
 /**  Every torrent's progress, once a second while the engine runs. */
 export type TorrentProgress = {

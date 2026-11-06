@@ -34,6 +34,16 @@ let resolvePlan: (v: unknown) => void = () => {};
 const commands = {
   itemDetail: vi.fn(() => ok(DETAIL)),
   preparePlay: vi.fn(() => new Promise((r) => (resolvePlan = r))),
+  seriesDetail: vi.fn(() =>
+    ok({ seasons: [{ number: 0, episodes: 1 }, { number: 1, episodes: 2 }, { number: 2, episodes: 1 }], next_airing: { episode: 7, airs_at: 4102444800 } }),
+  ),
+  seasonEpisodes: vi.fn((_id: number, season: number | null) =>
+    ok(
+      season === 1
+        ? [{ id: 71, season: 1, episode: 1, title: "Pilot", air_date: "1990-04-08" }, { id: 72, season: 1, episode: 2, title: "Traces to Nowhere", air_date: null }]
+        : [{ id: 81, season: 2, episode: 1, title: "May the Giant Be with You", air_date: null }],
+    ),
+  ),
 };
 vi.mock("@/lib/ipc", () => ({ commands }));
 const { DetailScreen } = await import("./DetailScreen");
@@ -56,8 +66,8 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
 
   it("asks the sources the moment it opens, before Play is pressed", async () => {
     renderIt();
-    expect(commands.preparePlay).toHaveBeenCalledWith(7, null, null);
     expect(await screen.findByText("Sunrise")).toBeInTheDocument();
+    expect(commands.preparePlay).toHaveBeenCalledWith(7, null, null);
     expect(screen.getByText("Asking your sources…")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Play" })).toBeDisabled();
   });
@@ -107,8 +117,8 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
   it("says plainly when no copy has the chosen language", async () => {
     usePlaybackChoice.setState({ audio: "hi", quality: null });
     renderIt();
-    expect(commands.preparePlay).toHaveBeenCalledWith(7, "hi", null);
     await screen.findByText("Sunrise");
+    expect(commands.preparePlay).toHaveBeenCalledWith(7, "hi", null);
     resolvePlan({ status: "ok", data: { ...PLAN, languages: ["en"], qualities: [], unmet: "carries en, not hi", original_language: null } });
     expect(await screen.findByText("None of your sources has Hindi audio.")).toBeInTheDocument();
     // Still playable, and the choice stays visible so it can be changed.
@@ -152,5 +162,20 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
     await screen.findByText("Sunrise");
     resolvePlan({ status: "ok", data: { ...PLAN, ...NO_OFFERS, candidates: RANKED } });
     expect(await screen.findByRole("region", { name: "Sources, ranked" })).toBeInTheDocument();
+  });
+
+  it("a series lists its seasons and episodes, says when the next airs, and asks no sources", async () => {
+    commands.itemDetail.mockImplementationOnce(() => ok({ ...DETAIL, title: "Twin Peaks", kind: "series" }));
+    renderIt();
+    expect(await screen.findByText("Pilot")).toBeInTheDocument();
+    expect(screen.getByLabelText("Next episode")).toHaveTextContent(/^Episode 7 airs/);
+    expect(commands.preparePlay).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Play" })).not.toBeInTheDocument();
+    // Season 1 first, not the specials; season 2 on choosing it.
+    expect(commands.seasonEpisodes).toHaveBeenCalledWith(7, 1);
+    fireEvent.click(screen.getByRole("radio", { name: "Season 2" }));
+    expect(await screen.findByText("May the Giant Be with You")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("May the Giant Be with You"));
+    expect(useUi.getState().detail).toBe(81);
   });
 });

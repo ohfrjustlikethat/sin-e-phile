@@ -187,6 +187,78 @@ Un sous-titre.
 }
 
 #[test]
+fn chapters_are_listed_and_the_current_one_is_known() {
+    let dir = tempfile::tempdir().unwrap();
+    let meta = dir.path().join("chapters.txt");
+    std::fs::write(
+        &meta,
+        ";FFMETADATA1
+[CHAPTER]
+TIMEBASE=1/1000
+START=0
+END=3000
+title=Opening
+[CHAPTER]
+TIMEBASE=1/1000
+START=3000
+END=6000
+title=The Storm
+",
+    )
+    .unwrap();
+    let out = dir.path().join("chaptered.mkv");
+    let ok = Command::new("ffmpeg")
+        .args(["-v", "error", "-y", "-i"])
+        .arg(clip(dir.path()))
+        .arg("-i")
+        .arg(&meta)
+        .args(["-map_metadata", "1", "-map_chapters", "1", "-c", "copy"])
+        .arg(&out)
+        .status()
+        .unwrap()
+        .success();
+    assert!(ok);
+    let p = player();
+    p.load(out.to_str().unwrap(), None).unwrap();
+    p.wait_first_frame(Duration::from_secs(10)).unwrap();
+    let chapters = p.chapters();
+    assert_eq!(chapters.len(), 2, "{chapters:?}");
+    assert_eq!(chapters[1].title.as_deref(), Some("The Storm"));
+    assert!((chapters[1].time - 3.0).abs() < 0.01);
+    p.seek_to_and_wait(4.0, Duration::from_secs(10)).unwrap();
+    assert_eq!(p.state().chapter, Some(1));
+}
+
+#[test]
+fn thumbnail_sheets_are_made_from_a_file() {
+    // Phase 11: one tile per 10 s; a 6 s clip is one sheet with one tile used.
+    let dir = tempfile::tempdir().unwrap();
+    let film = clip(dir.path());
+    let out = dir.path().join("thumbs");
+    let sheets = sinephile_player::thumbs::generate(&film, &out, 360.0 / 640.0).unwrap();
+    assert_eq!(sheets.count, 1);
+    assert_eq!((sheets.tile_width, sheets.tile_height), (160, 90));
+    assert!(sinephile_player::thumbs::sheet_path(&out, 0).is_file());
+    assert_eq!(sinephile_player::thumbs::finished(&out), Some(sheets));
+}
+
+#[test]
+fn audio_delay_picture_and_stats_are_set_and_reported() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = player();
+    p.load(clip(dir.path()).to_str().unwrap(), None).unwrap();
+    p.wait_first_frame(Duration::from_secs(10)).unwrap();
+    p.set_audio_delay(0.25).unwrap();
+    assert!((p.audio_delay() - 0.25).abs() < 1e-6);
+    p.set_picture(10, -5, 200).unwrap(); // saturation clamped to 100
+    let stats = p.stats();
+    let get = |k: &str| stats.iter().find(|(n, _)| *n == k).map(|(_, v)| v.clone());
+    assert_eq!(get("Video").as_deref(), Some("h264"), "{stats:?}");
+    assert_eq!(get("Size").as_deref(), Some("640×360"));
+    assert_eq!(get("Audio delay").as_deref(), Some("+250 ms"));
+}
+
+#[test]
 fn an_exact_seek_lands_on_the_frame_asked_for() {
     // Phase 8 E3: "Seeking is frame-accurate and responsive."
     let dir = tempfile::tempdir().unwrap();
