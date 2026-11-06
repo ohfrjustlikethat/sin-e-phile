@@ -12,11 +12,11 @@
 
 **Phase 9 — Intelligent Source Selection** (`in_progress`, branch `phase/09-intelligent-source-selection`)
 
-6 of 7 exit criteria met with evidence.
+7 of 7 exit criteria met with evidence.
 
 > Opened 2026-11-06 when Phase 8 merged (5e5558f, tag phase-08); planned under ADR-0040. Carried in from Phase 8: E5's one-time real-controller check (author); from Phase 7: E7's VPN-drop check (author). Release-group reputation is structural only: no group names in the repo (2.1). ADR-0042 (spec 3.1.0) adds the TV focus language to this phase as subtask 9.0, built first.
 
-### Subtasks — 6/7 complete
+### Subtasks — 7/7 complete
 
 - [x] **9.0** The TV focus language (ADR-0042) in src/design-system/focus/: the white ring with hairline and oxblood halo as one gliding element (critically damped spring ~200 ms), grow 1.06 and lift on tiles, left-stick tilt up to 6 degrees with a following sheen, A press-down 0.97x, TV mode with a pad (125% scale, 5% safe margin, button-hints footer, Web Audio ticks, ~20 ms rumble on select, View toggles full screen and picking up the pad enters it), settings for sounds, rumble and auto full screen, reduced motion honoured; extended tools/uiaudit/controller.mjs proves it. · `1be4948`
 - [x] **9.1** crates/selection: score(candidate, context) -> Score{total, terms[]} as a pure function over SourceCandidate plus a Context (title runtime, hardware tier and decode caps, preferred audio language, wanted quality, measured throughput). Terms: local availability, swarm health, size-versus-quality plausibility, encoding signals, codec/HDR compatibility, audio language, subtitles. Unit tests over a fixture set of candidate lists and property tests (ordering invariants). · `0db6420`
@@ -24,7 +24,7 @@
 - [x] **9.3** Language and quality as first-class choices: the detail page lists the audio languages the candidates actually carry and the qualities on offer (defaulting to the best the hardware and connection support), with dub/sub distinction for anime; choosing one re-plans to a candidate that carries it, or says plainly that none does. · `92d4d71`
 - [x] **9.4** Automatic fallback: the plan returns the ranked list; if the chosen candidate has no first frame within a start timeout, the player silently opens the next one and logs why, within 10 s of Play in total for a failing first choice. · `0f18990`
 - [x] **9.5** The expert panel (Ctrl+Shift+S, and a Settings toggle): every candidate ranked with each score term and its weight, matching the code; and a one-line 'why this source' under Play. · `5b50da9`
-- [ ] **9.6** docs/specs/source-scoring.md: every term, its weight and its justification; learning note; evidence for E1-E6 including a deliberately failing top candidate in a test.
+- [x] **9.6** docs/specs/source-scoring.md: every term, its weight and its justification; learning note; evidence for E1-E6 including a deliberately failing top candidate in a test. · `91595da`
 
 ### Exit criteria
 
@@ -40,13 +40,14 @@
       - *Evidence:* 5b50da9: src/features/detail/DetailScreen.test.tsx 'Ctrl+Shift+S shows every source with the arithmetic of its score (E5)' — points render as value x weight (+4.00, +1.50) and the shown total (+5.50) is the backend's Score.total; seen to fail when the panel printed value instead of points. The panel shows the backend's Score.terms verbatim (CandidateView/TermView in src-tauri/src/commands/playback.rs). Legible: real-window screenshot 2026-11-06 of Nosferatu (1922), six Internet Archive candidates ranked with source, quality, codec, transport, total and nine term rows each. 'Why this source' line: crates/selection/tests/explained.rs (4 tests).
 - [x] **E6** `docs/specs/source-scoring.md` documents every term in the scoring function and its weight, with justification.
       - *Evidence:* 5b50da9: docs/specs/source-scoring.md documents all nine terms (§2 table: weight, +1/0/-1 meanings), each weight's justification (§2 'Why these weights'), fakes (§3), choices (§5), fallback (§6) and explanation (§7). crates/selection/tests/explained.rs the_specs_weights_are_the_codes_weights parses the table and fails on any mismatch with selection::weight (seen to fail with health documented as 3).
-- [ ] **E7** The TV focus language (ADR-0042) is in the design system, and `tools/uiaudit` proves it in TV mode: the white ring is visible on every focus stop, the ring glides rather than jumps, the 125% scale and safe margin hold at 1920×1080, and under reduced motion no transform remains.
+- [x] **E7** The TV focus language (ADR-0042) is in the design system, and `tools/uiaudit` proves it in TV mode: the white ring is visible on every focus stop, the ring glides rather than jumps, the 125% scale and safe margin hold at 1920×1080, and under reduced motion no transform remains.
+      - *Evidence:* 1be4948 (9.0) + 91595da: tools/uiaudit/controller.mjs in CI ('Controller flow (simulated Xbox pad)') at --window-size=1920,1080 with a simulated pad: 'the focus ring is white, 3px and showing'; 'the ring surrounds every focus stop on the film page (19 stops; missed: none)' (seen to fail naming six stops when the choice rows opted out); 'the ring glides to the next key: 9 frames in between, overshoot 0.00px' (seen to fail with the spring removed, 9.0); 'TV mode renders the app at 125%' and 'the scaled app fills the window, with a 5% safe margin' (seen to fail when the zoom shrank the app, 9.0); 'under reduced motion a focused tile has no transform or shadow' and 'the ring moves without gliding (0 frames in between)'. 19/19 locally 2026-11-06.
 
 ---
 
 ## What's next
 
-Phase 9 subtask 9.6 then close (docs/phases/phase-09-intelligent-source-selection.md): trim docs/learning/phase-09-notes.md section 4 to the phase's five questions; record E7 (TV focus language) with the controller-flow evidence from 1be4948/93ad89e; run the rule-13 regression check (cargo run --release -p eval -- all twice, -- vector --report) and record it in docs/eval-results.md; update README status and docs/HOW_IT_WORKS.md (source selection stub); SESSION_LOG entry with the Phase 9 retrospective; then /closephase 9 (merge --no-ff to main, CI green on main, tag phase-09) and open Phase 10.
+Close Phase 9 (/closephase 9): CI green on phase/09-intelligent-source-selection, merge --no-ff into main, CI green on main, tag phase-09, write completion_commit, then python tools/phasedoc/generate.py --open 10 and plan Phase 10 (subtitles) from SPEC.md §15.
 
 ---
 
@@ -71,7 +72,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 6/6 |
 | [x] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 6/8 |
 | [x] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 5/7 |
-| [~] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 6/7 |
+| [~] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 7/7 |
 | [ ] | 10 | Subtitle Pipeline | B | 8 | 2 | 0/6 |
 | [ ] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 0/5 |
 | [ ] | 12 | Local Library Engine | B | 4 | 2–3 | 0/6 |

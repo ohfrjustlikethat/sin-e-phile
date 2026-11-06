@@ -21,7 +21,7 @@ A scoring function over `SourceCandidate`s combining: swarm health (seeders, pee
 - [x] **E4** A deliberately-failing top candidate falls back within 10 s with no user action.
 - [x] **E5** The expert panel's score breakdown is legible and matches the code.
 - [x] **E6** `docs/specs/source-scoring.md` documents every term in the scoring function and its weight, with justification.
-- [ ] **E7** The TV focus language (ADR-0042) is in the design system, and `tools/uiaudit` proves it in TV mode: the white ring is visible on every focus stop, the ring glides rather than jumps, the 125% scale and safe margin hold at 1920×1080, and under reduced motion no transform remains.
+- [x] **E7** The TV focus language (ADR-0042) is in the design system, and `tools/uiaudit` proves it in TV mode: the white ring is visible on every focus stop, the ring glides rather than jumps, the 125% scale and safe margin hold at 1920×1080, and under reduced motion no transform remains.
 
 ## Subtasks
 
@@ -31,7 +31,7 @@ A scoring function over `SourceCandidate`s combining: swarm health (seeders, pee
 - [x] **9.3** Language and quality as first-class choices: the detail page lists the audio languages the candidates actually carry and the qualities on offer (defaulting to the best the hardware and connection support), with dub/sub distinction for anime; choosing one re-plans to a candidate that carries it, or says plainly that none does.
 - [x] **9.4** Automatic fallback: the plan returns the ranked list; if the chosen candidate has no first frame within a start timeout, the player silently opens the next one and logs why, within 10 s of Play in total for a failing first choice.
 - [x] **9.5** The expert panel (Ctrl+Shift+S, and a Settings toggle): every candidate ranked with each score term and its weight, matching the code; and a one-line 'why this source' under Play.
-- [ ] **9.6** docs/specs/source-scoring.md: every term, its weight and its justification; learning note; evidence for E1-E6 including a deliberately failing top candidate in a test.
+- [x] **9.6** docs/specs/source-scoring.md: every term, its weight and its justification; learning note; evidence for E1-E6 including a deliberately failing top candidate in a test.
 
 ## Learning note
 
@@ -48,3 +48,4 @@ Designing a scoring function; why weights need justification and testing; the fa
 - **9.3** Language and quality as first-class choices: the detail page lists the audio languages the candi · `92d4d71`
 - **9.4** Automatic fallback: the plan returns the ranked list; if the chosen candidate has no first frame · `0f18990`
 - **9.5** The expert panel (Ctrl+Shift+S, and a Settings toggle): every candidate ranked with each score t · `5b50da9`
+- **9.6** docs/specs/source-scoring.md: every term, its weight and its justification; learning note; evide · `91595da`
