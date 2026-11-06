@@ -45,8 +45,8 @@
       {
         "id": "11.7",
         "text": "The TV keyboard (ADR-0043): the Netflix-TV grid (a-z/0-9 left, results live beside it, space and backspace below) on every text field, Xbox-standard buttons (A type, B close, X backspace, Y space, LT/RT cursor, LB/RB letters/symbols incl. case, Menu submit), title suggestions and word completion from the catalogue, recent searches; a voice key placeholder for Phase 20; the controller flow proves an API key and a search can be typed with the pad alone.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "6fed80f"
       },
       {
         "id": "11.6",
@@ -89,8 +89,8 @@
       {
         "id": "E6",
         "text": "With only a controller, every text field in the app can be filled from the on-screen keyboard, and its suggestions, recent searches and word completion work (ADR-0043).",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "6fed80f: tools/uiaudit/controller.mjs (CI step 'Controller flow (simulated Xbox pad)'), pad only: Y opens search and the keyboard, 'sunrise' typed with D-pad and A; Menu opens Settings, the D-pad walks to the OpenSubtitles API key field 'without a keyboard popping up on the way', A opens the keyboard, RB/LB switch case and 'Ab9' is typed, X deletes, Menu closes with focus kept on the field. Typing aids: src/app/PadKeyboard.test.tsx 'on search: recent searches first, then suggestions and word completion' and 'types upper case and symbols, for API keys and addresses'; src/app/keyboardText.test.ts (cursor editing, completion, recents)."
       }
     ]
   },
@@ -1418,8 +1418,8 @@
         {
           "id": "E6",
           "text": "With only a controller, every text field in the app can be filled from the on-screen keyboard, and its suggestions, recent searches and word completion work (ADR-0043).",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "6fed80f: tools/uiaudit/controller.mjs (CI step 'Controller flow (simulated Xbox pad)'), pad only: Y opens search and the keyboard, 'sunrise' typed with D-pad and A; Menu opens Settings, the D-pad walks to the OpenSubtitles API key field 'without a keyboard popping up on the way', A opens the keyboard, RB/LB switch case and 'Ab9' is typed, X deletes, Menu closes with focus kept on the field. Typing aids: src/app/PadKeyboard.test.tsx 'on search: recent searches first, then suggestions and word completion' and 'types upper case and symbols, for API keys and addresses'; src/app/keyboardText.test.ts (cursor editing, completion, recents)."
         }
       ],
       "subtasks": [
@@ -1456,8 +1456,8 @@
         {
           "id": "11.7",
           "text": "The TV keyboard (ADR-0043): the Netflix-TV grid (a-z/0-9 left, results live beside it, space and backspace below) on every text field, Xbox-standard buttons (A type, B close, X backspace, Y space, LT/RT cursor, LB/RB letters/symbols incl. case, Menu submit), title suggestions and word completion from the catalogue, recent searches; a voice key placeholder for Phase 20; the controller flow proves an API key and a search can be typed with the pad alone.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "6fed80f"
         },
         {
           "id": "11.6",
@@ -2190,7 +2190,7 @@
       ]
     }
   ],
-  "next_action": "Phase 11 subtask 11.7 (docs/phases/phase-11-player-experience-layer.md): the TV keyboard (ADR-0043). Rework src/app/PadKeyboard.tsx into the Netflix-TV grid (a-z/0-9 block, 6 columns, space and backspace keys below) attached to EVERY text field in pad mode, with Xbox buttons (A type, B close, X backspace, Y space, LT/RT cursor, LB/RB letters vs symbols incl. upper case, Menu submit), a row of title suggestions from the catalogue (search command, top 5) and word completion, recent searches before typing (persisted, last 8), and a hidden voice key for Phase 20. Extend tools/uiaudit/controller.mjs to type a settings field (the OpenSubtitles key, with upper case) with the pad alone.",
+  "next_action": "Phase 11 subtask 11.6 then close (docs/phases/phase-11-player-experience-layer.md): docs/MANUAL_TESTS.md playback plan (a checklist) run in the real window under each tier via set_tier_override (modest, standard, capable): play a local file and a stream, pause overlay, subtitles (alignment on Tier 1+ vs length scaling on Tier 0), scrub thumbnails, menu, PiP, mini player; record results with screenshots as E5's manual evidence; docs/specs/player-experience.md; learning note docs/learning/phase-11-notes.md; README and HOW_IT_WORKS; SESSION_LOG with retrospective; rule-13 regression; close Phase 11.",
   "blockers": [
     {
       "id": "B11",

@@ -20,7 +20,7 @@ The player becomes better than the commercial ones.
 - [x] **E3** Next-episode autoplay works and is disableable.
 - [x] **E4** All player features are keyboard-accessible and documented in a shortcuts overlay (`?`).
 - [ ] **E5** Manual test plan for playback passes on all three tiers.
-- [ ] **E6** With only a controller, every text field in the app can be filled from the on-screen keyboard, and its suggestions, recent searches and word completion work (ADR-0043).
+- [x] **E6** With only a controller, every text field in the app can be filled from the on-screen keyboard, and its suggestions, recent searches and word completion work (ADR-0043).
 
 ## Subtasks
 
@@ -29,7 +29,7 @@ The player becomes better than the commercial ones.
 - [x] **11.3** Episodes in the player: previous/next episode (N/P keys, pad), a next-episode card with a countdown in the last 30 s or at a credits chapter, autoplay on by default and switchable in Settings -> Playback; a pure, tested function decides the next episode across season boundaries.
 - [x] **11.4** The scrub bar: chapter marks from mpv's chapter list; hover thumbnails from FFmpeg sprites generated in a low-priority background process (one frame per 10 s, cached under data/cache/thumbs by file hash), proven not to stutter playback (mpv frame-drop-count unchanged while generating).
 - [x] **11.5** Player controls: picture-in-picture (small always-on-top window, Ctrl+P), audio delay (Ctrl+[ / Ctrl+]), brightness/contrast/saturation in a Picture menu, a stats-for-nerds overlay (I: decode path, dropped frames, bitrate, cache, swarm peers/speed), and a shortcuts overlay (?) generated from the same key map the player uses.
-- [ ] **11.7** The TV keyboard (ADR-0043): the Netflix-TV grid (a-z/0-9 left, results live beside it, space and backspace below) on every text field, Xbox-standard buttons (A type, B close, X backspace, Y space, LT/RT cursor, LB/RB letters/symbols incl. case, Menu submit), title suggestions and word completion from the catalogue, recent searches; a voice key placeholder for Phase 20; the controller flow proves an API key and a search can be typed with the pad alone.
+- [x] **11.7** The TV keyboard (ADR-0043): the Netflix-TV grid (a-z/0-9 left, results live beside it, space and backspace below) on every text field, Xbox-standard buttons (A type, B close, X backspace, Y space, LT/RT cursor, LB/RB letters/symbols incl. case, Menu submit), title suggestions and word completion from the catalogue, recent searches; a voice key placeholder for Phase 20; the controller flow proves an API key and a search can be typed with the pad alone.
 - [ ] **11.6** docs/MANUAL_TESTS.md playback plan run on all three tiers via the tier override (screenshots per tier), docs/specs/player-experience.md, learning note, evidence for E1-E5, regression check, close.
 
 ## Learning note
@@ -46,3 +46,4 @@ Why the overlay data is available but scene-level data isn't; background work wi
 - **11.3** Episodes in the player: previous/next episode (N/P keys, pad), a next-episode card with a countd · `1369b57`
 - **11.4** The scrub bar: chapter marks from mpv's chapter list; hover thumbnails from FFmpeg sprites gener · `f2bf342`
 - **11.5** Player controls: picture-in-picture (small always-on-top window, Ctrl+P), audio delay (Ctrl+[ /  · `656441e`
+- **11.7** The TV keyboard (ADR-0043): the Netflix-TV grid (a-z/0-9 left, results live beside it, space and · `6fed80f`

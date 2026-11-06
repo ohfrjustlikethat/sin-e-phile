@@ -12,18 +12,18 @@
 
 **Phase 11 — Player Experience Layer** (`in_progress`, branch `phase/11-player-experience-layer`)
 
-4 of 6 exit criteria met with evidence.
+5 of 6 exit criteria met with evidence.
 
 > Opened 2026-11-06 when Phase 10 merged (c48c546, tag phase-10); part of the author's five-phase request (9-13). No series page existed, so 11.1 builds a minimal one (airing awareness needs somewhere to show). Trivia, goofs and soundtrack have no free, legal source (IMDb's datasets omit them; scraping is out, 2.1): the overlay says so rather than inventing a source. Author checks still outstanding: real controller (Phase 8 E5), VPN drop (Phase 7 E7), both carried to 13.
 
-### Subtasks — 5/7 complete
+### Subtasks — 6/7 complete
 
 - [x] **11.1** Series and airing awareness (ADR-0030): migration 0019 airing_schedule filled from AniList nextAiringEpisode during anime ingest/refresh; EpisodeRepository lists a series' seasons and episodes and its next airing; the detail page of a series shows seasons, episodes (playable) and 'Episode 7 airs Thursday' even with no episode row (a pure, tested wording function). · `2794a42`
 - [x] **11.2** The pause overlay: on pause, over the dimmed still, a panel with the cast (character names; headshots only with the user's TMDB key, else typographic), director and key crew, ratings that exist (IMDb from the catalogue; AniList for anime) and never Rotten Tomatoes, time remaining, the current chapter, 'more like this' from the vector index; a cast member opens their filmography. Data fetched when playback starts so the overlay paints in < 200 ms (measured in the real window). Trivia, goofs and soundtrack have no free legal source and are said to be absent, not scraped. · `5b55e4c`
 - [x] **11.3** Episodes in the player: previous/next episode (N/P keys, pad), a next-episode card with a countdown in the last 30 s or at a credits chapter, autoplay on by default and switchable in Settings -> Playback; a pure, tested function decides the next episode across season boundaries. · `1369b57`
 - [x] **11.4** The scrub bar: chapter marks from mpv's chapter list; hover thumbnails from FFmpeg sprites generated in a low-priority background process (one frame per 10 s, cached under data/cache/thumbs by file hash), proven not to stutter playback (mpv frame-drop-count unchanged while generating). · `f2bf342`
 - [x] **11.5** Player controls: picture-in-picture (small always-on-top window, Ctrl+P), audio delay (Ctrl+[ / Ctrl+]), brightness/contrast/saturation in a Picture menu, a stats-for-nerds overlay (I: decode path, dropped frames, bitrate, cache, swarm peers/speed), and a shortcuts overlay (?) generated from the same key map the player uses. · `656441e`
-- [ ] **11.7** The TV keyboard (ADR-0043): the Netflix-TV grid (a-z/0-9 left, results live beside it, space and backspace below) on every text field, Xbox-standard buttons (A type, B close, X backspace, Y space, LT/RT cursor, LB/RB letters/symbols incl. case, Menu submit), title suggestions and word completion from the catalogue, recent searches; a voice key placeholder for Phase 20; the controller flow proves an API key and a search can be typed with the pad alone.
+- [x] **11.7** The TV keyboard (ADR-0043): the Netflix-TV grid (a-z/0-9 left, results live beside it, space and backspace below) on every text field, Xbox-standard buttons (A type, B close, X backspace, Y space, LT/RT cursor, LB/RB letters/symbols incl. case, Menu submit), title suggestions and word completion from the catalogue, recent searches; a voice key placeholder for Phase 20; the controller flow proves an API key and a search can be typed with the pad alone. · `6fed80f`
 - [ ] **11.6** docs/MANUAL_TESTS.md playback plan run on all three tiers via the tier override (screenshots per tier), docs/specs/player-experience.md, learning note, evidence for E1-E5, regression check, close.
 
 ### Exit criteria
@@ -37,13 +37,14 @@
 - [x] **E4** All player features are keyboard-accessible and documented in a shortcuts overlay (`?`).
       - *Evidence:* 656441e: every player feature has a key: src/features/player/intents.ts SHORTCUTS (19 rows: play/pause, seeks, volume, mute, full screen, frame step, speed, subtitles, subtitle timing, sound timing, episodes, statistics, mini player, picture-in-picture, shortcuts, back, and the pad's player menu); intents.test.ts 'says what each key really does' turns each row's real key event through keyIntent and must get the row's intent; the '?' overlay renders that same table (PlayerScreen.test.tsx '? lists the shortcuts, I shows statistics, Ctrl+[ moves the sound'). The pad reaches the rest through Menu (PlayerScreen.test.tsx 'Menu opens the player menu; inside it the D-pad moves focus instead of seeking'). Real window 2026-11-07: Ctrl+M mini player and Ctrl+P picture-in-picture (480x270, restored to 1455x909) screenshotted.
 - [ ] **E5** Manual test plan for playback passes on all three tiers.
-- [ ] **E6** With only a controller, every text field in the app can be filled from the on-screen keyboard, and its suggestions, recent searches and word completion work (ADR-0043).
+- [x] **E6** With only a controller, every text field in the app can be filled from the on-screen keyboard, and its suggestions, recent searches and word completion work (ADR-0043).
+      - *Evidence:* 6fed80f: tools/uiaudit/controller.mjs (CI step 'Controller flow (simulated Xbox pad)'), pad only: Y opens search and the keyboard, 'sunrise' typed with D-pad and A; Menu opens Settings, the D-pad walks to the OpenSubtitles API key field 'without a keyboard popping up on the way', A opens the keyboard, RB/LB switch case and 'Ab9' is typed, X deletes, Menu closes with focus kept on the field. Typing aids: src/app/PadKeyboard.test.tsx 'on search: recent searches first, then suggestions and word completion' and 'types upper case and symbols, for API keys and addresses'; src/app/keyboardText.test.ts (cursor editing, completion, recents).
 
 ---
 
 ## What's next
 
-Phase 11 subtask 11.7 (docs/phases/phase-11-player-experience-layer.md): the TV keyboard (ADR-0043). Rework src/app/PadKeyboard.tsx into the Netflix-TV grid (a-z/0-9 block, 6 columns, space and backspace keys below) attached to EVERY text field in pad mode, with Xbox buttons (A type, B close, X backspace, Y space, LT/RT cursor, LB/RB letters vs symbols incl. upper case, Menu submit), a row of title suggestions from the catalogue (search command, top 5) and word completion, recent searches before typing (persisted, last 8), and a hidden voice key for Phase 20. Extend tools/uiaudit/controller.mjs to type a settings field (the OpenSubtitles key, with upper case) with the pad alone.
+Phase 11 subtask 11.6 then close (docs/phases/phase-11-player-experience-layer.md): docs/MANUAL_TESTS.md playback plan (a checklist) run in the real window under each tier via set_tier_override (modest, standard, capable): play a local file and a stream, pause overlay, subtitles (alignment on Tier 1+ vs length scaling on Tier 0), scrub thumbnails, menu, PiP, mini player; record results with screenshots as E5's manual evidence; docs/specs/player-experience.md; learning note docs/learning/phase-11-notes.md; README and HOW_IT_WORKS; SESSION_LOG with retrospective; rule-13 regression; close Phase 11.
 
 ---
 
@@ -70,7 +71,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 5/7 |
 | [x] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 7/7 |
 | [x] | 10 | Subtitle Pipeline | B | 8 | 2 | 6/6 |
-| [~] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 4/6 |
+| [~] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 5/6 |
 | [ ] | 12 | Local Library Engine | B | 4 | 2–3 | 0/6 |
 | [ ] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 0/8 |
 | [ ] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 0/6 |
