@@ -20,7 +20,7 @@ pub use catalogue::{
     MIN_SYNOPSIS,
 };
 pub use credentials::{CredentialRepository, TmdbAccess};
-pub use episodes::EpisodeRepository;
+pub use episodes::{EpisodeRepository, EpisodeRow};
 pub use media::{Credit, MediaRepository};
 pub use profiles::ProfileRepository;
 pub use search::{Hit, HitDetail, MatchReason, SearchRepository};

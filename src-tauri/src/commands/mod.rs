@@ -8,6 +8,7 @@ pub mod assets;
 pub mod playback;
 pub mod player;
 pub mod search;
+pub mod series;
 pub mod sources;
 pub mod subtitles;
 pub mod system;

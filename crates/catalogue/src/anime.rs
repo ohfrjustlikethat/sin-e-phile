@@ -517,6 +517,23 @@ async fn write_match(
     .await
     .map_err(|e| JobError::step(step, e.to_string()))?;
 
+    // When the next episode airs (ADR-0030, Phase 11): AniList knows before IMDb lists
+    // the episode, so this needs no `episodes` row.
+    if let Some(next) = &media.next_airing {
+        sqlx::query(
+            "INSERT INTO airing_schedule (series_id, episode_number, airs_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT (series_id) DO UPDATE
+               SET episode_number = excluded.episode_number, airs_at = excluded.airs_at,
+                   updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')",
+        )
+        .bind(media_item_id)
+        .bind(next.episode)
+        .bind(next.airing_at)
+        .execute(&mut **tx)
+        .await
+        .map_err(|e| JobError::step(step, e.to_string()))?;
+    }
+
     // `confidence` records HOW the mapping was made, which the schema asks for and
     // which matters here more than anywhere else: these are TITLE matches, not id
     // matches. A season-aware match survived a looser rule than an exact one, and a

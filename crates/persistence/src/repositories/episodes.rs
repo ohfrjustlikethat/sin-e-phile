@@ -35,6 +35,16 @@ pub struct ResolvedEpisode {
     pub matched_by: NumberingMatch,
 }
 
+/// An episode as a series page lists it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EpisodeRow {
+    pub media_item_id: i64,
+    pub season_number: Option<i64>,
+    pub episode_number: Option<i64>,
+    pub title: String,
+    pub air_date: Option<String>,
+}
+
 pub struct EpisodeRepository<'a> {
     db: &'a Db,
 }
@@ -211,6 +221,148 @@ impl<'a> EpisodeRepository<'a> {
 
         row.map(|r| resolved(r, NumberingMatch::Absolute))
             .transpose()
+    }
+
+    /// A series' seasons, by number, with how many episodes the catalogue holds for each
+    /// (Phase 11's series page). Episodes with no season number are season `None`.
+    pub async fn seasons(&self, series_id: i64) -> Result<Vec<(Option<i64>, i64)>, DbError> {
+        let rows = sqlx::query(
+            "SELECT season_number, COUNT(*) FROM episodes WHERE series_id = ?
+             GROUP BY season_number ORDER BY season_number IS NULL, season_number",
+        )
+        .bind(series_id)
+        .fetch_all(self.db.pool())
+        .await?;
+        Ok(rows.into_iter().map(|r| (r.get(0), r.get(1))).collect())
+    }
+
+    /// One season's episodes in order, with their titles and air dates. `None` is the
+    /// episodes without a season number.
+    pub async fn episodes_of(
+        &self,
+        series_id: i64,
+        season: Option<i64>,
+    ) -> Result<Vec<EpisodeRow>, DbError> {
+        let rows = sqlx::query(
+            "SELECT e.media_item_id, e.season_number, e.episode_number, m.primary_title, e.air_date
+             FROM episodes e JOIN media_items m ON m.id = e.media_item_id
+             WHERE e.series_id = ?1 AND e.season_number IS ?2
+             ORDER BY e.episode_number IS NULL, e.episode_number, e.media_item_id",
+        )
+        .bind(series_id)
+        .bind(season)
+        .fetch_all(self.db.pool())
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| EpisodeRow {
+                media_item_id: r.get(0),
+                season_number: r.get(1),
+                episode_number: r.get(2),
+                title: r.get(3),
+                air_date: r.get(4),
+            })
+            .collect())
+    }
+
+    /// The episode after this one in the series: the next in its season, else the first
+    /// of the next season that has any (Phase 11's next-episode card).
+    pub async fn next_after(&self, episode_id: i64) -> Result<Option<EpisodeRow>, DbError> {
+        let row = sqlx::query(
+            "SELECT n.media_item_id, n.season_number, n.episode_number, m.primary_title, n.air_date
+             FROM episodes e
+             JOIN episodes n ON n.series_id = e.series_id
+             JOIN media_items m ON m.id = n.media_item_id
+             WHERE e.media_item_id = ?1
+               AND n.season_number IS NOT NULL AND n.episode_number IS NOT NULL
+               AND (n.season_number > e.season_number
+                    OR (n.season_number = e.season_number AND n.episode_number > e.episode_number))
+             ORDER BY n.season_number, n.episode_number
+             LIMIT 1",
+        )
+        .bind(episode_id)
+        .fetch_optional(self.db.pool())
+        .await?;
+        Ok(row.map(|r| EpisodeRow {
+            media_item_id: r.get(0),
+            season_number: r.get(1),
+            episode_number: r.get(2),
+            title: r.get(3),
+            air_date: r.get(4),
+        }))
+    }
+
+    /// The one before it, the same way backwards.
+    pub async fn previous_before(&self, episode_id: i64) -> Result<Option<EpisodeRow>, DbError> {
+        let row = sqlx::query(
+            "SELECT p.media_item_id, p.season_number, p.episode_number, m.primary_title, p.air_date
+             FROM episodes e
+             JOIN episodes p ON p.series_id = e.series_id
+             JOIN media_items m ON m.id = p.media_item_id
+             WHERE e.media_item_id = ?1
+               AND p.season_number IS NOT NULL AND p.episode_number IS NOT NULL
+               AND (p.season_number < e.season_number
+                    OR (p.season_number = e.season_number AND p.episode_number < e.episode_number))
+             ORDER BY p.season_number DESC, p.episode_number DESC
+             LIMIT 1",
+        )
+        .bind(episode_id)
+        .fetch_optional(self.db.pool())
+        .await?;
+        Ok(row.map(|r| EpisodeRow {
+            media_item_id: r.get(0),
+            season_number: r.get(1),
+            episode_number: r.get(2),
+            title: r.get(3),
+            air_date: r.get(4),
+        }))
+    }
+
+    /// Where an episode sits: (series, season, episode).
+    pub async fn placement(
+        &self,
+        episode_id: i64,
+    ) -> Result<Option<(i64, Option<i64>, Option<i64>)>, DbError> {
+        let row = sqlx::query(
+            "SELECT series_id, season_number, episode_number FROM episodes WHERE media_item_id = ?",
+        )
+        .bind(episode_id)
+        .fetch_optional(self.db.pool())
+        .await?;
+        Ok(row.map(|r| (r.get(0), r.get(1), r.get(2))))
+    }
+
+    /// Record when the series' next episode airs (ADR-0030): one row per series, the
+    /// newest schedule replacing the last.
+    pub async fn set_next_airing(
+        &self,
+        series_id: i64,
+        episode: i64,
+        airs_at: i64,
+    ) -> Result<(), DbError> {
+        sqlx::query(
+            "INSERT INTO airing_schedule (series_id, episode_number, airs_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT (series_id) DO UPDATE
+               SET episode_number = excluded.episode_number, airs_at = excluded.airs_at,
+                   updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')",
+        )
+        .bind(series_id)
+        .bind(episode)
+        .bind(airs_at)
+        .execute(self.db.pool())
+        .await?;
+        Ok(())
+    }
+
+    /// (episode, airs at, Unix seconds), if one is scheduled — whether or not an
+    /// `episodes` row exists for it yet.
+    pub async fn next_airing(&self, series_id: i64) -> Result<Option<(i64, i64)>, DbError> {
+        let row =
+            sqlx::query("SELECT episode_number, airs_at FROM airing_schedule WHERE series_id = ?")
+                .bind(series_id)
+                .fetch_optional(self.db.pool())
+                .await?;
+        Ok(row.map(|r| (r.get(0), r.get(1))))
     }
 
     /// Every numbering recorded for an episode — what a "why did it match?"

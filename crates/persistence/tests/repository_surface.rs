@@ -198,6 +198,75 @@ async fn episode_repository_surface() {
         .expect("resolve_absolute miss")
         .is_none());
 
+    // seasons / episodes_of / next_after / previous_before (Phase 11)
+    let mk = |title: &'static str| NewMediaItem {
+        kind: Some(MediaKind::Episode),
+        primary_title: title.into(),
+        ..Default::default()
+    };
+    let s1e4 = media.insert(&mk("S1E4")).await.unwrap();
+    let s2e1 = media.insert(&mk("S2E1")).await.unwrap();
+    let season2 = repo.create_season(series, 2, None).await.unwrap();
+    repo.create_episode(s1e4, series, Some(season), Some(1), Some(4), None)
+        .await
+        .unwrap();
+    repo.create_episode(s2e1, series, Some(season2), Some(2), Some(1), None)
+        .await
+        .unwrap();
+    assert_eq!(
+        repo.seasons(series).await.expect("seasons"),
+        [(Some(1), 2), (Some(2), 1)]
+    );
+    let first = repo
+        .episodes_of(series, Some(1))
+        .await
+        .expect("episodes_of");
+    assert_eq!(
+        first.iter().map(|e| e.title.as_str()).collect::<Vec<_>>(),
+        ["An Episode", "S1E4"]
+    );
+    assert!(repo.episodes_of(series, None).await.unwrap().is_empty());
+    // Across the season boundary, both ways; nothing past the ends.
+    assert_eq!(
+        repo.next_after(s1e4)
+            .await
+            .expect("next_after")
+            .map(|e| e.media_item_id),
+        Some(s2e1)
+    );
+    assert_eq!(repo.next_after(s2e1).await.unwrap(), None);
+    assert_eq!(
+        repo.previous_before(s2e1)
+            .await
+            .expect("previous_before")
+            .map(|e| e.media_item_id),
+        Some(s1e4)
+    );
+    assert_eq!(repo.previous_before(episode).await.unwrap(), None);
+    // placement
+    assert_eq!(
+        repo.placement(s2e1).await.expect("placement"),
+        Some((series, Some(2), Some(1)))
+    );
+    assert_eq!(
+        repo.placement(series).await.unwrap(),
+        None,
+        "not an episode"
+    );
+
+    // set_next_airing / next_airing — no episode row needed; the newest replaces
+    assert_eq!(repo.next_airing(series).await.expect("next_airing"), None);
+    repo.set_next_airing(series, 7, 1_794_200_000)
+        .await
+        .expect("set");
+    repo.set_next_airing(series, 8, 1_794_800_000)
+        .await
+        .expect("replace");
+    assert_eq!(
+        repo.next_airing(series).await.unwrap(),
+        Some((8, 1_794_800_000))
+    );
+
     // numberings_for
     assert_eq!(
         repo.numberings_for(episode)

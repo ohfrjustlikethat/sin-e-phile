@@ -7,6 +7,7 @@ import { clock } from "@/features/player/intents";
 import { languageName, qualityLabel, usePlaybackChoice } from "@/lib/playbackChoice";
 import { ChoiceRow, type Choice } from "./ChoiceRow";
 import { SourcePanel } from "./SourcePanel";
+import { SeriesSection } from "./SeriesSection";
 
 /**
  * The minimal detail page — SPEC.md Phase 8: title, synopsis, cast, and a Play button
@@ -71,8 +72,13 @@ export function DetailScreen() {
     enabled: id !== null,
   });
 
+  // A series is not played itself; its episodes are (SeriesSection). Its sources are not
+  // asked, so the plan waits until the kind is known — one local query.
+  const kind = item.data?.kind;
+  const isSeries = kind === "series" || kind === "anime_series";
+
   useEffect(() => {
-    if (id === null) return;
+    if (id === null || kind === undefined || isSeries) return;
     let live = true;
     setPlan({ phase: "finding" });
     void commands.preparePlay(id, audio, quality).then((r) => {
@@ -83,7 +89,7 @@ export function DetailScreen() {
     return () => {
       live = false;
     };
-  }, [id, audio, quality]);
+  }, [id, audio, quality, kind, isSeries]);
 
   // A different film offers different things.
   useEffect(() => setOffers(null), [id]);
@@ -144,6 +150,10 @@ export function DetailScreen() {
       <h1 className="font-serif text-[64px] leading-[0.98] tracking-[-0.015em] text-ink">{d.title}</h1>
       {byline && <p className="label mt-5">{byline}</p>}
 
+      {isSeries ? (
+        <SeriesSection id={d.id} />
+      ) : (
+      <>
       <div className="mt-10 flex items-center gap-5">
         <Button
           id="detail-play"
@@ -179,6 +189,8 @@ export function DetailScreen() {
       )}
 
       {showPanel && plan.phase === "ready" && <SourcePanel candidates={plan.plan.candidates} />}
+      </>
+      )}
 
       {d.synopsis && (
         <p className="mt-12 max-w-[68ch] text-[17px] leading-[1.65] text-ink-muted">{d.synopsis}</p>

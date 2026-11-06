@@ -171,6 +171,9 @@ export const commands = {
 	 *  subtitle (Phase 10 E5). Returns the nudge now in force.
 	 */
 	subtitleNudge: (deltaMs: number) => typedError<number, string>(__TAURI_INVOKE("subtitle_nudge", { deltaMs })),
+	seriesDetail: (id: number) => typedError<SeriesView, string>(__TAURI_INVOKE("series_detail", { id })),
+	seasonEpisodes: (id: number, season: number | null) => typedError<EpisodeView[], string>(__TAURI_INVOKE("season_episodes", { id, season })),
+	episodeNeighbours: (id: number) => typedError<Neighbours, string>(__TAURI_INVOKE("episode_neighbours", { id })),
 };
 
 /* Types */
@@ -192,6 +195,13 @@ export type AddonPreview = {
 	host: string,
 	homepage: string | null,
 	replaces: boolean,
+};
+
+export type AiringView = {
+	/**  AniList's own number for the episode (ADR-0031: never converted). */
+	episode: number,
+	/**  Unix seconds. */
+	airs_at: number | null,
 };
 
 /**
@@ -306,6 +316,14 @@ export type CutoutRect = {
 	radius: number | null,
 };
 
+export type EpisodeView = {
+	id: number,
+	season: number | null,
+	episode: number | null,
+	title: string,
+	air_date: string | null,
+};
+
 /**
  *  What detection actually found. Shown verbatim in Settings (§8: "in plain
  *  language. This is a nice UI moment, not an apology").
@@ -344,6 +362,12 @@ export type LinkInfo = {
 	title: string,
 	year: number | null,
 	url: string,
+};
+
+/**  The episodes either side of this one, for the player (Phase 11). */
+export type Neighbours = {
+	previous: EpisodeView | null,
+	next: EpisodeView | null,
 };
 
 /**  One optional download, as the consent screen needs it. */
@@ -457,6 +481,17 @@ export type SearchResponse = {
 	 *  "found nothing", and the two must never render the same.
 	 */
 	ready: boolean,
+};
+
+export type SeasonView = {
+	/**  `None`: episodes without a season number. */
+	number: number | null,
+	episodes: number,
+};
+
+export type SeriesView = {
+	seasons: SeasonView[],
+	next_airing: AiringView | null,
 };
 
 /**  One row of the Sources list. */
