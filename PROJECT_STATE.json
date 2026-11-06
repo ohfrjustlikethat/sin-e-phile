@@ -2109,14 +2109,7 @@
     }
   ],
   "next_action": "Phase 9 subtask 9.1 (docs/phases/phase-09-intelligent-source-selection.md): create crates/selection with score(candidate, &Context) -> Score { total, terms: Vec<Term{name, value, weight, why}> } as a pure function over source_protocol::SourceCandidate; start with local availability, swarm health and size-versus-quality plausibility, fixture lists in crates/selection/tests/fixtures.rs, then wire it into crates/playback::rank in place of the fixed transport order. Author checks outstanding: real controller (E5 carried), VPN drop (P7 E7).",
-  "blockers": [
-    {
-      "id": "B9",
-      "raised": "2026-11-06T05:10:00Z",
-      "needs_user": false,
-      "description": "CI run 42165606563 failed in 'Controller flow (simulated Xbox pad)': the Windows Server runner reports prefers-reduced-motion, so the glide and grow checks saw them correctly off. Fixed in 93ad89e by pinning the media feature in the harness; clears when CI on the branch is green."
-    }
-  ],
+  "blockers": [],
   "decisions_pending": [
     {
       "id": "P1",
