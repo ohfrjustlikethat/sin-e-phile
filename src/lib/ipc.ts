@@ -141,6 +141,8 @@ export const commands = {
 	speed: number | null,
 	hwdec: string | null,
 	ended: boolean,
+	/**  The first frame is up; before it the page shows what is opening. */
+	started: boolean,
 	tracks: TrackView[],
 } | null, string>(__TAURI_INVOKE("player_state")),
 	/**
@@ -354,6 +356,8 @@ export type PlayerStateView = {
 	speed: number | null,
 	hwdec: string | null,
 	ended: boolean,
+	/**  The first frame is up; before it the page shows what is opening. */
+	started: boolean,
 	tracks: TrackView[],
 };
 

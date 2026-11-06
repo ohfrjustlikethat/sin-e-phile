@@ -47,6 +47,12 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
     expect(commands.playerOpen).toHaveBeenCalledWith("https://films.example/a.mp4", 42);
   });
 
+  it("says what is opening until the first frame, not a black screen", () => {
+    render(<PlayerScreen />);
+    expect(screen.getByText("Resuming from 0:42")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Nosferatu" })).toBeInTheDocument();
+  });
+
   it("cuts both chrome panels out of the video while they show (ADR-0020)", () => {
     render(<PlayerScreen />);
     const calls = commands.playerLayout.mock.calls as unknown as unknown[][];
@@ -86,7 +92,7 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
         events.push?.({
           payload: {
             position: 2712.4, duration: 5700, paused: false, buffered_until: null, volume: 100,
-            muted: false, speed: 1, hwdec: null, ended: false, tracks: [],
+            muted: false, speed: 1, hwdec: null, ended: false, started: true, tracks: [],
           },
         }),
       );

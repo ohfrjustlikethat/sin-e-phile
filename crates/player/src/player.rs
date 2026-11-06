@@ -85,6 +85,9 @@ pub struct State {
     /// A seek is still in progress. mpv reports the TARGET as `position` as soon as a
     /// seek starts, so "done" is `!seeking`, not "the position reads right".
     pub seeking: bool,
+    /// The first frame of what was last loaded is on screen. Until then the screen is
+    /// the page's "opening" state, not a black video window.
+    pub started: bool,
 }
 
 pub struct Player {
@@ -340,6 +343,7 @@ impl Player {
             idle: self.flag("idle-active"),
             ended: self.flag("eof-reached"),
             seeking: self.flag("seeking"),
+            started: self.seen.0.lock().expect("seen").first_frame_at.is_some(),
         }
     }
 

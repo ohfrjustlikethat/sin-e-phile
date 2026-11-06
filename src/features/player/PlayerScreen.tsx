@@ -252,6 +252,19 @@ export function PlayerScreen() {
         </>
       )}
 
+      {/* Until the first frame: what is opening, not a black rectangle. The video
+          window stays hidden until then (src-tauri player_open). */}
+      {!still && !error && !state?.started && (
+        <div className="absolute inset-x-0 top-[36%] flex flex-col items-center gap-4 text-center">
+          <p className="label text-ink-muted">
+            {playing.start ? `Resuming from ${clock(playing.start)}` : "Opening"}
+          </p>
+          <h1 className="max-w-[70%] font-display text-[44px] leading-[1.05] font-semibold tracking-[-0.03em]">
+            {playing.title}
+          </h1>
+        </div>
+      )}
+
       {error && (
         <div className="absolute inset-0 grid place-items-center">
           <div className="max-w-md text-center">

@@ -67,8 +67,10 @@ pub async fn player_open(
     let rt = runtime(&app, &state)
         .inspect_err(|e| tracing::error!(error = %e, "player could not start"))?;
     let ready_ms = t0.elapsed().as_millis();
+    // The video window stays hidden until there is a picture to show: until then the
+    // page underneath says what is opening, instead of a black rectangle.
+    rt.host.lock().expect("host").hide();
     rt.player.load(&target, start).map_err(err)?;
-    rt.host.lock().expect("host").show();
     // §2.3's play → first frame budget, measured where it is spent.
     let waiting = rt.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -76,11 +78,17 @@ pub async fn player_open(
             .player
             .wait_first_frame(std::time::Duration::from_secs(60))
         {
-            Ok(_) => tracing::info!(
-                ready_ms,
-                first_frame_ms = t0.elapsed().as_millis(),
-                "first frame"
-            ),
+            Ok(_) => {
+                // Not over a pause overlay, if Pause came first.
+                if !waiting.player.state().paused {
+                    waiting.host.lock().expect("host").show();
+                }
+                tracing::info!(
+                    ready_ms,
+                    first_frame_ms = t0.elapsed().as_millis(),
+                    "first frame"
+                )
+            }
             Err(e) => tracing::warn!(error = %e, "no first frame"),
         }
     });
@@ -226,6 +234,8 @@ pub struct PlayerStateView {
     pub speed: f64,
     pub hwdec: Option<String>,
     pub ended: bool,
+    /// The first frame is up; before it the page shows what is opening.
+    pub started: bool,
     pub tracks: Vec<TrackView>,
 }
 
@@ -241,6 +251,7 @@ fn view(rt: &PlayerRuntime) -> PlayerStateView {
         speed: s.speed,
         hwdec: s.hwdec,
         ended: s.ended,
+        started: s.started,
         tracks: rt
             .player
             .tracks()
