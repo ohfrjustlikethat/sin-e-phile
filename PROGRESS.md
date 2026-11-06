@@ -46,7 +46,7 @@
 
 ## What's next
 
-Plan Phase 8 (player core) per SPEC.md §15 Phase 8 and ADR-0020/0021/0041: libmpv embedded into a child HWND (spikes/spike-a-libmpv), custom chrome with region cutouts and still-frame-on-pause, keyboard and Xbox-controller control, position resume, a minimal detail page, and search -> detail -> resolve -> play end to end. Write the subtasks into PROJECT_STATE.json and start (ADR-0040). Carried in: Phase 7 E1 (start the torrent when the detail page opens; D61) and E7 (author's VPN-drop check). Author actions outstanding: publish embeddings-v3; retake case-study shots; E7.
+Finish Phase 8 (docs/phases/phase-08-player-core.md): (1) 8.8/E1 - a search->detail->play check per source kind: local file, the Internet Archive (crates/playback/tests/end_to_end.rs live test) and P2P (the offline-swarm test), plus one real-window run of each through SINEPHILE_AUTOPLAY; (2) the carried Phase 7 E1 (torrent start < 8 s) measured from the detail page opening, since prepare_play starts the torrent then (D61); (3) E6 - record the demo GIF from the real window with the scratchpad PrintWindow method (PrintWindow PW_RENDERFULLCONTENT, never desktop capture) and put it in README.md; (4) learning note docs/learning/phase-08-notes.md, HOW_IT_WORKS stub, SESSION_LOG retrospective, regression check against Phase 7's numbers, then /closephase 8 and fire the Tier A understanding gate. Author batch: real-controller check for E5 (a controller is paired), VPN-drop check (Phase 7 E7), embeddings-v3 release.
 
 ---
 

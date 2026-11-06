@@ -17,8 +17,8 @@ libmpv embedded and rendering into the Tauri window, with hardware decoding enab
 
 - [ ] **E1** A user can search, click, and watch — from a local file, from the Internet Archive backend, and from a configured P2P source.
 - [x] **E2** Playback of 4K HEVC HDR uses hardware decode (verified in logs and by CPU usage).
-- [ ] **E3** Seeking is frame-accurate and responsive.
-- [ ] **E4** Position resume works across app restarts.
+- [x] **E3** Seeking is frame-accurate and responsive.
+- [x] **E4** Position resume works across app restarts.
 - [ ] **E5** With only an Xbox controller, a user can browse to a film, start it, pause, seek and leave the player — tested with a simulated gamepad in CI and confirmed once by the author with a real controller.
 - [ ] **E6** A demo GIF of this flow exists and is in the README.
 - [ ] **E7** Tag `phase-08`, and celebrate — this is the first thing worth showing anyone.
