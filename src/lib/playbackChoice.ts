@@ -11,8 +11,11 @@ interface PlaybackChoice {
   audio: string | null;
   /** A wire name: `uhd`, `full_hd`, `hd`, `sd`. */
   quality: string | null;
+  /** Show every candidate's score on film pages (the expert panel, Phase 9). */
+  details: boolean;
   setAudio: (audio: string | null) => void;
   setQuality: (quality: string | null) => void;
+  setDetails: (details: boolean) => void;
 }
 
 export const usePlaybackChoice = create<PlaybackChoice>()(
@@ -20,8 +23,10 @@ export const usePlaybackChoice = create<PlaybackChoice>()(
     (set) => ({
       audio: null,
       quality: null,
+      details: false,
       setAudio: (audio) => set({ audio }),
       setQuality: (quality) => set({ quality }),
+      setDetails: (details) => set({ details }),
     }),
     { name: "sinephile.choice" },
   ),

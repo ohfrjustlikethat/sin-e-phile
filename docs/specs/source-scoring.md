@@ -1,6 +1,6 @@
 # Source scoring
 
-**Status:** built in Phase 9 (subtasks 9.1–9.4) · **Code:** `crates/selection/` ·
+**Status:** built in Phase 9 (subtasks 9.1–9.5) · **Code:** `crates/selection/` ·
 **Tests:** `crates/selection/tests/fixtures.rs`, `crates/selection/tests/properties.rs`
 
 Which copy plays when the viewer presses Play. Every candidate the sources return, whether
@@ -143,7 +143,24 @@ loop before it opens anything (a generation counter in `src-tauri`). Each skip i
 with its reason; the viewer sees nothing unless every copy fails, and then the player
 shows every reason.
 
-## 7. Known limits
+## 7. Explaining the choice (9.5)
+
+- **"Why this source"**, under Play, is `why(candidate, score)`, written for a viewer:
+  on this machine (if so), the quality, the chosen language (if it has it), the two
+  strongest of health, compatibility, throughput, subtitles and encoding, and "size and
+  length check out" when both checks scored full. A sunk or unmet copy leads with that.
+  For example: *720p · served directly · plays everywhere · size and length check out*.
+- **The expert panel** (Ctrl+Shift+S on a film page, or Settings → Playback → *Show source
+  details on film pages*) lists every candidate best first: source, title, quality,
+  codec, transport, total; whether it plays, is local, is sunk (in the warning colour)
+  or misses the choice; and a row per term with its value, weight, points (value ×
+  weight) and reason. The numbers are the backend's `Score`, never recomputed in the
+  page. Each candidate is a focus stop, so a pad can scroll the panel.
+- **The documentation is checked against the code.**
+  `crates/selection/tests/explained.rs::the_specs_weights_are_the_codes_weights` reads
+  §2's table and fails if any weight here differs from `weight::*`, or a term is missing.
+
+## 8. Known limits
 
 - A film genuinely titled with a camera tag as a word (*Cam*, 2018) takes the −1
   `encoding` term. It is not sunk, and a local copy still comes first.

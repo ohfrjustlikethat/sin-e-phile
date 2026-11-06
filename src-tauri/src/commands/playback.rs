@@ -88,6 +88,39 @@ pub struct PlayPlanView {
     pub qualities: Vec<String>,
     /// When the chosen language or quality is not to be had, why, in words.
     pub unmet: Option<String>,
+    /// "Why this source", one line under Play.
+    pub why: String,
+    /// Every candidate, best first, with its score term by term: the expert panel.
+    pub candidates: Vec<CandidateView>,
+}
+
+/// One candidate as the expert panel shows it (SPEC.md Phase 9 E5).
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct CandidateView {
+    pub title: String,
+    /// The source's display name.
+    pub from: String,
+    pub transport: String,
+    /// `1080p`, or `unknown quality`.
+    pub quality: String,
+    /// `h264`, or `unknown`.
+    pub codec: String,
+    pub total: f64,
+    pub sunk: Option<String>,
+    pub unmet: Option<String>,
+    pub local: bool,
+    /// The one that opens.
+    pub chosen: bool,
+    pub terms: Vec<TermView>,
+}
+
+/// A score term exactly as `sinephile_selection::Term` holds it.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct TermView {
+    pub name: String,
+    pub value: f64,
+    pub weight: f64,
+    pub why: String,
 }
 
 /// What the last plan would fall back to, for `player_open` (SPEC.md Phase 9, 9.4). Kept
@@ -167,6 +200,38 @@ pub async fn prepare_play(
             .qualities
             .into_iter()
             .map(|r| sinephile_selection::resolution_code(r).to_string())
+            .collect(),
+        why: plan
+            .ranked
+            .get(plan.chosen)
+            .map(|(c, s)| sinephile_selection::why(c, s))
+            .unwrap_or_default(),
+        candidates: plan
+            .ranked
+            .iter()
+            .enumerate()
+            .map(|(i, (c, s))| CandidateView {
+                title: c.title.clone(),
+                from: overview::display_name(&c.provenance.backend, &ctx.addons),
+                transport: format!("{:?}", c.transport).to_lowercase(),
+                quality: sinephile_selection::resolution_label(c.quality.resolution).into(),
+                codec: format!("{:?}", c.codec).to_lowercase(),
+                total: s.total,
+                sunk: s.sunk.clone(),
+                unmet: s.unmet.clone(),
+                local: s.local,
+                chosen: i == plan.chosen,
+                terms: s
+                    .terms
+                    .iter()
+                    .map(|t| TermView {
+                        name: t.name.into(),
+                        value: t.value,
+                        weight: t.weight,
+                        why: t.why.clone(),
+                    })
+                    .collect(),
+            })
             .collect(),
         unmet: plan.score.unmet,
     })

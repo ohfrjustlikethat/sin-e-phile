@@ -224,6 +224,25 @@ export type Backfilled = {
 	found_by: string,
 };
 
+/**  One candidate as the expert panel shows it (SPEC.md Phase 9 E5). */
+export type CandidateView = {
+	title: string,
+	/**  The source's display name. */
+	from: string,
+	transport: string,
+	/**  `1080p`, or `unknown quality`. */
+	quality: string,
+	/**  `h264`, or `unknown`. */
+	codec: string,
+	total: number | null,
+	sunk: string | null,
+	unmet: string | null,
+	local: boolean,
+	/**  The one that opens. */
+	chosen: boolean,
+	terms: TermView[],
+};
+
 /**  What a tier permits. Features ask about a `Capability`, never about hardware. */
 export type Capability = 
 /**
@@ -345,6 +364,10 @@ export type PlayPlanView = {
 	qualities: string[],
 	/**  When the chosen language or quality is not to be had, why, in words. */
 	unmet: string | null,
+	/**  "Why this source", one line under Play. */
+	why: string,
+	/**  Every candidate, best first, with its score term by term: the expert panel. */
+	candidates: CandidateView[],
 };
 
 /**
@@ -444,6 +467,14 @@ export type SourcesView = {
 	sources: SourceInfo[],
 	/**  Installed addons whose stored manifest no longer passes the checks. */
 	refused_addons: string[],
+};
+
+/**  A score term exactly as `sinephile_selection::Term` holds it. */
+export type TermView = {
+	name: string,
+	value: number | null,
+	weight: number | null,
+	why: string,
 };
 
 /**  The three tiers from §8. */

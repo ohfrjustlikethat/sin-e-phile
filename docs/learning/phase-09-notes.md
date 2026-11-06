@@ -26,6 +26,9 @@ inherits.** Four sections per ADR-0016 (A4). Written as the phase goes; 9.0 firs
 - **Automatic fallback** (9.4) — `crates/playback/src/fallback.rs`: a copy that errors is left
   at once, one that never loads after 8 s, one that loads is given 30 s; the next copy is
   resolved on demand; a newer Play stops an old loop.
+- **The expert panel and "why this source"** (9.5) — `src/features/detail/SourcePanel.tsx`,
+  `crates/selection/src/lib.rs` `why`: every candidate's arithmetic on a film page, and one
+  plain line under Play.
 
 ## 2. Why
 
@@ -92,6 +95,12 @@ inherits.** Four sections per ADR-0016 (A4). Written as the phase goes; 9.0 firs
   run on tokio's blocking pool, never on the async workers.
 - **A generation counter (`AtomicU64`)** — `src-tauri/src/commands/player.rs` `OPENS`: each
   Play counts up; an older loop sees the count move and stops.
+
+- **A test that reads the documentation** — `crates/selection/tests/explained.rs`
+  `the_specs_weights_are_the_codes_weights`: the spec's table is parsed and compared with the
+  constants, so neither can drift.
+- **Showing the backend's numbers, not recomputing them** — `SourcePanel.tsx`: a panel that
+  did its own arithmetic could disagree with the ranking it explains.
 
 ## 4. The questions
 

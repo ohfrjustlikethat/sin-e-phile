@@ -65,7 +65,7 @@ const FAKE = `(() => {
       credits: [{ name: "F. W. Murnau", role: "director", character: null }] }),
     prepare_play: () => ({ title: "Sunrise", open: "https://films.example/sunrise.mp4", start: null,
       from: "Internet Archive", offered: 2, languages: ["en", "de"], original_language: null,
-      qualities: ["full_hd", "hd"], unmet: null }),
+      qualities: ["full_hd", "hd"], unmet: null, why: "1080p · served directly", candidates: [] }),
     player_pause_still: () => "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
     dev_autoplay: () => null,
   };

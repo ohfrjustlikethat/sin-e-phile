@@ -6,6 +6,7 @@ import { useUi } from "@/lib/store";
 import { clock } from "@/features/player/intents";
 import { languageName, qualityLabel, usePlaybackChoice } from "@/lib/playbackChoice";
 import { ChoiceRow, type Choice } from "./ChoiceRow";
+import { SourcePanel } from "./SourcePanel";
 
 /**
  * The minimal detail page — SPEC.md Phase 8: title, synopsis, cast, and a Play button
@@ -59,7 +60,10 @@ export function DetailScreen() {
   const play = useUi((s) => s.play);
   const [plan, setPlan] = useState<PlanState>({ phase: "finding" });
   const [offers, setOffers] = useState<Offers | null>(null);
-  const { audio, quality, setAudio, setQuality } = usePlaybackChoice();
+  const { audio, quality, setAudio, setQuality, details } = usePlaybackChoice();
+  // Ctrl+Shift+S shows or hides the expert panel on this page; the setting keeps it on.
+  const [panel, setPanel] = useState<boolean | null>(null);
+  const showPanel = panel ?? details;
 
   const item = useQuery({
     queryKey: ["item", id],
@@ -95,6 +99,10 @@ export function DetailScreen() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" || e.key === "Backspace") closeDetail();
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        setPanel((p) => !(p ?? usePlaybackChoice.getState().details));
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -153,6 +161,11 @@ export function DetailScreen() {
           {plan.phase === "none" && plan.reason}
         </p>
       </div>
+      {plan.phase === "ready" && plan.plan.why && (
+        <p className="mt-3 text-[13px] text-ink-faint" aria-label="Why this source">
+          {plan.plan.why}
+        </p>
+      )}
 
       {offers && (offers.languages.length > 0 || audio || offers.qualities.length > 1 || quality) && (
         <div className="mt-8 flex flex-col gap-3">
@@ -164,6 +177,8 @@ export function DetailScreen() {
           )}
         </div>
       )}
+
+      {showPanel && plan.phase === "ready" && <SourcePanel candidates={plan.plan.candidates} />}
 
       {d.synopsis && (
         <p className="mt-12 max-w-[68ch] text-[17px] leading-[1.65] text-ink-muted">{d.synopsis}</p>

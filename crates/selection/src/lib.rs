@@ -180,6 +180,54 @@ pub fn rank(candidates: Vec<SourceCandidate>, ctx: &Context) -> Vec<(SourceCandi
     scored
 }
 
+/// The "why this source" line under Play, for a viewer rather than an engineer: where it
+/// is, its quality, the chosen language if it has it, the two strongest of availability,
+/// compatibility and extras, and whether its size and length check out. A sunk or unmet
+/// copy leads with that instead, since it is the thing to know.
+pub fn why(c: &SourceCandidate, score: &Score) -> String {
+    const EXTRAS: [&str; 5] = [
+        "health",
+        "compatibility",
+        "throughput",
+        "subtitles",
+        "encoding",
+    ];
+    let term = |name: &str| score.terms.iter().find(|t| t.name == name);
+    let full = |name: &str| term(name).is_some_and(|t| t.value >= 1.0);
+    let mut parts: Vec<String> = Vec::new();
+    if score.local {
+        parts.push("on this machine".into());
+    }
+    if c.quality.resolution != Resolution::Unknown {
+        parts.push(resolution_label(c.quality.resolution).into());
+    }
+    if let Some(t) = term("language").filter(|_| full("language")) {
+        parts.push(t.why.clone());
+    }
+    let mut extras: Vec<&Term> = score
+        .terms
+        .iter()
+        .filter(|t| EXTRAS.contains(&t.name) && t.contribution() > 0.0)
+        .filter(|t| !(score.local && t.name == "health"))
+        .collect();
+    extras.sort_by(|a, b| b.contribution().total_cmp(&a.contribution()));
+    parts.extend(extras.iter().take(2).map(|t| t.why.clone()));
+    if full("plausibility") && full("duration") {
+        parts.push("size and length check out".into());
+    }
+    let line = parts.join(" · ");
+    let lead = score
+        .sunk
+        .as_ref()
+        .map(|s| format!("the best left, though {s}"))
+        .or_else(|| score.unmet.clone());
+    match lead {
+        Some(lead) if line.is_empty() => lead,
+        Some(lead) => format!("{lead} · {line}"),
+        None => line,
+    }
+}
+
 /// What the candidates offer the viewer to choose between (SPEC.md Phase 9: "listing
 /// available audio languages"). Only what some honest copy actually states: a choice
 /// that nothing could satisfy is not offered.
@@ -314,6 +362,11 @@ fn quality(c: &SourceCandidate, ctx: &Context) -> (Term, Option<String>) {
         f64::from(target.rank()),
         f64::from(ctx.machine.max_resolution.rank()),
     );
+    // What the target is, in words: the viewer's choice, or the machine's best.
+    let aim = match ctx.wanted {
+        Some(_) => format!("the {} chosen", resolution_label(target)),
+        None => format!("the {} this machine plays", resolution_label(target)),
+    };
     let term = if ctx.wanted.is_none() && have > max {
         Term::new(
             "quality",
@@ -329,15 +382,10 @@ fn quality(c: &SourceCandidate, ctx: &Context) -> (Term, Option<String>) {
             "quality",
             1.0 - 0.5 * (target_rank - have),
             w,
-            format!("{label}, below the {} wanted", resolution_label(target)),
+            format!("{label}, below {aim}"),
         )
     } else {
-        Term::new(
-            "quality",
-            0.5,
-            w,
-            format!("{label}, above the {} wanted", resolution_label(target)),
-        )
+        Term::new("quality", 0.5, w, format!("{label}, above {aim}"))
     };
     (term, unmet)
 }
