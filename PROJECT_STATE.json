@@ -2,115 +2,87 @@
   "spec_version": "3.0.0",
   "project": "sin-e-phile",
   "last_updated": "2026-11-06",
-  "sessions_completed": 20,
+  "sessions_completed": 21,
   "current_phase": {
-    "number": 8,
-    "slug": "player-core",
-    "title": "Player Core — MILESTONE: FIRST DEMOABLE BUILD",
+    "number": 9,
+    "slug": "intelligent-source-selection",
+    "title": "Intelligent Source Selection",
     "status": "in_progress",
-    "branch": "phase/08-player-core",
-    "started_at": "2026-11-06T06:00:00Z",
-    "note": "Opened 2026-11-06 when Phase 7 merged (125a0a2). Carried in from Phase 7: E1 (start under 8 s; D61) and E7 (the live VPN-drop check, which needs the author).",
+    "branch": "phase/09-intelligent-source-selection",
+    "started_at": "2026-11-06T04:00:00Z",
+    "note": "Opened 2026-11-06 when Phase 8 merged (5e5558f, tag phase-08); planned under ADR-0040. Carried in from Phase 8: E5's one-time real-controller check (author); from Phase 7: E7's VPN-drop check (author). Release-group reputation is structural only: no group names in the repo (2.1).",
     "subtasks": [
       {
-        "id": "8.1",
-        "text": "libmpv as a pinned dependency: tools/mpv/fetch.py downloads shinchiro's mpv-dev-x86_64 20261021 build (baseline x86-64, not v3, so Tier 0 CPUs without AVX2 work), verifies its SHA-256, and places libmpv-2.dll beside the app; doctor checks for it; the bundle ships it.",
-        "status": "complete",
-        "commit": "a3b2079"
+        "id": "9.1",
+        "text": "crates/selection: score(candidate, context) -> Score{total, terms[]} as a pure function over SourceCandidate plus a Context (title runtime, hardware tier and decode caps, preferred audio language, wanted quality, measured throughput). Terms: local availability, swarm health, size-versus-quality plausibility, encoding signals, codec/HDR compatibility, audio language, subtitles. Unit tests over a fixture set of candidate lists and property tests (ordering invariants).",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "8.2",
-        "text": "crates/player: libmpv loaded dynamically (no import library, as Spike A), a safe wrapper — options, commands, properties, an event thread — and tests against an FFmpeg-generated clip: load, play, pause, exact seek (frame-accurate), tracks, speed.",
-        "status": "complete",
-        "commit": "54396ea"
+        "id": "9.2",
+        "text": "Fake and mislabel detection: bytes-per-minute against the claimed resolution and codec, and duration against the catalogue runtime; a 700 MB '4K' or a 60-minute file for a 140-minute film is flagged and sunk, with the reason kept. 'Release-group reputation' is implemented as structural signals only (naming consistency, encode tags, plausibility); no release-group or indexer names appear anywhere in the repo (SPEC.md 2.1).",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "8.3",
-        "text": "Embedding: libmpv renders into a child HWND of the main window (Spike A step 2), resized with it; play/pause/seek/volume/track/speed/stop commands; player state streamed to the frontend.",
-        "status": "complete",
-        "commit": "e2fd2c8"
+        "id": "9.3",
+        "text": "Language and quality as first-class choices: the detail page lists the audio languages the candidates actually carry and the qualities on offer (defaulting to the best the hardware and connection support), with dub/sub distinction for anime; choosing one re-plans to a candidate that carries it, or says plainly that none does.",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "8.4",
-        "text": "The player chrome (ADR-0020/0021): scrub bar with buffered ranges and torrent progress, volume, time, fullscreen, audio and subtitle tracks, speed; full keyboard control; auto-hide; still frame on pause.",
-        "status": "complete",
-        "commit": "02684b6"
+        "id": "9.4",
+        "text": "Automatic fallback: the plan returns the ranked list; if the chosen candidate has no first frame within a start timeout, the player silently opens the next one and logs why, within 10 s of Play in total for a failing first choice.",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "8.5",
-        "text": "Xbox controller (ADR-0041): a gamepad layer over the focus system, the player mappings, the ten-foot focus treatment; tested with a simulated gamepad.",
-        "status": "complete",
-        "commit": "5506006"
+        "id": "9.5",
+        "text": "The expert panel (Ctrl+Shift+S, and a Settings toggle): every candidate ranked with each score term and its weight, matching the code; and a one-line 'why this source' under Play.",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "8.6",
-        "text": "Position saving on exit and resume on reopen, per profile, across restarts.",
-        "status": "complete",
-        "commit": "63ded9f"
-      },
-      {
-        "id": "8.7",
-        "text": "A minimal detail page — title, year, synopsis, cast, a Play button through the resolver — with the torrent started as soon as the page opens (Phase 7 E1, D61).",
-        "status": "complete",
-        "commit": "63ded9f"
-      },
-      {
-        "id": "8.8",
-        "text": "Search -> detail -> resolve -> play end to end, from a local file, the Internet Archive, and a P2P source.",
-        "status": "complete",
-        "commit": "973efe0"
-      },
-      {
-        "id": "8.9",
-        "text": "Evidence: 4K HEVC HDR on hardware decode (log and CPU), frame-accurate seek, resume across restarts, play-to-first-frame timings, the demo GIF in the README; the carried Phase 7 E1; the author's batched manual checks (controller, VPN drop).",
-        "status": "complete",
-        "commit": "e0e5872"
+        "id": "9.6",
+        "text": "docs/specs/source-scoring.md: every term, its weight and its justification; learning note; evidence for E1-E6 including a deliberately failing top candidate in a test.",
+        "status": "not_started",
+        "commit": null
       }
     ],
     "exit_criteria": [
       {
         "id": "E1",
-        "text": "A user can search, click, and watch — from a local file, from the Internet Archive backend, and from a configured P2P source.",
+        "text": "Scoring is a pure function with unit and property tests over a fixture set of candidate lists.",
         "met": false,
-        "evidence": "MEASURED 2026-11-06, carried (ADR-0036): the Internet Archive and P2P paths are tested from catalogue row to first frame - crates/playback/tests/end_to_end.rs::search_to_first_frame_over_a_swarm (offline swarm) and ::live_archive_search_to_first_frame (live), and in the real window search -> detail -> Play -> picture in 5.5-7.9 s from the Internet Archive (docs/eval-results.md, docs/media/phase-08-demo.gif). A local file plays by drag-and-drop (src/features/player/useDropToPlay.ts) but cannot be searched for: LocalFileBackend::find is a stub until the library scanner.",
-        "carried_to_phase": 12,
-        "carried_reason": "Searching for and clicking a local file needs the scanned library index that Phase 12 builds; until then LocalFileBackend has nothing to find. The IA and P2P halves are met."
+        "evidence": null
       },
       {
         "id": "E2",
-        "text": "Playback of 4K HEVC HDR uses hardware decode (verified in logs and by CPU usage).",
-        "met": true,
-        "evidence": "cargo run --release -p sinephile-player --example hwdec -- hdr4k.mp4 8 (3840x2160 HEVC Main10 PQ/BT.2020): hwdec-current=d3d11va-copy at 18.2% of one core vs forced software 35.9%, both real-time; RTX 5070 Ti Laptop, 2026-11-06, docs/eval-results.md Phase 8 E2"
+        "text": "Selecting \"Hindi\" plays a source with a Hindi audio track, or clearly reports that none is available.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E3",
-        "text": "Seeking is frame-accurate and responsive.",
-        "met": true,
-        "evidence": "crates/player/tests/playback.rs::an_exact_seek_lands_on_the_frame_asked_for: paused exact seeks to 3.52 / 1.08 / 5.2 s (3.52 between keyframes) land at 3.520 / 1.080 / 5.200 in 4.5 / 2.3 / 2.8 ms (cargo test --release -p sinephile-player --test playback an_exact_seek -- --nocapture, 2026-11-06), then a frame step to 5.24; seek_to_and_wait waits on playback-restart so the landing is real; passed 25/25 runs"
+        "text": "Selecting 4K plays genuine 4K, or explains why it can't.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E4",
-        "text": "Position resume works across app restarts.",
-        "met": true,
-        "evidence": "Three links, each tested: the player saves on the way out (src/features/player/PlayerScreen.test.tsx 'saves the position it reached on the way out', seen to fail with the unmount save removed); the position survives closing and reopening the database file (crates/playback/tests/plan.rs::the_position_survives_a_restart, seen to fail against a fresh file); the player starts there (crates/player/tests/playback.rs::resuming_starts_where_it_left_off)"
+        "text": "A deliberately-failing top candidate falls back within 10 s with no user action.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E5",
-        "text": "With only an Xbox controller, a user can browse to a film, start it, pause, seek and leave the player — tested with a simulated gamepad in CI and confirmed once by the author with a real controller.",
+        "text": "The expert panel's score breakdown is legible and matches the code.",
         "met": false,
-        "evidence": "Simulated half met: tools/uiaudit/controller.mjs (npm run audit:controller, CI step 'Controller flow (simulated Xbox pad)') drives the built app in headless Chrome with only pad buttons - Y, D-pad+A on the new on-screen keyboard (src/app/PadKeyboard.tsx), A result, A Play, A pause, RT seek, B leave - 8/8 checks pass 2026-11-06; seen to fail with Play's focus effect removed. Outstanding: the author's one-time check with a real controller (one is paired over Bluetooth on the dev machine).",
-        "carried_to_phase": 9,
-        "carried_reason": "The simulated half is met and runs in CI; the criterion also needs the author's one-time check with a real Xbox controller, which only the author can do. Asked for in the batched author checks."
+        "evidence": null
       },
       {
         "id": "E6",
-        "text": "A demo GIF of this flow exists and is in the README.",
-        "met": true,
-        "evidence": "docs/media/phase-08-demo.gif (960x600, 88 frames, 1.2 MB), recorded 2026-11-06 from the real window with PrintWindow: search 'nosferatu', open the 1922 film, Resume from 0:52 from the Internet Archive, picture; embedded at the top of README.md"
-      },
-      {
-        "id": "E7",
-        "text": "Tag `phase-08`, and celebrate — this is the first thing worth showing anyone.",
+        "text": "`docs/specs/source-scoring.md` documents every term in the scoring function and its weight, with justification.",
         "met": false,
         "evidence": null
       }
@@ -1109,8 +1081,8 @@
       "title": "Player Core — MILESTONE: FIRST DEMOABLE BUILD",
       "depends_on": "5, 7",
       "sessions": "2–3",
-      "status": "in_progress",
-      "completion_commit": null,
+      "status": "complete",
+      "completion_commit": "5e5558f",
       "exit_criteria": [
         {
           "id": "E1",
@@ -1155,8 +1127,8 @@
         {
           "id": "E7",
           "text": "Tag `phase-08`, and celebrate — this is the first thing worth showing anyone.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "Tag phase-08 (annotated, 1da3d88) on merge commit 5e5558f, pushed 2026-11-06 after CI run 42157416324 passed on main; the demo GIF docs/media/phase-08-demo.gif is the thing to show."
         }
       ],
       "subtasks": [
@@ -1222,7 +1194,7 @@
       "title": "Intelligent Source Selection",
       "depends_on": "8",
       "sessions": "1–2",
-      "status": "not_started",
+      "status": "in_progress",
       "completion_commit": null,
       "exit_criteria": [
         {
@@ -1260,6 +1232,44 @@
           "text": "`docs/specs/source-scoring.md` documents every term in the scoring function and its weight, with justification.",
           "met": false,
           "evidence": null
+        }
+      ],
+      "subtasks": [
+        {
+          "id": "9.1",
+          "text": "crates/selection: score(candidate, context) -> Score{total, terms[]} as a pure function over SourceCandidate plus a Context (title runtime, hardware tier and decode caps, preferred audio language, wanted quality, measured throughput). Terms: local availability, swarm health, size-versus-quality plausibility, encoding signals, codec/HDR compatibility, audio language, subtitles. Unit tests over a fixture set of candidate lists and property tests (ordering invariants).",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "9.2",
+          "text": "Fake and mislabel detection: bytes-per-minute against the claimed resolution and codec, and duration against the catalogue runtime; a 700 MB '4K' or a 60-minute file for a 140-minute film is flagged and sunk, with the reason kept. 'Release-group reputation' is implemented as structural signals only (naming consistency, encode tags, plausibility); no release-group or indexer names appear anywhere in the repo (SPEC.md 2.1).",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "9.3",
+          "text": "Language and quality as first-class choices: the detail page lists the audio languages the candidates actually carry and the qualities on offer (defaulting to the best the hardware and connection support), with dub/sub distinction for anime; choosing one re-plans to a candidate that carries it, or says plainly that none does.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "9.4",
+          "text": "Automatic fallback: the plan returns the ranked list; if the chosen candidate has no first frame within a start timeout, the player silently opens the next one and logs why, within 10 s of Play in total for a failing first choice.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "9.5",
+          "text": "The expert panel (Ctrl+Shift+S, and a Settings toggle): every candidate ranked with each score term and its weight, matching the code; and a one-line 'why this source' under Play.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "9.6",
+          "text": "docs/specs/source-scoring.md: every term, its weight and its justification; learning note; evidence for E1-E6 including a deliberately failing top candidate in a test.",
+          "status": "not_started",
+          "commit": null
         }
       ]
     },
@@ -2068,7 +2078,7 @@
       ]
     }
   ],
-  "next_action": "Finish Phase 8 (docs/phases/phase-08-player-core.md): (1) 8.8/E1 - a search->detail->play check per source kind: local file, the Internet Archive (crates/playback/tests/end_to_end.rs live test) and P2P (the offline-swarm test), plus one real-window run of each through SINEPHILE_AUTOPLAY; (2) the carried Phase 7 E1 (torrent start < 8 s) measured from the detail page opening, since prepare_play starts the torrent then (D61); (3) E6 - record the demo GIF from the real window with the scratchpad PrintWindow method (PrintWindow PW_RENDERFULLCONTENT, never desktop capture) and put it in README.md; (4) learning note docs/learning/phase-08-notes.md, HOW_IT_WORKS stub, SESSION_LOG retrospective, regression check against Phase 7's numbers, then /closephase 8 and fire the Tier A understanding gate. Author batch: real-controller check for E5 (a controller is paired), VPN-drop check (Phase 7 E7), embeddings-v3 release.",
+  "next_action": "Phase 9 (docs/phases/phase-09-intelligent-source-selection.md), subtask 9.1: create crates/selection with score(candidate, &Context) -> Score { total, terms: Vec<Term{name, value, weight, why}> } as a pure function over source_protocol::SourceCandidate; start with local availability, swarm health and size-versus-quality plausibility, fixture lists in crates/selection/tests/fixtures.rs, then wire it into crates/playback::rank in place of the fixed transport order.",
   "blockers": [],
   "decisions_pending": [
     {

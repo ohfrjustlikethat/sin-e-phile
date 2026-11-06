@@ -4,51 +4,41 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 3.0.0** · 20 session(s) completed · last updated 2026-11-06
+**Spec version 3.0.0** · 21 session(s) completed · last updated 2026-11-06
 
 ---
 
 ## Where we are right now
 
-**Phase 8 — Player Core — MILESTONE: FIRST DEMOABLE BUILD** (`in_progress`, branch `phase/08-player-core`)
+**Phase 9 — Intelligent Source Selection** (`in_progress`, branch `phase/09-intelligent-source-selection`)
 
-4 of 7 exit criteria met with evidence.
+0 of 6 exit criteria met with evidence.
 
-> Opened 2026-11-06 when Phase 7 merged (125a0a2). Carried in from Phase 7: E1 (start under 8 s; D61) and E7 (the live VPN-drop check, which needs the author).
+> Opened 2026-11-06 when Phase 8 merged (5e5558f, tag phase-08); planned under ADR-0040. Carried in from Phase 8: E5's one-time real-controller check (author); from Phase 7: E7's VPN-drop check (author). Release-group reputation is structural only: no group names in the repo (2.1).
 
-### Subtasks — 9/9 complete
+### Subtasks — 0/6 complete
 
-- [x] **8.1** libmpv as a pinned dependency: tools/mpv/fetch.py downloads shinchiro's mpv-dev-x86_64 20261021 build (baseline x86-64, not v3, so Tier 0 CPUs without AVX2 work), verifies its SHA-256, and places libmpv-2.dll beside the app; doctor checks for it; the bundle ships it. · `a3b2079`
-- [x] **8.2** crates/player: libmpv loaded dynamically (no import library, as Spike A), a safe wrapper — options, commands, properties, an event thread — and tests against an FFmpeg-generated clip: load, play, pause, exact seek (frame-accurate), tracks, speed. · `54396ea`
-- [x] **8.3** Embedding: libmpv renders into a child HWND of the main window (Spike A step 2), resized with it; play/pause/seek/volume/track/speed/stop commands; player state streamed to the frontend. · `e2fd2c8`
-- [x] **8.4** The player chrome (ADR-0020/0021): scrub bar with buffered ranges and torrent progress, volume, time, fullscreen, audio and subtitle tracks, speed; full keyboard control; auto-hide; still frame on pause. · `02684b6`
-- [x] **8.5** Xbox controller (ADR-0041): a gamepad layer over the focus system, the player mappings, the ten-foot focus treatment; tested with a simulated gamepad. · `5506006`
-- [x] **8.6** Position saving on exit and resume on reopen, per profile, across restarts. · `63ded9f`
-- [x] **8.7** A minimal detail page — title, year, synopsis, cast, a Play button through the resolver — with the torrent started as soon as the page opens (Phase 7 E1, D61). · `63ded9f`
-- [x] **8.8** Search -> detail -> resolve -> play end to end, from a local file, the Internet Archive, and a P2P source. · `973efe0`
-- [x] **8.9** Evidence: 4K HEVC HDR on hardware decode (log and CPU), frame-accurate seek, resume across restarts, play-to-first-frame timings, the demo GIF in the README; the carried Phase 7 E1; the author's batched manual checks (controller, VPN drop). · `e0e5872`
+- [ ] **9.1** crates/selection: score(candidate, context) -> Score{total, terms[]} as a pure function over SourceCandidate plus a Context (title runtime, hardware tier and decode caps, preferred audio language, wanted quality, measured throughput). Terms: local availability, swarm health, size-versus-quality plausibility, encoding signals, codec/HDR compatibility, audio language, subtitles. Unit tests over a fixture set of candidate lists and property tests (ordering invariants).
+- [ ] **9.2** Fake and mislabel detection: bytes-per-minute against the claimed resolution and codec, and duration against the catalogue runtime; a 700 MB '4K' or a 60-minute file for a 140-minute film is flagged and sunk, with the reason kept. 'Release-group reputation' is implemented as structural signals only (naming consistency, encode tags, plausibility); no release-group or indexer names appear anywhere in the repo (SPEC.md 2.1).
+- [ ] **9.3** Language and quality as first-class choices: the detail page lists the audio languages the candidates actually carry and the qualities on offer (defaulting to the best the hardware and connection support), with dub/sub distinction for anime; choosing one re-plans to a candidate that carries it, or says plainly that none does.
+- [ ] **9.4** Automatic fallback: the plan returns the ranked list; if the chosen candidate has no first frame within a start timeout, the player silently opens the next one and logs why, within 10 s of Play in total for a failing first choice.
+- [ ] **9.5** The expert panel (Ctrl+Shift+S, and a Settings toggle): every candidate ranked with each score term and its weight, matching the code; and a one-line 'why this source' under Play.
+- [ ] **9.6** docs/specs/source-scoring.md: every term, its weight and its justification; learning note; evidence for E1-E6 including a deliberately failing top candidate in a test.
 
 ### Exit criteria
 
-- [ ] **E1** A user can search, click, and watch — from a local file, from the Internet Archive backend, and from a configured P2P source.
-      - *Evidence:* MEASURED 2026-11-06, carried (ADR-0036): the Internet Archive and P2P paths are tested from catalogue row to first frame - crates/playback/tests/end_to_end.rs::search_to_first_frame_over_a_swarm (offline swarm) and ::live_archive_search_to_first_frame (live), and in the real window search -> detail -> Play -> picture in 5.5-7.9 s from the Internet Archive (docs/eval-results.md, docs/media/phase-08-demo.gif). A local file plays by drag-and-drop (src/features/player/useDropToPlay.ts) but cannot be searched for: LocalFileBackend::find is a stub until the library scanner.
-- [x] **E2** Playback of 4K HEVC HDR uses hardware decode (verified in logs and by CPU usage).
-      - *Evidence:* cargo run --release -p sinephile-player --example hwdec -- hdr4k.mp4 8 (3840x2160 HEVC Main10 PQ/BT.2020): hwdec-current=d3d11va-copy at 18.2% of one core vs forced software 35.9%, both real-time; RTX 5070 Ti Laptop, 2026-11-06, docs/eval-results.md Phase 8 E2
-- [x] **E3** Seeking is frame-accurate and responsive.
-      - *Evidence:* crates/player/tests/playback.rs::an_exact_seek_lands_on_the_frame_asked_for: paused exact seeks to 3.52 / 1.08 / 5.2 s (3.52 between keyframes) land at 3.520 / 1.080 / 5.200 in 4.5 / 2.3 / 2.8 ms (cargo test --release -p sinephile-player --test playback an_exact_seek -- --nocapture, 2026-11-06), then a frame step to 5.24; seek_to_and_wait waits on playback-restart so the landing is real; passed 25/25 runs
-- [x] **E4** Position resume works across app restarts.
-      - *Evidence:* Three links, each tested: the player saves on the way out (src/features/player/PlayerScreen.test.tsx 'saves the position it reached on the way out', seen to fail with the unmount save removed); the position survives closing and reopening the database file (crates/playback/tests/plan.rs::the_position_survives_a_restart, seen to fail against a fresh file); the player starts there (crates/player/tests/playback.rs::resuming_starts_where_it_left_off)
-- [ ] **E5** With only an Xbox controller, a user can browse to a film, start it, pause, seek and leave the player — tested with a simulated gamepad in CI and confirmed once by the author with a real controller.
-      - *Evidence:* Simulated half met: tools/uiaudit/controller.mjs (npm run audit:controller, CI step 'Controller flow (simulated Xbox pad)') drives the built app in headless Chrome with only pad buttons - Y, D-pad+A on the new on-screen keyboard (src/app/PadKeyboard.tsx), A result, A Play, A pause, RT seek, B leave - 8/8 checks pass 2026-11-06; seen to fail with Play's focus effect removed. Outstanding: the author's one-time check with a real controller (one is paired over Bluetooth on the dev machine).
-- [x] **E6** A demo GIF of this flow exists and is in the README.
-      - *Evidence:* docs/media/phase-08-demo.gif (960x600, 88 frames, 1.2 MB), recorded 2026-11-06 from the real window with PrintWindow: search 'nosferatu', open the 1922 film, Resume from 0:52 from the Internet Archive, picture; embedded at the top of README.md
-- [ ] **E7** Tag `phase-08`, and celebrate — this is the first thing worth showing anyone.
+- [ ] **E1** Scoring is a pure function with unit and property tests over a fixture set of candidate lists.
+- [ ] **E2** Selecting "Hindi" plays a source with a Hindi audio track, or clearly reports that none is available.
+- [ ] **E3** Selecting 4K plays genuine 4K, or explains why it can't.
+- [ ] **E4** A deliberately-failing top candidate falls back within 10 s with no user action.
+- [ ] **E5** The expert panel's score breakdown is legible and matches the code.
+- [ ] **E6** `docs/specs/source-scoring.md` documents every term in the scoring function and its weight, with justification.
 
 ---
 
 ## What's next
 
-Finish Phase 8 (docs/phases/phase-08-player-core.md): (1) 8.8/E1 - a search->detail->play check per source kind: local file, the Internet Archive (crates/playback/tests/end_to_end.rs live test) and P2P (the offline-swarm test), plus one real-window run of each through SINEPHILE_AUTOPLAY; (2) the carried Phase 7 E1 (torrent start < 8 s) measured from the detail page opening, since prepare_play starts the torrent then (D61); (3) E6 - record the demo GIF from the real window with the scratchpad PrintWindow method (PrintWindow PW_RENDERFULLCONTENT, never desktop capture) and put it in README.md; (4) learning note docs/learning/phase-08-notes.md, HOW_IT_WORKS stub, SESSION_LOG retrospective, regression check against Phase 7's numbers, then /closephase 8 and fire the Tier A understanding gate. Author batch: real-controller check for E5 (a controller is paired), VPN-drop check (Phase 7 E7), embeddings-v3 release.
+Phase 9 (docs/phases/phase-09-intelligent-source-selection.md), subtask 9.1: create crates/selection with score(candidate, &Context) -> Score { total, terms: Vec<Term{name, value, weight, why}> } as a pure function over source_protocol::SourceCandidate; start with local availability, swarm health and size-versus-quality plausibility, fixture lists in crates/selection/tests/fixtures.rs, then wire it into crates/playback::rank in place of the fixed transport order.
 
 ---
 
@@ -72,8 +62,8 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 5 | Semantic Search Engine | A | 4 | 2 | 2/5 |
 | [x] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 6/6 |
 | [x] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 6/8 |
-| [~] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 4/7 |
-| [ ] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 0/6 |
+| [x] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 5/7 |
+| [~] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 0/6 |
 | [ ] | 10 | Subtitle Pipeline | B | 8 | 2 | 0/6 |
 | [ ] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 0/5 |
 | [ ] | 12 | Local Library Engine | B | 4 | 2–3 | 0/6 |
