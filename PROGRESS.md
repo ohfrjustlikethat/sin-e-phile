@@ -12,23 +12,25 @@
 
 **Phase 12 — Local Library Engine** (`in_progress`, branch `phase/12-local-library-engine`)
 
-1 of 6 exit criteria met with evidence.
+3 of 6 exit criteria met with evidence.
 
 > Opened 2026-11-07 when Phase 11 merged (cc3ca3c, tag phase-11). Inherits: absolute_number is NULL by design (ADR-0031), so an anime-style absolute number goes to the review queue rather than a lookup; Phase 8's carried criterion (search, click and watch a local file) is discharged by 12.5; the confidence threshold is measured, not chosen (DECISIONS_PENDING). Release-group names in fixtures are invented: real ones would be naming content sources by the back door (2.1). Author checks still outstanding: real controller (Phase 8 E5), VPN drop (Phase 7 E7), both carried to 13.
 
-### Subtasks — 2/6 complete
+### Subtasks — 3/6 complete
 
 - [x] **12.1** crates/filename-parser (MIT/Apache, pure, no I/O): title, year, season, episode (S01E02, 1x02, multi-episode ranges), absolute episode for anime-style 'Title - 059', resolution, source, codec, audio, language, release group (bracket prefix or dash suffix, recognised by position, never by a list of names). fixtures/filenames/: 500+ hand-labelled names covering scene, anime fansub, multi-episode, messy and adversarial cases; every group name invented (2.1); a per-field accuracy test. Documented with a runnable README example (E6). · `8c3a377`
 - [x] **12.2** Migration 0021 library: library_folders (the user's own roots, machine-specific like local_files.path; the portability test's allow-list grows by that column with the reason), local_files gains folder_id and a missing_since for moves; match_memory (a normalised name pattern -> media item, from the user's decisions). LibraryRepository with a repository_surface line per method. · `9de8483`
-- [ ] **12.3** crates/library identification: candidates from the catalogue by title (FTS) and year, scored on independent weak signals (title similarity, year, duration vs runtime from FFprobe, episode exists, folder and sibling context, remembered decisions), a confidence in [0,1], auto-accepted above a threshold set from measurement (DECISIONS_PENDING), else the review queue. tools/eval 'identify' harness over fixtures/filenames labelled with catalogue ids: top-1 (E1 > 95%) and false-confident (E2 < 1%); numbers to docs/eval-results.md.
+- [x] **12.3** crates/library identification: candidates from the catalogue by title (FTS) and year, scored on independent weak signals (title similarity, year, duration vs runtime from FFprobe, episode exists, folder and sibling context, remembered decisions), a confidence in [0,1], auto-accepted above a threshold set from measurement (DECISIONS_PENDING), else the review queue. tools/eval 'identify' harness over fixtures/filenames labelled with catalogue ids: top-1 (E1 > 95%) and false-confident (E2 < 1%); numbers to docs/eval-results.md. · `c0eda95`
 - [ ] **12.4** Scanner and watcher: register a folder, walk it recursively, probe only what identification needs, in parallel, off the UI thread with progress events; the notify crate (ReadDirectoryChangesW) applies creates, deletes, renames and moves without a rescan; a rename or move keeps the row (no duplicate, E4). Measured: 10,000 files under 3 minutes with the UI responsive (E3).
 - [ ] **12.5** The review queue (Settings or Library): side-by-side candidates, typographic when there is no artwork, one click or one A press resolves, manual search for the rest, one decision settles a whole series' files; remembered for similar names. The library feeds LocalFileBackend so a local film is found by search and plays from its page (discharges Phase 8's carried criterion). Pad-only flow in tools/uiaudit/controller.mjs; resolving 20 items timed (E5).
 - [ ] **12.6** docs/specs/library.md, learning note, README and HOW_IT_WORKS, regression check, close.
 
 ### Exit criteria
 
-- [ ] **E1** > 95% top-1 accuracy on the fixture corpus.
-- [ ] **E2** < 1% false-confident rate — being wrong while confident is the worst failure mode here.
+- [x] **E1** > 95% top-1 accuracy on the fixture corpus.
+      - *Evidence:* c0eda95: cargo run --release -p eval -- identify (2026-11-07, full catalogue): tuning set fixtures/filenames/names.psv 549 names, 2 labels not in the catalogue left out, top-1 523/528 = 99.05%; held out heldout.psv 108/108 = 100%. Method and every tuning step with its measured number in docs/eval-results.md (Phase 12, Identification). crates/library/tests/identify.rs: 7 tests (year, duration, episode over film namesake, folders, remembered decision, no guess); seen to fail when the kind signal was neutralised.
+- [x] **E2** < 1% false-confident rate — being wrong while confident is the worst failure mode here.
+      - *Evidence:* c0eda95: same run, at the library's own threshold sinephile_library::ACCEPT_AT = 0.75: tuning set 2/510 accepted were wrong = 0.39% (0.37% of all names; strict reading: of accepted names, and a '?'-labelled name accepted counts as wrong); held out 0/103. Asked (review queue) 6.8% and 5.5%. The lowest threshold under 1% was 0.615 at 0.97%; 0.75 keeps a margin. 9 of 549 labels were corrected, each reason recorded in docs/eval-results.md.
 - [ ] **E3** Scanning 10,000 files completes in under 3 minutes and does not block the UI.
 - [ ] **E4** Renaming a file outside the app is detected and does not create a duplicate.
 - [ ] **E5** The review queue is genuinely pleasant to use — resolving 20 ambiguous items takes under a minute.
@@ -39,7 +41,7 @@
 
 ## What's next
 
-Phase 12 subtask 12.3 (docs/phases/phase-12-local-library-engine.md): new crate crates/library (identify.rs): candidates for a parsed name from the catalogue (titles table and FTS, by comparable title, year +-1, kind), scored on independent signals (title match, year, runtime vs probed duration, episode exists, folder name, remembered decision); confidence in [0,1]; then tools/eval identify over fixtures/filenames (top-1 E1, false-confident E2) to set the threshold.
+Phase 12 subtask 12.4 (docs/phases/phase-12-local-library-engine.md): crates/library/src/scan.rs: walk a folder (std::fs, recursive, video extensions only), upsert each file, detect moves (a new path whose size matches a missing file with the same content hash of the first+last 64 KiB, via sinephile_subtitles::hash or a local copy), probe with FFprobe only files that identification needs, identify in parallel with a per-series cache, write matches/candidates; then the notify watcher in src-tauri applying create/remove/rename events through the same functions. Measure 10,000 files under 3 minutes (E3) with a generated tree of small files.
 
 ---
 
@@ -67,7 +69,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 7/7 |
 | [x] | 10 | Subtitle Pipeline | B | 8 | 2 | 6/6 |
 | [x] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 6/6 |
-| [~] | 12 | Local Library Engine | B | 4 | 2–3 | 1/6 |
+| [~] | 12 | Local Library Engine | B | 4 | 2–3 | 3/6 |
 | [ ] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 0/8 |
 | [ ] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 0/6 |
 | [ ] | 15 | Taste Model | B | 5, 14 | 2 | 0/5 |
