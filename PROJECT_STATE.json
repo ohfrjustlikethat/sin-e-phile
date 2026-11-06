@@ -51,8 +51,8 @@
       {
         "id": "11.6",
         "text": "docs/MANUAL_TESTS.md playback plan run on all three tiers via the tier override (screenshots per tier), docs/specs/player-experience.md, learning note, evidence for E1-E5, regression check, close.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "acf5a85"
       }
     ],
     "exit_criteria": [
@@ -1462,8 +1462,8 @@
         {
           "id": "11.6",
           "text": "docs/MANUAL_TESTS.md playback plan run on all three tiers via the tier override (screenshots per tier), docs/specs/player-experience.md, learning note, evidence for E1-E5, regression check, close.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "acf5a85"
         }
       ]
     },
@@ -2190,7 +2190,7 @@
       ]
     }
   ],
-  "next_action": "Phase 11 subtask 11.6 then close (docs/phases/phase-11-player-experience-layer.md): docs/MANUAL_TESTS.md playback plan (a checklist) run in the real window under each tier via set_tier_override (modest, standard, capable): play a local file and a stream, pause overlay, subtitles (alignment on Tier 1+ vs length scaling on Tier 0), scrub thumbnails, menu, PiP, mini player; record results with screenshots as E5's manual evidence; docs/specs/player-experience.md; learning note docs/learning/phase-11-notes.md; README and HOW_IT_WORKS; SESSION_LOG with retrospective; rule-13 regression; close Phase 11.",
+  "next_action": "Close Phase 11: CI green on phase/11-player-experience-layer, merge --no-ff into main, CI green on main, tag phase-11, write the close record (completion_commit = merge), python tools/phasedoc/generate.py --close 11 and --open 12.",
   "blockers": [],
   "decisions_pending": [
     {

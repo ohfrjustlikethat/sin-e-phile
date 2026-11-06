@@ -2411,3 +2411,12 @@ Every tier: scrub sheets produced, statistics, shortcuts, mini player out and ba
 picture-in-picture 742×418 on top and restored to the exact inner size, 0 `ERROR` lines.
 The stream was the same file from a local HTTP server, so its first-frame times are a floor,
 not a measure of a real network.
+
+### Regression check before merging Phase 11 (rule 13)
+
+2026-11-07, release build at `acf5a85`, `cargo run --release -p eval -- all` twice and
+`-- vector --report`: E2 **43/43**; E3 meaning **0.0472**, filter **1.0000** (the carried miss; it is
+why `all` exits 1, as before); E1 p50 / p95 **14.1 / 44.1 ms** on the first run, straight after the
+release build with cold caches, and **6.4 / 14.8 ms** warm; HNSW recall@10 **0.9760**; subtitles
+**80/80** (held out 32/32), false accepts **0/10**. Unchanged from Phase 10. Rust tests 654 passed,
+0 failed; frontend 104.
