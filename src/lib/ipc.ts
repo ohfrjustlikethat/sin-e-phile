@@ -145,6 +145,8 @@ export const commands = {
 	started: boolean,
 	/**  The chapter playing, an index into `player_chapters`. */
 	chapter: number | null,
+	/**  Frames the video output has dropped (the stats overlay; Phase 11 E2). */
+	dropped_frames: number | null,
 	tracks: TrackView[],
 } | null, string>(__TAURI_INVOKE("player_state")),
 	/**
@@ -183,6 +185,17 @@ export const commands = {
 	/**  A cast or crew member's other work, from the overlay. */
 	filmography: (personId: number) => typedError<TitleView[], string>(__TAURI_INVOKE("filmography", { personId })),
 	playerChapters: () => typedError<ChapterView[], string>(__TAURI_INVOKE("player_chapters")),
+	/**  The playing film's sheets, once made. */
+	scrubThumbs: () => typedError<{
+	interval: number | null,
+	cols: number,
+	rows: number,
+	tile_width: number,
+	tile_height: number,
+	count: number,
+} | null, string>(__TAURI_INVOKE("scrub_thumbs")),
+	/**  One sheet, as a `data:` URI. */
+	scrubSheet: (index: number) => typedError<string, string>(__TAURI_INVOKE("scrub_sheet", { index })),
 };
 
 /* Types */
@@ -454,6 +467,8 @@ export type PlayerStateView = {
 	started: boolean,
 	/**  The chapter playing, an index into `player_chapters`. */
 	chapter: number | null,
+	/**  Frames the video output has dropped (the stats overlay; Phase 11 E2). */
+	dropped_frames: number | null,
 	tracks: TrackView[],
 };
 
@@ -531,6 +546,15 @@ export type SeasonView = {
 export type SeriesView = {
 	seasons: SeasonView[],
 	next_airing: AiringView | null,
+};
+
+export type SheetsView = {
+	interval: number | null,
+	cols: number,
+	rows: number,
+	tile_width: number,
+	tile_height: number,
+	count: number,
 };
 
 /**  One row of the Sources list. */

@@ -230,6 +230,19 @@ title=The Storm
 }
 
 #[test]
+fn thumbnail_sheets_are_made_from_a_file() {
+    // Phase 11: one tile per 10 s; a 6 s clip is one sheet with one tile used.
+    let dir = tempfile::tempdir().unwrap();
+    let film = clip(dir.path());
+    let out = dir.path().join("thumbs");
+    let sheets = sinephile_player::thumbs::generate(&film, &out, 360.0 / 640.0).unwrap();
+    assert_eq!(sheets.count, 1);
+    assert_eq!((sheets.tile_width, sheets.tile_height), (160, 90));
+    assert!(sinephile_player::thumbs::sheet_path(&out, 0).is_file());
+    assert_eq!(sinephile_player::thumbs::finished(&out), Some(sheets));
+}
+
+#[test]
 fn an_exact_seek_lands_on_the_frame_asked_for() {
     // Phase 8 E3: "Seeking is frame-accurate and responsive."
     let dir = tempfile::tempdir().unwrap();

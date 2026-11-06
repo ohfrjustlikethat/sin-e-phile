@@ -31,6 +31,8 @@ const commands = {
   ),
   preparePlay: vi.fn(() => ok({ title: "Next", open: "https://films.example/next.mp4", start: null })),
   rateTitle: vi.fn(() => ok(null)),
+  scrubThumbs: vi.fn(() => ok({ interval: 10, cols: 10, rows: 10, tile_width: 160, tile_height: 90, count: 1 })),
+  scrubSheet: vi.fn(() => ok("data:image/jpeg;base64,AAAA")),
   titleRating: vi.fn(() => ok(null)),
 };
 vi.mock("@/lib/ipc", () => ({ commands }));

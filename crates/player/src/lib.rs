@@ -9,6 +9,7 @@ mod ffi;
 pub mod host;
 pub mod player;
 pub mod still;
+pub mod thumbs;
 
 #[cfg(windows)]
 pub use host::{Cutout, Placement, VideoHost};

@@ -2376,3 +2376,21 @@ Taking the plateau's late edge instead of its middle (`crates/subtitle-align/src
 **6.5 / 15.3** and **6.1 / 14.8 ms**; HNSW recall@10 **0.9760**; subtitles **80/80**, false accepts
 **0/10**. Unchanged from Phase 9. Rust tests 646 passed, 0 failed; frontend 76; controller flow 19/19.
 
+## Phase 11 — Player experience layer
+
+### E1: the pause overlay
+
+2026-11-06, real window, *Nosferatu* (1922) from the Internet Archive, Space pressed four times;
+`window.__pauseMs` (the intent to the overlay's first painted frame): **22, 4, 4, 5 ms** (target
+< 200 ms). The overlay used to wait for mpv's still capture (up to 500 ms); the video window is
+now hidden first and the still fades in after.
+
+### E2: scrub thumbnails without stuttering
+
+2026-11-07, real window, a 20-minute 1080p H.264 file (`d3d11va`), `player_state.dropped_frames`
+read 5 s and 35 s after the first frame: **0 → 0 with thumbnail generation running, 0 → 0 with the
+sheets already cached.** Generation itself (`sinephile_player::thumbs::generate`: FFmpeg at
+below-normal priority, one thread, keyframes only) took **970 ms** for the whole 20 minutes
+(two 10×10 sheets). It is light enough that it overlaps only the first second of playback; on
+a Tier 0 machine it would take longer, at the same priority.
+

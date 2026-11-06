@@ -13,4 +13,5 @@ pub mod series;
 pub mod sources;
 pub mod subtitles;
 pub mod system;
+pub mod thumbs;
 pub mod torrent;

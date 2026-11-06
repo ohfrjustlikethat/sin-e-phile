@@ -124,6 +124,8 @@ pub async fn player_open(
                     skipped = s.failed.len(),
                     "first frame"
                 );
+                // Scrub thumbnails for a file on this machine, in the background (Phase 11).
+                crate::commands::thumbs::start_for(&s.open, screen.rt.player.state().video_size);
                 // Then the subtitles (SPEC.md Phase 10), never delaying the picture.
                 let still_this_film = move || OPENS.load(Ordering::SeqCst) == generation;
                 if let Err(e) = crate::commands::subtitles::open_for(
@@ -345,6 +347,8 @@ pub struct PlayerStateView {
     pub started: bool,
     /// The chapter playing, an index into `player_chapters`.
     pub chapter: Option<i32>,
+    /// Frames the video output has dropped (the stats overlay; Phase 11 E2).
+    pub dropped_frames: Option<i32>,
     pub tracks: Vec<TrackView>,
 }
 
@@ -362,6 +366,7 @@ fn view(rt: &PlayerRuntime) -> PlayerStateView {
         ended: s.ended,
         started: s.started,
         chapter: s.chapter.map(|c| c as i32),
+        dropped_frames: s.dropped_frames.map(|n| n as i32),
         tracks: rt
             .player
             .tracks()

@@ -8,6 +8,7 @@ import { onPlayerIntent } from "./intentBus";
 import { PauseOverlay } from "./PauseOverlay";
 import { EndCard, NextEpisodeCard } from "./WhatNext";
 import { moment } from "./endCard";
+import { previewLeft, tileAt } from "./scrubPreview";
 import { usePlaybackChoice } from "@/lib/playbackChoice";
 
 /**
@@ -127,6 +128,35 @@ export function PlayerScreen() {
     [audio, quality, play],
   );
   const card = useRef<HTMLDivElement>(null);
+
+  // Scrub thumbnails (Phase 11): made in the background for a file on this machine; asked
+  // for until they exist. A stream has none, and the preview shows the time alone.
+  const [hover, setHover] = useState<{ time: number; x: number; barLeft: number; barWidth: number } | null>(null);
+  const sheets = useQuery({
+    queryKey: ["scrub-sheets", playing?.target],
+    queryFn: async () => {
+      const r = await commands.scrubThumbs();
+      return r.status === "ok" ? r.data : null;
+    },
+    enabled: !!state?.started,
+    refetchInterval: (q) => (q.state.data ? false : 10_000),
+  });
+  const [sheetImages, setSheetImages] = useState<Record<number, string>>({});
+  const asked = useRef(new Set<number>());
+  useEffect(() => {
+    setSheetImages({});
+    asked.current = new Set();
+  }, [playing]);
+  const tile = hover && sheets.data ? tileAt(hover.time, sheets.data) : null;
+  const wanted = tile?.sheet;
+  useEffect(() => {
+    if (wanted === undefined || asked.current.has(wanted)) return;
+    asked.current.add(wanted);
+    void commands.scrubSheet(wanted).then((r) => {
+      if (r.status === "ok") setSheetImages((m) => ({ ...m, [wanted]: r.data }));
+    });
+  }, [wanted]);
+  const preview = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   // Every copy was tried and none would start (SPEC.md Phase 9: fallback is silent
   // until there is nothing left to fall back to).
@@ -185,6 +215,7 @@ export function PlayerScreen() {
     const panels = [
       ...(chrome && !paused ? [top.current, bottom.current] : []),
       ...(showNextCard ? [card.current] : []),
+      ...(hover && chrome ? [preview.current] : []),
     ];
     const cutouts = panels
       .filter((el): el is HTMLDivElement => !!el)
@@ -199,7 +230,7 @@ export function PlayerScreen() {
         };
       });
     void commands.playerLayout(s.x, s.y, s.width, s.height, window.devicePixelRatio, cutouts);
-  }, [chrome, paused, showNextCard]);
+  }, [chrome, paused, showNextCard, hover]);
 
   useLayoutEffect(() => {
     layout();
@@ -364,6 +395,34 @@ export function PlayerScreen() {
         />
       )}
 
+      {hover && showChrome && (() => {
+        const w = sheets.data?.tile_width ?? 0;
+        const h = sheets.data?.tile_height ?? 0;
+        const img = tile ? sheetImages[tile.sheet] : undefined;
+        const width = img ? w : 72;
+        return (
+          <div
+            ref={preview}
+            aria-hidden
+            className="absolute bottom-[96px] overflow-hidden rounded-sm bg-surface"
+            style={{ left: previewLeft(hover.x, width + 8, hover.barLeft, hover.barWidth) }}
+          >
+            {img && tile && (
+              <div
+                className="m-1"
+                style={{
+                  width: w,
+                  height: h,
+                  backgroundImage: `url(${img})`,
+                  backgroundPosition: `-${tile.col * w}px -${tile.row * h}px`,
+                }}
+              />
+            )}
+            <p className="px-2 pb-1 text-center text-[12px] tabular-nums text-ink">{clock(hover.time)}</p>
+          </div>
+        );
+      })()}
+
       {showNextCard && next && (
         <NextEpisodeCard
           ref={card}
@@ -437,7 +496,9 @@ export function PlayerScreen() {
               position={position}
               duration={duration}
               buffered={state?.buffered_until ?? null}
+              chapters={chapters}
               onSeek={(t) => act({ kind: "seek_to", seconds: t })}
+              onHover={setHover}
             />
             <div className="mt-2 flex items-center gap-3 text-[12px]">
               <button
@@ -480,9 +541,21 @@ export function PlayerScreen() {
 }
 
 function Scrub({
-  position, duration, buffered, onSeek,
-}: { position: number; duration: number; buffered: number | null; onSeek: (t: number) => void }) {
+  position, duration, buffered, chapters, onSeek, onHover,
+}: {
+  position: number;
+  duration: number;
+  buffered: number | null;
+  chapters: ChapterView[];
+  onSeek: (t: number) => void;
+  /** The time under the pointer, and where the pointer is; null when it leaves. */
+  onHover: (h: { time: number; x: number; barLeft: number; barWidth: number } | null) => void;
+}) {
   const pct = (v: number) => (duration > 0 ? `${Math.min(100, (v / duration) * 100)}%` : "0%");
+  const at = (e: React.MouseEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return { time: ((e.clientX - r.left) / r.width) * duration, x: e.clientX, barLeft: r.left, barWidth: r.width };
+  };
   return (
     <div
       role="slider"
@@ -492,16 +565,26 @@ function Scrub({
       aria-valuemax={Math.round(duration)}
       aria-valuenow={Math.round(position)}
       aria-valuetext={`${clock(position)} of ${clock(duration)}`}
-      onClick={(e) => {
-        const r = e.currentTarget.getBoundingClientRect();
-        onSeek(((e.clientX - r.left) / r.width) * duration);
-      }}
+      onClick={(e) => onSeek(at(e).time)}
+      onMouseMove={(e) => onHover(at(e))}
+      onMouseLeave={() => onHover(null)}
       className="relative h-1.5 cursor-pointer rounded-sm bg-line"
     >
       {buffered != null && (
         <div className="absolute inset-y-0 left-0 rounded-sm bg-line-strong" style={{ width: pct(buffered) }} />
       )}
       <div className="absolute inset-y-0 left-0 rounded-sm bg-oxblood-bright" style={{ width: pct(position) }} />
+      {/* Chapter marks (Phase 11): a gap in the bar where each chapter begins. */}
+      {chapters
+        .filter((c) => (c.time ?? 0) > 0)
+        .map((c) => (
+          <div
+            key={c.time}
+            data-chapter={c.title ?? ""}
+            className="absolute inset-y-0 w-[3px] -translate-x-1/2 bg-surface"
+            style={{ left: pct(c.time ?? 0) }}
+          />
+        ))}
     </div>
   );
 }

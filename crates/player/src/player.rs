@@ -122,6 +122,13 @@ pub struct State {
     /// A seek is still in progress. mpv reports the TARGET as `position` as soon as a
     /// seek starts, so "done" is `!seeking`, not "the position reads right".
     pub seeking: bool,
+    /// Frames the video output dropped since the file opened: the stutter measure
+    /// (Phase 11 E2) and the stats overlay's.
+    #[serde(default)]
+    pub dropped_frames: Option<i64>,
+    /// The decoded picture's size, in pixels.
+    #[serde(default)]
+    pub video_size: Option<(i64, i64)>,
     /// The chapter playing, as an index into [`Player::chapters`].
     #[serde(default)]
     pub chapter: Option<i64>,
@@ -423,6 +430,11 @@ impl Player {
             seeking: self.flag("seeking"),
             started: self.seen.0.lock().expect("seen").first_frame_at.is_some(),
             chapter: self.num("chapter").filter(|c| *c >= 0.0).map(|c| c as i64),
+            dropped_frames: self.num("frame-drop-count").map(|n| n as i64),
+            video_size: self
+                .num("video-params/w")
+                .zip(self.num("video-params/h"))
+                .map(|(w, h)| (w as i64, h as i64)),
         }
     }
 

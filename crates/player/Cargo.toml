@@ -13,6 +13,7 @@ description = "The player: libmpv, loaded dynamically, behind a safe API (SPEC.m
 [dependencies]
 libloading = "=0.8.9"
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 thiserror = "2"
 tracing = "0.1"
 
