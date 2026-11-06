@@ -59,6 +59,7 @@ impl SourceBackend for Swarm {
             subtitles: vec![],
             codec: Default::default(),
             size_bytes: None,
+            duration_seconds: None,
             health: Health::Swarm {
                 seeders: 1,
                 peers: 1,

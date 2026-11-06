@@ -167,6 +167,7 @@ An empty list is a normal answer. Every field of a candidate:
 | `languages`, `subtitles` | no | Up to 16 each, BCP 47 in shape (`en`, `pt-BR`): 2–35 letters, digits and hyphens, starting with a letter. |
 | `codec` | no | `"h264"`, `"h265"`, `"av1"`, `"vp9"`, `"mpeg4"`. |
 | `size_bytes` | no | Integer. |
+| `duration_seconds` | no | Integer: how long the file plays. Compared with the catalogue's runtime, so a trailer or a single episode offered as a film is ranked last (Phase 9). |
 | `health` | no | `{"kind":"direct"}` for a file a host serves, or `{"kind":"swarm","seeders":n,"peers":n}`. |
 | `locator` | no | Up to 2,048 characters naming *what the bytes are* — a URL, an info hash. Two candidates with the same locator, from you or from another source, are shown as one. Omit it if you cannot say. |
 | `provenance.page` | no | A page about the item. Address rules as §2.1 (any host). An unsafe one is dropped. |

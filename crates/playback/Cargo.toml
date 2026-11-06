@@ -12,6 +12,7 @@ description = "From a catalogue item to something playing: query, sources, ranki
 
 [dependencies]
 sinephile-persistence = { path = "../persistence" }
+sinephile-selection = { path = "../selection" }
 sinephile-sources = { path = "../sources" }
 sinephile-torrent = { path = "../torrent" }
 source-protocol = { path = "../source-protocol" }

@@ -1,0 +1,14 @@
+[package]
+name = "sinephile-selection"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "Which copy to play: the source scoring function (SPEC.md Phase 9)."
+
+# A pure function over candidates, so it depends on the candidate types and nothing
+# else: no database, no network, no clock. Everything it knows arrives in `Context`.
+
+[dependencies]
+source-protocol = { path = "../source-protocol" }
+serde = { version = "1", features = ["derive"] }

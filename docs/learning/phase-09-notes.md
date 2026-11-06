@@ -14,6 +14,12 @@ inherits.** Four sections per ADR-0016 (A4). Written as the phase goes; 9.0 firs
 - **Proof in a real browser** — `tools/uiaudit/controller.mjs` now checks the ring's
   colour and position, the glide frame by frame, the scale and margin, the tile effects,
   and that reduced motion removes them.
+- **Source scoring** (9.1–9.2) — `crates/selection/`: every candidate gets nine scored terms
+  and a sentence for each, and the list is ordered: sunk fakes last, copies that miss the
+  viewer's choice next, a file on this machine first, then by points. Play now uses it.
+- **Fake and mislabel detection** — `crates/selection/src/plausibility.rs`: too few bytes a
+  minute for the claimed resolution, too short for the film's runtime, a name that
+  contradicts its listing, or a file that is not a video at all.
 
 ## 2. Why
 
@@ -24,6 +30,13 @@ inherits.** Four sections per ADR-0016 (A4). Written as the phase goes; 9.0 firs
 - **CSS for the tiles, JavaScript for the ring.** A tile's effects are states of one
   element, which CSS transitions do well; the ring has to follow a target that may be
   moving (scrolling, growing), so it is recomputed every frame.
+- **Rules before points.** "A local file always wins" and "a fake is never played" are
+  rules, so the order is lexicographic: no weight can be big enough to buy past a rule,
+  and none has to be tuned to pretend to be one.
+- **A pure function** so a ranking can be reproduced exactly in a test and shown term by
+  term in the expert panel; nothing it depends on is hidden.
+- **Structure, not names, for reputation**: a list of group names would be a catalogue of
+  where to find things (SPEC.md §2.1), and it would go stale.
 - **The exception is confined to one folder** so the design rules can still be enforced
   everywhere else by a lint, rather than by memory.
 
@@ -48,6 +61,18 @@ inherits.** Four sections per ADR-0016 (A4). Written as the phase goes; 9.0 firs
 - **Tauri capabilities** — `src-tauri/capabilities/default.json`: a window call the app is
   not granted fails silently; the player's full-screen button had never worked.
 
+- **Lexicographic ordering with `Ordering::then`** — `crates/selection/src/lib.rs` `compare`:
+  each `.then` only matters when everything before it is equal.
+- **`f64::total_cmp`** — `crates/selection/src/lib.rs` `compare`: a total order on floats,
+  so `sort_by` never sees "neither less nor greater" (NaN).
+- **Property tests from a seeded generator** — `crates/selection/tests/properties.rs` `Rng`:
+  thousands of random lists, the same ones every run, checking what must hold for all.
+- **Mutation as proof** — swapping one `.then` in `compare` fails
+  `an_honest_local_file_that_meets_the_choice_is_first`; a property nobody has seen fail
+  proves nothing.
+- **`#[serde(default)]` for a wire field** — `crates/source-protocol/src/types.rs`
+  `duration_seconds`: old addons that never send it still parse.
+
 ## 4. The questions
 
 Written, not asked — Phase 9 is not a tier boundary (§10.10).
@@ -62,3 +87,12 @@ Written, not asked — Phase 9 is not a tier boundary (§10.10).
    press?
 5. Under reduced motion the ring still moves to the new target. What exactly is removed,
    and why is the ring itself kept?
+
+Source scoring (9.1–9.2):
+
+6. Why is "a local file always wins" a step in the order rather than a large weight?
+7. A copy states no audio languages; another states English. The viewer chose Hindi.
+   Which ranks higher, and why is that the honest choice?
+8. Why are `quality` and `plausibility` given the same weight?
+9. Why does the bytes-per-minute floor use 60% for an unknown codec rather than 100%?
+10. Why is a camera recording scored −1 but not sunk, while a ".exe" is sunk?

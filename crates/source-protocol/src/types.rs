@@ -98,6 +98,10 @@ pub struct SourceCandidate {
     pub codec: VideoCodec,
     #[serde(default)]
     pub size_bytes: Option<u64>,
+    /// How long the file plays, when the source states it. Compared with the
+    /// catalogue's runtime to catch a mislabelled file (SPEC.md Phase 9).
+    #[serde(default)]
+    pub duration_seconds: Option<u32>,
     #[serde(default)]
     pub health: Health,
     /// The same bytes reached two ways are one candidate. When a backend can name

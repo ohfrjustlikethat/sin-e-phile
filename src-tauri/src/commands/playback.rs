@@ -94,7 +94,15 @@ pub async fn prepare_play(state: State<'_, AppState>, id: i32) -> Result<PlayPla
     // means swarms are skipped, not that nothing can play.
     let rt = state.torrent().await.ok();
     let torrent = rt.as_ref().map(|r| (&r.engine, &r.server));
-    let plan = sinephile_playback::plan(&db, &resolver, torrent, i64::from(id))
+    let tier = state.effective_tier();
+    let choice = sinephile_playback::Context {
+        machine: sinephile_playback::machine(
+            tier.allows(crate::tiers::Capability::HighResPlayback),
+            state.hardware_profile().hardware_decode,
+        ),
+        ..Default::default()
+    };
+    let plan = sinephile_playback::plan_with(&db, &resolver, torrent, i64::from(id), choice)
         .await
         .map_err(|e| e.to_string())?;
     Ok(PlayPlanView {

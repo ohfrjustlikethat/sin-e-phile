@@ -8,19 +8,18 @@
 //! torrent's peers are found while the viewer reads, so Play has nothing left to wait
 //! for (Phase 7 E1, carried here).
 //!
-//! The ranking is deliberately simple. SPEC.md Phase 9 is where sources are scored
-//! properly; this only has to pick something sensible today.
+//! The order candidates are tried in is `sinephile_selection`'s: every candidate is
+//! scored against what this machine plays and what the viewer chose (SPEC.md Phase 9).
 
 use std::sync::Arc;
 
 use sinephile_persistence::repositories::{MediaRepository, ProfileRepository};
 use sinephile_persistence::{Db, DbError, MediaKind};
+pub use sinephile_selection::{Context, Machine, Score};
 use sinephile_sources::{registry, Resolver};
 use sinephile_torrent::play::{target, Target};
 use sinephile_torrent::{Engine, StreamServer, Wanted};
-use source_protocol::{
-    ExternalIds, Health, MediaKind as Kind, MediaQuery, SourceCandidate, Transport,
-};
+use source_protocol::{ExternalIds, MediaKind as Kind, MediaQuery};
 
 #[derive(Debug, thiserror::Error)]
 pub enum PlayError {
@@ -47,6 +46,8 @@ pub struct PlayPlan {
     pub backend: String,
     /// How many candidates the sources offered.
     pub offered: usize,
+    /// Why this copy: its score, term by term.
+    pub score: Score,
 }
 
 /// The catalogue item as the query sources receive.
@@ -79,31 +80,20 @@ pub async fn query_for(db: &Db, media_item_id: i64) -> Result<Option<MediaQuery>
     }))
 }
 
-/// The interim order, until Phase 9 scores sources: your own file, then a direct
-/// stream, then a swarm; within each, higher resolution first, then more seeders.
-pub fn rank(mut candidates: Vec<SourceCandidate>) -> Vec<SourceCandidate> {
-    let transport = |c: &SourceCandidate| match c.transport {
-        Transport::Local => 0,
-        Transport::Http => 1,
-        Transport::P2p => 2,
-        Transport::Unknown => 3,
-    };
-    let seeders = |c: &SourceCandidate| match c.health {
-        Health::Swarm { seeders, .. } => seeders,
-        _ => 0,
-    };
-    candidates.sort_by(|a, b| {
-        transport(a)
-            .cmp(&transport(b))
-            .then(
-                b.quality
-                    .resolution
-                    .rank()
-                    .cmp(&a.quality.resolution.rank()),
-            )
-            .then(seeders(b).cmp(&seeders(a)))
-    });
-    candidates
+/// What this machine plays well, from what `tiers.rs` permits and found. AV1 decode and
+/// an HDR display are not probed yet, so both are assumed absent: the cautious guess
+/// costs a little ranking, never a stutter.
+pub fn machine(high_res_playback: bool, hardware_decode: bool) -> Machine {
+    Machine {
+        max_resolution: if high_res_playback {
+            source_protocol::Resolution::Uhd
+        } else {
+            source_protocol::Resolution::FullHd
+        },
+        hevc: hardware_decode,
+        av1: false,
+        hdr_display: false,
+    }
 }
 
 /// Where to start: the saved position, unless it is in the first 10 seconds (start
@@ -120,26 +110,43 @@ pub fn resume_from(position: i64, duration: Option<i64>) -> Option<f64> {
     Some(position as f64)
 }
 
-/// See the module note. `torrent` is the engine and its server, for a candidate that is
-/// a swarm; `None` skips swarms (the engine could not start).
+/// [`plan_with`] on a Tier 0 machine with nothing chosen.
 pub async fn plan(
     db: &Db,
     resolver: &Resolver,
     torrent: Option<(&Arc<Engine>, &StreamServer)>,
     media_item_id: i64,
 ) -> Result<PlayPlan, PlayError> {
+    plan_with(db, resolver, torrent, media_item_id, Context::default()).await
+}
+
+/// See the module note. `torrent` is the engine and its server, for a candidate that is
+/// a swarm; `None` skips swarms (the engine could not start). `ctx` says what the
+/// machine plays and what the viewer chose; the catalogue's runtime is filled in here.
+pub async fn plan_with(
+    db: &Db,
+    resolver: &Resolver,
+    torrent: Option<(&Arc<Engine>, &StreamServer)>,
+    media_item_id: i64,
+    mut ctx: Context,
+) -> Result<PlayPlan, PlayError> {
     let query = query_for(db, media_item_id)
         .await?
         .ok_or(PlayError::Unknown)?;
+    ctx.runtime_minutes = MediaRepository::new(db)
+        .by_id(media_item_id)
+        .await?
+        .and_then(|item| item.runtime_minutes)
+        .and_then(|m| u32::try_from(m).ok());
     let found = resolver.find_all(&query).await;
     registry::record(db, &found.outcomes).await?;
-    let ranked = rank(found.candidates);
+    let ranked = sinephile_selection::rank(found.candidates, &ctx);
     if ranked.is_empty() {
         return Err(PlayError::NoSources);
     }
     let offered = ranked.len();
     let mut reasons = Vec::new();
-    for candidate in ranked {
+    for (candidate, score) in ranked {
         let stream = match resolver.resolve(&candidate).await {
             Ok(s) => s,
             Err(e) => {
@@ -179,6 +186,7 @@ pub async fn plan(
             start,
             backend: candidate.provenance.backend,
             offered,
+            score,
         });
     }
     Err(PlayError::NothingPlayable(offered, reasons.join("; ")))
@@ -187,52 +195,13 @@ pub async fn plan(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use source_protocol::{Provenance, Quality, Resolution};
-
-    fn cand(t: Transport, r: Resolution, seeders: u32) -> SourceCandidate {
-        SourceCandidate {
-            key: format!("{t:?}-{r:?}-{seeders}"),
-            title: "T".into(),
-            year: None,
-            transport: t,
-            quality: Quality {
-                resolution: r,
-                hdr: false,
-            },
-            languages: vec![],
-            subtitles: vec![],
-            codec: Default::default(),
-            size_bytes: None,
-            health: if t == Transport::P2p {
-                Health::Swarm { seeders, peers: 0 }
-            } else {
-                Health::Direct
-            },
-            locator: None,
-            provenance: Provenance::default(),
-        }
-    }
 
     #[test]
-    fn your_own_file_first_then_streams_then_swarms() {
-        let ranked = rank(vec![
-            cand(Transport::P2p, Resolution::Uhd, 500),
-            cand(Transport::Http, Resolution::Sd, 0),
-            cand(Transport::P2p, Resolution::Uhd, 900),
-            cand(Transport::Local, Resolution::Hd, 0),
-            cand(Transport::Http, Resolution::FullHd, 0),
-        ]);
-        let keys: Vec<&str> = ranked.iter().map(|c| c.key.as_str()).collect();
-        assert_eq!(
-            keys,
-            [
-                "Local-Hd-0",
-                "Http-FullHd-0",
-                "Http-Sd-0",
-                "P2p-Uhd-900",
-                "P2p-Uhd-500"
-            ]
-        );
+    fn a_machine_without_high_res_playback_tops_out_at_1080p() {
+        use source_protocol::Resolution;
+        assert_eq!(machine(false, true).max_resolution, Resolution::FullHd);
+        assert_eq!(machine(true, true).max_resolution, Resolution::Uhd);
+        assert!(!machine(true, false).hevc);
     }
 
     #[test]

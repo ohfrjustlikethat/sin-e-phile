@@ -5373,6 +5373,7 @@ dependencies = [
  "sinephile-metadata-api",
  "sinephile-persistence",
  "sinephile-player",
+ "sinephile-selection",
  "sinephile-sources",
  "sinephile-torrent",
  "source-protocol",
@@ -5403,6 +5404,14 @@ dependencies = [
  "sinephile-vector-index",
  "thiserror 2.0.20",
  "tokio",
+]
+
+[[package]]
+name = "sinephile-selection"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "source-protocol",
 ]
 
 [[package]]

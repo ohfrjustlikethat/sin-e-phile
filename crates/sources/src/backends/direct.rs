@@ -72,6 +72,7 @@ impl SourceBackend for DirectHttpBackend {
                 subtitles: vec![],
                 codec: Default::default(),
                 size_bytes: None,
+                duration_seconds: None,
                 health: Health::Direct,
                 locator: Some(link.url.clone()),
                 provenance: Default::default(),

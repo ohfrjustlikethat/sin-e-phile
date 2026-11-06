@@ -60,6 +60,7 @@ fn absorb(kept: &mut SourceCandidate, dup: SourceCandidate) {
         }
     }
     kept.size_bytes = kept.size_bytes.or(dup.size_bytes);
+    kept.duration_seconds = kept.duration_seconds.or(dup.duration_seconds);
 }
 
 #[cfg(test)]
@@ -78,6 +79,7 @@ mod tests {
             subtitles: vec![],
             codec: Default::default(),
             size_bytes: None,
+            duration_seconds: None,
             health: Default::default(),
             locator: locator.map(Into::into),
             provenance: Provenance {

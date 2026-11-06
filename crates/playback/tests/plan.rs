@@ -17,6 +17,8 @@ struct Fake {
     id: &'static str,
     resolves: bool,
     url: &'static str,
+    /// How long the source says its file plays.
+    minutes: Option<u32>,
 }
 
 #[async_trait]
@@ -44,6 +46,7 @@ impl SourceBackend for Fake {
             subtitles: vec![],
             codec: Default::default(),
             size_bytes: None,
+            duration_seconds: self.minutes.map(|m| m * 60),
             health: Health::Direct,
             locator: Some(self.url.into()),
             provenance: Default::default(),
@@ -109,6 +112,7 @@ async fn the_position_survives_a_restart() {
         id: "a",
         resolves: true,
         url: "https://films.example/sunrise.mp4",
+        minutes: None,
     }]);
     let p = plan(&db, &r, None, id).await.unwrap();
     assert_eq!(p.start, Some(2712.0), "resumes where the last run stopped");
@@ -136,6 +140,7 @@ async fn a_playable_source_and_the_saved_position() {
         id: "a",
         resolves: true,
         url: "https://films.example/sunrise.mp4",
+        minutes: None,
     }]);
     let p = plan(&db, &r, None, id).await.unwrap();
     assert_eq!(p.open, "https://films.example/sunrise.mp4");
@@ -152,11 +157,13 @@ async fn a_source_that_cannot_be_opened_is_passed_over() {
             id: "broken",
             resolves: false,
             url: "https://a.example/x.mp4",
+            minutes: None,
         },
         Fake {
             id: "works",
             resolves: true,
             url: "https://b.example/y.mp4",
+            minutes: None,
         },
     ]);
     let p = plan(&db, &r, None, id).await.unwrap();
@@ -176,6 +183,7 @@ async fn nothing_to_play_is_said_plainly() {
         id: "broken",
         resolves: false,
         url: "https://a.example/x.mp4",
+        minutes: None,
     }]);
     let err = plan(&db, &r, None, id).await.unwrap_err();
     assert!(err.to_string().contains("none could be opened"), "{err}");
@@ -183,4 +191,35 @@ async fn nothing_to_play_is_said_plainly() {
         plan(&db, &r, None, 999_999).await,
         Err(PlayError::Unknown)
     ));
+}
+
+#[tokio::test]
+async fn the_scorer_chooses_not_the_order_sources_answer_in() {
+    // A 20-minute file for a 94-minute film is sunk (Phase 9), even though its source
+    // answers first and resolves.
+    let db = Db::in_memory().await.unwrap();
+    let id = MediaRepository::new(&db)
+        .insert(&NewMediaItem {
+            runtime_minutes: Some(94),
+            ..NewMediaItem::film("Sunrise", 1927)
+        })
+        .await
+        .unwrap();
+    let r = resolver(vec![
+        Fake {
+            id: "short",
+            resolves: true,
+            url: "https://a.example/trailer.mp4",
+            minutes: Some(20),
+        },
+        Fake {
+            id: "whole",
+            resolves: true,
+            url: "https://b.example/film.mp4",
+            minutes: Some(94),
+        },
+    ]);
+    let p = plan(&db, &r, None, id).await.unwrap();
+    assert_eq!(p.backend, "whole");
+    assert_eq!(p.score.sunk, None);
 }
