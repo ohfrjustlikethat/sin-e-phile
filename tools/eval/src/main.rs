@@ -5,7 +5,8 @@
 //! evidence. §10.12 compares each phase's numbers against the previous phase's before a
 //! merge, and that comparison is only possible if the numbers are re-derivable.
 //!
-//! Subcommands arrive with the phases that need them. Today: `search` and `vector`.
+//! Subcommands arrive with the phases that need them. Today: `search`, `vector`, `embed`
+//! and `subs`.
 
 use std::path::Path;
 
@@ -13,6 +14,7 @@ mod embed;
 mod error;
 mod relevance;
 mod search;
+mod subs;
 mod vector;
 
 #[tokio::main]
@@ -50,13 +52,32 @@ async fn main() {
             embed::compare(Path::new(&data_dir), &query, &ids).await
         }
         "embed" => embed::run(Path::new(&data_dir), report).await,
+        "subs" if args.iter().any(|a| a == "--trace") => {
+            let i = args.iter().position(|a| a == "--trace").expect("present");
+            match (args.get(i + 1), args.get(i + 2)) {
+                (Some(wav), Some(out)) => subs::trace(Path::new(wav), Path::new(out)),
+                _ => Err(error::EvalError::Missing(
+                    "eval subs --trace <wav> <out>".into(),
+                )),
+            }
+        }
+        "subs" => subs::run(
+            report,
+            args.iter()
+                .position(|a| a == "--only")
+                .and_then(|i| args.get(i + 1))
+                .map(String::as_str),
+        ),
         "all" => match search::run(Path::new(&data_dir), report).await {
             // Every harness runs even when an earlier one misses its target — stopping
             // at the first failure hides the rest, and §10.12 compares ALL the numbers
             // against the previous phase before a merge.
-            Ok(searched) => vector::run(Path::new(&data_dir), report, false, None)
-                .await
-                .map(|vectored| searched && vectored),
+            Ok(searched) => match vector::run(Path::new(&data_dir), report, false, None).await {
+                Ok(vectored) => {
+                    subs::run(report, None).map(|subbed| searched && vectored && subbed)
+                }
+                Err(e) => Err(e),
+            },
             Err(e) => Err(e),
         },
         _ => {
@@ -69,6 +90,8 @@ async fn main() {
                  \n                           full — the measurement behind P11\
                  \n  eval embed [--report]    query-embedding latency, and whether a\
                  \n                           re-embedded document still matches the artefact\
+                 \n  eval subs [--report]     subtitle alignment over fixtures/subtitles\
+                 \n       --trace <wav> <out> the speech trace of a 16-bit mono WAV\
                  \n  eval all [--report]      every harness that exists\
                  \n\
                  \nReads the catalogue from $SINEPHILE_DATA_DIR, default ./data.\n"

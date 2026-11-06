@@ -1,0 +1,886 @@
+{
+ "films": [
+  {
+   "id": "parlour",
+   "minutes": 9,
+   "bed": "room",
+   "lines": 115,
+   "cues": 103,
+   "holdout": false
+  },
+  {
+   "id": "harbour",
+   "minutes": 10,
+   "bed": "street",
+   "lines": 129,
+   "cues": 118,
+   "holdout": false
+  },
+  {
+   "id": "ballroom",
+   "minutes": 9,
+   "bed": "music",
+   "lines": 101,
+   "cues": 93,
+   "holdout": false
+  },
+  {
+   "id": "station",
+   "minutes": 11,
+   "bed": "street",
+   "lines": 130,
+   "cues": 119,
+   "holdout": false
+  },
+  {
+   "id": "garden",
+   "minutes": 8,
+   "bed": "room",
+   "lines": 105,
+   "cues": 97,
+   "holdout": false
+  },
+  {
+   "id": "cabaret",
+   "minutes": 10,
+   "bed": "music",
+   "lines": 134,
+   "cues": 121,
+   "holdout": false
+  },
+  {
+   "id": "lighthouse",
+   "minutes": 12,
+   "bed": "street",
+   "lines": 155,
+   "cues": 134,
+   "holdout": true
+  },
+  {
+   "id": "orchard",
+   "minutes": 9,
+   "bed": "music",
+   "lines": 117,
+   "cues": 105,
+   "holdout": true
+  },
+  {
+   "id": "tenement",
+   "minutes": 11,
+   "bed": "room",
+   "lines": 129,
+   "cues": 120,
+   "holdout": true
+  },
+  {
+   "id": "carnival",
+   "minutes": 10,
+   "bed": "music",
+   "lines": 109,
+   "cues": 98,
+   "holdout": true
+  }
+ ],
+ "variants": [
+  {
+   "id": "parlour-aligned",
+   "film": "parlour",
+   "kind": "none",
+   "scale": 1.0,
+   "offset_ms": 0,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "parlour-offset-small",
+   "film": "parlour",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": 3166,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "parlour-offset-large",
+   "film": "parlour",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": -30838,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "parlour-pal-speedup",
+   "film": "parlour",
+   "kind": "scale",
+   "from_fps": 23.976,
+   "to_fps": 25,
+   "scale": 0.95904,
+   "offset_ms": 6776,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "parlour-pal-slowdown",
+   "film": "parlour",
+   "kind": "scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": -4492,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "parlour-24-to-25",
+   "film": "parlour",
+   "kind": "scale",
+   "from_fps": 24,
+   "to_fps": 25,
+   "scale": 0.96,
+   "offset_ms": -7423,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "parlour-intro-removed",
+   "film": "parlour",
+   "kind": "split",
+   "scale": 1.0,
+   "offset_ms": 4865,
+   "split_at_ms": 215884,
+   "split_jump_ms": 42415
+  },
+  {
+   "id": "parlour-intro-added-and-scaled",
+   "film": "parlour",
+   "kind": "split+scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": 2767,
+   "split_at_ms": 168960,
+   "split_jump_ms": -7310
+  },
+  {
+   "id": "harbour-aligned",
+   "film": "harbour",
+   "kind": "none",
+   "scale": 1.0,
+   "offset_ms": 0,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "harbour-offset-small",
+   "film": "harbour",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": -446,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "harbour-offset-large",
+   "film": "harbour",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": -37890,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "harbour-pal-speedup",
+   "film": "harbour",
+   "kind": "scale",
+   "from_fps": 23.976,
+   "to_fps": 25,
+   "scale": 0.95904,
+   "offset_ms": 3690,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "harbour-pal-slowdown",
+   "film": "harbour",
+   "kind": "scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": 261,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "harbour-24-to-25",
+   "film": "harbour",
+   "kind": "scale",
+   "from_fps": 24,
+   "to_fps": 25,
+   "scale": 0.96,
+   "offset_ms": 6090,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "harbour-intro-removed",
+   "film": "harbour",
+   "kind": "split",
+   "scale": 1.0,
+   "offset_ms": 1530,
+   "split_at_ms": 153506,
+   "split_jump_ms": 89963
+  },
+  {
+   "id": "harbour-intro-added-and-scaled",
+   "film": "harbour",
+   "kind": "split+scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": 2497,
+   "split_at_ms": 200813,
+   "split_jump_ms": -6210
+  },
+  {
+   "id": "ballroom-aligned",
+   "film": "ballroom",
+   "kind": "none",
+   "scale": 1.0,
+   "offset_ms": 0,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "ballroom-offset-small",
+   "film": "ballroom",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": -781,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "ballroom-offset-large",
+   "film": "ballroom",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": 53710,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "ballroom-pal-speedup",
+   "film": "ballroom",
+   "kind": "scale",
+   "from_fps": 23.976,
+   "to_fps": 25,
+   "scale": 0.95904,
+   "offset_ms": -7006,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "ballroom-pal-slowdown",
+   "film": "ballroom",
+   "kind": "scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": 3468,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "ballroom-24-to-25",
+   "film": "ballroom",
+   "kind": "scale",
+   "from_fps": 24,
+   "to_fps": 25,
+   "scale": 0.96,
+   "offset_ms": -7805,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "ballroom-intro-removed",
+   "film": "ballroom",
+   "kind": "split",
+   "scale": 1.0,
+   "offset_ms": 2713,
+   "split_at_ms": 166679,
+   "split_jump_ms": 76852
+  },
+  {
+   "id": "ballroom-intro-added-and-scaled",
+   "film": "ballroom",
+   "kind": "split+scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": 4611,
+   "split_at_ms": 299074,
+   "split_jump_ms": -16443
+  },
+  {
+   "id": "station-aligned",
+   "film": "station",
+   "kind": "none",
+   "scale": 1.0,
+   "offset_ms": 0,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "station-offset-small",
+   "film": "station",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": -2750,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "station-offset-large",
+   "film": "station",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": -27738,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "station-pal-speedup",
+   "film": "station",
+   "kind": "scale",
+   "from_fps": 23.976,
+   "to_fps": 25,
+   "scale": 0.95904,
+   "offset_ms": 5700,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "station-pal-slowdown",
+   "film": "station",
+   "kind": "scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": -4333,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "station-24-to-25",
+   "film": "station",
+   "kind": "scale",
+   "from_fps": 24,
+   "to_fps": 25,
+   "scale": 0.96,
+   "offset_ms": 6488,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "station-intro-removed",
+   "film": "station",
+   "kind": "split",
+   "scale": 1.0,
+   "offset_ms": 1936,
+   "split_at_ms": 172204,
+   "split_jump_ms": 44775
+  },
+  {
+   "id": "station-intro-added-and-scaled",
+   "film": "station",
+   "kind": "split+scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": 3896,
+   "split_at_ms": 262408,
+   "split_jump_ms": -10675
+  },
+  {
+   "id": "garden-aligned",
+   "film": "garden",
+   "kind": "none",
+   "scale": 1.0,
+   "offset_ms": 0,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "garden-offset-small",
+   "film": "garden",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": 625,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "garden-offset-large",
+   "film": "garden",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": 82247,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "garden-pal-speedup",
+   "film": "garden",
+   "kind": "scale",
+   "from_fps": 23.976,
+   "to_fps": 25,
+   "scale": 0.95904,
+   "offset_ms": -7127,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "garden-pal-slowdown",
+   "film": "garden",
+   "kind": "scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": -7898,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "garden-24-to-25",
+   "film": "garden",
+   "kind": "scale",
+   "from_fps": 24,
+   "to_fps": 25,
+   "scale": 0.96,
+   "offset_ms": 2897,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "garden-intro-removed",
+   "film": "garden",
+   "kind": "split",
+   "scale": 1.0,
+   "offset_ms": 274,
+   "split_at_ms": 160285,
+   "split_jump_ms": 44406
+  },
+  {
+   "id": "garden-intro-added-and-scaled",
+   "film": "garden",
+   "kind": "split+scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": 3128,
+   "split_at_ms": 209941,
+   "split_jump_ms": -12042
+  },
+  {
+   "id": "cabaret-aligned",
+   "film": "cabaret",
+   "kind": "none",
+   "scale": 1.0,
+   "offset_ms": 0,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "cabaret-offset-small",
+   "film": "cabaret",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": 1409,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "cabaret-offset-large",
+   "film": "cabaret",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": 39294,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "cabaret-pal-speedup",
+   "film": "cabaret",
+   "kind": "scale",
+   "from_fps": 23.976,
+   "to_fps": 25,
+   "scale": 0.95904,
+   "offset_ms": -3766,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "cabaret-pal-slowdown",
+   "film": "cabaret",
+   "kind": "scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": -870,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "cabaret-24-to-25",
+   "film": "cabaret",
+   "kind": "scale",
+   "from_fps": 24,
+   "to_fps": 25,
+   "scale": 0.96,
+   "offset_ms": 7704,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "cabaret-intro-removed",
+   "film": "cabaret",
+   "kind": "split",
+   "scale": 1.0,
+   "offset_ms": 3301,
+   "split_at_ms": 112869,
+   "split_jump_ms": 58280
+  },
+  {
+   "id": "cabaret-intro-added-and-scaled",
+   "film": "cabaret",
+   "kind": "split+scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": 3205,
+   "split_at_ms": 196663,
+   "split_jump_ms": -6916
+  },
+  {
+   "id": "lighthouse-aligned",
+   "film": "lighthouse",
+   "kind": "none",
+   "scale": 1.0,
+   "offset_ms": 0,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "lighthouse-offset-small",
+   "film": "lighthouse",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": -2218,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "lighthouse-offset-large",
+   "film": "lighthouse",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": 33805,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "lighthouse-pal-speedup",
+   "film": "lighthouse",
+   "kind": "scale",
+   "from_fps": 23.976,
+   "to_fps": 25,
+   "scale": 0.95904,
+   "offset_ms": 6673,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "lighthouse-pal-slowdown",
+   "film": "lighthouse",
+   "kind": "scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": 5944,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "lighthouse-24-to-25",
+   "film": "lighthouse",
+   "kind": "scale",
+   "from_fps": 24,
+   "to_fps": 25,
+   "scale": 0.96,
+   "offset_ms": 3426,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "lighthouse-intro-removed",
+   "film": "lighthouse",
+   "kind": "split",
+   "scale": 1.0,
+   "offset_ms": 4170,
+   "split_at_ms": 240910,
+   "split_jump_ms": 85329
+  },
+  {
+   "id": "lighthouse-intro-added-and-scaled",
+   "film": "lighthouse",
+   "kind": "split+scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": 2142,
+   "split_at_ms": 227243,
+   "split_jump_ms": -5797
+  },
+  {
+   "id": "orchard-aligned",
+   "film": "orchard",
+   "kind": "none",
+   "scale": 1.0,
+   "offset_ms": 0,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "orchard-offset-small",
+   "film": "orchard",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": 1457,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "orchard-offset-large",
+   "film": "orchard",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": -15355,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "orchard-pal-speedup",
+   "film": "orchard",
+   "kind": "scale",
+   "from_fps": 23.976,
+   "to_fps": 25,
+   "scale": 0.95904,
+   "offset_ms": 5281,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "orchard-pal-slowdown",
+   "film": "orchard",
+   "kind": "scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": -4737,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "orchard-24-to-25",
+   "film": "orchard",
+   "kind": "scale",
+   "from_fps": 24,
+   "to_fps": 25,
+   "scale": 0.96,
+   "offset_ms": 2177,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "orchard-intro-removed",
+   "film": "orchard",
+   "kind": "split",
+   "scale": 1.0,
+   "offset_ms": 3706,
+   "split_at_ms": 84543,
+   "split_jump_ms": 36498
+  },
+  {
+   "id": "orchard-intro-added-and-scaled",
+   "film": "orchard",
+   "kind": "split+scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": 1897,
+   "split_at_ms": 261298,
+   "split_jump_ms": -10617
+  },
+  {
+   "id": "tenement-aligned",
+   "film": "tenement",
+   "kind": "none",
+   "scale": 1.0,
+   "offset_ms": 0,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "tenement-offset-small",
+   "film": "tenement",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": -1108,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "tenement-offset-large",
+   "film": "tenement",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": -21717,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "tenement-pal-speedup",
+   "film": "tenement",
+   "kind": "scale",
+   "from_fps": 23.976,
+   "to_fps": 25,
+   "scale": 0.95904,
+   "offset_ms": 861,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "tenement-pal-slowdown",
+   "film": "tenement",
+   "kind": "scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": -4179,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "tenement-24-to-25",
+   "film": "tenement",
+   "kind": "scale",
+   "from_fps": 24,
+   "to_fps": 25,
+   "scale": 0.96,
+   "offset_ms": 1512,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "tenement-intro-removed",
+   "film": "tenement",
+   "kind": "split",
+   "scale": 1.0,
+   "offset_ms": 337,
+   "split_at_ms": 252264,
+   "split_jump_ms": 21111
+  },
+  {
+   "id": "tenement-intro-added-and-scaled",
+   "film": "tenement",
+   "kind": "split+scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": 4708,
+   "split_at_ms": 138060,
+   "split_jump_ms": -11276
+  },
+  {
+   "id": "carnival-aligned",
+   "film": "carnival",
+   "kind": "none",
+   "scale": 1.0,
+   "offset_ms": 0,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "carnival-offset-small",
+   "film": "carnival",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": -2095,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "carnival-offset-large",
+   "film": "carnival",
+   "kind": "offset",
+   "scale": 1.0,
+   "offset_ms": 45523,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "carnival-pal-speedup",
+   "film": "carnival",
+   "kind": "scale",
+   "from_fps": 23.976,
+   "to_fps": 25,
+   "scale": 0.95904,
+   "offset_ms": 7555,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "carnival-pal-slowdown",
+   "film": "carnival",
+   "kind": "scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": 3536,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "carnival-24-to-25",
+   "film": "carnival",
+   "kind": "scale",
+   "from_fps": 24,
+   "to_fps": 25,
+   "scale": 0.96,
+   "offset_ms": 4596,
+   "split_at_ms": null,
+   "split_jump_ms": 0
+  },
+  {
+   "id": "carnival-intro-removed",
+   "film": "carnival",
+   "kind": "split",
+   "scale": 1.0,
+   "offset_ms": 3260,
+   "split_at_ms": 171573,
+   "split_jump_ms": 37245
+  },
+  {
+   "id": "carnival-intro-added-and-scaled",
+   "film": "carnival",
+   "kind": "split+scale",
+   "from_fps": 25,
+   "to_fps": 23.976,
+   "scale": 1.0427093760427095,
+   "offset_ms": 4451,
+   "split_at_ms": 352793,
+   "split_jump_ms": -10929
+  }
+ ]
+}

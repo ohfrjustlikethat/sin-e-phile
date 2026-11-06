@@ -3,13 +3,43 @@
 Part of [sin-e-phile](https://github.com/ohfrjustlikethat/sin-e-phile), but
 **independently useful and independently licensed** (ADR-0017).
 
-Aligns a subtitle track to audio by solving for **offset and framerate scale**
-together via cross-correlation — because a 23.976 vs 25 fps mismatch is a
-multiplication, not an addition, and no constant offset can fix a drift.
+Aligns a subtitle file to a film's speech by solving for **offset and framerate scale
+together** — because a 23.976 vs 25 fps mismatch is a multiplication, not an addition,
+and no constant offset can fix a drift — and for an intro added or cut part-way through.
+It scores its own confidence and **refuses** to apply an alignment it is not sure of: a
+wrong shift is worse than none.
 
-Scores its own confidence and refuses to apply a low-confidence alignment.
+## Use
 
-Built in Phase 10.
+```rust
+use subtitle_align::{align_text, vad, Options};
+
+// Mono PCM of the film's audio, from wherever you get it (this crate never runs FFmpeg).
+let samples: Vec<f32> = vec![0.0; 16_000 * 60];
+let speech = vad::speech(&samples, 16_000); // one bool per 10 ms
+
+let srt = "1\n00:00:01,000 --> 00:00:02,000\nHello\n";
+match align_text(srt, &speech, &Options::default()) {
+    Ok((fixed, a)) => println!("scale {} offset {} ms\n{fixed}", a.scale, a.offset_ms),
+    Err(why) => println!("left as it was: {why}"), // here: no speech in a minute of silence
+}
+```
+
+Three modules, each usable on its own:
+
+| Module | Does |
+|---|---|
+| `cue` | Reads timings from SRT, WebVTT and ASS/SSA and rewrites them **in place**: styling, override tags and line endings come back byte for byte. |
+| `vad` | Which 10 ms frames of mono PCM are speech: band energy over a local noise floor, plus a syllable-modulation test that keeps music from reading as dialogue. Pure Rust, no model. |
+| `align` | Offset, scale and an optional split by FFT cross-correlation, with a distinctness confidence. |
+
+How it works, and why each choice: [`docs/specs/subtitle-alignment.md`](../../docs/specs/subtitle-alignment.md).
+
+## Measured
+
+On the project's corpus (`fixtures/subtitles/`, ten films, eighty damaged subtitle
+files, `cargo run --release -p eval -- subs`): **98.8%** aligned to within 150 ms
+(96.9% on films held out from tuning), **0** false accepts against the wrong film.
 
 ## Licence
 

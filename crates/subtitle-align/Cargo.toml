@@ -1,0 +1,15 @@
+[package]
+name = "subtitle-align"
+version = "0.1.0"
+edition = "2021"
+publish = false
+# NOT the workspace's GPL-3.0: this crate links neither libmpv nor FFmpeg, so it carries
+# the permissive licence that makes it usable elsewhere (ADR-0017). See README.md.
+license = "MIT OR Apache-2.0"
+description = "Align subtitles to speech: offset and framerate scale together, with a confidence that refuses to guess (SPEC.md Phase 10)."
+
+# What this crate deliberately does NOT depend on: FFmpeg, any process, any file. It
+# takes PCM samples or a speech trace in, and subtitle text in, and gives text back.
+
+[dependencies]
+rustfft = "=6.2.0"
