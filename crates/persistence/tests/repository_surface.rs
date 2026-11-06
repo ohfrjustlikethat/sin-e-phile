@@ -1268,3 +1268,178 @@ async fn detail_and_default_profile_surface() {
     assert_eq!(profiles.ensure_default().await.unwrap(), first);
     assert_eq!(profiles.all().await.unwrap().len(), 1);
 }
+
+/// Exercise every public method on `LibraryRepository` (Phase 12, migration 0021).
+#[tokio::test]
+async fn library_repository_surface() {
+    use sinephile_persistence::repositories::{
+        FileMatch, LibraryRepository, MatchMethod, NewLocalFile, Probe, Upserted,
+    };
+    let db = Db::in_memory().await.expect("open");
+    let media = MediaRepository::new(&db);
+    let heat = media
+        .insert(&NewMediaItem::film("Heat", 1995))
+        .await
+        .expect("film");
+    let other = media
+        .insert(&NewMediaItem::film("Heat", 1986))
+        .await
+        .expect("film");
+    let repo = LibraryRepository::new(&db);
+
+    // add_folder (idempotent) / folders / mark_folder_scanned
+    let folder = repo.add_folder(r"D:\Films").await.expect("add");
+    assert_eq!(repo.add_folder(r"D:\Films").await.expect("again"), folder);
+    repo.mark_folder_scanned(folder).await.expect("scanned");
+
+    // upsert_file: new, unchanged, changed
+    let f = NewLocalFile {
+        folder_id: folder,
+        path: r"D:\Films\Heat.1995.mkv",
+        size_bytes: 1000,
+        modified_at: Some("2024-01-01T00:00:00Z"),
+    };
+    let Upserted::New(id) = repo.upsert_file(&f).await.expect("insert") else {
+        panic!("new")
+    };
+    assert_eq!(repo.upsert_file(&f).await.unwrap(), Upserted::Unchanged(id));
+
+    // set_probe / set_content_hash / file / file_by_path / files_in_folder
+    repo.set_probe(
+        id,
+        &Probe {
+            duration_seconds: Some(10_200),
+            video_codec: Some("h264".into()),
+            audio_codec: Some("aac".into()),
+            width: Some(1920),
+            height: Some(1080),
+            audio_languages: vec!["en".into(), "fr".into()],
+            container_title: Some("Heat".into()),
+        },
+    )
+    .await
+    .expect("probe");
+    repo.set_content_hash(id, "abc").await.expect("hash");
+    let got = repo.file(id).await.unwrap().expect("file");
+    assert!(got.probed);
+    assert_eq!(got.audio_languages, vec!["en", "fr"]);
+    assert_eq!(got.content_hash.as_deref(), Some("abc"));
+    assert_eq!(repo.file_by_path(f.path).await.unwrap().unwrap().id, id);
+    assert_eq!(repo.files_in_folder(folder).await.unwrap().len(), 1);
+    assert_eq!(repo.folders().await.unwrap()[0].files, 1);
+
+    // set_match / match_of: a confirmed match is not replaced by an unconfirmed one
+    let confirmed = FileMatch {
+        media_item_id: heat,
+        confidence: 1.0,
+        method: MatchMethod::Manual,
+        covers: 1,
+        confirmed: true,
+    };
+    repo.set_match(id, &confirmed).await.expect("match");
+    repo.set_match(
+        id,
+        &FileMatch {
+            media_item_id: other,
+            confidence: 0.9,
+            method: MatchMethod::Filename,
+            covers: 1,
+            confirmed: false,
+        },
+    )
+    .await
+    .expect("ignored");
+    assert_eq!(repo.match_of(id).await.unwrap(), Some(confirmed.clone()));
+    assert_eq!(repo.files_for_item(heat).await.unwrap().len(), 1);
+
+    // a changed file keeps a confirmed match, and its probe is cleared
+    let changed = NewLocalFile {
+        size_bytes: 2000,
+        ..f.clone()
+    };
+    assert_eq!(
+        repo.upsert_file(&changed).await.unwrap(),
+        Upserted::Changed(id)
+    );
+    assert!(!repo.file(id).await.unwrap().unwrap().probed);
+    assert!(repo.match_of(id).await.unwrap().unwrap().confirmed);
+
+    // clear_match / set_candidates / candidates / review_queue / review_count
+    repo.clear_match(id).await.expect("clear");
+    assert_eq!(repo.match_of(id).await.unwrap(), None);
+    repo.set_candidates(id, &[(heat, 0.6), (other, 0.3)])
+        .await
+        .expect("candidates");
+    let c = repo.candidates(id).await.unwrap();
+    assert_eq!(
+        (c[0].media_item_id, c[0].release_year, c.len()),
+        (heat, Some(1995), 2)
+    );
+    assert_eq!(repo.review_queue(0.8, 10).await.unwrap().len(), 1);
+    assert_eq!(repo.review_count(0.8).await.unwrap(), 1);
+    repo.set_match(
+        id,
+        &FileMatch {
+            media_item_id: heat,
+            confidence: 0.85,
+            method: MatchMethod::Filename,
+            covers: 1,
+            confirmed: false,
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(repo.review_count(0.8).await.unwrap(), 0, "confident enough");
+    assert_eq!(
+        repo.review_count(0.9).await.unwrap(),
+        1,
+        "not for a higher bar"
+    );
+
+    // mark_missing / missing_with_size / move_file: a rename keeps the row and its match
+    repo.mark_missing(id).await.expect("missing");
+    assert_eq!(repo.missing_with_size(2000).await.unwrap()[0].id, id);
+    assert_eq!(
+        repo.review_count(0.9).await.unwrap(),
+        0,
+        "missing files wait"
+    );
+    repo.move_file(id, r"D:\Films\Heat (1995).mkv", folder)
+        .await
+        .expect("move");
+    let moved = repo.file(id).await.unwrap().unwrap();
+    assert_eq!(
+        (moved.path.as_str(), moved.missing_since),
+        (r"D:\Films\Heat (1995).mkv", None)
+    );
+    assert_eq!(
+        repo.match_of(id).await.unwrap().unwrap().media_item_id,
+        heat
+    );
+
+    // purge_missing / delete_file
+    let other_file = repo
+        .upsert_file(&NewLocalFile {
+            path: r"D:\Films\gone.mkv",
+            ..f.clone()
+        })
+        .await
+        .unwrap()
+        .id();
+    repo.mark_missing(other_file).await.unwrap();
+    assert_eq!(repo.purge_missing(folder).await.unwrap(), 1);
+    repo.delete_file(id).await.expect("delete");
+    assert_eq!(repo.file(id).await.unwrap(), None);
+
+    // remember / recall
+    assert_eq!(repo.recall("heat|1995|movie").await.unwrap(), None);
+    repo.remember("heat|1995|movie", other).await.unwrap();
+    repo.remember("heat|1995|movie", heat).await.unwrap();
+    assert_eq!(repo.recall("heat|1995|movie").await.unwrap(), Some(heat));
+
+    // remove_folder removes its files (0021's trigger)
+    let again = repo.upsert_file(&f).await.unwrap().id();
+    repo.remove_folder(folder).await.expect("remove");
+    assert!(repo.folders().await.unwrap().is_empty());
+    assert_eq!(repo.file(again).await.unwrap(), None);
+}
