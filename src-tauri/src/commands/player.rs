@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
-use sinephile_player::{Cutout, Options, Player, VideoHost};
+use sinephile_player::{Options, Placement, Player, VideoHost};
 
 use crate::state::AppState;
 
@@ -27,11 +27,22 @@ fn runtime(app: &AppHandle, state: &AppState) -> Result<Arc<PlayerRuntime>, Stri
     }
     let window = app.get_webview_window("main").ok_or("no main window")?;
     let parent = window.hwnd().map_err(err)?.0 as isize;
-    let host = VideoHost::new(parent)?;
+    // The video window must belong to the UI thread, which pumps its messages; this
+    // command runs on a worker (see `VideoHost::new`).
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(VideoHost::new(parent));
+    })
+    .map_err(err)?;
+    let mut host = rx.recv().map_err(err)??;
+    if let Some(p) = LAST_PLACEMENT.lock().expect("placement").as_ref() {
+        host.place(p)?;
+    }
     let options = Options {
         wid: Some(host.wid()),
         headless: false,
         hwdec: true,
+        cache_dir: Some(crate::logging::data_dir().join("cache").join("mpv")),
     };
     let player = Player::new(&sinephile_player::dll_path(), &options).map_err(err)?;
     let rt = Arc::new(PlayerRuntime {
@@ -52,10 +63,27 @@ pub async fn player_open(
     start: Option<f64>,
 ) -> Result<(), String> {
     tracing::info!(%target, ?start, "player open");
+    let t0 = std::time::Instant::now();
     let rt = runtime(&app, &state)
         .inspect_err(|e| tracing::error!(error = %e, "player could not start"))?;
+    let ready_ms = t0.elapsed().as_millis();
     rt.player.load(&target, start).map_err(err)?;
     rt.host.lock().expect("host").show();
+    // §2.3's play → first frame budget, measured where it is spent.
+    let waiting = rt.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        match waiting
+            .player
+            .wait_first_frame(std::time::Duration::from_secs(60))
+        {
+            Ok(_) => tracing::info!(
+                ready_ms,
+                first_frame_ms = t0.elapsed().as_millis(),
+                "first frame"
+            ),
+            Err(e) => tracing::warn!(error = %e, "no first frame"),
+        }
+    });
     Ok(())
 }
 
@@ -68,6 +96,12 @@ pub struct CutoutRect {
     pub height: f64,
     pub radius: f64,
 }
+
+/// Where the page last asked the video to sit. The page lays out on mount, before
+/// `player_open` has created the video window, so the request is kept and applied the
+/// moment the window exists — otherwise it stays at its 1×1 creation size, and both the
+/// picture and the pause still are a single pixel.
+static LAST_PLACEMENT: Mutex<Option<Placement>> = Mutex::new(None);
 
 /// Place the video and cut the chrome out of it. Coordinates are CSS pixels within the
 /// window's client area; `scale` is the page's `devicePixelRatio`.
@@ -82,23 +116,22 @@ pub async fn player_layout(
     scale: f64,
     cutouts: Vec<CutoutRect>,
 ) -> Result<(), String> {
-    let Some(rt) = state.player() else {
-        return Ok(());
+    let placement = Placement {
+        x,
+        y,
+        width,
+        height,
+        scale,
+        cutouts: cutouts
+            .iter()
+            .map(|c| (c.x, c.y, c.width, c.height, c.radius))
+            .collect(),
     };
-    let px = |v: f64| (v * scale).round() as i32;
-    let mut host = rt.host.lock().expect("host");
-    host.set_bounds(px(x), px(y), px(width), px(height));
-    let holes: Vec<Cutout> = cutouts
-        .iter()
-        .map(|c| Cutout {
-            x: px(c.x - x),
-            y: px(c.y - y),
-            width: px(c.width),
-            height: px(c.height),
-            radius: px(c.radius),
-        })
-        .collect();
-    host.set_cutouts(&holes)
+    *LAST_PLACEMENT.lock().expect("placement") = Some(placement.clone());
+    match state.player() {
+        Some(rt) => rt.host.lock().expect("host").place(&placement),
+        None => Ok(()),
+    }
 }
 
 /// One control action. A single command for all of them keeps the IPC surface small;

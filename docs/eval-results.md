@@ -2244,3 +2244,36 @@ page opens, so peer discovery overlaps with the user reading rather than followi
 2026-11-06, release build at `01be3d8`: E2 **43/43**; E3 meaning **0.0472**, filter **1.0000**;
 E1 warm p50 / p95 **6.5 / 14.9 ms** (the first run after a rebuild read 13.8 / 44.7 ms with cold
 pages, as in Phase 6); HNSW recall@10 **0.9760**. Unchanged from Phase 6.
+
+## Phase 8 — Player core (2026-11-06)
+
+### E2: 4K HEVC HDR decodes on the GPU
+
+Clip: 3840×2160, HEVC Main 10 (`yuv420p10le`), PQ (`smpte2084`) / BT.2020, 24 fps, 20 s, made with
+`ffmpeg -f lavfi -i testsrc2=size=3840x2160:rate=24 -t 20 -c:v libx265 -pix_fmt yuv420p10le
+-x265-params colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc hdr4k.mp4`.
+Machine: RTX 5070 Ti Laptop GPU, driver 610.88; libmpv shinchiro 20261021. Release build at `5506006`
+plus the example. Command: `cargo run --release -p sinephile-player --example hwdec -- hdr4k.mp4 8`.
+
+| Decode | mpv `hwdec-current` | Process CPU (share of one core) | Played |
+|---|---|---|---|
+| Hardware allowed | **`d3d11va-copy`** | **18.2 %** | 8.0 s in 8.0 s |
+| Forced software | — (`software`) | **35.9 %** | 8.0 s in 8.0 s |
+
+Hardware decode halves CPU at 4K HDR with real-time playback in both modes. `-copy` because
+the run is headless (no swapchain to hand the D3D11 surface to); in the window the same
+decoder runs without the copy. A synthetic test pattern is easy to decode, so the software
+figure understates what a real film costs — the point is the decoder chosen, not the margin.
+
+### Play → first frame in the real window (debug build, local 1080p clip)
+
+2026-11-06, `player open` → mpv's first `playback-restart`, logged by `player_open`
+(`SINEPHILE_AUTOPLAY=<clip> target/debug/sin-e-phile.exe`, then the `first frame` log line):
+**1506 / 1497 / 1518 / 1448 ms** over four launches; creating the player is **9–11 ms** of it.
+
+`SINEPHILE_MPV_LOG=v` shows where it goes: **1306 ms is WASAPI** failing with
+`AUDCLNT_E_DEVICE_IN_USE` on the default output (another application holds it
+exclusively), retrying at 1 / 10 / 100 / 1000 ms and then playing without sound. The
+video path is the remaining **~200 ms** — within §2.3's 500 ms. A persistent shader cache
+(`gpu-shader-cache-dir`) made no measurable difference (1684 → 1465 ms, inside the noise
+of the audio retry). The < 500 ms criterion needs a run with the audio device free.

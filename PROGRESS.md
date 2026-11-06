@@ -12,17 +12,17 @@
 
 **Phase 8 — Player Core — MILESTONE: FIRST DEMOABLE BUILD** (`in_progress`, branch `phase/08-player-core`)
 
-0 of 7 exit criteria met with evidence.
+1 of 7 exit criteria met with evidence.
 
 > Opened 2026-11-06 when Phase 7 merged (125a0a2). Carried in from Phase 7: E1 (start under 8 s; D61) and E7 (the live VPN-drop check, which needs the author).
 
-### Subtasks — 5/9 complete
+### Subtasks — 6/9 complete
 
 - [x] **8.1** libmpv as a pinned dependency: tools/mpv/fetch.py downloads shinchiro's mpv-dev-x86_64 20261021 build (baseline x86-64, not v3, so Tier 0 CPUs without AVX2 work), verifies its SHA-256, and places libmpv-2.dll beside the app; doctor checks for it; the bundle ships it. · `a3b2079`
 - [x] **8.2** crates/player: libmpv loaded dynamically (no import library, as Spike A), a safe wrapper — options, commands, properties, an event thread — and tests against an FFmpeg-generated clip: load, play, pause, exact seek (frame-accurate), tracks, speed. · `54396ea`
 - [x] **8.3** Embedding: libmpv renders into a child HWND of the main window (Spike A step 2), resized with it; play/pause/seek/volume/track/speed/stop commands; player state streamed to the frontend. · `e2fd2c8`
 - [~] **8.4** The player chrome (ADR-0020/0021): scrub bar with buffered ranges and torrent progress, volume, time, fullscreen, audio and subtitle tracks, speed; full keyboard control; auto-hide; still frame on pause.
-- [ ] **8.5** Xbox controller (ADR-0041): a gamepad layer over the focus system, the player mappings, the ten-foot focus treatment; tested with a simulated gamepad.
+- [x] **8.5** Xbox controller (ADR-0041): a gamepad layer over the focus system, the player mappings, the ten-foot focus treatment; tested with a simulated gamepad. · `5506006`
 - [x] **8.6** Position saving on exit and resume on reopen, per profile, across restarts. · `63ded9f`
 - [x] **8.7** A minimal detail page — title, year, synopsis, cast, a Play button through the resolver — with the torrent started as soon as the page opens (Phase 7 E1, D61). · `63ded9f`
 - [ ] **8.8** Search -> detail -> resolve -> play end to end, from a local file, the Internet Archive, and a P2P source.
@@ -31,7 +31,8 @@
 ### Exit criteria
 
 - [ ] **E1** A user can search, click, and watch — from a local file, from the Internet Archive backend, and from a configured P2P source.
-- [ ] **E2** Playback of 4K HEVC HDR uses hardware decode (verified in logs and by CPU usage).
+- [x] **E2** Playback of 4K HEVC HDR uses hardware decode (verified in logs and by CPU usage).
+      - *Evidence:* cargo run --release -p sinephile-player --example hwdec -- hdr4k.mp4 8 (3840x2160 HEVC Main10 PQ/BT.2020): hwdec-current=d3d11va-copy at 18.2% of one core vs forced software 35.9%, both real-time; RTX 5070 Ti Laptop, 2026-11-06, docs/eval-results.md Phase 8 E2
 - [ ] **E3** Seeking is frame-accurate and responsive.
 - [ ] **E4** Position resume works across app restarts.
 - [ ] **E5** With only an Xbox controller, a user can browse to a film, start it, pause, seek and leave the player — tested with a simulated gamepad in CI and confirmed once by the author with a real controller.
@@ -66,7 +67,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 5 | Semantic Search Engine | A | 4 | 2 | 2/5 |
 | [x] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 6/6 |
 | [x] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 6/8 |
-| [~] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 0/7 |
+| [~] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 1/7 |
 | [ ] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 0/6 |
 | [ ] | 10 | Subtitle Pipeline | B | 8 | 2 | 0/6 |
 | [ ] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 0/5 |

@@ -38,6 +38,9 @@ pub struct Options {
     pub headless: bool,
     /// Hardware decoding (`auto-safe`). Off forces software decode.
     pub hwdec: bool,
+    /// Where mpv keeps compiled GPU shaders between runs. Without it (`config=no` leaves
+    /// none) every launch recompiles them before the first frame.
+    pub cache_dir: Option<std::path::PathBuf>,
 }
 
 /// What the event thread has seen since the last `load`.
@@ -114,10 +117,16 @@ impl Player {
         } else {
             set("vo", "gpu-next")?;
         }
+        if let Some(dir) = &options.cache_dir {
+            let _ = std::fs::create_dir_all(dir);
+            set("gpu-shader-cache-dir", &dir.to_string_lossy())?;
+        }
         if let Some(wid) = options.wid {
             set("wid", &wid.to_string())?;
         }
-        mpv.request_log_messages("warn").map_err(PlayerError::Mpv)?;
+        // Warnings by default; `SINEPHILE_MPV_LOG=v` (or `debug`) to diagnose playback.
+        let level = std::env::var("SINEPHILE_MPV_LOG").unwrap_or_else(|_| "warn".into());
+        mpv.request_log_messages(&level).map_err(PlayerError::Mpv)?;
         mpv.initialize().map_err(PlayerError::Mpv)?;
 
         let mpv = Arc::new(mpv);

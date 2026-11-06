@@ -11,7 +11,7 @@ pub mod player;
 pub mod still;
 
 #[cfg(windows)]
-pub use host::{Cutout, VideoHost};
+pub use host::{Cutout, Placement, VideoHost};
 pub use player::{Options, Player, PlayerError, State, Track};
 
 /// Where libmpv is: `SINEPHILE_LIBMPV` if set, else `lib/libmpv-2.dll` beside the

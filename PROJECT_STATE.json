@@ -39,8 +39,8 @@
       {
         "id": "8.5",
         "text": "Xbox controller (ADR-0041): a gamepad layer over the focus system, the player mappings, the ten-foot focus treatment; tested with a simulated gamepad.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "5506006"
       },
       {
         "id": "8.6",
@@ -77,8 +77,8 @@
       {
         "id": "E2",
         "text": "Playback of 4K HEVC HDR uses hardware decode (verified in logs and by CPU usage).",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "cargo run --release -p sinephile-player --example hwdec -- hdr4k.mp4 8 (3840x2160 HEVC Main10 PQ/BT.2020): hwdec-current=d3d11va-copy at 18.2% of one core vs forced software 35.9%, both real-time; RTX 5070 Ti Laptop, 2026-11-06, docs/eval-results.md Phase 8 E2"
       },
       {
         "id": "E3",
@@ -1115,8 +1115,8 @@
         {
           "id": "E2",
           "text": "Playback of 4K HEVC HDR uses hardware decode (verified in logs and by CPU usage).",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "cargo run --release -p sinephile-player --example hwdec -- hdr4k.mp4 8 (3840x2160 HEVC Main10 PQ/BT.2020): hwdec-current=d3d11va-copy at 18.2% of one core vs forced software 35.9%, both real-time; RTX 5070 Ti Laptop, 2026-11-06, docs/eval-results.md Phase 8 E2"
         },
         {
           "id": "E3",
@@ -1177,8 +1177,8 @@
         {
           "id": "8.5",
           "text": "Xbox controller (ADR-0041): a gamepad layer over the focus system, the player mappings, the ten-foot focus treatment; tested with a simulated gamepad.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "5506006"
         },
         {
           "id": "8.6",

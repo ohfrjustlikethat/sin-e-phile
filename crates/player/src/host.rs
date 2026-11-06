@@ -22,10 +22,11 @@ use windows::Win32::Graphics::Gdi::{
     CombineRgn, CreateRectRgn, CreateRoundRectRgn, DeleteObject, SetWindowRgn, HRGN, RGN_DIFF,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, RegisterClassW, SetWindowPos, ShowWindow,
-    HWND_TOP, SWP_NOACTIVATE, SW_HIDE, SW_SHOWNA, WINDOW_EX_STYLE, WM_ERASEBKGND, WNDCLASSW,
-    WS_CHILD, WS_CLIPSIBLINGS,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindowThreadProcessId, RegisterClassW,
+    SetWindowPos, ShowWindow, HWND_TOP, SWP_NOACTIVATE, SW_HIDE, SW_SHOWNA, WINDOW_EX_STYLE,
+    WM_ERASEBKGND, WNDCLASSW, WS_CHILD, WS_CLIPSIBLINGS,
 };
 
 /// A chrome panel's silhouette, in physical pixels relative to the host's top-left.
@@ -45,9 +46,11 @@ pub struct VideoHost {
     height: i32,
 }
 
-// SAFETY: the HWND is only an identifier here. Every call made with it (SetWindowPos,
-// SetWindowRgn, ShowWindow, DestroyWindow) is one Windows allows from any thread for a
-// window in the same process; none touches its message queue.
+// SAFETY: the HWND is only an identifier here. SetWindowPos, SetWindowRgn and ShowWindow
+// may be called from any thread: Windows forwards them to the thread that owns the
+// window, which `new` guarantees is the UI thread, so they are answered. DestroyWindow
+// only works from the owning thread; from any other it fails harmlessly, and the window
+// goes when its parent does.
 unsafe impl Send for VideoHost {}
 unsafe impl Sync for VideoHost {}
 
@@ -64,8 +67,24 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
 impl VideoHost {
     /// Create the host as a child of `parent` (the app window's HWND as an integer),
     /// hidden until `show`.
+    ///
+    /// **Must run on the thread that owns `parent`** — the UI thread. A window belongs
+    /// to the thread that creates it, and Windows sends a child synchronous messages
+    /// whenever its parent moves, paints or is printed. Created on a thread that never
+    /// pumps messages (an async command's worker), nothing answers them and the whole
+    /// app window hangs, grey. So any other thread gets an error, not a window.
     pub fn new(parent: isize) -> Result<Self, String> {
         unsafe {
+            let owner = GetWindowThreadProcessId(HWND(parent as *mut _), None);
+            if owner == 0 {
+                return Err("the parent is not a window".into());
+            }
+            if owner != GetCurrentThreadId() {
+                return Err(
+                    "the video window must be created on the thread that owns the app window"
+                        .into(),
+                );
+            }
             let instance = GetModuleHandleW(None).map_err(|e| e.to_string())?;
             let class = WNDCLASSW {
                 lpfnWndProc: Some(proc),
@@ -161,6 +180,49 @@ impl Drop for VideoHost {
     }
 }
 
+/// Where the page wants the video, in CSS pixels within the window's client area, with
+/// `scale` the page's `devicePixelRatio`. Cutouts are in the same space as the stage.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Placement {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub scale: f64,
+    /// `(x, y, width, height, radius)` of each chrome panel, in CSS pixels.
+    pub cutouts: Vec<(f64, f64, f64, f64, f64)>,
+}
+
+impl Placement {
+    /// The host's bounds `(x, y, width, height)` in physical pixels, and the holes
+    /// relative to the host's own top-left.
+    pub fn physical(&self) -> ((i32, i32, i32, i32), Vec<Cutout>) {
+        let px = |v: f64| (v * self.scale).round() as i32;
+        let bounds = (px(self.x), px(self.y), px(self.width), px(self.height));
+        let holes = self
+            .cutouts
+            .iter()
+            .map(|&(x, y, width, height, radius)| Cutout {
+                x: px(x - self.x),
+                y: px(y - self.y),
+                width: px(width),
+                height: px(height),
+                radius: px(radius),
+            })
+            .collect();
+        (bounds, holes)
+    }
+}
+
+impl VideoHost {
+    /// Size and place the host and cut its holes, from the page's request.
+    pub fn place(&mut self, p: &Placement) -> Result<(), String> {
+        let ((x, y, w, h), holes) = p.physical();
+        self.set_bounds(x, y, w, h);
+        self.set_cutouts(&holes)
+    }
+}
+
 /// The window's region: its rectangle minus each cutout. Pure geometry over GDI, kept
 /// separate so a test can check it without a window.
 pub(crate) unsafe fn region(width: i32, height: i32, cutouts: &[Cutout]) -> Result<HRGN, String> {
@@ -189,6 +251,7 @@ pub(crate) unsafe fn region(width: i32, height: i32, cutouts: &[Cutout]) -> Resu
 mod tests {
     use super::*;
     use windows::Win32::Graphics::Gdi::PtInRegion;
+    use windows::Win32::UI::WindowsAndMessaging::WS_OVERLAPPEDWINDOW;
 
     #[test]
     fn a_cutout_removes_exactly_its_shape() {
@@ -216,6 +279,72 @@ mod tests {
                 "the panel's first pixel is the hole"
             );
             let _ = DeleteObject(r.into());
+        }
+    }
+
+    /// A top-level window owned by the calling thread, standing in for the app window.
+    fn parent_window() -> HWND {
+        unsafe {
+            CreateWindowExW(
+                WINDOW_EX_STYLE::default(),
+                w!("STATIC"),
+                w!(""),
+                WS_OVERLAPPEDWINDOW,
+                0,
+                0,
+                200,
+                200,
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap()
+        }
+    }
+
+    #[test]
+    fn a_placement_becomes_physical_pixels_relative_to_the_host() {
+        // 150 % scaling: the stage starts 10 CSS px in; a bottom bar 20 px from the stage edge.
+        let p = Placement {
+            x: 10.0,
+            y: 0.0,
+            width: 800.0,
+            height: 450.0,
+            scale: 1.5,
+            cutouts: vec![(30.0, 400.0, 760.0, 40.0, 2.0)],
+        };
+        let (bounds, holes) = p.physical();
+        assert_eq!(bounds, (15, 0, 1200, 675));
+        assert_eq!(
+            holes,
+            vec![Cutout {
+                x: 30,
+                y: 600,
+                width: 1140,
+                height: 60,
+                radius: 3
+            }]
+        );
+    }
+
+    #[test]
+    fn the_host_is_created_only_on_the_parents_thread() {
+        // Created from a worker thread, the host hung the whole app window (Phase 8).
+        let parent = parent_window();
+        let raw = parent.0 as isize;
+        let elsewhere = std::thread::spawn(move || VideoHost::new(raw).err())
+            .join()
+            .unwrap();
+        assert!(
+            elsewhere.is_some_and(|e| e.contains("thread that owns")),
+            "a worker thread must be refused"
+        );
+        let here = VideoHost::new(raw).expect("the owning thread may create it");
+        drop(here);
+        assert!(VideoHost::new(0).is_err(), "no parent, no window");
+        unsafe {
+            let _ = DestroyWindow(parent);
         }
     }
 
