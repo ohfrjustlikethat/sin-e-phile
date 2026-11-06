@@ -33,8 +33,8 @@
       {
         "id": "8.4",
         "text": "The player chrome (ADR-0020/0021): scrub bar with buffered ranges and torrent progress, volume, time, fullscreen, audio and subtitle tracks, speed; full keyboard control; auto-hide; still frame on pause.",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "02684b6"
       },
       {
         "id": "8.5",
@@ -1171,8 +1171,8 @@
         {
           "id": "8.4",
           "text": "The player chrome (ADR-0020/0021): scrub bar with buffered ranges and torrent progress, volume, time, fullscreen, audio and subtitle tracks, speed; full keyboard control; auto-hide; still frame on pause.",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "02684b6"
         },
         {
           "id": "8.5",
