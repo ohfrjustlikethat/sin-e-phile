@@ -57,14 +57,14 @@
       {
         "id": "8.8",
         "text": "Search -> detail -> resolve -> play end to end, from a local file, the Internet Archive, and a P2P source.",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "973efe0"
       },
       {
         "id": "8.9",
         "text": "Evidence: 4K HEVC HDR on hardware decode (log and CPU), frame-accurate seek, resume across restarts, play-to-first-frame timings, the demo GIF in the README; the carried Phase 7 E1; the author's batched manual checks (controller, VPN drop).",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "e0e5872"
       }
     ],
     "exit_criteria": [
@@ -1205,14 +1205,14 @@
         {
           "id": "8.8",
           "text": "Search -> detail -> resolve -> play end to end, from a local file, the Internet Archive, and a P2P source.",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "973efe0"
         },
         {
           "id": "8.9",
           "text": "Evidence: 4K HEVC HDR on hardware decode (log and CPU), frame-accurate seek, resume across restarts, play-to-first-frame timings, the demo GIF in the README; the carried Phase 7 E1; the author's batched manual checks (controller, VPN drop).",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "e0e5872"
         }
       ]
     },

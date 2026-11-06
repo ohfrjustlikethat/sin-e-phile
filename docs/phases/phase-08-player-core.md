@@ -32,8 +32,8 @@ libmpv embedded and rendering into the Tauri window, with hardware decoding enab
 - [x] **8.5** Xbox controller (ADR-0041): a gamepad layer over the focus system, the player mappings, the ten-foot focus treatment; tested with a simulated gamepad.
 - [x] **8.6** Position saving on exit and resume on reopen, per profile, across restarts.
 - [x] **8.7** A minimal detail page — title, year, synopsis, cast, a Play button through the resolver — with the torrent started as soon as the page opens (Phase 7 E1, D61).
-- [ ] **8.8** Search -> detail -> resolve -> play end to end, from a local file, the Internet Archive, and a P2P source.
-- [ ] **8.9** Evidence: 4K HEVC HDR on hardware decode (log and CPU), frame-accurate seek, resume across restarts, play-to-first-frame timings, the demo GIF in the README; the carried Phase 7 E1; the author's batched manual checks (controller, VPN drop).
+- [x] **8.8** Search -> detail -> resolve -> play end to end, from a local file, the Internet Archive, and a P2P source.
+- [x] **8.9** Evidence: 4K HEVC HDR on hardware decode (log and CPU), frame-accurate seek, resume across restarts, play-to-first-frame timings, the demo GIF in the README; the carried Phase 7 E1; the author's batched manual checks (controller, VPN drop).
 
 ## Risks named by this phase
 
@@ -55,3 +55,5 @@ How video playback actually works — container, streams, codecs, decode, presen
 - **8.7** A minimal detail page — title, year, synopsis, cast, a Play button through the resolver — with t · `63ded9f`
 - **8.5** Xbox controller (ADR-0041): a gamepad layer over the focus system, the player mappings, the ten- · `5506006`
 - **8.4** The player chrome (ADR-0020/0021): scrub bar with buffered ranges and torrent progress, volume,  · `02684b6`
+- **8.8** Search -> detail -> resolve -> play end to end, from a local file, the Internet Archive, and a P · `973efe0`
+- **8.9** Evidence: 4K HEVC HDR on hardware decode (log and CPU), frame-accurate seek, resume across resta · `e0e5872`
