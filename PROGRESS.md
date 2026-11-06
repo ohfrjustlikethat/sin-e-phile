@@ -46,7 +46,7 @@ Phase 9 subtask 9.1 (docs/phases/phase-09-intelligent-source-selection.md): crea
 
 ## Blockers
 
-None.
+- **B9** CI run 42165606563 failed in 'Controller flow (simulated Xbox pad)': the Windows Server runner reports prefers-reduced-motion, so the glide and grow checks saw them correctly off. Fixed in 93ad89e by pinning the media feature in the harness; clears when CI on the branch is green.
 
 ---
 
