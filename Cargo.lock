@@ -5245,6 +5245,7 @@ dependencies = [
  "sinephile-playback",
  "sinephile-player",
  "sinephile-search-engine",
+ "sinephile-selection",
  "sinephile-sources",
  "sinephile-tiers",
  "sinephile-torrent",
@@ -5373,12 +5374,14 @@ dependencies = [
  "sinephile-metadata-api",
  "sinephile-persistence",
  "sinephile-player",
+ "sinephile-selection",
  "sinephile-sources",
  "sinephile-torrent",
  "source-protocol",
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -5403,6 +5406,15 @@ dependencies = [
  "sinephile-vector-index",
  "thiserror 2.0.20",
  "tokio",
+]
+
+[[package]]
+name = "sinephile-selection"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "source-protocol",
 ]
 
 [[package]]

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { moveFocus } from "@/lib/gamepad";
+import { useHints } from "@/design-system/focus/FocusLayer";
 
 /**
  * The on-screen keyboard for a controller — ADR-0041.
@@ -70,6 +71,10 @@ export function PadKeyboard() {
     if (!target) return;
     // Start on the first key, so the D-pad is already in the keyboard.
     panel.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const unhint = useHints.getState().push([
+      ["A", "Type"],
+      ["B", "Close"],
+    ]);
     closeOpen = () => {
       dismissed.current = target;
       setTarget(null);
@@ -78,6 +83,7 @@ export function PadKeyboard() {
     };
     return () => {
       closeOpen = null;
+      unhint();
     };
   }, [target]);
 

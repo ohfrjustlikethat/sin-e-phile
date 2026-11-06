@@ -121,6 +121,7 @@ function Entry({
   return (
     <div
       data-row
+      data-focus-tile
       role="link"
       tabIndex={0}
       onFocus={onFocus}

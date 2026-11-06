@@ -1810,3 +1810,65 @@ the hung capture scripts were the threading bug all along, and that should have 
 suspected the first time a call to the app's window did not return.
 
 **Carry forward.** E1 → 12, E5 → 9 (author), Phase 7 E7 → 9 (author). D63–D66.
+
+### Session 22, continued (2026-11-06) — the TV focus language (spec 3.1.0)
+
+The author asked for the Netflix-on-Xbox white focus rectangle, a "tv feel", and Apple
+TV's responsiveness, and asked to be questioned first. Researched (Microsoft's Xbox and
+TV guidance, Apple's tvOS focus and selection, Android TV's focus system, user reports on
+white borders vanishing on light posters) and put twelve choices to the author in three
+rounds with previews. Their answers became ADR-0042 and amendment A32: a white ring with
+a dark hairline and an oxblood halo for keyboard and pad; grow, lift, stick tilt, sheen
+and press; a gliding ring on a critically damped spring ("a combination" of springy and
+crisp); TV mode with a pad (125%, safe margin, hints, quiet ticks and rumble, View for full
+screen); the masthead kept; a typographic billboard with the full artwork backdrop in
+Phase 18. §9.0's bans gain one exception, confined to `src/design-system/focus/`. The
+focus language is built first in Phase 9 (subtask 9.0); `docs/specs/tv-focus.md` is the
+build input.
+
+### Session 22, continued (2026-11-06) — Phase 9: choosing the copy
+
+The author asked for the next five phases without check-ins unless something goes wrong.
+
+**Built.** `crates/selection`: nine scored terms and a lexicographic order (sunk, unmet,
+local, total, key), fakes caught by bytes per minute, length against the runtime and the
+structure of the name (no group names, §2.1); `SourceCandidate.duration_seconds` (the
+Archive's `length`). Audio and Quality rows on the film page, offering what honest copies
+carry, original/dub from AniList's `countryOfOrigin`, remembered across films. Automatic
+fallback (`crates/playback/src/fallback.rs`): an error moves on at once, 8 s without a load
+moves on, a loaded copy gets 30 s; a generation counter stops a stale loop. "Why this
+source" under Play and the expert panel (Ctrl+Shift+S, or a setting).
+
+**Numbers.** E4: dead first choice → next copy's first frame **8.11 s** (budget 10 s).
+Real window: Play through the new path 5615 ms, nothing skipped. Rust tests 557 → 602;
+frontend 62 → 70; the controller flow 17 → 19 checks.
+
+**Bugs found, and what each teaches.**
+- CI went red (B10): the controller harness's fake backend still answered `prepare_play`
+  with the Phase 8 shape. The harness runs locally against `dist/`, so it joins the
+  pre-push list in CLAUDE.md. *A fake that mirrors an IPC type has to change with it.*
+- The harness, once fixed, found a real navigation bug: Up from a small option under the
+  wide Play button skipped to the masthead, because sideways drift was measured centre to
+  centre. Now edge to edge. *Spatial navigation must be measured between boxes, not points.*
+- Two concurrent dynamic imports of a mocked module: Vitest served the real module to the
+  second, so a second event listener broke a test. Static import.
+- The panel's first real-window look showed two "identical" rows (an h264 and an mpeg4
+  file of one film) and a "why" line written for engineers; both reworded, and "below the
+  4K wanted" became "below the 4K this machine plays" when nothing was chosen.
+
+**Decisions.** Choices are buttons, not a `<select>` (a native popup cannot be driven by a
+pad). Choices are kept in local storage for now. AV1 decode and an HDR display are assumed
+absent until probed (D67). `original_language` only for AniList anime (D68). A swarm
+abandoned by fallback stays in the engine (D69).
+
+#### Phase 9 retrospective
+
+**Went well.** Rules as order rather than weights made the property tests short and the
+explanations honest. Mutation checks caught that `cargo test` stops at the first failing
+binary, which would have hidden two properties never seen to fail.
+
+**Went badly.** Pushed a change to an IPC type without running the pad harness, which
+turned CI red; caught by statecheck before a second push, but should not have happened.
+
+**Carry forward.** E5 of Phase 8 (real controller) and E7 of Phase 7 (VPN drop) are still
+the author's. D67–D69.

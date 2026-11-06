@@ -64,7 +64,7 @@ the whole app around 10 MB instead of 150 MB (ADR-0002).
 ## What happens when you press play
 
 This is the path worth understanding, because nearly every subsystem is on it.
-`⬜ not built yet` — this is Phase 8's vertical slice.
+Steps 1–5 and 7 are built (Phases 6–9); step 6, subtitles, is Phase 10.
 
 **1. You click a film.** The frontend asks the backend to resolve it, passing the
 internal media ID plus your language and quality preferences.
@@ -85,7 +85,9 @@ plausibility of size against claimed quality (a 700 MB "4K" file is a lie), code
 compatibility with your actual hardware, which audio languages are present, whether
 subtitles come with it, and whether you already have it locally — a local file
 always wins. The best candidate is chosen. You see none of this, unless you open the
-expert panel, which shows the full ranked list and every score component.
+expert panel, which shows the full ranked list and every score component. If the
+chosen copy will not start, the next is tried without a word — within 10 seconds of
+Play for a copy that never answers.
 
 **4. If it is a torrent, the streaming scheduler takes over.** *(Phase 7)* This is
 the hardest part of the project and it gets its own section below.
@@ -323,6 +325,17 @@ position. The app's controls are HTML drawn over the video through holes cut in 
 video window, and pausing swaps the video for a still frame so the pause screen can dim
 it. A keyboard and an Xbox controller send the same intents. How the window, the holes
 and the threads fit together: `docs/specs/player-embedding.md`.
+
+### Choosing a source ✅ `Phase 9`
+
+`crates/selection` scores every copy the sources find on nine terms — language, quality,
+plausibility, length, health, compatibility, throughput, encoding, subtitles — and ranks
+them with rules first: a fake is last, a copy that misses your choice comes next, your own
+file comes first. Fakes are caught by too few bytes for the claimed quality, a length that
+does not match the film, or a name that contradicts itself; never by a list of names. The
+film page offers the languages and qualities the honest copies carry, says why it chose a
+copy, and (Ctrl+Shift+S) shows the whole arithmetic. A copy that will not start is replaced
+by the next. Every term and weight: `docs/specs/source-scoring.md`.
 
 ### The posture guard ✅ `Phase 0`
 

@@ -66,7 +66,7 @@ fn media(
     let id_mal = id_mal.map(|m| m.to_string()).unwrap_or("null".into());
     let year = year.map(|y| y.to_string()).unwrap_or("null".into());
     format!(
-        r#"{{"id":{id},"idMal":{id_mal},"title":{{"romaji":"{romaji}","english":"{english}","native":"{native}"}},"format":"{format}","status":"FINISHED","episodes":26,"seasonYear":{year},"nextAiringEpisode":null}}"#
+        r#"{{"id":{id},"idMal":{id_mal},"title":{{"romaji":"{romaji}","english":"{english}","native":"{native}"}},"format":"{format}","status":"FINISHED","episodes":26,"seasonYear":{year},"nextAiringEpisode":null,"countryOfOrigin":"JP"}}"#
     )
 }
 
@@ -111,6 +111,15 @@ async fn a_matched_title_is_promoted_and_carries_both_ids() {
         .await
         .expect("kind");
     assert_eq!(kind, "anime_series");
+    // Made in Japan: the original soundtrack is Japanese, which is what tells a dub
+    // from the original on the detail page (Phase 9).
+    let original: Option<String> =
+        sqlx::query_scalar("SELECT original_language FROM media_items WHERE id = ?")
+            .bind(bebop)
+            .fetch_one(db.pool())
+            .await
+            .unwrap();
+    assert_eq!(original.as_deref(), Some("ja"));
 
     // MAL's id comes free with AniList's, and nothing else supplies one.
     let ids: Vec<(String, String)> = sqlx::query_as(

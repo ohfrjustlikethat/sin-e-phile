@@ -358,7 +358,7 @@ must not be compromised.
 | **MUBI** | Near-black ground, full-bleed film stills, enormous breathing room, almost no chrome, magazine-like layout, tiny uppercase metadata labels. **The page should feel edited, not generated.** |
 | **Spotify** | Aggressive weight contrast. Very heavy headings against very quiet metadata, tight tracking on large type. Hierarchy readable from across a room. |
 | **Criterion Channel** | The feeling of a curated collection — numbered, catalogued, cared for. Editorial serif used sparingly for titles. |
-| **Netflix** | **Mechanics only**: rails, hover behaviour, the billboard hero. Take none of its visual language. |
+| **Netflix** | **Mechanics only**: rails, hover behaviour, the billboard hero. Take none of its visual language — **except the white focus ring**, the author's explicit choice for the TV feel (ADR-0042). |
 
 The target is an application that feels like every media need can be met, and met
 tastefully. **Premium means considered, not decorated.**
@@ -383,6 +383,12 @@ it looks.
   least one must be `0` or `2px`.
 - **Uniform sizing.** If every card is the same size and every gap is the same, it
   reads as generated. Build deliberate irregularity.
+
+**One scoped exception — the focus effect** (ADR-0042). The focused element alone may
+have a tight oxblood halo, a lift shadow, a specular sheen and a 3D tilt, because a
+viewer across the room must find it instantly and the author chose the Apple TV feel.
+It lives in one component, `src/design-system/focus/`, and **nowhere else**; the design
+lint enforces the boundary. Everything above still applies to every other pixel.
 
 **Required instead:**
 
@@ -436,9 +442,12 @@ gentle ramp every panel sits somewhere on.
   /* Accent — oxblood, kept: see the note below */
   --oxblood:         #8E2B34;
   --oxblood-hover:   #A6333E;
-  --oxblood-bright:  #C4434F;  /* focus rings, active state, progress */
+  --oxblood-bright:  #C4434F;  /* focus halo, active state, progress */
   --oxblood-deep:    #4E171C;  /* pressed, deep fills */
   --oxblood-wash:    rgba(142,43,52,0.16);
+
+  /* Focus (ADR-0042) — the one pure white in the system, used only for the ring */
+  --focus-ring:      #FFFFFF;
 
   /* Semantic — deliberately distinct from oxblood */
   --success:         #4E7A5C;
@@ -455,7 +464,7 @@ separates from a warmer ground.
 
 **Colour rules:**
 
-- Oxblood is for *intent*: the play button, focus rings, progress, the active nav
+- Oxblood is for *intent*: the play button, the focus halo, progress, the active nav
   item, continue-watching markers. **Never decorative, never a large fill.**
 - **Posters and stills are the colour in this app.** The chrome recedes. If a screen
   looks colourful, the artwork is doing it.
@@ -499,8 +508,13 @@ grotesque; Circular), so the equivalents here must be **free and self-hostable**
   through the transparent window. **A crisp opaque panel suits this brief anyway.**
   The **pause overlay is exempt** and keeps its dim and blur — it composites over a
   captured still frame, where everything is HTML (ADR-0021).
-- `prefers-reduced-motion` disables all scale and parallax, keeps opacity fades at
-  100 ms.
+- **Focus motion** (ADR-0042): the ring glides between targets and rows scroll to keep
+  the focused tile in view, on a critically damped spring of about 200 ms — alive, never
+  bouncing. A focused tile grows to 1.06 and lifts; a thumb resting on the left stick
+  tilts it up to 6° with a sheen that follows; holding A presses it to 0.97×. These
+  replace the poster hover above when a pad or keyboard has focus.
+- `prefers-reduced-motion` disables all scale, tilt, sheen and parallax, and the ring
+  stops gliding; opacity fades stay, at 100 ms.
 
 ### 9.4 Layout
 
@@ -520,15 +534,21 @@ grotesque; Circular), so the equivalents here must be **free and self-hostable**
   no sidebar, it is the page's left edge: spine numbers and a hairline rule.
 - **Generous vertical rhythm.** Breathing room is the MUBI signal and the easiest
   thing to lose to density. When in doubt, more space.
-- Every interactive element has a visible `--oxblood-bright` focus ring. Full keyboard
-  navigation is a Phase 2 requirement, not a Phase 27 retrofit.
+- **Every interactive element has a visible focus ring: 3px `--focus-ring` white, a 2px
+  gap, a dark hairline outside it, and a tight `--oxblood-bright` halo** (ADR-0042) — the
+  Netflix-on-Xbox rectangle, readable across a room and on light artwork. Keyboard and
+  controller share it; mouse users see none. Full keyboard navigation is a Phase 2
+  requirement, not a Phase 27 retrofit.
 - **An Xbox controller is a remote** (ADR-0041). Over Bluetooth, the wireless adapter or
   USB, a controller drives the same focus system as the keyboard through the WebView's
   Gamepad API: D-pad and left stick move focus, A selects, B goes back, LB/RB change
   destination, and the player maps play/pause, seek and the subtitle and audio menus to
-  the face buttons and triggers. When the last input came from a controller, focus gets
-  the larger ten-foot treatment, because the viewer is across the room. Built in Phase 8;
-  text entry (an on-screen keyboard) and the whole-app audit in Phase 18.
+  the face buttons and triggers. When the last input came from a controller, the app is
+  in **TV mode** (ADR-0042): 125% scale inside a 5% TV-safe margin, a button-hints
+  footer, quiet navigation ticks and a light rumble on select (both on by default, both
+  switchable), and the View button toggles full screen (entered on picking the pad up,
+  unless turned off). Built in Phase 8 with an on-screen keyboard; the TV focus language
+  in Phase 9; the whole-app audit in Phase 18.
 - **`PosterCard` has a designed artwork-free state** (ADR-0013): a typographic
   title card, not a grey rectangle. Given this brief it should be genuinely
   beautiful — for a film app a typographic card is arguably the better default.
@@ -1118,7 +1138,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 **Goal.** The user picks a language and a quality. The app does everything else, invisibly and well.
 
-**Deliverables.** A scoring function over `SourceCandidate`s combining: swarm health (seeders, peers, measured throughput), size-versus-quality plausibility (catching fakes and mislabels), release-group and encoding reputation heuristics, codec and HDR compatibility with the user's hardware, audio-track languages present, subtitle presence, and local availability (a local file always wins). Fake and mislabel detection: a 700 MB "4K" file is a lie; a 60-minute file for a 140-minute film is a lie. Language selection as a **first-class UI concept** — a Netflix-style language dropdown listing available audio languages, which resolves to whichever candidate actually carries that audio track, with dub/sub distinction for anime. Quality selection the same way, defaulting to the best the hardware and connection support. Automatic fallback: if the top candidate fails to start within a timeout, silently try the next, and log why. The hidden expert panel (`Ctrl+Shift+S` and a Settings toggle) showing the full ranked candidate list with every score component — this is both a debugging tool and a compelling demo. A "why this source" one-liner under the play button.
+**Deliverables.** A scoring function over `SourceCandidate`s combining: swarm health (seeders, peers, measured throughput), size-versus-quality plausibility (catching fakes and mislabels), release-group and encoding reputation heuristics, codec and HDR compatibility with the user's hardware, audio-track languages present, subtitle presence, and local availability (a local file always wins). Fake and mislabel detection: a 700 MB "4K" file is a lie; a 60-minute file for a 140-minute film is a lie. Language selection as a **first-class UI concept** — a Netflix-style language dropdown listing available audio languages, which resolves to whichever candidate actually carries that audio track, with dub/sub distinction for anime. Quality selection the same way, defaulting to the best the hardware and connection support. Automatic fallback: if the top candidate fails to start within a timeout, silently try the next, and log why. **The TV focus language** (ADR-0042), built here because every later screen inherits it and this phase's language and quality pickers are its first users: the white ring with its halo, grow, lift, stick tilt, sheen, press, the gliding ring, TV mode's 125% scale and safe margin, the button-hints footer, navigation sounds, rumble, and View for full screen, all in `src/design-system/focus/`. The hidden expert panel (`Ctrl+Shift+S` and a Settings toggle) showing the full ranked candidate list with every score component — this is both a debugging tool and a compelling demo. A "why this source" one-liner under the play button.
 
 **Exit criteria.**
 - [ ] Scoring is a pure function with unit and property tests over a fixture set of candidate lists.
@@ -1127,6 +1147,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 - [ ] A deliberately-failing top candidate falls back within 10 s with no user action.
 - [ ] The expert panel's score breakdown is legible and matches the code.
 - [ ] `docs/specs/source-scoring.md` documents every term in the scoring function and its weight, with justification.
+- [ ] The TV focus language (ADR-0042) is in the design system, and `tools/uiaudit` proves it in TV mode: the white ring is visible on every focus stop, the ring glides rather than jumps, the 125% scale and safe margin hold at 1920×1080, and under reduced motion no transform remains.
 
 **Learning note.** Designing a scoring function; why weights need justification and testing; the fake-detection heuristics; how to build an abstraction that hides complexity without hiding failure.
 
@@ -1289,14 +1310,14 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 **Goal.** Home, Films, and TV Shows become the beautiful, navigable front of the whole system, and the whole app is brought to one design standard before the phase closes.
 
-**Deliverables.** **Home**: Continue Watching first (with progress, next episode, and a remove option), then adaptive rails generated by the discovery engine, ordered by predicted engagement, with an optional hero for a single strong recommendation. **Films** and **TV Shows**: Continue Watching scoped to that kind, then browsable structure — by genre, decade, country, language, director, movement, collection, awards, and curated lists — with real filtering and sorting. **Every rail has a "see all"** that opens a proper browsable grid with filters, honouring the anti-pattern rule that nothing is more than three interactions from Home. Detail pages: hero artwork, synopsis, cast and crew with links, ratings, availability badges (local / streamable / downloadable, with quality and language), episode lists with progress for series, related and "more like this", and a prominent play button with the language and quality selectors from Phase 9. Hover previews: muted, 400 ms dwell, still-frame-then-motion, disableable. A Live Channels tab with an honest, well-designed empty state pointing to Phase 24. Everything virtualised, everything keyboard-navigable, everything at 60 fps.
+**Deliverables.** **Home**: Continue Watching first (with progress, next episode, and a remove option), then adaptive rails generated by the discovery engine, ordered by predicted engagement, with an optional hero for a single strong recommendation. **Films** and **TV Shows**: Continue Watching scoped to that kind, then browsable structure — by genre, decade, country, language, director, movement, collection, awards, and curated lists — with real filtering and sorting. **Every rail has a "see all"** that opens a proper browsable grid with filters, honouring the anti-pattern rule that nothing is more than three interactions from Home. Detail pages: hero artwork, synopsis, cast and crew with links, ratings, availability badges (local / streamable / downloadable, with quality and language), episode lists with progress for series, related and "more like this", and a prominent play button with the language and quality selectors from Phase 9. Hover previews: muted, 400 ms dwell, still-frame-then-motion, disableable. A Live Channels tab with an honest, well-designed empty state pointing to Phase 24. **The TV billboard** (ADR-0042): the top of Home is a typographic billboard for the focused or featured film — title in the display face, year, director, one line of why — and behind it **the focused film's full artwork backdrop** when the user has a TMDB key, cross-fading as focus moves; with no key, a dim tint (designed first, since it is the default). Everything virtualised, everything keyboard-navigable, everything at 60 fps.
 
 **The final design overhaul** (ADR-0037). The phase ends by bringing **every** surface to one standard: Home, Films, TV Shows, Watchlist, Live, Search, Settings, Downloads, the detail page, and every empty, loading and error state. In order:
 1. **The masthead** (§9.4), if it has not already been built ahead of the phase: tabs on top, a labelled Search button, the left rail and its collapse state removed.
 2. **Mockups before code** (ADR-0023's rule): static HTML with real catalogue data, two interpretations of the masthead, Home, Films and a detail page, each shown **with no artwork first** and with artwork second. The author chooses before any surface is built.
 3. **The artwork-free state is the primary state.** A default install has no TMDB key and so no artwork (ADR-0013). The typographic card must hold a whole page, with sizes varied by editorial weight, and every page is judged in that state first.
 4. **No placeholder survives.** The "PHASE NN" pill screens are removed; an honest empty state is still a designed one.
-5. **A design lint in CI** that fails on what §9.0 bans and code can detect: shadow utilities, radii other than 0 and 2px, `backdrop-blur`, decorative gradient utilities, Tailwind's default palette names, and colour classes that resolve to no token.
+5. **A design lint in CI** that fails on what §9.0 bans and code can detect: shadow utilities, radii other than 0 and 2px, `backdrop-blur`, decorative gradient utilities, Tailwind's default palette names, and colour classes that resolve to no token — everywhere except `src/design-system/focus/`, the one scoped exception (ADR-0042).
 6. **Motion as a finish**: 180ms page changes, an active-tab underline that moves rather than jumps, and an opacity-only fallback under `prefers-reduced-motion`.
 7. **A screenshot review set**: `tools/shots` captures every surface at 1024×640 and 1920×1080, with and without artwork, and the author reviews it against §9.0's test.
 
@@ -1308,7 +1329,8 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 - [ ] The masthead fits at the 1024×640 minimum window with every destination, Search, Downloads and Settings visible, measured by `tools/uiaudit`.
 - [ ] Search is reachable from every surface by the visible Search button and by `/`.
 - [ ] No destination or state shows a placeholder screen.
-- [ ] Every screen is usable with an Xbox controller alone, search included through an on-screen keyboard built for the D-pad (ADR-0041).
+- [ ] Every screen is usable with an Xbox controller alone, search included through an on-screen keyboard built for the D-pad (ADR-0041), in TV mode with the focus language of ADR-0042.
+- [ ] Home's billboard shows the focused film's artwork backdrop with a TMDB key and the designed tint without one, cross-fading in under 300 ms as focus moves, at 60 fps.
 - [ ] The design lint passes in CI, and each of its rules has been seen to fail.
 - [ ] The author signs off the screenshot review set (every surface, both sizes, with and without artwork) against §9.0's test: `manual: <what they reviewed and said>`. This set supplies the README's screenshots.
 
@@ -1596,6 +1618,14 @@ Face recognition, live TV, manga and comics, casting and watch-together. Fully i
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 3.1.0 — 2026-11-06 (a TV focus language)
+
+Minor: it adds deliverables and a scoped exception; no decision is reversed.
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A32 | §9.0, §9.1, §9.3, §9.4, Phase 9, Phase 18 | **A TV feel**, decided by the author question by question: a white Netflix-style focus ring with an oxblood halo for keyboard and controller; Apple TV-style grow, lift, stick tilt, sheen and press; a gliding ring on a critically damped spring; TV mode with a pad (125% scale, safe margin, button hints, quiet sounds and rumble, View for full screen); and in Phase 18 a typographic billboard over the focused film's full artwork backdrop. §9.0's bans gain one exception, confined to the focus component and enforced by the design lint. The masthead stays. | [0042](docs/adr/0042-tv-focus-language.md) |
 
 ### spec_version 3.0.0 — 2026-11-05 (autonomous delivery, and a controller as a remote)
 

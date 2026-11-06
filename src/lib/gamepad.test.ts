@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BUTTON, heldDirections, navAction, nearest, newlyPressed, playerIntent, shouldRepeat,
-  startGamepad, type Box, type PadFrame,
+  startGamepad, tiltFor, TILT_MAX, type Box, type PadFrame,
 } from "./gamepad";
 
 /** ADR-0041: an Xbox controller drives the app like a remote. */
@@ -56,6 +56,25 @@ describe("gamepad decisions", () => {
   });
 });
 
+describe("stick tilt (ADR-0042)", () => {
+  it("a resting thumb tilts toward itself; noise and navigation do not", () => {
+    expect(tiltFor(0.05, 0)).toEqual({ rx: 0, ry: 0 }); // noise
+    expect(tiltFor(0.9, 0)).toEqual({ rx: 0, ry: 0 }); // that is a move, not a tilt
+    const right = tiltFor(0.4, 0);
+    expect(right.ry).toBeGreaterThan(0);
+    expect(right.rx).toBeCloseTo(0);
+    const up = tiltFor(0, -0.4);
+    expect(up.rx).toBeGreaterThan(0);
+  });
+
+  it("never tilts past the maximum", () => {
+    for (const [x, y] of [[0.49, 0], [0.35, 0.35], [-0.2, 0.45]] as const) {
+      const t = tiltFor(x, y);
+      expect(Math.hypot(t.rx, t.ry)).toBeLessThanOrEqual(TILT_MAX + 1e-9);
+    }
+  });
+});
+
 describe("startGamepad, with a simulated pad", () => {
   afterEach(() => vi.unstubAllGlobals());
 
@@ -86,4 +105,51 @@ describe("startGamepad, with a simulated pad", () => {
     stop();
     expect(document.documentElement.dataset.input).toBeUndefined();
   });
+
+  it("reports pick-up once, A down and up for the press, View, and a resting tilt", () => {
+    let pad = { connected: true, buttons: Array(17).fill({ pressed: false, value: 0 }), axes: [0, 0] };
+    vi.stubGlobal("navigator", { getGamepads: () => [pad] });
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => frames.push(cb));
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+    const h = { player: vi.fn(() => false), nav: vi.fn(), tilt: vi.fn(), press: vi.fn(), view: vi.fn(), pickup: vi.fn() };
+    const stop = startGamepad(h);
+    const set = (down: number[], axes = [0, 0]) => {
+      const buttons = Array(17).fill({ pressed: false, value: 0 });
+      down.forEach((b) => (buttons[b] = { pressed: true, value: 1 }));
+      pad = { ...pad, buttons, axes };
+      frames.shift()?.(performance.now());
+    };
+    set([BUTTON.A]);
+    set([BUTTON.A]);
+    set([]);
+    expect(h.press.mock.calls).toEqual([[true], [false]]);
+    set([BUTTON.VIEW]);
+    expect(h.view).toHaveBeenCalledTimes(1);
+    set([], [0.3, 0]);
+    expect(h.tilt).toHaveBeenLastCalledWith(0, expect.any(Number));
+    expect(h.tilt.mock.lastCall?.[1]).toBeGreaterThan(0);
+    set([], [0, 0]);
+    expect(h.tilt).toHaveBeenLastCalledWith(0, 0);
+    expect(h.pickup).toHaveBeenCalledTimes(1);
+    stop();
+  });
 });
+
+describe("nearest, wide targets (Phase 9)", () => {
+  it("goes up from a small option to the wide button it sits under, not past it", () => {
+    // Play spans 100-400; "German" sits under its right end; a masthead link is far above
+    // but centred over the option.
+    const option = { x: 380, y: 300, width: 60, height: 20 };
+    const play = { x: 100, y: 230, width: 300, height: 50 };
+    const masthead = { x: 390, y: 20, width: 60, height: 20 };
+    expect(nearest(option, [masthead, play], "up")).toBe(1);
+  });
+
+  it("among options under a wide button, goes down to the nearest one", () => {
+    const play = { x: 100, y: 230, width: 300, height: 50 };
+    const options = [80, 160, 240].map((x) => ({ x, y: 300, width: 60, height: 20 }));
+    expect(nearest(play, options, "down")).toBe(2);
+  });
+});
+

@@ -1,3 +1,4 @@
+import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { commands, type PlayerStateView, type TrackView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
@@ -22,24 +23,29 @@ function inTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
-/** `player-state`, four times a second. Inert outside the Tauri shell. */
-function usePlayerState(): PlayerStateView | null {
-  const [state, setState] = useState<PlayerStateView | null>(null);
+/** A backend event, for as long as the component is mounted. Inert outside the Tauri shell. */
+function useTauriEvent<T>(name: string, on: (payload: T) => void) {
+  const handler = useRef(on);
+  handler.current = on;
   useEffect(() => {
     if (!inTauri()) return;
     let unlisten: (() => void) | undefined;
     let cancelled = false;
-    void import("@tauri-apps/api/event").then(({ listen }) =>
-      listen<PlayerStateView>("player-state", (e) => setState(e.payload)).then((u) => {
-        if (cancelled) u();
-        else unlisten = u;
-      }),
-    );
+    void listen<T>(name, (e) => handler.current(e.payload)).then((u) => {
+      if (cancelled) u();
+      else unlisten = u;
+    });
     return () => {
       cancelled = true;
       unlisten?.();
     };
-  }, []);
+  }, [name]);
+}
+
+/** `player-state`, four times a second. */
+function usePlayerState(): PlayerStateView | null {
+  const [state, setState] = useState<PlayerStateView | null>(null);
+  useTauriEvent<PlayerStateView>("player-state", setState);
   return state;
 }
 
@@ -54,6 +60,9 @@ export function PlayerScreen() {
   const stopPlaying = useUi((s) => s.stopPlaying);
   const state = usePlayerState();
   const [error, setError] = useState<string | null>(null);
+  // Every copy was tried and none would start (SPEC.md Phase 9: fallback is silent
+  // until there is nothing left to fall back to).
+  useTauriEvent<string>("player-failed", setError);
   const [still, setStill] = useState<string | null>(null);
   const [chrome, setChrome] = useState(true);
   const [menu, setMenu] = useState<"audio" | "sub" | null>(null);

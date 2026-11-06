@@ -154,6 +154,9 @@ struct File {
     format: String,
     size: Option<u64>,
     height: Option<u32>,
+    /// Seconds. The Archive writes `length` as seconds (`5634.21`) or as a clock
+    /// (`93:54`, `1:33:54`).
+    length: Option<u32>,
 }
 
 async fn get(http: &dyn Transport, url: String, max: usize) -> Result<String, SourceError> {
@@ -246,6 +249,14 @@ fn first_text(v: Option<&Value>) -> Option<String> {
     }
 }
 
+fn seconds(text: &str) -> Option<u32> {
+    let mut total = 0.0;
+    for part in text.trim().split(':') {
+        total = total * 60.0 + part.parse::<f64>().ok()?;
+    }
+    (total.is_finite() && total > 0.0).then_some(total as u32)
+}
+
 fn year_of(v: Option<&Value>) -> Option<u16> {
     let text = first_text(v)?;
     let year: u16 = text.get(..4)?.parse().ok()?;
@@ -288,6 +299,7 @@ fn parse_files(body: &str) -> Result<Vec<File>, SourceError> {
                 format: first_text(f.get("format"))?,
                 size: first_text(f.get("size")).and_then(|s| s.parse().ok()),
                 height: first_text(f.get("height")).and_then(|s| s.parse().ok()),
+                length: first_text(f.get("length")).and_then(|s| seconds(&s)),
             })
         })
         .collect())
@@ -347,6 +359,7 @@ fn candidates(doc: &Doc, files: &[File]) -> Vec<SourceCandidate> {
             subtitles: vec![],
             codec,
             size_bytes: f.size,
+            duration_seconds: f.length,
             health: Health::Direct,
             locator: Some(download_url(&doc.identifier, &f.name)),
             provenance: Provenance {
@@ -416,6 +429,15 @@ mod tests {
         assert_eq!(year_of(Some(&serde_json::json!("1922-03-04"))), Some(1922));
         assert_eq!(year_of(Some(&serde_json::json!(["1922"]))), Some(1922));
         assert_eq!(year_of(Some(&serde_json::json!("unknown"))), None);
+    }
+
+    #[test]
+    fn a_length_is_seconds_or_a_clock() {
+        assert_eq!(seconds("5634.21"), Some(5634));
+        assert_eq!(seconds("93:54"), Some(5634));
+        assert_eq!(seconds("1:33:54"), Some(5634));
+        assert_eq!(seconds("0"), None);
+        assert_eq!(seconds("n/a"), None);
     }
 
     #[test]

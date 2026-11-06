@@ -2,7 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { commands, type Capability, type HardwareProfile, type Tier } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
 import { NetworkSection } from "./NetworkSection";
+import { ControllerSection } from "./ControllerSection";
 import { SourcesSection } from "./SourcesSection";
+import { PlaybackSection } from "./PlaybackSection";
 
 /**
  * Settings — SPEC.md Phase 1, subtask 1.9.
@@ -51,7 +53,9 @@ export function SettingsScreen() {
       </header>
 
       <SourcesSection />
+      <PlaybackSection />
       <NetworkSection />
+      <ControllerSection />
 
       {profile.isPending && <Skeleton />}
       {profile.isError && (

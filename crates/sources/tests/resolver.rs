@@ -87,6 +87,7 @@ impl SourceBackend for Fake {
                     subtitles: vec![],
                     codec: Default::default(),
                     size_bytes: None,
+                    duration_seconds: None,
                     health: Default::default(),
                     locator: Some(l.to_string()),
                     // A backend lying about who it is: the resolver must overwrite this.

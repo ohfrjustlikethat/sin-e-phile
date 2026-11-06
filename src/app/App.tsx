@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Masthead } from "@/app/Masthead";
 import { PlayerScreen } from "@/features/player/PlayerScreen";
 import { DetailScreen } from "@/features/detail/DetailScreen";
@@ -12,6 +12,27 @@ import { SearchScreen } from "@/features/search/SearchScreen";
 import { DesignGallery } from "@/features/design/DesignGallery";
 import { CommandPalette, type Command } from "@/design-system";
 import { DESTINATIONS, useUi, type Destination } from "@/lib/store";
+import { FocusLayer } from "@/design-system/focus/FocusLayer";
+import { play, rumble } from "@/design-system/focus/feedback";
+import { useControllerSettings } from "@/lib/controllerSettings";
+
+function inTauri(): boolean {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
+
+/** Full screen for the whole app window (ADR-0042: View, or picking the pad up). */
+async function fullscreen(on?: boolean) {
+  if (!inTauri()) return;
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  const w = getCurrentWindow();
+  await w.setFullscreen(on ?? !(await w.isFullscreen()));
+}
+
+/** The focused tile, if focus is on one (ADR-0042's tilt and press apply to tiles only). */
+function focusedTile(): HTMLElement | null {
+  const a = document.activeElement as HTMLElement | null;
+  return a?.closest<HTMLElement>("[data-focus-tile]") ?? null;
+}
 
 /**
  * The gallery is a DEV-ONLY route (SPEC.md Phase 2, subtask 2.2). It is reached at
@@ -31,6 +52,20 @@ export function App() {
   useDropToPlay();
   const [palette, setPalette] = useState(false);
   const [searching, setSearching] = useState(false);
+  // Search opens from anywhere: over Settings and over a film's page, which would
+  // otherwise take precedence and leave search switched on but invisible.
+  const openSearch = useCallback(() => {
+    const ui = useUi.getState();
+    ui.setSettingsOpen(false);
+    ui.closeDetail();
+    setSearching(true);
+  }, []);
+
+  // TV mode's scale must not apply while the player positions its native window.
+  useEffect(() => {
+    if (playing) document.documentElement.dataset["playing"] = "";
+    else delete document.documentElement.dataset["playing"];
+  }, [playing]);
 
   // ADR-0041: an Xbox controller as a remote. The player takes its intents while it is
   // on screen; everywhere else the pad moves focus and acts on it.
@@ -41,9 +76,11 @@ export function App() {
         nav: (action) => {
           switch (action.kind) {
             case "move":
-              moveFocus(action.direction);
+              play(moveFocus(action.direction) ? "move" : "edge");
               break;
             case "activate":
+              play("select");
+              rumble();
               (document.activeElement as HTMLElement | null)?.click();
               break;
             case "back":
@@ -59,12 +96,28 @@ export function App() {
               break;
             }
             case "search":
-              setSearching(true);
+              openSearch();
               break;
             case "settings":
               useUi.getState().setSettingsOpen(true);
               break;
           }
+        },
+        tilt: (rx, ry) => {
+          const tile = focusedTile();
+          tile?.style.setProperty("--tilt-x", `${rx}deg`);
+          tile?.style.setProperty("--tilt-y", `${ry}deg`);
+          tile?.style.setProperty("--sheen-shift", `${ry * 3}%`);
+        },
+        press: (down) => {
+          const tile = focusedTile();
+          if (!tile) return;
+          if (down) tile.dataset["pressed"] = "";
+          else delete tile.dataset["pressed"];
+        },
+        view: () => void fullscreen(),
+        pickup: () => {
+          if (useControllerSettings.getState().fullscreenOnPickup) void fullscreen(true);
         },
       }),
     [],
@@ -93,13 +146,12 @@ export function App() {
       if (typing) return;
       if (event.key === "/" || (event.key.toLowerCase() === "f" && event.ctrlKey)) {
         event.preventDefault();
-        setSettingsOpen(false);
-        setSearching(true);
+        openSearch();
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [searching, setSettingsOpen]);
+  }, [searching, openSearch]);
 
   // §3.1: the palette searches "media, actions, and settings". Phase 5 supplies
   // media; these are the actions and settings that exist today.
@@ -111,7 +163,7 @@ export function App() {
       run: () => { setSettingsOpen(false); setDestination(d); },
     })),
     { id: "settings", label: "Open settings", group: "Settings", run: () => setSettingsOpen(true) },
-    { id: "search", label: "Search", group: "Navigate", hint: "/", run: () => { setSettingsOpen(false); setSearching(true); } },
+    { id: "search", label: "Search", group: "Navigate", hint: "/", run: openSearch },
   ];
 
   if (DESIGN_ROUTE) {
@@ -123,11 +175,14 @@ export function App() {
     );
   }
 
-  // The player is immersive: no masthead, its own top bar (with a drag region).
+  // The player is immersive: no masthead, its own top bar (with a drag region). Its
+  // chrome sits under a native video window, so it keeps per-element outlines rather
+  // than the drawn ring, and TV mode's scale is off while it is open (focus.css).
   if (playing) {
     return (
-      <div className="h-full bg-black text-ink">
+      <div className="h-full bg-black text-ink" data-no-focus-ring>
         <PlayerScreen />
+        <FocusLayer />
       </div>
     );
   }
@@ -148,6 +203,7 @@ export function App() {
       </main>
       <CommandPalette commands={commands} open={palette} onOpenChange={setPalette} />
       <PadKeyboard />
+      <FocusLayer />
     </div>
   );
 }

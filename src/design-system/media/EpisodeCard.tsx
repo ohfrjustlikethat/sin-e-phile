@@ -23,6 +23,7 @@ export function EpisodeCard({ ep, onOpen }: { ep: Episode; onOpen?: (id: string)
   return (
     <article className="w-[320px] shrink-0">
       <button
+        data-focus-tile
         type="button"
         onClick={() => onOpen?.(ep.id)}
         aria-label={`${ep.series}, season ${ep.season} episode ${ep.episode}, ${ep.title}`}

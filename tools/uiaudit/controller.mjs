@@ -64,7 +64,8 @@ const FAKE = `(() => {
       synopsis: "A married farmer falls under the spell of a woman from the city.",
       credits: [{ name: "F. W. Murnau", role: "director", character: null }] }),
     prepare_play: () => ({ title: "Sunrise", open: "https://films.example/sunrise.mp4", start: null,
-      from: "Internet Archive", offered: 2 }),
+      from: "Internet Archive", offered: 2, languages: ["en", "de"], original_language: null,
+      qualities: ["full_hd", "hd"], unmet: null, why: "1080p · served directly", candidates: [] }),
     player_pause_still: () => "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
     dev_autoplay: () => null,
   };
@@ -171,7 +172,7 @@ children.push(
       "--no-first-run",
       `--remote-debugging-port=${CDP_PORT}`,
       `--user-data-dir=${resolve(tmpdir(), `sinephile-controller-${process.pid}`)}`,
-      "--window-size=1440,900",
+      "--window-size=1920,1080", // Phase 9 E7: the TV focus language at 1920×1080
       `http://127.0.0.1:${PORT}/`,
     ],
     { stdio: "ignore" },
@@ -193,6 +194,10 @@ ws.addEventListener("message", (e) => {
 });
 await send("Page.enable");
 await send("Runtime.enable");
+// The machine's own setting must not decide the result: Windows Server (the CI runner)
+// reports reduced motion, which correctly switched the glide and the grow off. Motion is
+// asserted with it off, then again with it on, explicitly.
+await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "no-preference" }] });
 const errors = [];
 ws.addEventListener("message", (e) => {
   const m = JSON.parse(e.data);
@@ -228,6 +233,33 @@ const check = (ok, what) => {
   if (!ok) failures++;
 };
 
+// ── TV focus language probes (ADR-0042) ─────────────────────────────────────
+/** The ring's box, colour and opacity, and the focused element's box. */
+const ringState = () =>
+  evalJs(`(() => { const r = document.querySelector("[data-focus-ring-el]"); const a = document.activeElement;
+    if (!r || !a) return null; const cs = getComputedStyle(r); const rb = r.getBoundingClientRect(); const ab = a.getBoundingClientRect();
+    return { colour: cs.borderTopColor, width: cs.borderTopWidth, opacity: Number(cs.opacity),
+      ring: { x: rb.left, y: rb.top, w: rb.width, h: rb.height }, el: { x: ab.left, y: ab.top, w: ab.width, h: ab.height } }; })()`);
+/** Start sampling the ring's x every frame for `ms`; await the result with `samples()`. */
+const startSampling = (ms) =>
+  evalJs(`(() => { const r = document.querySelector("[data-focus-ring-el]"); const out = []; const t0 = performance.now();
+    window.__ringSamples = new Promise((res) => { const f = () => { out.push(new DOMMatrix(getComputedStyle(r).transform).m41);
+      if (performance.now() - t0 < ${ms}) requestAnimationFrame(f); else res(out); }; requestAnimationFrame(f); }); return true; })()`);
+const samples = () => evalJs("window.__ringSamples");
+/** The computed transform and shadow of a throwaway focused tile: focus.css applies to any tile. */
+const tileProbe = () =>
+  evalJs(`(async () => { const t = document.createElement("button"); t.dataset.focusTile = ""; t.textContent = "probe";
+    t.style.cssText = "position:fixed;left:40%;top:40%;width:120px;height:160px"; document.body.appendChild(t); t.focus();
+    await new Promise((r) => setTimeout(r, 350)); const cs = getComputedStyle(t); const out = { transform: cs.transform, shadow: cs.boxShadow };
+    t.remove(); return out; })()`);
+/** The X scale of a computed `matrix(...)` or `matrix3d(...)`; this runs in Node, which has no DOMMatrix. */
+const scaleOf = (transform) => {
+  if (transform === "none") return 1;
+  const n = transform.match(/-?[\d.]+(?:e-?\d+)?/g).map(Number);
+  // In "matrix3d(" the "3" is matched too, so the sixteen values start at n[1].
+  return transform.startsWith("matrix3d") ? Math.hypot(n[1], n[2], n[3]) : Math.hypot(n[0], n[1]);
+};
+
 /** Steer focus with the D-pad onto the key labelled `label`, using only the pad. */
 const steerTo = async (label) => {
   const goal = await evalJs(`(() => { const k = [...document.querySelectorAll('[aria-label="On-screen keyboard"] button')]
@@ -254,6 +286,44 @@ try {
   check(kb, "Y opens search, and the field brings up the on-screen keyboard");
   await shoot("02-keyboard");
 
+  // ADR-0042 in TV mode: the ring, its glide, the couch scale.
+  await sleep(300);
+  const ring = await ringState();
+  check(
+    ring?.colour === "rgb(255, 255, 255)" && ring.width === "3px" && ring.opacity === 1,
+    `the focus ring is white, 3px and showing (${ring?.colour}, ${ring?.width})`,
+  );
+  const hug = ring && Math.abs(ring.ring.x - (ring.el.x - 5)) < 2 && Math.abs(ring.ring.w - (ring.el.w + 10)) < 2;
+  check(
+    !!hug,
+    `the ring sits 2px outside the focused key, under the 125% scale (ring x ${ring?.ring.x.toFixed(1)}, key x ${ring?.el.x.toFixed(1)})`,
+  );
+  const zoom = await evalJs(`getComputedStyle(document.getElementById("root")).zoom`);
+  check(zoom === "1.25", `TV mode renders the app at 125% (zoom ${zoom})`);
+  // The scaled app must still fill the window, with the safe margin inside it.
+  const fit = await evalJs(`(() => { const r = document.getElementById("root").getBoundingClientRect();
+    const m = document.querySelector("header, nav").getBoundingClientRect();
+    return { w: r.width / innerWidth, h: r.height / innerHeight, left: m.left / innerWidth, top: m.top / innerHeight }; })()`);
+  check(
+    Math.abs(fit.w - 1) < 0.01 && Math.abs(fit.h - 1) < 0.01 && Math.abs(fit.left - 0.05) < 0.01 && Math.abs(fit.top - 0.05) < 0.01,
+    `the scaled app fills the window, with a 5% safe margin (fills ${(fit.w * 100).toFixed(0)}% x ${(fit.h * 100).toFixed(0)}%, masthead at ${(fit.left * 100).toFixed(1)}% / ${(fit.top * 100).toFixed(1)}%)`,
+  );
+  const fromX = ring?.ring.x ?? 0;
+  await startSampling(450);
+  await press(B.RIGHT);
+  const xs = await samples();
+  const toX = xs.at(-1);
+  const between = xs.filter((x) => x > fromX + 1 && x < toX - 1).length;
+  const overshoot = Math.max(...xs) - toX;
+  check(between >= 3 && overshoot < 0.5, `the ring glides to the next key: ${between} frames in between, overshoot ${overshoot.toFixed(2)}px`);
+  await press(B.LEFT); // back to "A", where the typing loop expects to start
+  const tile = await tileProbe();
+  check(
+    Math.abs(scaleOf(tile.transform) - 1.06) < 0.01 && tile.shadow !== "none",
+    `a focused tile grows to 1.06 and lifts (scale ${scaleOf(tile.transform).toFixed(3)})`,
+  );
+  await evalJs(`[...document.querySelectorAll('[aria-label="On-screen keyboard"] button')].find((b) => b.textContent.trim() === "A").focus()`);
+
   for (const ch of "SUNRISE") {
     await steerTo(ch);
     await press(B.A);
@@ -270,6 +340,37 @@ try {
   await waitFor(async () => (await active())?.text === "Play", "Play to take focus", 25);
   check((await calls("prepare_play")).length === 1, "A opens the film; its sources are asked before Play");
   await shoot("04-detail");
+
+  // Phase 9 E7: the ring is visible on EVERY focus stop of the page, not just one.
+  const stops = await evalJs(`(async () => {
+    const sel = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const all = [...document.querySelectorAll(sel)].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+    const misses = [];
+    for (const el of all) {
+      el.scrollIntoView({ block: "center" }); el.focus();
+      await new Promise((r) => setTimeout(r, 350));
+      const ring = document.querySelector("[data-focus-ring-el]"); const rb = ring.getBoundingClientRect(); const eb = el.getBoundingClientRect();
+      const encloses = rb.left <= eb.left + 1 && rb.top <= eb.top + 1 && rb.right >= eb.right - 1 && rb.bottom >= eb.bottom - 1;
+      if (Number(getComputedStyle(ring).opacity) !== 1 || !encloses) misses.push((el.getAttribute("aria-label") || el.textContent || el.tagName).trim().slice(0, 30));
+    }
+    document.getElementById("detail-play").focus();
+    return { count: all.length, misses };
+  })()`);
+  check(stops.count >= 10 && stops.misses.length === 0, `the ring surrounds every focus stop on the film page (${stops.count} stops; missed: ${stops.misses.join(", ") || "none"})`);
+  await sleep(300);
+
+  // Phase 9: the language choice is reachable with the pad, and choosing re-plans.
+  await press(B.DOWN);
+  await waitFor(async () => (await active())?.text === "Auto", "the Audio row", 25);
+  await press(B.RIGHT);
+  await press(B.RIGHT);
+  check((await active())?.text === "German", `the D-pad walks the Audio row (${(await active())?.text})`);
+  await press(B.A);
+  const replanned = await waitFor(async () => (await calls("prepare_play"))[1], "a new plan", 25);
+  check(replanned.language === "de" && replanned.quality === null, "A on a language plans again with it");
+  await shoot("04b-language");
+  await press(B.UP);
+  await waitFor(async () => (await active())?.text === "Play", "Play again", 25);
 
   await press(B.A);
   const opened = await waitFor(async () => (await calls("player_open"))[0], "the player", 25);
@@ -292,6 +393,23 @@ try {
   await waitFor(async () => (await calls("player_close")).length > 0, "the player to close", 25);
   check(await evalJs(`document.body.textContent.includes("Sunrise")`), "B leaves the player, back to the film");
   await shoot("07-left");
+
+  // Reduced motion: every transform goes, the ring stops gliding.
+  await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
+  const still = await tileProbe();
+  check(
+    still.transform === "none" && still.shadow === "none",
+    `under reduced motion a focused tile has no transform or shadow (${still.transform})`,
+  );
+  await press(B.Y);
+  await waitFor(() => evalJs(`!!document.querySelector('[aria-label="On-screen keyboard"]')`), "the keyboard again", 20);
+  await sleep(250);
+  const before = (await ringState())?.ring.x ?? 0;
+  await startSampling(300);
+  await press(B.RIGHT);
+  const snap = await samples();
+  const mid = snap.filter((x) => x > before + 1 && x < snap.at(-1) - 1).length;
+  check(mid === 0, `under reduced motion the ring moves without gliding (${mid} frames in between)`);
 } catch (e) {
   console.error(`controller: ${e.message}`);
   await shoot("failure").catch(() => {});

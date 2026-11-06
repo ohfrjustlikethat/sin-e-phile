@@ -159,7 +159,7 @@ export const commands = {
 	synopsis: string | null,
 	credits: CreditView[],
 } | null, string>(__TAURI_INVOKE("item_detail", { id })),
-	preparePlay: (id: number) => typedError<PlayPlanView, string>(__TAURI_INVOKE("prepare_play", { id })),
+	preparePlay: (id: number, language: string | null, quality: string | null) => typedError<PlayPlanView, string>(__TAURI_INVOKE("prepare_play", { id, language, quality })),
 	/**  Remember where the viewer is, for resume. Called periodically and on leaving. */
 	savePosition: (id: number, position: number | null, duration: number | null) => typedError<null, string>(__TAURI_INVOKE("save_position", { id, position, duration })),
 };
@@ -222,6 +222,25 @@ export type Backfilled = {
 	year: number,
 	/**  The source's name, for "found by …". */
 	found_by: string,
+};
+
+/**  One candidate as the expert panel shows it (SPEC.md Phase 9 E5). */
+export type CandidateView = {
+	title: string,
+	/**  The source's display name. */
+	from: string,
+	transport: string,
+	/**  `1080p`, or `unknown quality`. */
+	quality: string,
+	/**  `h264`, or `unknown`. */
+	codec: string,
+	total: number | null,
+	sunk: string | null,
+	unmet: string | null,
+	local: boolean,
+	/**  The one that opens. */
+	chosen: boolean,
+	terms: TermView[],
 };
 
 /**  What a tier permits. Features ask about a `Capability`, never about hardware. */
@@ -337,6 +356,18 @@ export type PlayPlanView = {
 	/**  The source's display name. */
 	from: string,
 	offered: number,
+	/**  Audio languages some honest copy carries, primary subtags, most common first. */
+	languages: string[],
+	/**  The film's own language, if known: an original soundtrack versus a dub. */
+	original_language: string | null,
+	/**  Qualities on offer, best first, as wire names (`"full_hd"`). */
+	qualities: string[],
+	/**  When the chosen language or quality is not to be had, why, in words. */
+	unmet: string | null,
+	/**  "Why this source", one line under Play. */
+	why: string,
+	/**  Every candidate, best first, with its score term by term: the expert panel. */
+	candidates: CandidateView[],
 };
 
 /**
@@ -436,6 +467,14 @@ export type SourcesView = {
 	sources: SourceInfo[],
 	/**  Installed addons whose stored manifest no longer passes the checks. */
 	refused_addons: string[],
+};
+
+/**  A score term exactly as `sinephile_selection::Term` holds it. */
+export type TermView = {
+	name: string,
+	value: number | null,
+	weight: number | null,
+	why: string,
 };
 
 /**  The three tiers from §8. */

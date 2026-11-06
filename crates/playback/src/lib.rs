@@ -8,19 +8,20 @@
 //! torrent's peers are found while the viewer reads, so Play has nothing left to wait
 //! for (Phase 7 E1, carried here).
 //!
-//! The ranking is deliberately simple. SPEC.md Phase 9 is where sources are scored
-//! properly; this only has to pick something sensible today.
+//! The order candidates are tried in is `sinephile_selection`'s: every candidate is
+//! scored against what this machine plays and what the viewer chose (SPEC.md Phase 9).
 
 use std::sync::Arc;
 
+pub mod fallback;
+
 use sinephile_persistence::repositories::{MediaRepository, ProfileRepository};
 use sinephile_persistence::{Db, DbError, MediaKind};
+pub use sinephile_selection::{Context, Machine, Offers, Score};
 use sinephile_sources::{registry, Resolver};
 use sinephile_torrent::play::{target, Target};
 use sinephile_torrent::{Engine, StreamServer, Wanted};
-use source_protocol::{
-    ExternalIds, Health, MediaKind as Kind, MediaQuery, SourceCandidate, Transport,
-};
+use source_protocol::{ExternalIds, MediaKind as Kind, MediaQuery, SourceCandidate};
 
 #[derive(Debug, thiserror::Error)]
 pub enum PlayError {
@@ -47,6 +48,30 @@ pub struct PlayPlan {
     pub backend: String,
     /// How many candidates the sources offered.
     pub offered: usize,
+    /// Why this copy: its score, term by term.
+    pub score: Score,
+    /// The languages and qualities the viewer can choose between.
+    pub offers: Offers,
+    /// The film's own language, if the catalogue knows it: what tells an original
+    /// soundtrack from a dub.
+    pub original_language: Option<String>,
+    /// Every candidate, best first, with its score: for the expert panel and fallback.
+    pub ranked: Vec<(SourceCandidate, Score)>,
+    /// Which of `ranked` is the one that opens.
+    pub chosen: usize,
+}
+
+impl PlayPlan {
+    /// What to fall back to, in order: every honest copy ranked below the chosen one.
+    /// A sunk copy is never tried, even last: a fake is worse than "nothing would start".
+    pub fn fallbacks(&self) -> Vec<SourceCandidate> {
+        self.ranked
+            .iter()
+            .skip(self.chosen + 1)
+            .filter(|(_, s)| s.sunk.is_none())
+            .map(|(c, _)| c.clone())
+            .collect()
+    }
 }
 
 /// The catalogue item as the query sources receive.
@@ -79,31 +104,46 @@ pub async fn query_for(db: &Db, media_item_id: i64) -> Result<Option<MediaQuery>
     }))
 }
 
-/// The interim order, until Phase 9 scores sources: your own file, then a direct
-/// stream, then a swarm; within each, higher resolution first, then more seeders.
-pub fn rank(mut candidates: Vec<SourceCandidate>) -> Vec<SourceCandidate> {
-    let transport = |c: &SourceCandidate| match c.transport {
-        Transport::Local => 0,
-        Transport::Http => 1,
-        Transport::P2p => 2,
-        Transport::Unknown => 3,
+/// Resolve one candidate to what the player opens: a URL, or a path. A torrent becomes
+/// the local streaming server's address, which needs the engine.
+pub(crate) async fn target_for(
+    resolver: &Resolver,
+    torrent: Option<(&Arc<Engine>, &StreamServer)>,
+    candidate: &SourceCandidate,
+) -> Result<String, String> {
+    use source_protocol::PlayableStream;
+    let stream = resolver
+        .resolve(candidate)
+        .await
+        .map_err(|e| e.to_string())?;
+    let opened = match (&stream, torrent) {
+        (PlayableStream::Torrent { .. }, None) => {
+            return Err("a torrent, but the torrent engine is not running".into())
+        }
+        (_, Some((engine, server))) => target(engine, server, &stream, Wanted::default()).await,
+        (PlayableStream::Http { url, .. }, None) => Ok(Target::Url(url.clone())),
+        (PlayableStream::File { path }, None) => Ok(Target::File(path.into())),
     };
-    let seeders = |c: &SourceCandidate| match c.health {
-        Health::Swarm { seeders, .. } => seeders,
-        _ => 0,
-    };
-    candidates.sort_by(|a, b| {
-        transport(a)
-            .cmp(&transport(b))
-            .then(
-                b.quality
-                    .resolution
-                    .rank()
-                    .cmp(&a.quality.resolution.rank()),
-            )
-            .then(seeders(b).cmp(&seeders(a)))
-    });
-    candidates
+    match opened.map_err(|e| e.to_string())? {
+        Target::Url(u) => Ok(u),
+        Target::File(p) => Ok(p.to_string_lossy().into_owned()),
+    }
+}
+
+/// What this machine plays well, from what `tiers.rs` permits and found. AV1 decode and
+/// an HDR display are not probed yet, so both are assumed absent: the cautious guess
+/// costs a little ranking, never a stutter.
+pub fn machine(high_res_playback: bool, hardware_decode: bool) -> Machine {
+    Machine {
+        max_resolution: if high_res_playback {
+            source_protocol::Resolution::Uhd
+        } else {
+            source_protocol::Resolution::FullHd
+        },
+        hevc: hardware_decode,
+        av1: false,
+        hdr_display: false,
+    }
 }
 
 /// Where to start: the saved position, unless it is in the first 10 seconds (start
@@ -120,48 +160,47 @@ pub fn resume_from(position: i64, duration: Option<i64>) -> Option<f64> {
     Some(position as f64)
 }
 
-/// See the module note. `torrent` is the engine and its server, for a candidate that is
-/// a swarm; `None` skips swarms (the engine could not start).
+/// [`plan_with`] on a Tier 0 machine with nothing chosen.
 pub async fn plan(
     db: &Db,
     resolver: &Resolver,
     torrent: Option<(&Arc<Engine>, &StreamServer)>,
     media_item_id: i64,
 ) -> Result<PlayPlan, PlayError> {
+    plan_with(db, resolver, torrent, media_item_id, Context::default()).await
+}
+
+/// See the module note. `torrent` is the engine and its server, for a candidate that is
+/// a swarm; `None` skips swarms (the engine could not start). `ctx` says what the
+/// machine plays and what the viewer chose; the catalogue's runtime is filled in here.
+pub async fn plan_with(
+    db: &Db,
+    resolver: &Resolver,
+    torrent: Option<(&Arc<Engine>, &StreamServer)>,
+    media_item_id: i64,
+    mut ctx: Context,
+) -> Result<PlayPlan, PlayError> {
     let query = query_for(db, media_item_id)
         .await?
         .ok_or(PlayError::Unknown)?;
+    let item = MediaRepository::new(db).by_id(media_item_id).await?;
+    ctx.runtime_minutes = item
+        .as_ref()
+        .and_then(|i| i.runtime_minutes)
+        .and_then(|m| u32::try_from(m).ok());
+    let original_language = item.and_then(|i| i.original_language);
     let found = resolver.find_all(&query).await;
     registry::record(db, &found.outcomes).await?;
-    let ranked = rank(found.candidates);
+    let ranked = sinephile_selection::rank(found.candidates, &ctx);
     if ranked.is_empty() {
         return Err(PlayError::NoSources);
     }
     let offered = ranked.len();
+    let offers = sinephile_selection::offers(&ranked);
     let mut reasons = Vec::new();
-    for candidate in ranked {
-        let stream = match resolver.resolve(&candidate).await {
-            Ok(s) => s,
-            Err(e) => {
-                reasons.push(format!("{}: {e}", candidate.provenance.backend));
-                continue;
-            }
-        };
-        let opened = match (&stream, torrent) {
-            (source_protocol::PlayableStream::Torrent { .. }, None) => {
-                reasons.push("a torrent, but the torrent engine is not running".into());
-                continue;
-            }
-            (_, Some((engine, server))) => target(engine, server, &stream, Wanted::default()).await,
-            (_, None) => match &stream {
-                source_protocol::PlayableStream::Http { url, .. } => Ok(Target::Url(url.clone())),
-                source_protocol::PlayableStream::File { path } => Ok(Target::File(path.into())),
-                source_protocol::PlayableStream::Torrent { .. } => unreachable!("handled above"),
-            },
-        };
-        let open = match opened {
-            Ok(Target::Url(u)) => u,
-            Ok(Target::File(p)) => p.to_string_lossy().into_owned(),
+    for (chosen, (candidate, score)) in ranked.iter().enumerate() {
+        let open = match target_for(resolver, torrent, candidate).await {
+            Ok(open) => open,
             Err(e) => {
                 reasons.push(format!("{}: {e}", candidate.provenance.backend));
                 continue;
@@ -177,8 +216,13 @@ pub async fn plan(
             title: query.title,
             open,
             start,
-            backend: candidate.provenance.backend,
+            backend: candidate.provenance.backend.clone(),
             offered,
+            score: score.clone(),
+            offers,
+            original_language,
+            chosen,
+            ranked,
         });
     }
     Err(PlayError::NothingPlayable(offered, reasons.join("; ")))
@@ -187,52 +231,13 @@ pub async fn plan(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use source_protocol::{Provenance, Quality, Resolution};
-
-    fn cand(t: Transport, r: Resolution, seeders: u32) -> SourceCandidate {
-        SourceCandidate {
-            key: format!("{t:?}-{r:?}-{seeders}"),
-            title: "T".into(),
-            year: None,
-            transport: t,
-            quality: Quality {
-                resolution: r,
-                hdr: false,
-            },
-            languages: vec![],
-            subtitles: vec![],
-            codec: Default::default(),
-            size_bytes: None,
-            health: if t == Transport::P2p {
-                Health::Swarm { seeders, peers: 0 }
-            } else {
-                Health::Direct
-            },
-            locator: None,
-            provenance: Provenance::default(),
-        }
-    }
 
     #[test]
-    fn your_own_file_first_then_streams_then_swarms() {
-        let ranked = rank(vec![
-            cand(Transport::P2p, Resolution::Uhd, 500),
-            cand(Transport::Http, Resolution::Sd, 0),
-            cand(Transport::P2p, Resolution::Uhd, 900),
-            cand(Transport::Local, Resolution::Hd, 0),
-            cand(Transport::Http, Resolution::FullHd, 0),
-        ]);
-        let keys: Vec<&str> = ranked.iter().map(|c| c.key.as_str()).collect();
-        assert_eq!(
-            keys,
-            [
-                "Local-Hd-0",
-                "Http-FullHd-0",
-                "Http-Sd-0",
-                "P2p-Uhd-900",
-                "P2p-Uhd-500"
-            ]
-        );
+    fn a_machine_without_high_res_playback_tops_out_at_1080p() {
+        use source_protocol::Resolution;
+        assert_eq!(machine(false, true).max_resolution, Resolution::FullHd);
+        assert_eq!(machine(true, true).max_resolution, Resolution::Uhd);
+        assert!(!machine(true, false).hevc);
     }
 
     #[test]

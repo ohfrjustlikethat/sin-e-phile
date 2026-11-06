@@ -69,6 +69,7 @@ mod tests {
             subtitles: vec![],
             codec: Default::default(),
             size_bytes: None,
+            duration_seconds: None,
             health: Default::default(),
             locator: None,
             provenance: Default::default(),

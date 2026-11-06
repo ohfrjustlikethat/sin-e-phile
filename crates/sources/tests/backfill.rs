@@ -41,6 +41,7 @@ impl SourceBackend for Knows {
             subtitles: vec![],
             codec: Default::default(),
             size_bytes: None,
+            duration_seconds: None,
             health: Default::default(),
             locator: Some("https://films.example/k.mp4".into()),
             provenance: Default::default(),

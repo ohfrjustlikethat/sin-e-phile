@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **3.0.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **3.1.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -43,6 +43,8 @@ could hurt the whole app.* So:
   tag phases yourself. Before **every** push, run all of:
   `cargo fmt --all --check` · `cargo clippy --workspace --all-targets -- -D warnings` ·
   `cargo test --workspace` · `npm run lint` · `npm test` · `npm run build` ·
+  `node tools/uiaudit/controller.mjs` (the pad flow against the built `dist/`; it runs
+  locally, and a changed IPC shape breaks its fake backend before it breaks CI) ·
   `python tools/guard/guard.py --staged` (the hook) · `python tools/guard/secretscan.py --tree` ·
   **gitleaks over full history** (CI runs it; the regex scanner does not catch what it
   catches): `gitleaks detect --source . --redact --no-banner --exit-code 1`, using the
@@ -311,7 +313,14 @@ typographic treatment rather than breaking.
   author's sign-off on a screenshot set.
 - **An Xbox controller is a remote** (ADR-0041): the Gamepad API drives the same focus
   system as the keyboard, everywhere. Anything reachable by keyboard must be reachable
-  by controller, with a ten-foot focus treatment when the last input was a pad.
+  by controller.
+- **The TV focus language** (ADR-0042): focus is a 3px white ring with a dark hairline and
+  a tight oxblood halo (keyboard and pad; never for the mouse), gliding between targets
+  on a critically damped spring. Focused tiles grow 1.06, lift, tilt under the left stick
+  with a sheen, and press down on A. With a pad the app is in TV mode: 125% scale, 5%
+  safe margin, button hints, quiet ticks and rumble, View for full screen. Shadow, glow,
+  gradient and 3D transforms are allowed **only** in `src/design-system/focus/` — §9.0's
+  bans hold everywhere else. Reduced motion removes every transform.
 - **Windows only.** Use Windows APIs directly where they give a better result.
 - **Portable by default.** All data in `./data/` next to the executable. Installed
   mode using `%APPDATA%` is an opt-in, never the default.

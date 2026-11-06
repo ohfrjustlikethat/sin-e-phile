@@ -12,10 +12,13 @@ description = "From a catalogue item to something playing: query, sources, ranki
 
 [dependencies]
 sinephile-persistence = { path = "../persistence" }
+sinephile-selection = { path = "../selection" }
 sinephile-sources = { path = "../sources" }
 sinephile-torrent = { path = "../torrent" }
 source-protocol = { path = "../source-protocol" }
 thiserror = "2"
+tokio = { version = "1", features = ["rt"] }
+tracing = "0.1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
