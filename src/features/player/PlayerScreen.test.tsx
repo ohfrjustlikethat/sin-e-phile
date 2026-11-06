@@ -14,6 +14,17 @@ const commands = {
   savePosition: vi.fn(() => ok(null)),
 };
 vi.mock("@/lib/ipc", () => ({ commands }));
+// Inert unless a test marks the page as inside Tauri.
+const events = vi.hoisted(() => ({ push: undefined as ((e: { payload: unknown }) => void) | undefined }));
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn((_: string, cb: (e: { payload: unknown }) => void) => {
+    events.push = cb;
+    return Promise.resolve(() => {});
+  }),
+}));
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({ setFullscreen: () => Promise.resolve() }),
+}));
 const { PlayerScreen } = await import("./PlayerScreen");
 const { sendPlayerIntent } = await import("./intentBus");
 
@@ -62,6 +73,28 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
       sendPlayerIntent({ kind: "seek", seconds: -30 });
     });
     expect(commands.playerAction).toHaveBeenCalledWith({ kind: "seek_by", seconds: -30 });
+  });
+
+  it("saves the position it reached on the way out (Phase 8 E4)", async () => {
+    events.push = undefined;
+    const w = window as unknown as Record<string, unknown>;
+    w.__TAURI_INTERNALS__ = {};
+    try {
+      const { unmount } = render(<PlayerScreen />);
+      await waitFor(() => expect(events.push).toBeDefined());
+      act(() =>
+        events.push?.({
+          payload: {
+            position: 2712.4, duration: 5700, paused: false, buffered_until: null, volume: 100,
+            muted: false, speed: 1, hwdec: null, ended: false, tracks: [],
+          },
+        }),
+      );
+      unmount();
+      expect(commands.savePosition).toHaveBeenCalledWith(1, 2712.4, 5700);
+    } finally {
+      delete w.__TAURI_INTERNALS__;
+    }
   });
 
   it("leaves on Escape and closes the player", async () => {

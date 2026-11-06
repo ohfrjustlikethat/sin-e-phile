@@ -2277,3 +2277,9 @@ exclusively), retrying at 1 / 10 / 100 / 1000 ms and then playing without sound.
 video path is the remaining **~200 ms** — within §2.3's 500 ms. A persistent shader cache
 (`gpu-shader-cache-dir`) made no measurable difference (1684 → 1465 ms, inside the noise
 of the audio retry). The < 500 ms criterion needs a run with the audio device free.
+
+### E3: exact seeks
+
+2026-11-06, `cargo test --release -p sinephile-player --test playback an_exact_seek -- --nocapture`:
+paused, seek to **3.52 / 1.08 / 5.2 s** (25 fps, one keyframe per second) landed at
+**3.520 / 1.080 / 5.200** in **4.5 / 2.3 / 2.8 ms**, measured to mpv's `playback-restart`.

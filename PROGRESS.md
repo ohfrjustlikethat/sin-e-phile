@@ -12,7 +12,7 @@
 
 **Phase 8 — Player Core — MILESTONE: FIRST DEMOABLE BUILD** (`in_progress`, branch `phase/08-player-core`)
 
-1 of 7 exit criteria met with evidence.
+3 of 7 exit criteria met with evidence.
 
 > Opened 2026-11-06 when Phase 7 merged (125a0a2). Carried in from Phase 7: E1 (start under 8 s; D61) and E7 (the live VPN-drop check, which needs the author).
 
@@ -33,8 +33,10 @@
 - [ ] **E1** A user can search, click, and watch — from a local file, from the Internet Archive backend, and from a configured P2P source.
 - [x] **E2** Playback of 4K HEVC HDR uses hardware decode (verified in logs and by CPU usage).
       - *Evidence:* cargo run --release -p sinephile-player --example hwdec -- hdr4k.mp4 8 (3840x2160 HEVC Main10 PQ/BT.2020): hwdec-current=d3d11va-copy at 18.2% of one core vs forced software 35.9%, both real-time; RTX 5070 Ti Laptop, 2026-11-06, docs/eval-results.md Phase 8 E2
-- [ ] **E3** Seeking is frame-accurate and responsive.
-- [ ] **E4** Position resume works across app restarts.
+- [x] **E3** Seeking is frame-accurate and responsive.
+      - *Evidence:* crates/player/tests/playback.rs::an_exact_seek_lands_on_the_frame_asked_for: paused exact seeks to 3.52 / 1.08 / 5.2 s (3.52 between keyframes) land at 3.520 / 1.080 / 5.200 in 4.5 / 2.3 / 2.8 ms (cargo test --release -p sinephile-player --test playback an_exact_seek -- --nocapture, 2026-11-06), then a frame step to 5.24; seek_to_and_wait waits on playback-restart so the landing is real; passed 25/25 runs
+- [x] **E4** Position resume works across app restarts.
+      - *Evidence:* Three links, each tested: the player saves on the way out (src/features/player/PlayerScreen.test.tsx 'saves the position it reached on the way out', seen to fail with the unmount save removed); the position survives closing and reopening the database file (crates/playback/tests/plan.rs::the_position_survives_a_restart, seen to fail against a fresh file); the player starts there (crates/player/tests/playback.rs::resuming_starts_where_it_left_off)
 - [ ] **E5** With only an Xbox controller, a user can browse to a film, start it, pause, seek and leave the player — tested with a simulated gamepad in CI and confirmed once by the author with a real controller.
 - [ ] **E6** A demo GIF of this flow exists and is in the README.
 - [ ] **E7** Tag `phase-08`, and celebrate — this is the first thing worth showing anyone.
@@ -67,7 +69,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 5 | Semantic Search Engine | A | 4 | 2 | 2/5 |
 | [x] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 6/6 |
 | [x] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 6/8 |
-| [~] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 1/7 |
+| [~] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 3/7 |
 | [ ] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 0/6 |
 | [ ] | 10 | Subtitle Pipeline | B | 8 | 2 | 0/6 |
 | [ ] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 0/5 |

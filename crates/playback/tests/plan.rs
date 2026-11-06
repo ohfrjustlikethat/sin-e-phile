@@ -79,6 +79,42 @@ async fn film(db: &Db) -> i64 {
 }
 
 #[tokio::test]
+async fn the_position_survives_a_restart() {
+    // Phase 8 E4: the player saves through `save_position`; the app closes; a new
+    // process opens the same database file and plans the same film.
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("sinephile.db");
+    let id = {
+        let db = Db::open(&path).await.unwrap();
+        let id = film(&db).await;
+        let profile = ProfileRepository::new(&db).ensure_default().await.unwrap();
+        ProfileRepository::new(&db)
+            .save_position(
+                profile,
+                &PlaybackPosition {
+                    media_item_id: id,
+                    position_seconds: 2712,
+                    duration_seconds: Some(5700),
+                    audio_language: None,
+                    subtitle_language: None,
+                },
+            )
+            .await
+            .unwrap();
+        db.pool().close().await;
+        id
+    };
+    let db = Db::open(&path).await.unwrap();
+    let r = resolver(vec![Fake {
+        id: "a",
+        resolves: true,
+        url: "https://films.example/sunrise.mp4",
+    }]);
+    let p = plan(&db, &r, None, id).await.unwrap();
+    assert_eq!(p.start, Some(2712.0), "resumes where the last run stopped");
+}
+
+#[tokio::test]
 async fn a_playable_source_and_the_saved_position() {
     let db = Db::in_memory().await.unwrap();
     let id = film(&db).await;

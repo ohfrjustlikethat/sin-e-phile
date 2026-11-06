@@ -83,14 +83,14 @@
       {
         "id": "E3",
         "text": "Seeking is frame-accurate and responsive.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "crates/player/tests/playback.rs::an_exact_seek_lands_on_the_frame_asked_for: paused exact seeks to 3.52 / 1.08 / 5.2 s (3.52 between keyframes) land at 3.520 / 1.080 / 5.200 in 4.5 / 2.3 / 2.8 ms (cargo test --release -p sinephile-player --test playback an_exact_seek -- --nocapture, 2026-11-06), then a frame step to 5.24; seek_to_and_wait waits on playback-restart so the landing is real; passed 25/25 runs"
       },
       {
         "id": "E4",
         "text": "Position resume works across app restarts.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "Three links, each tested: the player saves on the way out (src/features/player/PlayerScreen.test.tsx 'saves the position it reached on the way out', seen to fail with the unmount save removed); the position survives closing and reopening the database file (crates/playback/tests/plan.rs::the_position_survives_a_restart, seen to fail against a fresh file); the player starts there (crates/player/tests/playback.rs::resuming_starts_where_it_left_off)"
       },
       {
         "id": "E5",
@@ -1121,14 +1121,14 @@
         {
           "id": "E3",
           "text": "Seeking is frame-accurate and responsive.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "crates/player/tests/playback.rs::an_exact_seek_lands_on_the_frame_asked_for: paused exact seeks to 3.52 / 1.08 / 5.2 s (3.52 between keyframes) land at 3.520 / 1.080 / 5.200 in 4.5 / 2.3 / 2.8 ms (cargo test --release -p sinephile-player --test playback an_exact_seek -- --nocapture, 2026-11-06), then a frame step to 5.24; seek_to_and_wait waits on playback-restart so the landing is real; passed 25/25 runs"
         },
         {
           "id": "E4",
           "text": "Position resume works across app restarts.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "Three links, each tested: the player saves on the way out (src/features/player/PlayerScreen.test.tsx 'saves the position it reached on the way out', seen to fail with the unmount save removed); the position survives closing and reopening the database file (crates/playback/tests/plan.rs::the_position_survives_a_restart, seen to fail against a fresh file); the player starts there (crates/player/tests/playback.rs::resuming_starts_where_it_left_off)"
         },
         {
           "id": "E5",
