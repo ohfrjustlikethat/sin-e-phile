@@ -127,6 +127,66 @@ fn a_clip_loads_plays_and_reports_its_tracks() {
 }
 
 #[test]
+fn a_subtitle_beside_the_file_is_not_loaded_behind_the_chains_back() {
+    // mpv's own sub-auto would load it unaligned; the chain must be the only one.
+    let dir = tempfile::tempdir().unwrap();
+    let film = clip(dir.path());
+    std::fs::write(
+        film.with_extension("en.srt"),
+        "1
+00:00:01,000 --> 00:00:02,000
+Beside.
+",
+    )
+    .unwrap();
+    let p = player();
+    p.load(film.to_str().unwrap(), None).unwrap();
+    p.wait_first_frame(Duration::from_secs(10)).unwrap();
+    let subs = p.tracks().into_iter().filter(|t| t.kind == "sub").count();
+    assert_eq!(subs, 1, "only the embedded track");
+}
+
+#[test]
+fn an_outside_subtitle_loads_shifts_and_keeps_its_style() {
+    // SPEC.md Phase 10: a file found beside the film or downloaded, loaded and selected;
+    // the nudge moves it; the style is accepted.
+    let dir = tempfile::tempdir().unwrap();
+    let p = player();
+    p.load(clip(dir.path()).to_str().unwrap(), None).unwrap();
+    p.wait_first_frame(Duration::from_secs(10)).unwrap();
+    let outside = dir.path().join("outside.fr.srt");
+    std::fs::write(
+        &outside,
+        "1
+00:00:01,000 --> 00:00:04,000
+Un sous-titre.
+",
+    )
+    .unwrap();
+    p.add_subtitle(outside.to_str().unwrap(), "Downloaded", Some("fr"))
+        .unwrap();
+    wait_until("the outside subtitle to be selected", || {
+        p.tracks()
+            .iter()
+            .any(|t| t.kind == "sub" && t.selected && t.lang.as_deref() == Some("fr"))
+    });
+    assert_eq!(p.tracks().iter().filter(|t| t.kind == "sub").count(), 2);
+    let subs: Vec<_> = p.tracks().into_iter().filter(|t| t.kind == "sub").collect();
+    assert_eq!(
+        subs.iter().map(|t| t.external).collect::<Vec<_>>(),
+        [false, true],
+        "the embedded one and the added file are told apart"
+    );
+    p.set_subtitle_delay(-0.3).unwrap();
+    assert!((p.subtitle_delay() + 0.3).abs() < 1e-6);
+    p.set_subtitle_style(&sinephile_player::SubtitleStyle {
+        background: true,
+        ..Default::default()
+    })
+    .unwrap();
+}
+
+#[test]
 fn an_exact_seek_lands_on_the_frame_asked_for() {
     // Phase 8 E3: "Seeking is frame-accurate and responsive."
     let dir = tempfile::tempdir().unwrap();

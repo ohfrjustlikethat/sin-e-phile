@@ -124,6 +124,18 @@ pub async fn player_open(
                     skipped = s.failed.len(),
                     "first frame"
                 );
+                // Then the subtitles (SPEC.md Phase 10), never delaying the picture.
+                let still_this_film = move || OPENS.load(Ordering::SeqCst) == generation;
+                if let Err(e) = crate::commands::subtitles::open_for(
+                    &state,
+                    screen.rt.clone(),
+                    s.open,
+                    still_this_film,
+                )
+                .await
+                {
+                    tracing::warn!(error = %e, "subtitles could not be prepared");
+                }
             }
             Err(FallbackError::Superseded) => {}
             Err(e) => {

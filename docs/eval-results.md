@@ -2333,3 +2333,46 @@ first run after a rebuild pays the disk cache); HNSW recall@10 **0.9760**, index
 Unchanged from Phase 8. Rust tests 602 passed, 0 failed; frontend 70 passed; controller
 flow 19/19.
 
+## Phase 10 — Subtitle pipeline
+
+### E1–E2: subtitle alignment over `fixtures/subtitles/`
+
+2026-11-06, `cargo run --release -p eval -- subs --report`: ten synthetic films (speech by
+Windows' synthesiser over room, street and music beds; traces from the app's own VAD),
+eight damaged copies each. A copy aligns when 95% of its cues land within 150 ms.
+
+| Damage | Aligned |
+|---|---|
+| none | 10/10 |
+| offset (0.4–90 s either way) | 20/20 |
+| scale (23.976→25, 25→23.976, 24→25) | 30/30 |
+| intro removed (split) | 9/10 |
+| intro added + 25→23.976 | 10/10 |
+| **all** | **79/80 = 98.8%** (target > 90%) |
+
+Tuned on six films: 48/48. **Held out** (four films built after tuning, never tuned on):
+**31/32 = 96.9%**. False accepts, each film's subtitles against another film's speech:
+**0/10** (controls score ≤ 1.30, real matches ≥ 1.6; threshold 1.45). The miss: a split
+whose second part landed 156 ms off. VAD against the true speech: agreement
+93.8–97.9%, recall 89.5–96.1%, precision 95.5–99.5% per film.
+
+Seen to fail: with the scale set reduced to 1.0 alone, 39/80 = 48.8% and every scaled
+copy refused. How the number got here, in order: z-score confidence 50.0% (21 refusals of
+real matches) → distinctness 72.9% → corpus fix (no cue moved before zero) 77.1% →
+realistic intros 85.4% → per-window candidate offsets 91.7% → prefer no stretch 97.9% →
+film time runs forward (and a corpus fix: a cue moves whole) 100% on the tuned films.
+
+### E1 again: the plateau's late edge
+
+2026-11-06, same command: **80/80** (tuned 48/48, **held out 32/32**), false accepts 0/10.
+Taking the plateau's late edge instead of its middle (`crates/subtitle-align/src/align.rs`
+`peak`): the middle was biased early by half the subtitles' linger, found when
+`crates/subtitles/tests/plan.rs` aligned a file lingering 400 ms to 160 ms off.
+
+### Regression check before merging Phase 10 (rule 13)
+
+2026-11-06, release build at `9d84655`, `cargo run --release -p eval -- all` twice (now including
+`subs`) and `-- vector --report`: E2 **43/43**; E3 meaning **0.0472**, filter **1.0000**; E1 p50 / p95
+**6.5 / 15.3** and **6.1 / 14.8 ms**; HNSW recall@10 **0.9760**; subtitles **80/80**, false accepts
+**0/10**. Unchanged from Phase 9. Rust tests 646 passed, 0 failed; frontend 76; controller flow 19/19.
+

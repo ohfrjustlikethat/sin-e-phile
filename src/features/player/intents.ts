@@ -13,12 +13,14 @@ export type Intent =
   | { kind: "frame"; forward: boolean }
   | { kind: "speed"; faster: boolean }
   | { kind: "subtitles_menu" }
+  /** Move the subtitles: negative earlier, positive later (SPEC.md Phase 10's nudge). */
+  | { kind: "subtitle_delay"; ms: number }
   | { kind: "audio_menu" }
   | { kind: "back" };
 
 /**
  * SPEC.md Phase 8: space, arrows, J/K/L, F, M, `,`/`.` frame step, `[`/`]` speed — plus
- * Escape to leave. Returns `null` for any key the player does not own, so the page's
+ * Escape to leave; Phase 10: G/H move the subtitles earlier and later. Returns `null` for any key the player does not own, so the page's
  * other shortcuts still work.
  */
 export function keyIntent(e: Pick<KeyboardEvent, "key" | "shiftKey" | "ctrlKey" | "altKey" | "metaKey">): Intent | null {
@@ -59,6 +61,13 @@ export function keyIntent(e: Pick<KeyboardEvent, "key" | "shiftKey" | "ctrlKey" 
     case "c":
     case "C":
       return { kind: "subtitles_menu" };
+    // SPEC.md Phase 10: G and H nudge the subtitles a tenth of a second.
+    case "g":
+    case "G":
+      return { kind: "subtitle_delay", ms: -100 };
+    case "h":
+    case "H":
+      return { kind: "subtitle_delay", ms: 100 };
     case "Escape":
       return { kind: "back" };
     default:

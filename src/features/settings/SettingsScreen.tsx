@@ -5,6 +5,7 @@ import { NetworkSection } from "./NetworkSection";
 import { ControllerSection } from "./ControllerSection";
 import { SourcesSection } from "./SourcesSection";
 import { PlaybackSection } from "./PlaybackSection";
+import { SubtitlesSection } from "./SubtitlesSection";
 
 /**
  * Settings — SPEC.md Phase 1, subtask 1.9.
@@ -54,6 +55,7 @@ export function SettingsScreen() {
 
       <SourcesSection />
       <PlaybackSection />
+      <SubtitlesSection />
       <NetworkSection />
       <ControllerSection />
 

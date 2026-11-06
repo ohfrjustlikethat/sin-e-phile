@@ -9,5 +9,6 @@ pub mod playback;
 pub mod player;
 pub mod search;
 pub mod sources;
+pub mod subtitles;
 pub mod system;
 pub mod torrent;

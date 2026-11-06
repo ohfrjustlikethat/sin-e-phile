@@ -12,6 +12,7 @@ const commands = {
   playerPauseStill: vi.fn(() => ok("data:image/jpeg;base64,AAAA")),
   playerResumeVideo: vi.fn(() => ok(null)),
   savePosition: vi.fn(() => ok(null)),
+  subtitleNudge: vi.fn((ms: number) => ok(ms * 3)),
 };
 vi.mock("@/lib/ipc", () => ({ commands }));
 // Inert unless a test marks the page as inside Tauri.
@@ -123,5 +124,12 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
     } finally {
       delete w.__TAURI_INTERNALS__;
     }
+  });
+
+  it("G nudges the subtitles and says where they are now (Phase 10)", async () => {
+    render(<PlayerScreen />);
+    fireEvent.keyDown(window, { key: "g" });
+    expect(commands.subtitleNudge).toHaveBeenCalledWith(-100);
+    expect(await screen.findByText("Subtitles −0.3 s")).toBeInTheDocument();
   });
 });

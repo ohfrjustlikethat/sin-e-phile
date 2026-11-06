@@ -26,6 +26,7 @@ use sinephile_persistence::repositories::{
     EpisodeRepository, MatchReason, MediaRepository, ProfileRepository, Readiness, Sample,
     SearchRepository, SourceRepository, TmdbAccess, WikipediaRepository,
 };
+use sinephile_persistence::repositories::{CachedSubtitle, QuotaDay, SubtitleRepository};
 use sinephile_persistence::{Db, IdSource, MediaKind, NewMediaItem, TitleVariant};
 
 /// Exercise every public method on `MediaRepository`.
@@ -443,6 +444,32 @@ async fn db_surface() {
         creds.tmdb_access(profile).await.expect("tmdb_access"),
         TmdbAccess::Absent
     );
+
+    // opensubtitles_key / set_opensubtitles_key / clear_opensubtitles_key (Phase 10)
+    assert_eq!(
+        creds.opensubtitles_key(profile).await.unwrap(),
+        None,
+        "none ships"
+    );
+    assert!(creds
+        .set_opensubtitles_key(profile, "too-short")
+        .await
+        .is_err());
+    creds
+        .set_opensubtitles_key(profile, " Ab0123456789cdEF0123456789abcd01 ")
+        .await
+        .expect("set_opensubtitles_key");
+    assert_eq!(
+        creds.opensubtitles_key(profile).await.unwrap().as_deref(),
+        Some("Ab0123456789cdEF0123456789abcd01")
+    );
+    assert!(
+        creds.get(profile, "opensubtitles.api_key").await.is_err(),
+        "a secret"
+    );
+    assert!(creds.clear_opensubtitles_key(profile).await.unwrap());
+    assert!(!creds.clear_opensubtitles_key(profile).await.unwrap());
+    assert_eq!(creds.opensubtitles_key(profile).await.unwrap(), None);
 
     // ── SearchRepository ──────────────────────────────────────────────────────
     let search = SearchRepository::new(&db);
@@ -911,6 +938,92 @@ async fn direct_link_repository_surface() {
         "already gone"
     );
     assert_eq!(repo.all().await.unwrap().len(), 1);
+}
+
+/// `SubtitleRepository` (Phase 10, migration 0018).
+#[tokio::test]
+async fn subtitle_repository_surface() {
+    let db = Db::in_memory().await.expect("open");
+    let repo = SubtitleRepository::new(&db);
+
+    // nudge / set_nudge — per file AND subtitle; zero removes it
+    assert_eq!(repo.nudge("hash:1", "embedded:3").await.unwrap(), None);
+    repo.set_nudge("hash:1", "embedded:3", 300)
+        .await
+        .expect("set");
+    repo.set_nudge("hash:1", "embedded:3", -200)
+        .await
+        .expect("update");
+    repo.set_nudge("hash:1", "file:x.srt", 900)
+        .await
+        .expect("another subtitle");
+    assert_eq!(
+        repo.nudge("hash:1", "embedded:3").await.unwrap(),
+        Some(-200)
+    );
+    assert_eq!(repo.nudge("hash:1", "file:x.srt").await.unwrap(), Some(900));
+    repo.set_nudge("hash:1", "embedded:3", 0)
+        .await
+        .expect("clear");
+    assert_eq!(repo.nudge("hash:1", "embedded:3").await.unwrap(), None);
+
+    // quota / reserve / release / set_server_remaining — never past the budget
+    let day = "2026-11-06";
+    assert_eq!(
+        repo.quota("opensubtitles", day).await.unwrap(),
+        QuotaDay::default()
+    );
+    assert!(repo.reserve("opensubtitles", day, 2).await.unwrap());
+    assert!(repo.reserve("opensubtitles", day, 2).await.unwrap());
+    assert!(
+        !repo.reserve("opensubtitles", day, 2).await.unwrap(),
+        "budget spent"
+    );
+    assert_eq!(repo.quota("opensubtitles", day).await.unwrap().used, 2);
+    repo.release("opensubtitles", day).await.expect("release");
+    assert_eq!(repo.quota("opensubtitles", day).await.unwrap().used, 1);
+    // The provider says none is left: that wins over our own budget.
+    repo.set_server_remaining("opensubtitles", day, 0)
+        .await
+        .expect("server");
+    assert!(!repo.reserve("opensubtitles", day, 20).await.unwrap());
+    assert_eq!(
+        repo.quota("opensubtitles", day).await.unwrap(),
+        QuotaDay {
+            used: 1,
+            server_remaining: Some(0)
+        }
+    );
+    // A new day starts fresh.
+    assert!(repo
+        .reserve("opensubtitles", "2026-11-07", 20)
+        .await
+        .unwrap());
+
+    // cached / remember
+    assert_eq!(repo.cached("8e245d9679d31e12", "en").await.unwrap(), None);
+    let entry = CachedSubtitle {
+        provider: "opensubtitles".into(),
+        file_id: "1234".into(),
+        relative_path: "cache/subtitles/8e245d9679d31e12.en.srt".into(),
+    };
+    // remember — refuses a path that would not travel with the data folder
+    let absolute = CachedSubtitle {
+        relative_path: "C:/Users/x/sub.srt".into(),
+        ..entry.clone()
+    };
+    assert!(repo
+        .remember("8e245d9679d31e12", "en", &absolute)
+        .await
+        .is_err());
+    repo.remember("8e245d9679d31e12", "en", &entry)
+        .await
+        .expect("remember");
+    assert_eq!(
+        repo.cached("8e245d9679d31e12", "en").await.unwrap(),
+        Some(entry)
+    );
+    assert_eq!(repo.cached("8e245d9679d31e12", "fr").await.unwrap(), None);
 }
 
 /// `BackfillRepository` (Phase 6, ADR-0030 layer 3, migration 0017).

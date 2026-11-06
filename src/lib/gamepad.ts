@@ -90,6 +90,11 @@ export function playerIntent(button: number): Intent | null {
       return { kind: "seek", seconds: -30 };
     case BUTTON.RT:
       return { kind: "seek", seconds: 30 };
+    // The bumpers nudge the subtitles, as G and H do (SPEC.md Phase 10).
+    case BUTTON.LB:
+      return { kind: "subtitle_delay", ms: -100 };
+    case BUTTON.RB:
+      return { kind: "subtitle_delay", ms: 100 };
     case BUTTON.LEFT:
       return { kind: "seek", seconds: -10 };
     case BUTTON.RIGHT:

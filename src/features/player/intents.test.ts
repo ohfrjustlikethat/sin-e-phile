@@ -20,6 +20,11 @@ describe("player keys (SPEC.md Phase 8)", () => {
     expect(key("]")).toEqual({ kind: "speed", faster: true });
   });
 
+  it("G and H nudge the subtitles a tenth of a second (Phase 10)", () => {
+    expect(key("g")).toEqual({ kind: "subtitle_delay", ms: -100 });
+    expect(key("H")).toEqual({ kind: "subtitle_delay", ms: 100 });
+  });
+
   it("leaves keys it does not own, and every chord, to the rest of the app", () => {
     expect(key("/")).toBeNull();
     expect(key("f", { ctrlKey: true })).toBeNull();

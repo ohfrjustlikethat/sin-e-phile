@@ -162,6 +162,15 @@ export const commands = {
 	preparePlay: (id: number, language: string | null, quality: string | null) => typedError<PlayPlanView, string>(__TAURI_INVOKE("prepare_play", { id, language, quality })),
 	/**  Remember where the viewer is, for resume. Called periodically and on leaving. */
 	savePosition: (id: number, position: number | null, duration: number | null) => typedError<null, string>(__TAURI_INVOKE("save_position", { id, position, duration })),
+	subtitleSettings: () => typedError<SubtitleSettingsView, string>(__TAURI_INVOKE("subtitle_settings")),
+	setSubtitleSettings: (settings: SubtitleSettings) => typedError<null, string>(__TAURI_INVOKE("set_subtitle_settings", { settings })),
+	setOpensubtitlesKey: (key: string) => typedError<null, string>(__TAURI_INVOKE("set_opensubtitles_key", { key })),
+	clearOpensubtitlesKey: () => typedError<boolean, string>(__TAURI_INVOKE("clear_opensubtitles_key")),
+	/**
+	 *  Move the subtitles by `delta_ms` (G earlier, H later) and remember it for this file and
+	 *  subtitle (Phase 10 E5). Returns the nudge now in force.
+	 */
+	subtitleNudge: (deltaMs: number) => typedError<number, string>(__TAURI_INVOKE("subtitle_nudge", { deltaMs })),
 };
 
 /* Types */
@@ -467,6 +476,29 @@ export type SourcesView = {
 	sources: SourceInfo[],
 	/**  Installed addons whose stored manifest no longer passes the checks. */
 	refused_addons: string[],
+};
+
+/**  The viewer's subtitle settings, per profile. */
+export type SubtitleSettings = {
+	/**  Languages, most preferred first (`en`, `fr`). */
+	languages: string[],
+	/**  Subtitles even when the audio is in one of `languages`. */
+	always: boolean,
+	font: string,
+	size: number,
+	position: number,
+	background: boolean,
+};
+
+export type SubtitleSettingsView = {
+	settings: SubtitleSettings,
+	/**  Whether this profile has its own OpenSubtitles key. */
+	has_key: boolean,
+	/**  Downloads spent today, and the daily budget. */
+	used_today: number,
+	budget: number,
+	/**  What OpenSubtitles last said is left today, if it said. */
+	server_remaining: number | null,
 };
 
 /**  A score term exactly as `sinephile_selection::Term` holds it. */

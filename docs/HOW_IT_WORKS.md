@@ -64,7 +64,7 @@ the whole app around 10 MB instead of 150 MB (ADR-0002).
 ## What happens when you press play
 
 This is the path worth understanding, because nearly every subsystem is on it.
-Steps 1–5 and 7 are built (Phases 6–9); step 6, subtitles, is Phase 10.
+Every step is built (Phases 6–10).
 
 **1. You click a film.** The frontend asks the backend to resolve it, passing the
 internal media ID plus your language and quality preferences.
@@ -184,7 +184,7 @@ scarcest. Sequential is cooking strictly in order of tickets. What actually work
 cooking the dish being served *right now* first, while prepping the rest in whatever
 order keeps the kitchen efficient.
 
-### Subtitles — in sync on the first frame `⬜ Phase 10`
+### Subtitles — in sync on the first frame `✅ Phase 10`
 
 Most tools give you an offset slider. That fails on the common case, because a
 subtitle file made for a 25 fps master drifts **progressively** against a 23.976 fps
@@ -201,6 +201,11 @@ Making subtitles worse is worse than leaving them alone.
 **The analogy:** two people clapping along to the same song, recorded separately. You
 can work out both how late one started *and* whether they were clapping slightly
 fast, by sliding the recordings against each other until the claps line up.
+
+**Measured**, on eighty deliberately damaged subtitle files over ten synthetic films
+(offsets, framerate changes, intros added and cut): all eighty land within 150 ms,
+including the films held back from tuning, and subtitles for the wrong film are refused
+every time. `docs/specs/subtitle-alignment.md` has the method and its numbers.
 
 ### The local library — identifying your files by looking at them `⬜ Phase 12`
 

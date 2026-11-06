@@ -11,6 +11,8 @@ use crate::secrets;
 
 /// The settings key a profile's TMDB key is stored under.
 const TMDB_KEY: &str = "tmdb.api_key";
+/// The settings key a profile's OpenSubtitles key is stored under.
+const OPENSUBTITLES_KEY: &str = "opensubtitles.api_key";
 
 /// Whether a profile can reach TMDB.
 ///
@@ -185,6 +187,59 @@ impl<'a> CredentialRepository<'a> {
             Some((value, _)) => Ok(String::from_utf8(value).ok()),
             None => Ok(None),
         }
+    }
+
+    /// Store a profile's own OpenSubtitles API key (SPEC.md §14, Phase 10), wrapped like
+    /// the TMDB key and under the same rules: none ships, each user brings their own.
+    pub async fn set_opensubtitles_key(&self, profile_id: i64, key: &str) -> Result<(), DbError> {
+        let key = key.trim();
+        if key.is_empty() {
+            return Err(DbError::Invalid(KeyError::Empty.to_string()));
+        }
+        // OpenSubtitles keys are 32 letters and digits; anything else is a paste error.
+        if key.len() != 32 || !key.bytes().all(|b| b.is_ascii_alphanumeric()) {
+            return Err(DbError::Invalid(KeyError::Malformed.to_string()));
+        }
+        let Some(wrapped) = secrets::wrap(key) else {
+            return Err(DbError::Invalid(KeyError::NotProtectable.to_string()));
+        };
+        sqlx::query(
+            "INSERT INTO profile_settings (profile_id, key, value, is_secret, updated_at)
+             VALUES (?, ?, ?, 1, datetime('now'))
+             ON CONFLICT (profile_id, key)
+             DO UPDATE SET value = excluded.value, is_secret = 1, updated_at = datetime('now')",
+        )
+        .bind(profile_id)
+        .bind(OPENSUBTITLES_KEY)
+        .bind(wrapped)
+        .execute(self.db.pool())
+        .await?;
+        Ok(())
+    }
+
+    /// The profile's OpenSubtitles key, if it has one that unwraps on this machine.
+    pub async fn opensubtitles_key(&self, profile_id: i64) -> Result<Option<String>, DbError> {
+        let stored: Option<Vec<u8>> = sqlx::query_scalar(
+            "SELECT value FROM profile_settings WHERE profile_id = ? AND key = ?",
+        )
+        .bind(profile_id)
+        .bind(OPENSUBTITLES_KEY)
+        .fetch_optional(self.db.pool())
+        .await?;
+        Ok(stored
+            .as_deref()
+            .and_then(secrets::unwrap)
+            .filter(|k| !k.is_empty()))
+    }
+
+    pub async fn clear_opensubtitles_key(&self, profile_id: i64) -> Result<bool, DbError> {
+        let removed = sqlx::query("DELETE FROM profile_settings WHERE profile_id = ? AND key = ?")
+            .bind(profile_id)
+            .bind(OPENSUBTITLES_KEY)
+            .execute(self.db.pool())
+            .await?
+            .rows_affected();
+        Ok(removed > 0)
     }
 
     /// How many profiles have supplied a key. For the settings screen, and for making

@@ -65,6 +65,35 @@ pub struct Track {
     pub title: Option<String>,
     pub codec: Option<String>,
     pub selected: bool,
+    /// A forced subtitle: only the foreign-language lines.
+    #[serde(default)]
+    pub forced: bool,
+    /// Loaded from a separate file rather than inside the media.
+    #[serde(default)]
+    pub external: bool,
+}
+
+/// How plain subtitles look (Settings → Subtitles).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SubtitleStyle {
+    pub font: String,
+    /// mpv's scale: 55 is its default, at 720 lines.
+    pub size: u32,
+    /// 0 top … 100 bottom.
+    pub position: u32,
+    /// A dark box behind the text instead of an outline.
+    pub background: bool,
+}
+
+impl Default for SubtitleStyle {
+    fn default() -> Self {
+        Self {
+            font: "Segoe UI".into(),
+            size: 46,
+            position: 95,
+            background: false,
+        }
+    }
 }
 
 /// A snapshot of the player.
@@ -112,6 +141,9 @@ impl Player {
         set("keep-open", "yes")?;
         set("hr-seek", "yes")?;
         set("cache", "yes")?;
+        // mpv would load a subtitle beside the file by itself, unaligned, and report it as
+        // a track. The subtitle chain (crates/subtitles) finds, aligns and loads those.
+        set("sub-auto", "no")?;
         set("demuxer-max-bytes", "256MiB")?;
         set("hwdec", if options.hwdec { "auto-safe" } else { "no" })?;
         if options.headless {
@@ -280,6 +312,41 @@ impl Player {
         self.prop("sid", &id.map_or("no".to_string(), |i| i.to_string()))
     }
 
+    /// Load a subtitle file and show it (SPEC.md Phase 10).
+    pub fn add_subtitle(
+        &self,
+        path: &str,
+        title: &str,
+        lang: Option<&str>,
+    ) -> Result<(), PlayerError> {
+        self.cmd(&["sub-add", path, "select", title, lang.unwrap_or("")])
+    }
+
+    /// Shift the subtitles: positive shows them later. The viewer's nudge.
+    pub fn set_subtitle_delay(&self, seconds: f64) -> Result<(), PlayerError> {
+        self.prop("sub-delay", &format!("{seconds:.3}"))
+    }
+
+    pub fn subtitle_delay(&self) -> f64 {
+        self.num("sub-delay").unwrap_or(0.0)
+    }
+
+    /// The viewer's subtitle style. Applies to plain subtitles only: an ASS/SSA file keeps
+    /// its own typesetting (`sub-ass-override=no`), since it was styled on purpose.
+    pub fn set_subtitle_style(&self, style: &SubtitleStyle) -> Result<(), PlayerError> {
+        self.prop("sub-ass-override", "no")?;
+        self.prop("sub-font", &style.font)?;
+        self.prop("sub-font-size", &style.size.to_string())?;
+        // 100 is the bottom edge; lower raises the line.
+        self.prop("sub-pos", &style.position.clamp(0, 100).to_string())?;
+        if style.background {
+            self.prop("sub-border-style", "opaque-box")?;
+            self.prop("sub-back-color", "#B0000000")
+        } else {
+            self.prop("sub-border-style", "outline-and-shadow")
+        }
+    }
+
     /// Save the frame on screen, at window resolution, to `path` (JPEG by extension).
     /// The pause overlay shows it while the video window is hidden (ADR-0021).
     pub fn screenshot(&self, path: &Path) -> Result<(), PlayerError> {
@@ -359,6 +426,8 @@ impl Player {
                     title: p("title"),
                     codec: p("codec"),
                     selected: p("selected").as_deref() == Some("yes"),
+                    forced: p("forced").as_deref() == Some("yes"),
+                    external: p("external").as_deref() == Some("yes"),
                 }
             })
             .collect()

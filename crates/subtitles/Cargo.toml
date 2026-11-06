@@ -1,0 +1,22 @@
+[package]
+name = "sinephile-subtitles"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "Where a film's subtitles come from: embedded, beside it, in its torrent, then a quota-budgeted download (SPEC.md Phase 10)."
+
+# The chain is logic, so it lives in a crate and is tested here (ADR-0022); src-tauri
+# only hands it the player's track list and the file's path.
+
+[dependencies]
+sinephile-persistence = { path = "../persistence" }
+sinephile-metadata-api = { path = "../metadata-api" }
+subtitle-align = { path = "../subtitle-align" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+tempfile = "3"

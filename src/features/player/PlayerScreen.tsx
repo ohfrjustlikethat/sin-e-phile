@@ -66,6 +66,13 @@ export function PlayerScreen() {
   const [still, setStill] = useState<string | null>(null);
   const [chrome, setChrome] = useState(true);
   const [menu, setMenu] = useState<"audio" | "sub" | null>(null);
+  // The last nudge, shown for a moment in the controls (G/H, LB/RB).
+  const [nudge, setNudge] = useState<string | null>(null);
+  useEffect(() => {
+    if (!nudge) return;
+    const t = window.setTimeout(() => setNudge(null), 2500);
+    return () => window.clearTimeout(t);
+  }, [nudge]);
   const [fullscreen, setFs] = useState(false);
 
   const stage = useRef<HTMLDivElement>(null);
@@ -197,6 +204,18 @@ export function PlayerScreen() {
         case "subtitles_menu":
           setMenu((m) => (m === "sub" ? null : "sub"));
           break;
+        case "subtitle_delay":
+          void commands.subtitleNudge(intent.ms).then((r) => {
+            const ms = r.status === "ok" ? r.data : null;
+            setNudge(
+              ms === null
+                ? "No subtitles showing"
+                : ms === 0
+                  ? "Subtitles as timed"
+                  : `Subtitles ${ms > 0 ? "+" : "−"}${(Math.abs(ms) / 1000).toFixed(1)} s`,
+            );
+          });
+          break;
         case "audio_menu":
           setMenu((m) => (m === "audio" ? null : "audio"));
           break;
@@ -325,6 +344,11 @@ export function PlayerScreen() {
               <div className="flex-1" />
               {state?.hwdec && <span className="label text-ink-faint">{state.hwdec}</span>}
               {(state?.speed ?? 1) !== 1 && <span className="tabular-nums">{state?.speed}×</span>}
+              {nudge && (
+                <span role="status" className="tabular-nums text-ink">
+                  {nudge}
+                </span>
+              )}
               <TrackMenu label="Audio" kind="audio" open={menu === "audio"} tracks={tracks}
                 onToggle={() => run({ kind: "audio_menu" })}
                 onPick={(id) => { act({ kind: "audio", id: id ?? 1 }); setMenu(null); }} />

@@ -12,6 +12,7 @@ pub mod media;
 pub mod profiles;
 pub mod search;
 pub mod sources;
+pub mod subtitles;
 
 pub use backfill::{BackfillRepository, BackfilledRow};
 pub use catalogue::{
@@ -26,3 +27,4 @@ pub use search::{Hit, HitDetail, MatchReason, SearchRepository};
 pub use sources::{
     AddonRow, BackendRow, DirectLinkRepository, DirectLinkRow, Sample, SourceRepository,
 };
+pub use subtitles::{CachedSubtitle, QuotaDay, SubtitleRepository};
