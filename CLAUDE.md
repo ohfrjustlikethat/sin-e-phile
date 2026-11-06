@@ -43,6 +43,8 @@ could hurt the whole app.* So:
   tag phases yourself. Before **every** push, run all of:
   `cargo fmt --all --check` · `cargo clippy --workspace --all-targets -- -D warnings` ·
   `cargo test --workspace` · `npm run lint` · `npm test` · `npm run build` ·
+  `node tools/uiaudit/controller.mjs` (the pad flow against the built `dist/`; it runs
+  locally, and a changed IPC shape breaks its fake backend before it breaks CI) ·
   `python tools/guard/guard.py --staged` (the hook) · `python tools/guard/secretscan.py --tree` ·
   **gitleaks over full history** (CI runs it; the regex scanner does not catch what it
   catches): `gitleaks detect --source . --redact --no-banner --exit-code 1`, using the

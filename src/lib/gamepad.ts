@@ -133,44 +133,51 @@ export interface Box {
 /**
  * Spatial navigation: the candidate nearest to `from` in `direction`, or -1.
  *
- * A candidate counts only if it lies in that direction (its near edge beyond the
- * current one's centre). Among those, distance along the direction counts fully and
- * sideways drift counts double, so "down" prefers the thing directly below over a
- * slightly nearer thing off to the side — what a remote user expects.
+ * A candidate counts only if it lies in that direction (its centre beyond the current
+ * one's). Among those, distance along the direction counts fully and sideways drift
+ * counts double, so "down" prefers the thing directly below over a slightly nearer thing
+ * off to the side — what a remote user expects.
+ *
+ * Sideways drift is the gap between the two boxes' edges, zero when they overlap — not
+ * the distance between centres, which made a wide button "far" from a small option
+ * sitting under its right half, so Up from the option skipped the button for the
+ * masthead (found by the controller flow, Phase 9).
  */
 export function nearest(from: Box, candidates: Box[], direction: Direction): number {
   const cx = from.x + from.width / 2;
   const cy = from.y + from.height / 2;
+  const gapX = (c: Box) => Math.max(0, c.x - (from.x + from.width), from.x - (c.x + c.width));
+  const gapY = (c: Box) => Math.max(0, c.y - (from.y + from.height), from.y - (c.y + c.height));
   let best = -1;
   let bestScore = Infinity;
   candidates.forEach((c, i) => {
-    const ox = c.x + c.width / 2;
-    const oy = c.y + c.height / 2;
+    // Centre distance only breaks ties between boxes that overlap equally.
+    const tie = 0.01 * Math.hypot(c.x + c.width / 2 - cx, c.y + c.height / 2 - cy);
     let along: number;
     let across: number;
     switch (direction) {
       case "down":
         if (c.y + c.height / 2 <= cy + 1) return;
         along = c.y - (from.y + from.height);
-        across = Math.abs(ox - cx);
+        across = gapX(c);
         break;
       case "up":
         if (c.y + c.height / 2 >= cy - 1) return;
         along = from.y - (c.y + c.height);
-        across = Math.abs(ox - cx);
+        across = gapX(c);
         break;
       case "right":
         if (c.x + c.width / 2 <= cx + 1) return;
         along = c.x - (from.x + from.width);
-        across = Math.abs(oy - cy);
+        across = gapY(c);
         break;
       case "left":
         if (c.x + c.width / 2 >= cx - 1) return;
         along = from.x - (c.x + c.width);
-        across = Math.abs(oy - cy);
+        across = gapY(c);
         break;
     }
-    const score = Math.max(along, 0) + 2 * across;
+    const score = Math.max(along, 0) + 2 * across + tie;
     if (score < bestScore) {
       bestScore = score;
       best = i;

@@ -64,7 +64,8 @@ const FAKE = `(() => {
       synopsis: "A married farmer falls under the spell of a woman from the city.",
       credits: [{ name: "F. W. Murnau", role: "director", character: null }] }),
     prepare_play: () => ({ title: "Sunrise", open: "https://films.example/sunrise.mp4", start: null,
-      from: "Internet Archive", offered: 2 }),
+      from: "Internet Archive", offered: 2, languages: ["en", "de"], original_language: null,
+      qualities: ["full_hd", "hd"], unmet: null }),
     player_pause_still: () => "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
     dev_autoplay: () => null,
   };
@@ -339,6 +340,19 @@ try {
   await waitFor(async () => (await active())?.text === "Play", "Play to take focus", 25);
   check((await calls("prepare_play")).length === 1, "A opens the film; its sources are asked before Play");
   await shoot("04-detail");
+
+  // Phase 9: the language choice is reachable with the pad, and choosing re-plans.
+  await press(B.DOWN);
+  await waitFor(async () => (await active())?.text === "Auto", "the Audio row", 25);
+  await press(B.RIGHT);
+  await press(B.RIGHT);
+  check((await active())?.text === "German", `the D-pad walks the Audio row (${(await active())?.text})`);
+  await press(B.A);
+  const replanned = await waitFor(async () => (await calls("prepare_play"))[1], "a new plan", 25);
+  check(replanned.language === "de" && replanned.quality === null, "A on a language plans again with it");
+  await shoot("04b-language");
+  await press(B.UP);
+  await waitFor(async () => (await active())?.text === "Play", "Play again", 25);
 
   await press(B.A);
   const opened = await waitFor(async () => (await calls("player_open"))[0], "the player", 25);

@@ -2109,7 +2109,14 @@
     }
   ],
   "next_action": "Phase 9 subtask 9.5 (docs/phases/phase-09-intelligent-source-selection.md): the expert panel and the 'why this source' line. Add a pure crates/selection function why(&Score) -> String (the strongest positive terms in words, e.g. '1080p · Hindi audio · 120 seeders'); carry it and the ranked list (key, backend, title, total, sunk, unmet, terms) in PlayPlanView; on the detail page show the why line under Play and a Ctrl+Shift+S overlay (also a Settings toggle 'Show source details') listing every candidate with each term's value, weight and contribution; pad-reachable. Test that the panel's numbers equal Score.terms (E5). Then 9.6 and close Phase 9.",
-  "blockers": [],
+  "blockers": [
+    {
+      "id": "B10",
+      "raised": "2026-11-06T07:00:00Z",
+      "needs_user": false,
+      "description": "CI run 42176797589 failed in 'Controller flow (simulated Xbox pad)': the harness's fake prepare_play still returned the Phase 8 PlayPlanView, so the detail page threw on the missing language/quality fields and Play never took focus. Fixed by updating the fake (and adding pad checks for the Audio row), which also exposed a spatial-navigation bug (Up from an option skipped the wide Play button) fixed in src/lib/gamepad.ts nearest(). Clears when CI on the branch is green."
+    }
+  ],
   "decisions_pending": [
     {
       "id": "P1",

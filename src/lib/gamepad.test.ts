@@ -135,3 +135,21 @@ describe("startGamepad, with a simulated pad", () => {
     stop();
   });
 });
+
+describe("nearest, wide targets (Phase 9)", () => {
+  it("goes up from a small option to the wide button it sits under, not past it", () => {
+    // Play spans 100-400; "German" sits under its right end; a masthead link is far above
+    // but centred over the option.
+    const option = { x: 380, y: 300, width: 60, height: 20 };
+    const play = { x: 100, y: 230, width: 300, height: 50 };
+    const masthead = { x: 390, y: 20, width: 60, height: 20 };
+    expect(nearest(option, [masthead, play], "up")).toBe(1);
+  });
+
+  it("among options under a wide button, goes down to the nearest one", () => {
+    const play = { x: 100, y: 230, width: 300, height: 50 };
+    const options = [80, 160, 240].map((x) => ({ x, y: 300, width: 60, height: 20 }));
+    expect(nearest(play, options, "down")).toBe(2);
+  });
+});
+
