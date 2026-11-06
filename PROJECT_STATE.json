@@ -45,8 +45,8 @@
       {
         "id": "9.5",
         "text": "The expert panel (Ctrl+Shift+S, and a Settings toggle): every candidate ranked with each score term and its weight, matching the code; and a one-line 'why this source' under Play.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "5b50da9"
       },
       {
         "id": "9.6",
@@ -83,14 +83,14 @@
       {
         "id": "E5",
         "text": "The expert panel's score breakdown is legible and matches the code.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "5b50da9: src/features/detail/DetailScreen.test.tsx 'Ctrl+Shift+S shows every source with the arithmetic of its score (E5)' — points render as value x weight (+4.00, +1.50) and the shown total (+5.50) is the backend's Score.total; seen to fail when the panel printed value instead of points. The panel shows the backend's Score.terms verbatim (CandidateView/TermView in src-tauri/src/commands/playback.rs). Legible: real-window screenshot 2026-11-06 of Nosferatu (1922), six Internet Archive candidates ranked with source, quality, codec, transport, total and nine term rows each. 'Why this source' line: crates/selection/tests/explained.rs (4 tests)."
       },
       {
         "id": "E6",
         "text": "`docs/specs/source-scoring.md` documents every term in the scoring function and its weight, with justification.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "5b50da9: docs/specs/source-scoring.md documents all nine terms (§2 table: weight, +1/0/-1 meanings), each weight's justification (§2 'Why these weights'), fakes (§3), choices (§5), fallback (§6) and explanation (§7). crates/selection/tests/explained.rs the_specs_weights_are_the_codes_weights parses the table and fails on any mismatch with selection::weight (seen to fail with health documented as 3)."
       },
       {
         "id": "E7",
@@ -1236,14 +1236,14 @@
         {
           "id": "E5",
           "text": "The expert panel's score breakdown is legible and matches the code.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "5b50da9: src/features/detail/DetailScreen.test.tsx 'Ctrl+Shift+S shows every source with the arithmetic of its score (E5)' — points render as value x weight (+4.00, +1.50) and the shown total (+5.50) is the backend's Score.total; seen to fail when the panel printed value instead of points. The panel shows the backend's Score.terms verbatim (CandidateView/TermView in src-tauri/src/commands/playback.rs). Legible: real-window screenshot 2026-11-06 of Nosferatu (1922), six Internet Archive candidates ranked with source, quality, codec, transport, total and nine term rows each. 'Why this source' line: crates/selection/tests/explained.rs (4 tests)."
         },
         {
           "id": "E6",
           "text": "`docs/specs/source-scoring.md` documents every term in the scoring function and its weight, with justification.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "5b50da9: docs/specs/source-scoring.md documents all nine terms (§2 table: weight, +1/0/-1 meanings), each weight's justification (§2 'Why these weights'), fakes (§3), choices (§5), fallback (§6) and explanation (§7). crates/selection/tests/explained.rs the_specs_weights_are_the_codes_weights parses the table and fails on any mismatch with selection::weight (seen to fail with health documented as 3)."
         },
         {
           "id": "E7",
@@ -1286,8 +1286,8 @@
         {
           "id": "9.5",
           "text": "The expert panel (Ctrl+Shift+S, and a Settings toggle): every candidate ranked with each score term and its weight, matching the code; and a one-line 'why this source' under Play.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "5b50da9"
         },
         {
           "id": "9.6",
@@ -2108,7 +2108,7 @@
       ]
     }
   ],
-  "next_action": "Phase 9 subtask 9.5 (docs/phases/phase-09-intelligent-source-selection.md): the expert panel and the 'why this source' line. Add a pure crates/selection function why(&Score) -> String (the strongest positive terms in words, e.g. '1080p · Hindi audio · 120 seeders'); carry it and the ranked list (key, backend, title, total, sunk, unmet, terms) in PlayPlanView; on the detail page show the why line under Play and a Ctrl+Shift+S overlay (also a Settings toggle 'Show source details') listing every candidate with each term's value, weight and contribution; pad-reachable. Test that the panel's numbers equal Score.terms (E5). Then 9.6 and close Phase 9.",
+  "next_action": "Phase 9 subtask 9.6 then close (docs/phases/phase-09-intelligent-source-selection.md): trim docs/learning/phase-09-notes.md section 4 to the phase's five questions; record E7 (TV focus language) with the controller-flow evidence from 1be4948/93ad89e; run the rule-13 regression check (cargo run --release -p eval -- all twice, -- vector --report) and record it in docs/eval-results.md; update README status and docs/HOW_IT_WORKS.md (source selection stub); SESSION_LOG entry with the Phase 9 retrospective; then /closephase 9 (merge --no-ff to main, CI green on main, tag phase-09) and open Phase 10.",
   "blockers": [
     {
       "id": "B10",
