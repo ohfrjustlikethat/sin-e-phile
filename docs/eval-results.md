@@ -2283,3 +2283,27 @@ of the audio retry). The < 500 ms criterion needs a run with the audio device fr
 2026-11-06, `cargo test --release -p sinephile-player --test playback an_exact_seek -- --nocapture`:
 paused, seek to **3.52 / 1.08 / 5.2 s** (25 fps, one keyframe per second) landed at
 **3.520 / 1.080 / 5.200** in **4.5 / 2.3 / 2.8 ms**, measured to mpv's `playback-restart`.
+
+### Play → first frame streamed from the Internet Archive (real window, debug build)
+
+2026-11-06, search → detail → Play driven by keystrokes posted to the WebView, `first frame`
+log line: **7859 ms** (an AVI of the 1922 *Nosferatu*) and **6349 / 5533 ms** (an MP4 copy,
+resuming at 0:52). Each includes the ~1.3 s WASAPI retry above. §2.3's streaming budget is
+< 8 s: met, without much room.
+
+### Phase 7 E1, carried: the torrent started when the detail page opens (D61)
+
+2026-11-06, `HEAD_START=5 target/release/examples/bench.exe <legal Linux ISO .torrent> <dir> 1`,
+ten fresh runs, the torrent added 5 s before "Play" (time spent on the detail page), timed
+from Play to the first MiB through the streaming server:
+**2, 242, 3957, 5, 59362, 3, 2, 2, 2, 2 ms** — under 8 s in **9 of 10**. The miss is a run
+where no peer connected for 62 s. With no head start the Phase 7 figures stand (first peer
+2–55 s on this network): the head start hides discovery, it does not speed it up.
+
+### Regression check before merging Phase 8 (rule 13)
+
+2026-11-06, release build at `973efe0`, `cargo run --release -p eval -- all` twice and
+`-- vector --report`: E2 **43/43**; E3 meaning **0.0472**, filter **1.0000**; E1 warm p50 / p95
+**6.4 / 15.8 ms** (cold first run 12.4 / 32.6 ms, as in Phases 6 and 7); HNSW recall@10
+**0.9760** (164/200 perfect). Unchanged from Phase 7 within run-to-run noise. Rust tests
+557 passed, 0 failed; frontend 52 passed; controller flow 8/8.

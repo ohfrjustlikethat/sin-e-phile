@@ -12,7 +12,7 @@
 
 **Phase 8 — Player Core — MILESTONE: FIRST DEMOABLE BUILD** (`in_progress`, branch `phase/08-player-core`)
 
-3 of 7 exit criteria met with evidence.
+4 of 7 exit criteria met with evidence.
 
 > Opened 2026-11-06 when Phase 7 merged (125a0a2). Carried in from Phase 7: E1 (start under 8 s; D61) and E7 (the live VPN-drop check, which needs the author).
 
@@ -25,12 +25,13 @@
 - [x] **8.5** Xbox controller (ADR-0041): a gamepad layer over the focus system, the player mappings, the ten-foot focus treatment; tested with a simulated gamepad. · `5506006`
 - [x] **8.6** Position saving on exit and resume on reopen, per profile, across restarts. · `63ded9f`
 - [x] **8.7** A minimal detail page — title, year, synopsis, cast, a Play button through the resolver — with the torrent started as soon as the page opens (Phase 7 E1, D61). · `63ded9f`
-- [ ] **8.8** Search -> detail -> resolve -> play end to end, from a local file, the Internet Archive, and a P2P source.
-- [ ] **8.9** Evidence: 4K HEVC HDR on hardware decode (log and CPU), frame-accurate seek, resume across restarts, play-to-first-frame timings, the demo GIF in the README; the carried Phase 7 E1; the author's batched manual checks (controller, VPN drop).
+- [~] **8.8** Search -> detail -> resolve -> play end to end, from a local file, the Internet Archive, and a P2P source.
+- [~] **8.9** Evidence: 4K HEVC HDR on hardware decode (log and CPU), frame-accurate seek, resume across restarts, play-to-first-frame timings, the demo GIF in the README; the carried Phase 7 E1; the author's batched manual checks (controller, VPN drop).
 
 ### Exit criteria
 
 - [ ] **E1** A user can search, click, and watch — from a local file, from the Internet Archive backend, and from a configured P2P source.
+      - *Evidence:* MEASURED 2026-11-06, carried (ADR-0036): the Internet Archive and P2P paths are tested from catalogue row to first frame - crates/playback/tests/end_to_end.rs::search_to_first_frame_over_a_swarm (offline swarm) and ::live_archive_search_to_first_frame (live), and in the real window search -> detail -> Play -> picture in 5.5-7.9 s from the Internet Archive (docs/eval-results.md, docs/media/phase-08-demo.gif). A local file plays by drag-and-drop (src/features/player/useDropToPlay.ts) but cannot be searched for: LocalFileBackend::find is a stub until the library scanner.
 - [x] **E2** Playback of 4K HEVC HDR uses hardware decode (verified in logs and by CPU usage).
       - *Evidence:* cargo run --release -p sinephile-player --example hwdec -- hdr4k.mp4 8 (3840x2160 HEVC Main10 PQ/BT.2020): hwdec-current=d3d11va-copy at 18.2% of one core vs forced software 35.9%, both real-time; RTX 5070 Ti Laptop, 2026-11-06, docs/eval-results.md Phase 8 E2
 - [x] **E3** Seeking is frame-accurate and responsive.
@@ -39,7 +40,8 @@
       - *Evidence:* Three links, each tested: the player saves on the way out (src/features/player/PlayerScreen.test.tsx 'saves the position it reached on the way out', seen to fail with the unmount save removed); the position survives closing and reopening the database file (crates/playback/tests/plan.rs::the_position_survives_a_restart, seen to fail against a fresh file); the player starts there (crates/player/tests/playback.rs::resuming_starts_where_it_left_off)
 - [ ] **E5** With only an Xbox controller, a user can browse to a film, start it, pause, seek and leave the player — tested with a simulated gamepad in CI and confirmed once by the author with a real controller.
       - *Evidence:* Simulated half met: tools/uiaudit/controller.mjs (npm run audit:controller, CI step 'Controller flow (simulated Xbox pad)') drives the built app in headless Chrome with only pad buttons - Y, D-pad+A on the new on-screen keyboard (src/app/PadKeyboard.tsx), A result, A Play, A pause, RT seek, B leave - 8/8 checks pass 2026-11-06; seen to fail with Play's focus effect removed. Outstanding: the author's one-time check with a real controller (one is paired over Bluetooth on the dev machine).
-- [ ] **E6** A demo GIF of this flow exists and is in the README.
+- [x] **E6** A demo GIF of this flow exists and is in the README.
+      - *Evidence:* docs/media/phase-08-demo.gif (960x600, 88 frames, 1.2 MB), recorded 2026-11-06 from the real window with PrintWindow: search 'nosferatu', open the 1922 film, Resume from 0:52 from the Internet Archive, picture; embedded at the top of README.md
 - [ ] **E7** Tag `phase-08`, and celebrate — this is the first thing worth showing anyone.
 
 ---
@@ -70,7 +72,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 5 | Semantic Search Engine | A | 4 | 2 | 2/5 |
 | [x] | 6 | Source Resolver and Addon Protocol | A | 3 | 1–2 | 6/6 |
 | [x] | 7 | Torrent Engine and Streaming Server | A | 6 | 2–3 | 6/8 |
-| [~] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 3/7 |
+| [~] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 4/7 |
 | [ ] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 0/6 |
 | [ ] | 10 | Subtitle Pipeline | B | 8 | 2 | 0/6 |
 | [ ] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 0/5 |
@@ -159,6 +161,10 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D60** (raised in Phase 7) Phase 3's sources_config table (migration 0004) was superseded by Phase 6's source_backends and addons (migration 0015) and is unused. Drop it in a migration when the schema is next touched.
 - **D61** (raised in Phase 7) Phase 7 E1 is carried to Phase 8: first-peer discovery takes 2-55 s on this network. Levers for Phase 8: start the torrent when the detail page opens, and persist DHT state sooner than librqbit's 60 s dump so a warm routing table survives short sessions.
 - **D62** (raised in Phase 7) tools/bench/qbittorrent_compare.py assumes qBittorrent at C:\Program Files\qBittorrent and Web UI port 18081; it is a measurement script, not a product feature, and ADR-0029's qBittorrent backend (Phase 13) must not reuse its throwaway-profile approach.
+- **D63** (raised in Phase 8) Pressing Play the instant a film page opens still waits on torrent peer discovery (2-55 s on this network). Persist DHT state sooner than librqbit's 60 s dump, and consider prestarting the top P2P candidate from search results.
+- **D64** (raised in Phase 8) When another application holds the default audio device exclusively, WASAPI retries for ~1.3 s before mpv plays silently; first frame waits for it. Consider audio init that does not block video, and telling the user the device is busy.
+- **D65** (raised in Phase 8) libmpv-2.dll is fetched by tools/mpv/fetch.py for development and CI; the release bundle must ship it (and its licence notice) - Phase 27's packaging.
+- **D66** (raised in Phase 8) ADR-0036 says PROGRESS.md lists carried criteria in their own section; tools/state/validate_state.py do_progress does not. Add the section (carried, and discharged) so a carry cannot hide among met criteria.
 
 ---
 

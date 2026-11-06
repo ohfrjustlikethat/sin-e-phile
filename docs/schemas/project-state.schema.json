@@ -73,6 +73,16 @@
           "type": "string",
           "minLength": 40,
           "description": "ADR-0036: why the criterion can't be met in this phase. Required with carried_to_phase."
+        },
+        "discharged_in_phase": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "ADR-0036 addendum: the receiving phase met this carried criterion. Must equal carried_to_phase; met stays false here, because THIS phase did not meet it."
+        },
+        "discharged_evidence": {
+          "type": "string",
+          "minLength": 40,
+          "description": "ADR-0036 addendum: the artefact with which the receiving phase met it (§10.8)."
         }
       },
       "allOf": [
@@ -137,6 +147,20 @@
             }
           },
           "description": "ADR-0036: a carried criterion is unmet, says why, and still records its MEASURED state as evidence (§10.8)."
+        },
+        {
+          "if": {
+            "required": [
+              "discharged_in_phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "carried_to_phase",
+              "discharged_evidence"
+            ]
+          },
+          "description": "ADR-0036 addendum: only a carried criterion can be discharged, and only with an artefact."
         }
       ]
     },

@@ -57,13 +57,13 @@
       {
         "id": "8.8",
         "text": "Search -> detail -> resolve -> play end to end, from a local file, the Internet Archive, and a P2P source.",
-        "status": "not_started",
+        "status": "in_progress",
         "commit": null
       },
       {
         "id": "8.9",
         "text": "Evidence: 4K HEVC HDR on hardware decode (log and CPU), frame-accurate seek, resume across restarts, play-to-first-frame timings, the demo GIF in the README; the carried Phase 7 E1; the author's batched manual checks (controller, VPN drop).",
-        "status": "not_started",
+        "status": "in_progress",
         "commit": null
       }
     ],
@@ -72,7 +72,9 @@
         "id": "E1",
         "text": "A user can search, click, and watch — from a local file, from the Internet Archive backend, and from a configured P2P source.",
         "met": false,
-        "evidence": null
+        "evidence": "MEASURED 2026-11-06, carried (ADR-0036): the Internet Archive and P2P paths are tested from catalogue row to first frame - crates/playback/tests/end_to_end.rs::search_to_first_frame_over_a_swarm (offline swarm) and ::live_archive_search_to_first_frame (live), and in the real window search -> detail -> Play -> picture in 5.5-7.9 s from the Internet Archive (docs/eval-results.md, docs/media/phase-08-demo.gif). A local file plays by drag-and-drop (src/features/player/useDropToPlay.ts) but cannot be searched for: LocalFileBackend::find is a stub until the library scanner.",
+        "carried_to_phase": 12,
+        "carried_reason": "Searching for and clicking a local file needs the scanned library index that Phase 12 builds; until then LocalFileBackend has nothing to find. The IA and P2P halves are met."
       },
       {
         "id": "E2",
@@ -96,13 +98,15 @@
         "id": "E5",
         "text": "With only an Xbox controller, a user can browse to a film, start it, pause, seek and leave the player — tested with a simulated gamepad in CI and confirmed once by the author with a real controller.",
         "met": false,
-        "evidence": "Simulated half met: tools/uiaudit/controller.mjs (npm run audit:controller, CI step 'Controller flow (simulated Xbox pad)') drives the built app in headless Chrome with only pad buttons - Y, D-pad+A on the new on-screen keyboard (src/app/PadKeyboard.tsx), A result, A Play, A pause, RT seek, B leave - 8/8 checks pass 2026-11-06; seen to fail with Play's focus effect removed. Outstanding: the author's one-time check with a real controller (one is paired over Bluetooth on the dev machine)."
+        "evidence": "Simulated half met: tools/uiaudit/controller.mjs (npm run audit:controller, CI step 'Controller flow (simulated Xbox pad)') drives the built app in headless Chrome with only pad buttons - Y, D-pad+A on the new on-screen keyboard (src/app/PadKeyboard.tsx), A result, A Play, A pause, RT seek, B leave - 8/8 checks pass 2026-11-06; seen to fail with Play's focus effect removed. Outstanding: the author's one-time check with a real controller (one is paired over Bluetooth on the dev machine).",
+        "carried_to_phase": 9,
+        "carried_reason": "The simulated half is met and runs in CI; the criterion also needs the author's one-time check with a real Xbox controller, which only the author can do. Asked for in the batched author checks."
       },
       {
         "id": "E6",
         "text": "A demo GIF of this flow exists and is in the README.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "docs/media/phase-08-demo.gif (960x600, 88 frames, 1.2 MB), recorded 2026-11-06 from the real window with PrintWindow: search 'nosferatu', open the 1922 film, Resume from 0:52 from the Internet Archive, picture; embedded at the top of README.md"
       },
       {
         "id": "E7",
@@ -986,7 +990,9 @@
           "met": false,
           "evidence": "MEASURED 2026-11-06, carried (ADR-0036): add -> first 1 MiB through the local streaming server, Ubuntu 24.04 desktop torrent fetched at run time: 3.6-3.8 s in 4 of 20 runs, 9.6-55 s in the rest; once a peer is connected the first MiB takes 0.6-3.4 s, the time is all first-peer discovery. qBittorrent on the same torrent minutes apart: 13.1 s. docs/eval-results.md 'Phase 7'.",
           "carried_to_phase": 8,
-          "carried_reason": "The delay is peer discovery on this network, which qBittorrent also suffers (13.1 s); Phase 8 measures play to first frame end to end and can start the torrent when the detail page opens so discovery overlaps with reading."
+          "carried_reason": "The delay is peer discovery on this network, which qBittorrent also suffers (13.1 s); Phase 8 measures play to first frame end to end and can start the torrent when the detail page opens so discovery overlaps with reading.",
+          "discharged_in_phase": 8,
+          "discharged_evidence": "The torrent now starts when the detail page opens (D61, prepare_play). HEAD_START=5 target/release/examples/bench.exe <legal Linux ISO torrent> <dir> 1: Play -> first MiB 2/242/3957/5/59362/3/2/2/2/2 ms, under 8 s in 9 of 10 fresh runs, 2026-11-06 (docs/eval-results.md 'Phase 7 E1, carried')."
         },
         {
           "id": "E2",
@@ -1023,8 +1029,8 @@
           "text": "Binding to a specific network interface works, verified by disabling that adapter mid-download and confirming traffic stops rather than falling back.",
           "met": false,
           "evidence": "MEASURED 2026-11-05, carried (ADR-0036): crates/torrent/tests/binding.rs (a279415) — an unknown adapter stops the engine starting; bound to loopback, local traffic flows and an outside address is unreachable (seen to fail with IP_UNICAST_IF removed). Probe: bound to the VPN adapter a connection succeeds, bound to a disconnected adapter it fails WSAENETUNREACH instead of using Wi-Fi.",
-          "carried_to_phase": 8,
-          "carried_reason": "The criterion requires disabling the bound adapter mid-download, which on this machine means dropping the author's VPN; it is batched with Phase 8's other manual checks for the author to perform."
+          "carried_to_phase": 9,
+          "carried_reason": "Needs the author to drop their VPN mid-download with the engine bound to it; built and tested as far as code allows (binding.rs). Re-asked in the batched author checks."
         },
         {
           "id": "E8",
@@ -1110,7 +1116,9 @@
           "id": "E1",
           "text": "A user can search, click, and watch — from a local file, from the Internet Archive backend, and from a configured P2P source.",
           "met": false,
-          "evidence": null
+          "evidence": "MEASURED 2026-11-06, carried (ADR-0036): the Internet Archive and P2P paths are tested from catalogue row to first frame - crates/playback/tests/end_to_end.rs::search_to_first_frame_over_a_swarm (offline swarm) and ::live_archive_search_to_first_frame (live), and in the real window search -> detail -> Play -> picture in 5.5-7.9 s from the Internet Archive (docs/eval-results.md, docs/media/phase-08-demo.gif). A local file plays by drag-and-drop (src/features/player/useDropToPlay.ts) but cannot be searched for: LocalFileBackend::find is a stub until the library scanner.",
+          "carried_to_phase": 12,
+          "carried_reason": "Searching for and clicking a local file needs the scanned library index that Phase 12 builds; until then LocalFileBackend has nothing to find. The IA and P2P halves are met."
         },
         {
           "id": "E2",
@@ -1134,13 +1142,15 @@
           "id": "E5",
           "text": "With only an Xbox controller, a user can browse to a film, start it, pause, seek and leave the player — tested with a simulated gamepad in CI and confirmed once by the author with a real controller.",
           "met": false,
-          "evidence": "Simulated half met: tools/uiaudit/controller.mjs (npm run audit:controller, CI step 'Controller flow (simulated Xbox pad)') drives the built app in headless Chrome with only pad buttons - Y, D-pad+A on the new on-screen keyboard (src/app/PadKeyboard.tsx), A result, A Play, A pause, RT seek, B leave - 8/8 checks pass 2026-11-06; seen to fail with Play's focus effect removed. Outstanding: the author's one-time check with a real controller (one is paired over Bluetooth on the dev machine)."
+          "evidence": "Simulated half met: tools/uiaudit/controller.mjs (npm run audit:controller, CI step 'Controller flow (simulated Xbox pad)') drives the built app in headless Chrome with only pad buttons - Y, D-pad+A on the new on-screen keyboard (src/app/PadKeyboard.tsx), A result, A Play, A pause, RT seek, B leave - 8/8 checks pass 2026-11-06; seen to fail with Play's focus effect removed. Outstanding: the author's one-time check with a real controller (one is paired over Bluetooth on the dev machine).",
+          "carried_to_phase": 9,
+          "carried_reason": "The simulated half is met and runs in CI; the criterion also needs the author's one-time check with a real Xbox controller, which only the author can do. Asked for in the batched author checks."
         },
         {
           "id": "E6",
           "text": "A demo GIF of this flow exists and is in the README.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "docs/media/phase-08-demo.gif (960x600, 88 frames, 1.2 MB), recorded 2026-11-06 from the real window with PrintWindow: search 'nosferatu', open the 1922 film, Resume from 0:52 from the Internet Archive, picture; embedded at the top of README.md"
         },
         {
           "id": "E7",
@@ -1195,13 +1205,13 @@
         {
           "id": "8.8",
           "text": "Search -> detail -> resolve -> play end to end, from a local file, the Internet Archive, and a P2P source.",
-          "status": "not_started",
+          "status": "in_progress",
           "commit": null
         },
         {
           "id": "8.9",
           "text": "Evidence: 4K HEVC HDR on hardware decode (log and CPU), frame-accurate seek, resume across restarts, play-to-first-frame timings, the demo GIF in the README; the carried Phase 7 E1; the author's batched manual checks (controller, VPN drop).",
-          "status": "not_started",
+          "status": "in_progress",
           "commit": null
         }
       ]
@@ -2629,6 +2639,26 @@
       "id": "D62",
       "phase_raised": 7,
       "text": "tools/bench/qbittorrent_compare.py assumes qBittorrent at C:\\Program Files\\qBittorrent and Web UI port 18081; it is a measurement script, not a product feature, and ADR-0029's qBittorrent backend (Phase 13) must not reuse its throwaway-profile approach."
+    },
+    {
+      "id": "D63",
+      "phase_raised": 8,
+      "text": "Pressing Play the instant a film page opens still waits on torrent peer discovery (2-55 s on this network). Persist DHT state sooner than librqbit's 60 s dump, and consider prestarting the top P2P candidate from search results."
+    },
+    {
+      "id": "D64",
+      "phase_raised": 8,
+      "text": "When another application holds the default audio device exclusively, WASAPI retries for ~1.3 s before mpv plays silently; first frame waits for it. Consider audio init that does not block video, and telling the user the device is busy."
+    },
+    {
+      "id": "D65",
+      "phase_raised": 8,
+      "text": "libmpv-2.dll is fetched by tools/mpv/fetch.py for development and CI; the release bundle must ship it (and its licence notice) - Phase 27's packaging."
+    },
+    {
+      "id": "D66",
+      "phase_raised": 8,
+      "text": "ADR-0036 says PROGRESS.md lists carried criteria in their own section; tools/state/validate_state.py do_progress does not. Add the section (carried, and discharged) so a carry cannot hide among met criteria."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

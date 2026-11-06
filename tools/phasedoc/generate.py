@@ -157,6 +157,8 @@ def render_open(phase: dict) -> str:
         # as if it were. The destination is what makes it closable (ADR-0036).
         carried = criterion.get("carried_to_phase")
         suffix = f" — *carried to Phase {carried}*" if carried is not None else ""
+        if criterion.get("discharged_in_phase") is not None:
+            suffix += " — *met there*"
         lines.append(f"- [{box}] **{criterion['id']}** {criterion['text']}{suffix}")
 
     lines += ["", "## Subtasks", ""]
@@ -304,6 +306,12 @@ def do_close(number: int, next_action: str | None) -> int:
             lines += [
                 f"**Not met; carried to Phase {criterion['carried_to_phase']}.** "
                 f"{criterion.get('carried_reason', '')}",
+                "",
+            ]
+        if criterion.get("discharged_in_phase") is not None:
+            lines += [
+                f"**Met in Phase {criterion['discharged_in_phase']}:** "
+                f"{criterion.get('discharged_evidence', '')}",
                 "",
             ]
         lines += [f"> {criterion['evidence']}", ""]

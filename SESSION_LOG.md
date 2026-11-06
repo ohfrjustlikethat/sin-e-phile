@@ -1759,3 +1759,54 @@ showed the cause is the swarm and network, and it should have been run first.
 
 **Carry forward.** E1 and E7 to Phase 8 (D61; E7 needs the author to drop the VPN
 mid-download). D60 (dead `sources_config` table), D62.
+
+### Session 22 (2026-11-06) — Phase 8, the player; Tier A complete
+
+**Built.** libmpv pinned and embedded (`crates/player`), the plan from catalogue row to
+first frame (`crates/playback`), the player chrome with holes and a pause still, the
+detail page, drop-to-play, position resume, an Xbox controller layer with an on-screen
+keyboard, and an opening state that replaces the black wait before a stream's first
+frame. `tools/uiaudit/controller.mjs` drives the built app in headless Chrome with only
+simulated pad buttons, in CI. The demo GIF (`docs/media/phase-08-demo.gif`) is recorded
+from the real window.
+
+**Numbers.** 4K HEVC HDR: `d3d11va-copy` at 18.2 % of a core vs 35.9 % in software.
+Exact seeks land in 2–5 ms. Play to picture: ~200 ms locally once audio answers, 5.5–7.9
+s streamed from the Internet Archive. Torrent with the detail-page head start: Play to
+first MiB under 8 s in 9 of 10 live runs (Phase 7 E1 discharged).
+
+**Bugs the real window found that every test missed.**
+- The video window was created on a Tokio worker that never pumps messages; the whole
+  app window hung grey whenever anything asked it to paint. `VideoHost::new` now refuses
+  any thread but the parent's (the test hangs, rather than fails, with the check removed).
+- The page laid out before the video window existed and the request was dropped: black
+  video under the chrome, and a 1×1 pause still. The last placement is now kept.
+- Enter in the search field did nothing on a highlighted result.
+- The Internet Archive backend offered the 1922 Nosferatu for the 2024 one: a year-less
+  item matched any year. Now it must name the year.
+- The first frame waited 1.3 s on WASAPI retrying an audio device another program held
+  exclusively (D64 — not ours to fix, but now visible).
+
+**How the real window was checked.** Desktop capture needs the window on top and moved
+the author's windows; `PrintWindow(PW_RENDERFULLCONTENT)` renders the window off-screen,
+WebView2 and mpv included, and keystrokes posted to `Chrome_RenderWidgetHostHWND` drive
+it without stealing focus. Posting `WM_CHAR` as well doubled every letter: the app's
+message loop translates `WM_KEYDOWN` itself. A hard-killed WebView2 holds its folder for
+~150 s ("resource in use"); close with `WM_CLOSE`.
+
+**Decisions.** E1 carried to Phase 12 (searching for a local file needs the library
+index). E5's real-controller check and Phase 7 E7's VPN drop carried to Phase 9 as author
+checks. ADR-0036 addendum: a carried criterion can be *discharged* by its receiving phase
+(`discharged_in_phase`, `discharged_evidence`), which the tooling could not record.
+
+#### Phase 8 retrospective
+
+**Went well.** Measuring before believing: the 1.5 s first frame looked like the player
+until the mpv log showed it was the audio device. The controller harness turned "a pad
+can do everything" from a claim into eight checks with real layout.
+
+**Went badly.** Too long spent on desktop screenshots before switching to `PrintWindow`;
+the hung capture scripts were the threading bug all along, and that should have been
+suspected the first time a call to the app's window did not return.
+
+**Carry forward.** E1 → 12, E5 → 9 (author), Phase 7 E7 → 9 (author). D63–D66.

@@ -4,17 +4,23 @@
 local film library behind one semantic search engine and a discovery-first
 recommender.**
 
-> **Status: Phases 0–7 of 28 closed — the shell, the design system, the data layer,
-> the metadata backbone, hybrid search, the source resolver, and the torrent engine.** The catalogue is real:
-> 2.7 million titles ingested offline from public datasets, with no API key of any kind,
-> searchable by title, person, filter and meaning, and the app can now find where a film
-> can be watched and stream a torrent as a seekable file. Nothing plays yet; that's Phase 8.
+> **Status: Phases 0–8 of 28 closed — Tier A, the first working vertical slice.** The
+> catalogue is real: 2.7 million titles ingested offline from public datasets, with no
+> API key of any kind, searchable by title, person, filter and meaning. And now it plays:
+> search, open a film, press Play, and it streams — from the Internet Archive's
+> public-domain films, a torrent, or a file you drop on the window — in an embedded
+> player with hardware decoding, drivable end to end with an Xbox controller.
 > This README describes what is being built and is updated at
 > the end of every phase that changes what the app can do. It is never allowed to
 > over-claim; the [feature list](#what-actually-works-today) below says exactly what
 > exists.
 >
 > Follow along in [`PROGRESS.md`](PROGRESS.md).
+
+![Search for Nosferatu, open the 1922 film, press Play: it resumes from where it was left, streamed from the Internet Archive.](docs/media/phase-08-demo.gif)
+
+*Recorded from the real window: search, the detail page asking its sources, Play, and
+the film resuming where it was left — 5.5 s from Play to picture over the network.*
 
 ---
 
@@ -219,12 +225,12 @@ off means the pause overlay shows the full cast list, beautifully.
 
 ## What actually works today
 
-**Phases 0–7 — the shell, the design system, the catalogue, search, sources, and torrents.**
-Nothing plays yet. Honestly:
+**Phases 0–8 — the shell, the design system, the catalogue, search, sources, torrents,
+and the player.** Honestly:
 
 - ✅ Posture guard, secret scanner, and prerequisite doctor — all three verified by
   deliberately planted failures
-- ✅ CI on `windows-latest`; git hooks; GPL-3.0; specification at 2.0.0 with 38 ADRs recorded
+- ✅ CI on `windows-latest`; git hooks; GPL-3.0; specification at 3.0.0 with 41 ADRs recorded
 - ✅ Machine-readable project state for all 28 phases, generated from the spec and
   schema-validated so a criterion cannot be marked done without evidence
 - ✅ A Tauri window that opens, with a top masthead for navigation and hardware tier detection.
@@ -273,8 +279,22 @@ Nothing plays yet. Honestly:
   default. Bound to a VPN's adapter, its traffic cannot leak if the VPN drops — librqbit
   could not do that on Windows, so the project added it. On the same torrent it reached
   the first MiB in 3.6 s to qBittorrent's 13.1 s, with bulk speed level.
-- ❌ **Playback start under 8 s is not reliable yet**: finding the first peer took 2–55 s
-  across 20 live runs (qBittorrent waits on the same thing). Carried to Phase 8.
+- ✅ Torrent playback starts fast: the torrent is started when a film's page opens, so by
+  the time Play is pressed peers are already found. With five seconds on the page, Play to
+  the first MiB took under 4 s in 9 of 10 live runs (most under 0.25 s); pressing Play
+  instantly still waits on peer discovery, 4–55 s on this network.
+- ✅ **It plays.** libmpv embedded in the window, with the app's own controls drawn over
+  the video through holes cut in it, and a still frame under the pause screen. 4K HEVC
+  HDR decodes on the GPU at half the CPU of software decoding; seeks land on the exact
+  frame in under 5 ms; the position is saved and resumed across restarts; Play to picture
+  is about 200 ms locally once the audio device answers, and 5.5–7.9 s streamed from the
+  Internet Archive.
+- ✅ An Xbox controller is a remote: the D-pad moves focus to whatever is nearest, A
+  presses, B goes back, the triggers seek, and an on-screen keyboard appears for search.
+  The whole flow — search, open, play, pause, seek, leave — is driven by a simulated pad
+  in CI.
+- ❌ **"Search, click and watch" a file on this machine** waits for the library scanner in
+  Phase 12; until then a local file plays by dropping it on the window. Carried there.
 - ⬜ Everything else described above this section
 
 ---

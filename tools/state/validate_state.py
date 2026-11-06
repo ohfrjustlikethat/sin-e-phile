@@ -230,6 +230,13 @@ def carried_problems(state: dict, n: int, criterion: dict) -> list[str]:
             f"named later phase with carried_to_phase and carried_reason (ADR-0036)."
         ]
     phases = {p["number"]: p for p in state["phases"]}
+    discharged = criterion.get("discharged_in_phase")
+    if discharged is not None:
+        # Met by the phase it was carried to (ADR-0036 addendum): that phase may be
+        # closed now, because it did check it.
+        if discharged != target:
+            return [f"{cid} is discharged in phase {discharged} but was carried to {target}."]
+        return []
     if target <= n:
         return [f"{cid} is carried to phase {target}, which is not later than {n}."]
     if target not in phases:

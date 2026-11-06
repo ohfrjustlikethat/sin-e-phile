@@ -66,6 +66,16 @@ async fn main() {
         t1.elapsed().as_secs_f64() * 1e3
     );
 
+    // Phase 8 (D61): the torrent starts when the detail page opens, so by the time Play
+    // is pressed it has had however long the viewer spent reading. `HEAD_START=<seconds>`
+    // simulates that, and the result is timed from Play.
+    let head: u64 = std::env::var("HEAD_START")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+    tokio::time::sleep(Duration::from_secs(head)).await;
+    let play = Instant::now();
+
     // Where the start-up time goes: finding the first peer, then fetching.
     let tp = Instant::now();
     engine.wait_for_peers(&id).await.unwrap();
@@ -98,6 +108,12 @@ async fn main() {
         "E1 proxy: add -> 1 MiB   {:>8.0} ms   (target < 8000)",
         t1.elapsed().as_secs_f64() * 1e3
     );
+    if head > 0 {
+        println!(
+            "Play -> 1 MiB, {head} s head start {:>6.0} ms   (target < 8000)",
+            play.elapsed().as_secs_f64() * 1e3
+        );
+    }
 
     let at = file.len * 6 / 10;
     let (sfb, smib) = range(&url, at, 1 << 20).await;
