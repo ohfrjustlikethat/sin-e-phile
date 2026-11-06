@@ -96,7 +96,7 @@
         "id": "E5",
         "text": "With only an Xbox controller, a user can browse to a film, start it, pause, seek and leave the player — tested with a simulated gamepad in CI and confirmed once by the author with a real controller.",
         "met": false,
-        "evidence": null
+        "evidence": "Simulated half met: tools/uiaudit/controller.mjs (npm run audit:controller, CI step 'Controller flow (simulated Xbox pad)') drives the built app in headless Chrome with only pad buttons - Y, D-pad+A on the new on-screen keyboard (src/app/PadKeyboard.tsx), A result, A Play, A pause, RT seek, B leave - 8/8 checks pass 2026-11-06; seen to fail with Play's focus effect removed. Outstanding: the author's one-time check with a real controller (one is paired over Bluetooth on the dev machine)."
       },
       {
         "id": "E6",
@@ -1134,7 +1134,7 @@
           "id": "E5",
           "text": "With only an Xbox controller, a user can browse to a film, start it, pause, seek and leave the player — tested with a simulated gamepad in CI and confirmed once by the author with a real controller.",
           "met": false,
-          "evidence": null
+          "evidence": "Simulated half met: tools/uiaudit/controller.mjs (npm run audit:controller, CI step 'Controller flow (simulated Xbox pad)') drives the built app in headless Chrome with only pad buttons - Y, D-pad+A on the new on-screen keyboard (src/app/PadKeyboard.tsx), A result, A Play, A pause, RT seek, B leave - 8/8 checks pass 2026-11-06; seen to fail with Play's focus effect removed. Outstanding: the author's one-time check with a real controller (one is paired over Bluetooth on the dev machine)."
         },
         {
           "id": "E6",

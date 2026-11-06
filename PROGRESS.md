@@ -38,6 +38,7 @@
 - [x] **E4** Position resume works across app restarts.
       - *Evidence:* Three links, each tested: the player saves on the way out (src/features/player/PlayerScreen.test.tsx 'saves the position it reached on the way out', seen to fail with the unmount save removed); the position survives closing and reopening the database file (crates/playback/tests/plan.rs::the_position_survives_a_restart, seen to fail against a fresh file); the player starts there (crates/player/tests/playback.rs::resuming_starts_where_it_left_off)
 - [ ] **E5** With only an Xbox controller, a user can browse to a film, start it, pause, seek and leave the player — tested with a simulated gamepad in CI and confirmed once by the author with a real controller.
+      - *Evidence:* Simulated half met: tools/uiaudit/controller.mjs (npm run audit:controller, CI step 'Controller flow (simulated Xbox pad)') drives the built app in headless Chrome with only pad buttons - Y, D-pad+A on the new on-screen keyboard (src/app/PadKeyboard.tsx), A result, A Play, A pause, RT seek, B leave - 8/8 checks pass 2026-11-06; seen to fail with Play's focus effect removed. Outstanding: the author's one-time check with a real controller (one is paired over Bluetooth on the dev machine).
 - [ ] **E6** A demo GIF of this flow exists and is in the README.
 - [ ] **E7** Tag `phase-08`, and celebrate — this is the first thing worth showing anyone.
 

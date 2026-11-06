@@ -50,6 +50,14 @@ export function DetailScreen() {
     };
   }, [id]);
 
+  // Once there is something to play, Play takes focus unless something else has it —
+  // so a controller or keyboard user can press it at once (ADR-0041).
+  useEffect(() => {
+    if (plan.phase !== "ready") return;
+    const active = document.activeElement;
+    if (!active || active === document.body) document.getElementById("detail-play")?.focus();
+  }, [plan.phase, item.data]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" || e.key === "Backspace") closeDetail();
@@ -96,6 +104,7 @@ export function DetailScreen() {
 
       <div className="mt-10 flex items-center gap-5">
         <Button
+          id="detail-play"
           variant="primary"
           size="lg"
           onClick={start}

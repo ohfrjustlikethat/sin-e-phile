@@ -6,6 +6,7 @@ import { useDropToPlay } from "@/features/player/useDropToPlay";
 import { sendPlayerIntent } from "@/features/player/intentBus";
 import { moveFocus, startGamepad } from "@/lib/gamepad";
 import { Placeholder } from "@/app/Placeholder";
+import { PadKeyboard, closePadKeyboard } from "@/app/PadKeyboard";
 import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { SearchScreen } from "@/features/search/SearchScreen";
 import { DesignGallery } from "@/features/design/DesignGallery";
@@ -46,6 +47,7 @@ export function App() {
               (document.activeElement as HTMLElement | null)?.click();
               break;
             case "back":
+              if (closePadKeyboard()) break;
               window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
               break;
             case "tab": {
@@ -145,6 +147,7 @@ export function App() {
         )}
       </main>
       <CommandPalette commands={commands} open={palette} onOpenChange={setPalette} />
+      <PadKeyboard />
     </div>
   );
 }

@@ -199,6 +199,14 @@ jobs:
           UIAUDIT_INJECT_STALL: ${{ inputs.uiaudit_inject_stall }}
         run: node tools/uiaudit/run.mjs --ci
 
+      # Phase 8 E5 (ADR-0041). The built app, a fake backend and a simulated Xbox
+      # controller: Y to search, the D-pad and A on the on-screen keyboard, A on the
+      # result, A on Play, A to pause, RT to seek, B to leave — buttons only, with
+      # real layout, so the spatial navigation is the real one.
+      - name: Controller flow (simulated Xbox pad)
+        if: steps.detect.outputs.present == 'true'
+        run: node tools/uiaudit/controller.mjs
+
   # ───────────────────────────────────────────────────────────────────────────
   # E1 — a fresh clone on a clean runner produces a working dev environment.
   #
