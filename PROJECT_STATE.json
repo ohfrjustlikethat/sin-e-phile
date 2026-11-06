@@ -27,8 +27,8 @@
       {
         "id": "11.3",
         "text": "Episodes in the player: previous/next episode (N/P keys, pad), a next-episode card with a countdown in the last 30 s or at a credits chapter, autoplay on by default and switchable in Settings -> Playback; a pure, tested function decides the next episode across season boundaries.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "1369b57"
       },
       {
         "id": "11.4",
@@ -71,8 +71,8 @@
       {
         "id": "E3",
         "text": "Next-episode autoplay works and is disableable.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "1369b57: src/features/player/PlayerScreen.test.tsx 'autoplay plays the next episode when the countdown ends' (the card shows 'Play in 10' at 30 s left; after ten seconds prepare_play is asked for the next episode) and 'offers the next episode in the last 30 s; B says not now, A plays it' (with autoplay switched off the card offers 'Play' with no countdown, and nothing plays by itself); the switch is Settings -> Playback 'Play the next episode automatically' (src/features/settings/PlaybackSection.tsx). When to offer it: src/features/player/endCard.test.ts (last 30 s, a credits chapter, the end). Next/previous across seasons: crates/persistence/tests/repository_surface.rs episode_repository_surface next_after/previous_before."
       },
       {
         "id": "E4",
@@ -1400,8 +1400,8 @@
         {
           "id": "E3",
           "text": "Next-episode autoplay works and is disableable.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "1369b57: src/features/player/PlayerScreen.test.tsx 'autoplay plays the next episode when the countdown ends' (the card shows 'Play in 10' at 30 s left; after ten seconds prepare_play is asked for the next episode) and 'offers the next episode in the last 30 s; B says not now, A plays it' (with autoplay switched off the card offers 'Play' with no countdown, and nothing plays by itself); the switch is Settings -> Playback 'Play the next episode automatically' (src/features/settings/PlaybackSection.tsx). When to offer it: src/features/player/endCard.test.ts (last 30 s, a credits chapter, the end). Next/previous across seasons: crates/persistence/tests/repository_surface.rs episode_repository_surface next_after/previous_before."
         },
         {
           "id": "E4",
@@ -1438,8 +1438,8 @@
         {
           "id": "11.3",
           "text": "Episodes in the player: previous/next episode (N/P keys, pad), a next-episode card with a countdown in the last 30 s or at a credits chapter, autoplay on by default and switchable in Settings -> Playback; a pure, tested function decides the next episode across season boundaries.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "1369b57"
         },
         {
           "id": "11.4",
@@ -2190,7 +2190,7 @@
       ]
     }
   ],
-  "next_action": "Phase 11 subtask 11.3 (docs/phases/phase-11-player-experience-layer.md): episodes in the player. PlayerScreen gets previous/next from commands.episodeNeighbours(mediaItemId); N/P keys and the pad (D-pad up/down are volume, so use View+LB/RB? prefer a 'next episode' button in the bottom bar reachable by D-pad) open them via prepare_play; a next-episode card with a 10 s countdown appears in the last 30 s or at a chapter titled like credits, autoplay on by default with a switch in Settings -> Playback (playbackChoice store), and for films the ADR-0043 end card after the credits (what you watched, rate it 1-5 stored per profile, more like this). A pure, tested function decides when the card shows.",
+  "next_action": "Phase 11 subtask 11.4 (docs/phases/phase-11-player-experience-layer.md): the scrub bar. Chapter marks from playerChapters on the Scrub component; hover thumbnails from a sprite sheet that a background FFmpeg process (BELOW_NORMAL priority, one frame per 10 s, 160 px wide, tiled 10x10 per sheet) writes under data/cache/thumbs/<file key>/; a tested pure function maps a time to (sheet, column, row); prove no stutter by comparing mpv's frame-drop-count over 30 s of playback with and without generation running (record in docs/eval-results.md).",
   "blockers": [],
   "decisions_pending": [
     {
