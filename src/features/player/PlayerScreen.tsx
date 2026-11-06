@@ -6,6 +6,9 @@ import { useUi } from "@/lib/store";
 import { clock, keyIntent, nextSpeed, type Intent } from "./intents";
 import { onPlayerIntent } from "./intentBus";
 import { PauseOverlay } from "./PauseOverlay";
+import { EndCard, NextEpisodeCard } from "./WhatNext";
+import { moment } from "./endCard";
+import { usePlaybackChoice } from "@/lib/playbackChoice";
 
 /**
  * The player — SPEC.md Phase 8, ADR-0020 (solid chrome through cutouts) and ADR-0021
@@ -80,6 +83,50 @@ export function PlayerScreen() {
     void commands.playerChapters().then((r) => setChapters(r.status === "ok" ? r.data : []));
   }, [state?.started]);
   const chapterTitle = state?.chapter != null ? (chapters[state.chapter]?.title ?? null) : null;
+
+  // The episodes either side (SPEC.md Phase 11): N/P and the stick clicks, and the card.
+  const play = useUi((s) => s.play);
+  const neighbours = useQuery({
+    queryKey: ["neighbours", playing?.mediaItemId],
+    queryFn: async () => {
+      const r = await commands.episodeNeighbours(playing?.mediaItemId ?? 0);
+      return r.status === "ok" ? r.data : { previous: null, next: null };
+    },
+    enabled: playing?.mediaItemId != null,
+    staleTime: Infinity,
+  });
+  const { autoplay, audio, quality } = usePlaybackChoice();
+  const [dismissed, setDismissed] = useState(false);
+  const [finished, setFinished] = useState(false);
+  useEffect(() => {
+    setDismissed(false);
+    setFinished(false);
+  }, [playing]);
+  const next = neighbours.data?.next ?? null;
+  const now = moment({
+    hasNext: !!next,
+    position: state?.position ?? null,
+    duration: state?.duration ?? null,
+    ended: !!state?.ended,
+    chapterTitle,
+  });
+  const showNextCard = now === "next-episode" && !dismissed && !!next;
+  useEffect(() => {
+    // A film's credits have played: stop the video, and the end card takes the screen.
+    if (now === "end-card" && !finished) {
+      setFinished(true);
+      void commands.playerClose();
+    }
+  }, [now, finished]);
+  const goTo = useCallback(
+    async (id: number) => {
+      const r = await commands.preparePlay(id, audio, quality);
+      if (r.status === "ok") play({ target: r.data.open, title: r.data.title, mediaItemId: id, start: r.data.start });
+      else setError(r.error);
+    },
+    [audio, quality, play],
+  );
+  const card = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   // Every copy was tried and none would start (SPEC.md Phase 9: fallback is silent
   // until there is nothing left to fall back to).
@@ -135,7 +182,10 @@ export function PlayerScreen() {
   const layout = useCallback(() => {
     const s = stage.current?.getBoundingClientRect();
     if (!s) return;
-    const panels = chrome && !paused ? [top.current, bottom.current] : [];
+    const panels = [
+      ...(chrome && !paused ? [top.current, bottom.current] : []),
+      ...(showNextCard ? [card.current] : []),
+    ];
     const cutouts = panels
       .filter((el): el is HTMLDivElement => !!el)
       .map((el) => {
@@ -149,7 +199,7 @@ export function PlayerScreen() {
         };
       });
     void commands.playerLayout(s.x, s.y, s.width, s.height, window.devicePixelRatio, cutouts);
-  }, [chrome, paused]);
+  }, [chrome, paused, showNextCard]);
 
   useLayoutEffect(() => {
     layout();
@@ -203,6 +253,11 @@ export function PlayerScreen() {
       const s = state;
       switch (intent.kind) {
         case "toggle_pause":
+          // With the next-episode card up, A plays it.
+          if (showNextCard && next) {
+            void goTo(next.id);
+            break;
+          }
           if (paused || s?.paused) void resume();
           else void pause();
           break;
@@ -231,6 +286,11 @@ export function PlayerScreen() {
         case "subtitles_menu":
           setMenu((m) => (m === "sub" ? null : "sub"));
           break;
+        case "episode": {
+          const target = intent.next ? neighbours.data?.next : neighbours.data?.previous;
+          if (target) void goTo(target.id);
+          break;
+        }
         case "subtitle_delay":
           void commands.subtitleNudge(intent.ms).then((r) => {
             const ms = r.status === "ok" ? r.data : null;
@@ -247,7 +307,8 @@ export function PlayerScreen() {
           setMenu((m) => (m === "audio" ? null : "audio"));
           break;
         case "back":
-          if (menu) setMenu(null);
+          if (showNextCard) setDismissed(true);
+          else if (menu) setMenu(null);
           else if (fullscreen) {
             setFs(false);
             void setFullscreen(false);
@@ -255,7 +316,7 @@ export function PlayerScreen() {
           break;
       }
     },
-    [act, fullscreen, leave, menu, pause, paused, resume, state, wake],
+    [act, fullscreen, goTo, leave, menu, neighbours.data, next, pause, paused, resume, showNextCard, state, wake],
   );
 
   useEffect(() => {
@@ -299,6 +360,32 @@ export function PlayerScreen() {
           onOpen={(id) => {
             stopPlaying();
             openDetail(id);
+          }}
+        />
+      )}
+
+      {showNextCard && next && (
+        <NextEpisodeCard
+          ref={card}
+          next={next}
+          autoplay={autoplay}
+          onPlay={() => void goTo(next.id)}
+          onDismiss={() => setDismissed(true)}
+        />
+      )}
+      {finished && playing.mediaItemId !== null && (
+        <EndCard
+          mediaItemId={playing.mediaItemId}
+          title={playing.title}
+          moreLikeThis={details.data?.more_like_this ?? []}
+          onOpen={(id) => {
+            stopPlaying();
+            openDetail(id);
+          }}
+          onLeave={() => {
+            const id = playing.mediaItemId;
+            stopPlaying();
+            if (id !== null) openDetail(id);
           }}
         />
       )}

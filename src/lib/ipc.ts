@@ -164,6 +164,9 @@ export const commands = {
 	preparePlay: (id: number, language: string | null, quality: string | null) => typedError<PlayPlanView, string>(__TAURI_INVOKE("prepare_play", { id, language, quality })),
 	/**  Remember where the viewer is, for resume. Called periodically and on leaving. */
 	savePosition: (id: number, position: number | null, duration: number | null) => typedError<null, string>(__TAURI_INVOKE("save_position", { id, position, duration })),
+	/**  The viewer's 1–5 rating, from the end card (Phase 11, ADR-0043). `None` clears it. */
+	rateTitle: (id: number, stars: number | null) => typedError<null, string>(__TAURI_INVOKE("rate_title", { id, stars })),
+	titleRating: (id: number) => typedError<number | null, string>(__TAURI_INVOKE("title_rating", { id })),
 	subtitleSettings: () => typedError<SubtitleSettingsView, string>(__TAURI_INVOKE("subtitle_settings")),
 	setSubtitleSettings: (settings: SubtitleSettings) => typedError<null, string>(__TAURI_INVOKE("set_subtitle_settings", { settings })),
 	setOpensubtitlesKey: (key: string) => typedError<null, string>(__TAURI_INVOKE("set_opensubtitles_key", { key })),

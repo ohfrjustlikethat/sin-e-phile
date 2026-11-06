@@ -13,6 +13,9 @@ interface PlaybackChoice {
   quality: string | null;
   /** Show every candidate's score on film pages (the expert panel, Phase 9). */
   details: boolean;
+  /** Play the next episode when the countdown ends (Phase 11). */
+  autoplay: boolean;
+  setAutoplay: (autoplay: boolean) => void;
   setAudio: (audio: string | null) => void;
   setQuality: (quality: string | null) => void;
   setDetails: (details: boolean) => void;
@@ -24,6 +27,8 @@ export const usePlaybackChoice = create<PlaybackChoice>()(
       audio: null,
       quality: null,
       details: false,
+      autoplay: true,
+      setAutoplay: (autoplay) => set({ autoplay }),
       setAudio: (audio) => set({ audio }),
       setQuality: (quality) => set({ quality }),
       setDetails: (details) => set({ details }),

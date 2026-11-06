@@ -77,6 +77,52 @@ impl<'a> ProfileRepository<'a> {
     }
 
     /// Append to the watch log. Never updates: the log is the record.
+    /// The profile's 1–5 rating of a title; rating again replaces it, `None` clears it.
+    pub async fn rate(
+        &self,
+        profile_id: i64,
+        media_item_id: i64,
+        stars: Option<i64>,
+    ) -> Result<(), DbError> {
+        match stars {
+            Some(stars) if (1..=5).contains(&stars) => {
+                sqlx::query(
+                    "INSERT INTO ratings (profile_id, media_item_id, stars) VALUES (?1, ?2, ?3)
+                     ON CONFLICT (profile_id, media_item_id) DO UPDATE
+                       SET stars = excluded.stars, rated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')",
+                )
+                .bind(profile_id)
+                .bind(media_item_id)
+                .bind(stars)
+                .execute(self.db.pool())
+                .await?;
+            }
+            Some(stars) => return Err(DbError::Invalid(format!("{stars} is not 1 to 5 stars"))),
+            None => {
+                sqlx::query("DELETE FROM ratings WHERE profile_id = ?1 AND media_item_id = ?2")
+                    .bind(profile_id)
+                    .bind(media_item_id)
+                    .execute(self.db.pool())
+                    .await?;
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn rating(
+        &self,
+        profile_id: i64,
+        media_item_id: i64,
+    ) -> Result<Option<i64>, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT stars FROM ratings WHERE profile_id = ?1 AND media_item_id = ?2",
+        )
+        .bind(profile_id)
+        .bind(media_item_id)
+        .fetch_optional(self.db.pool())
+        .await?)
+    }
+
     pub async fn record_watch(
         &self,
         profile_id: i64,

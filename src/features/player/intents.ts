@@ -15,6 +15,8 @@ export type Intent =
   | { kind: "subtitles_menu" }
   /** Move the subtitles: negative earlier, positive later (SPEC.md Phase 10's nudge). */
   | { kind: "subtitle_delay"; ms: number }
+  /** The previous or next episode of a series (SPEC.md Phase 11). */
+  | { kind: "episode"; next: boolean }
   | { kind: "audio_menu" }
   | { kind: "back" };
 
@@ -68,6 +70,13 @@ export function keyIntent(e: Pick<KeyboardEvent, "key" | "shiftKey" | "ctrlKey" 
     case "h":
     case "H":
       return { kind: "subtitle_delay", ms: 100 };
+    // Phase 11: N and P for the next and previous episode.
+    case "n":
+    case "N":
+      return { kind: "episode", next: true };
+    case "p":
+    case "P":
+      return { kind: "episode", next: false };
     case "Escape":
       return { kind: "back" };
     default:

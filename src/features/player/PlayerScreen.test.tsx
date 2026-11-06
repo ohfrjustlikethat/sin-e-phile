@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { useUi } from "@/lib/store";
+import { usePlaybackChoice } from "@/lib/playbackChoice";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 
@@ -25,6 +26,12 @@ const commands = {
   ),
   filmography: vi.fn(() => ok([{ id: 11, title: "Faust", year: 1926, kind: "film", part: "Mephisto" }])),
   playerChapters: vi.fn(() => ok([])),
+  episodeNeighbours: vi.fn(() =>
+    ok({ previous: null, next: null } as { previous: unknown; next: unknown }),
+  ),
+  preparePlay: vi.fn(() => ok({ title: "Next", open: "https://films.example/next.mp4", start: null })),
+  rateTitle: vi.fn(() => ok(null)),
+  titleRating: vi.fn(() => ok(null)),
 };
 vi.mock("@/lib/ipc", () => ({ commands }));
 // Inert unless a test marks the page as inside Tauri.
@@ -177,6 +184,84 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Faust/ }));
     expect(useUi.getState().playing).toBeNull();
     expect(useUi.getState().detail).toBe(11);
+  });
+
+  const NEXT = { id: 42, season: 1, episode: 2, title: "Traces to Nowhere", air_date: null };
+  const STATE = {
+    position: 0, duration: 1440, paused: false, buffered_until: null, volume: 100, muted: false, speed: 1,
+    hwdec: null, ended: false, started: true, chapter: null, tracks: [],
+  };
+  async function inTauri(run: () => Promise<void>) {
+    const w = window as unknown as Record<string, unknown>;
+    w.__TAURI_INTERNALS__ = {};
+    try {
+      await run();
+    } finally {
+      delete w.__TAURI_INTERNALS__;
+    }
+  }
+
+  it("N plays the next episode (Phase 11)", async () => {
+    commands.episodeNeighbours.mockImplementation(() => ok({ previous: null, next: NEXT }));
+    render(<PlayerScreen />);
+    await waitFor(() => expect(commands.episodeNeighbours).toHaveBeenCalledWith(1));
+    await waitFor(() => {
+      fireEvent.keyDown(window, { key: "n" });
+      expect(commands.preparePlay).toHaveBeenCalledWith(42, null, null);
+    });
+    await waitFor(() => expect(useUi.getState().playing?.mediaItemId).toBe(42));
+    commands.episodeNeighbours.mockImplementation(() => ok({ previous: null, next: null }));
+  });
+
+  it("offers the next episode in the last 30 s; B says not now, A plays it", async () => {
+    commands.episodeNeighbours.mockImplementation(() => ok({ previous: null, next: NEXT }));
+    usePlaybackChoice.setState({ autoplay: false });
+    await inTauri(async () => {
+      render(<PlayerScreen />);
+      await waitFor(() => expect(events.on["player-state"]).toBeDefined());
+      await waitFor(() => expect(commands.episodeNeighbours).toHaveBeenCalled());
+      act(() => events.on["player-state"]?.({ payload: { ...STATE, position: 1300 } }));
+      expect(screen.queryByRole("dialog", { name: "Next episode" })).not.toBeInTheDocument();
+      act(() => events.on["player-state"]?.({ payload: { ...STATE, position: 1415 } }));
+      expect(await screen.findByRole("dialog", { name: "Next episode" })).toHaveTextContent("Traces to Nowhere");
+      // Autoplay off: no countdown, so nothing plays by itself.
+      expect(screen.getByRole("button", { name: "Play" })).toBeInTheDocument();
+      expect(screen.queryByText(/Play in/)).not.toBeInTheDocument();
+      fireEvent.keyDown(window, { key: "Escape" });
+      expect(screen.queryByRole("dialog", { name: "Next episode" })).not.toBeInTheDocument();
+      // B dismisses the card; it does not leave the player.
+      expect(useUi.getState().playing).not.toBeNull();
+    });
+    usePlaybackChoice.setState({ autoplay: true });
+    commands.episodeNeighbours.mockImplementation(() => ok({ previous: null, next: null }));
+  });
+
+  it("autoplay plays the next episode when the countdown ends", async () => {
+    commands.episodeNeighbours.mockImplementation(() => ok({ previous: null, next: NEXT }));
+    await inTauri(async () => {
+      render(<PlayerScreen />);
+      await waitFor(() => expect(events.on["player-state"]).toBeDefined());
+      await waitFor(() => expect(commands.episodeNeighbours).toHaveBeenCalled());
+      vi.useFakeTimers();
+      act(() => events.on["player-state"]?.({ payload: { ...STATE, position: 1430 } }));
+      expect(screen.getByRole("dialog", { name: "Next episode" })).toHaveTextContent("Play in 10");
+      for (let i = 0; i < 10; i++) act(() => vi.advanceTimersByTime(1000));
+      vi.useRealTimers();
+      await waitFor(() => expect(commands.preparePlay).toHaveBeenCalledWith(42, null, null));
+    });
+    commands.episodeNeighbours.mockImplementation(() => ok({ previous: null, next: null }));
+  });
+
+  it("a film's credits play out, then the end card asks for a rating", async () => {
+    await inTauri(async () => {
+      render(<PlayerScreen />);
+      await waitFor(() => expect(events.on["player-state"]).toBeDefined());
+      act(() => events.on["player-state"]?.({ payload: { ...STATE, position: 1440, ended: true } }));
+      expect(await screen.findByRole("dialog", { name: "Finished" })).toHaveTextContent("Nosferatu");
+      expect(commands.playerClose).toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("radio", { name: "4 out of 5" }));
+      expect(commands.rateTitle).toHaveBeenCalledWith(1, 4);
+    });
   });
 });
 

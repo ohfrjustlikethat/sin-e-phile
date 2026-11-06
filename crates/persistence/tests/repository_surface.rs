@@ -291,6 +291,15 @@ async fn profile_repository_surface() {
 
     // create — including the demote-the-incumbent path
     let first = repo.create("First", true).await.expect("create");
+
+    // rate / rating (Phase 11) — replace, clear, refuse out of range
+    assert_eq!(repo.rating(first, film).await.expect("rating"), None);
+    repo.rate(first, film, Some(4)).await.expect("rate");
+    repo.rate(first, film, Some(5)).await.expect("rate again");
+    assert_eq!(repo.rating(first, film).await.unwrap(), Some(5));
+    assert!(repo.rate(first, film, Some(6)).await.is_err());
+    repo.rate(first, film, None).await.expect("clear");
+    assert_eq!(repo.rating(first, film).await.unwrap(), None);
     let second = repo
         .create("Second", true)
         .await
