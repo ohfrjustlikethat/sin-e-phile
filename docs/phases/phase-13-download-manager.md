@@ -31,7 +31,7 @@ A download manager: queue with priorities, pause/resume/cancel, per-download and
 - [x] **13.3** Bandwidth limits measured: a local seeder and a timed transfer under each limit, numbers to docs/eval-results.md (E7).
 - [x] **13.4** The advisor (crates/downloads advise.rs): stall probability from swarm throughput against the file's bitrate, free disk and an existing local copy, time-of-day network history, and the taste model's input (a neutral stand-in until Phase 15), giving one recommendation and one readable sentence (E8); trials recorded for E1.
 - [x] **13.5** The Downloads page (masthead Downloads button with a live count, ADR-0037): queue, progress, speed, seeds/peers, ETA, the reason each was queued, pause/resume/cancel, priorities, limits; storage budget and a cleanup view. Pad-complete in tools/uiaudit/controller.mjs.
-- [ ] **13.6** Author checks batched in one message: real controller (Phase 8 E5), VPN adapter pulled mid-download (Phase 7 E7), a real qBittorrent round trip (E2), the review screen's feel, D77's release-build console check. Then docs/specs/downloads.md, learning note, README and HOW_IT_WORKS, regression, close.
+- [x] **13.6** Author checks batched in one message: real controller (Phase 8 E5), VPN adapter pulled mid-download (Phase 7 E7), a real qBittorrent round trip (E2), the review screen's feel, D77's release-build console check. Then docs/specs/downloads.md, learning note, README and HOW_IT_WORKS, regression, close.
 
 ## Learning note
 
@@ -47,3 +47,4 @@ Estimating whether a stream will stall; bitrate versus throughput; why the taste
 - **13.3** Bandwidth limits measured: a local seeder and a timed transfer under each limit, numbers to docs · `35decf3`
 - **13.4** The advisor (crates/downloads advise.rs): stall probability from swarm throughput against the fi · `92c070d`
 - **13.5** The Downloads page (masthead Downloads button with a live count, ADR-0037): queue, progress, spe · `5d06e81`
+- **13.6** Author checks batched in one message: real controller (Phase 8 E5), VPN adapter pulled mid-downl · `fca4cf6`

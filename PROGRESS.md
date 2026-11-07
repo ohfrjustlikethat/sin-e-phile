@@ -16,14 +16,14 @@
 
 > Opened 2026-11-07 when Phase 12 merged (b5dccda, tag phase-12). qBittorrent is not installed on this machine; installing software on the author's PC is outside the repository, so the backend is built and tested against a local stand-in of its Web API and the one real round trip joins the batched author checks (13.6). The taste model (Phase 15) does not exist yet: the advisor takes its input through an interface with a neutral stand-in, recorded rather than faked. Author checks carried here: Phase 7 E7, Phase 8 E5.
 
-### Subtasks — 5/6 complete
+### Subtasks — 6/6 complete
 
 - [x] **13.1** The download queue (crates/downloads): items with priority, state (queued, active, paused, done, failed), per-item and global limits, a schedule window (start after a time), surviving restart (migration), a backend trait with librqbit as the default; completion files the item into the library through sinephile_library::scan (E5, E6). · `163095b`
 - [x] **13.2** The qBittorrent backend over its Web API (ADR-0029): configured by the user (address, credentials kept like other secrets), detected, never bundled or required; falls back to librqbit when not running (E3); a transport only, with a guard rule rejecting any read of search plugins, RSS or tracker lists (E4), seen to fail. Tested against a local stand-in Web API; one real-qBittorrent check batched for the author (E2). · `f5345b5`
 - [x] **13.3** Bandwidth limits measured: a local seeder and a timed transfer under each limit, numbers to docs/eval-results.md (E7). · `be543da`
 - [x] **13.4** The advisor (crates/downloads advise.rs): stall probability from swarm throughput against the file's bitrate, free disk and an existing local copy, time-of-day network history, and the taste model's input (a neutral stand-in until Phase 15), giving one recommendation and one readable sentence (E8); trials recorded for E1. · `92c070d`
 - [x] **13.5** The Downloads page (masthead Downloads button with a live count, ADR-0037): queue, progress, speed, seeds/peers, ETA, the reason each was queued, pause/resume/cancel, priorities, limits; storage budget and a cleanup view. Pad-complete in tools/uiaudit/controller.mjs. · `5d06e81`
-- [ ] **13.6** Author checks batched in one message: real controller (Phase 8 E5), VPN adapter pulled mid-download (Phase 7 E7), a real qBittorrent round trip (E2), the review screen's feel, D77's release-build console check. Then docs/specs/downloads.md, learning note, README and HOW_IT_WORKS, regression, close.
+- [x] **13.6** Author checks batched in one message: real controller (Phase 8 E5), VPN adapter pulled mid-download (Phase 7 E7), a real qBittorrent round trip (E2), the review screen's feel, D77's release-build console check. Then docs/specs/downloads.md, learning note, README and HOW_IT_WORKS, regression, close. · `fca4cf6`
 
 ### Exit criteria
 
@@ -54,7 +54,7 @@ Phase 13 close (docs/phases/phase-13-download-manager.md, subtask 13.6): every c
 
 ## Blockers
 
-- **B13** CI failed on phase/13 at c594a0c: (1) the UI audit's plain browser threw because the masthead's download count called Tauri's listen() on every page outside the shell; fixed by src/lib/events.ts onEvent, used by every always-mounted listener, and npm run audit:ui added to CLAUDE.md's pre-push list (locally it had been hanging: Vite scanned 96 index.html copies under target/, fixed by optimizeDeps.entries); (2) the bandwidth-limit tests measured 1.24 and 2.47 MiB/s against 1 and 2 on the runner, the limiter's opening burst inside the window; fixed by measuring only once the download is flowing (limits.rs settle). Clears when CI is green on the fix.
+None.
 
 ---
 

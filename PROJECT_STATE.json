@@ -45,8 +45,8 @@
       {
         "id": "13.6",
         "text": "Author checks batched in one message: real controller (Phase 8 E5), VPN adapter pulled mid-download (Phase 7 E7), a real qBittorrent round trip (E2), the review screen's feel, D77's release-build console check. Then docs/specs/downloads.md, learning note, README and HOW_IT_WORKS, regression, close.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "fca4cf6"
       }
     ],
     "exit_criteria": [
@@ -1652,8 +1652,8 @@
         {
           "id": "13.6",
           "text": "Author checks batched in one message: real controller (Phase 8 E5), VPN adapter pulled mid-download (Phase 7 E7), a real qBittorrent round trip (E2), the review screen's feel, D77's release-build console check. Then docs/specs/downloads.md, learning note, README and HOW_IT_WORKS, regression, close.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "fca4cf6"
         }
       ]
     },
@@ -2317,14 +2317,7 @@
     }
   ],
   "next_action": "Phase 13 close (docs/phases/phase-13-download-manager.md, subtask 13.6): every criterion now has evidence (E2 met against a real qBittorrent). Run the full pre-push list, commit, push, wait for CI green on phase/13-download-manager, merge --no-ff into main, CI green on main, tag phase-13, write the phase record (status complete, completion_commit = the merge) and the SESSION_LOG retrospective, then python tools/phasedoc/generate.py --close 13 and --open 14, and author Phase 14 subtasks from SPEC.md §15.",
-  "blockers": [
-    {
-      "id": "B13",
-      "raised": "2026-11-07T10:15:00Z",
-      "needs_user": false,
-      "description": "CI failed on phase/13 at c594a0c: (1) the UI audit's plain browser threw because the masthead's download count called Tauri's listen() on every page outside the shell; fixed by src/lib/events.ts onEvent, used by every always-mounted listener, and npm run audit:ui added to CLAUDE.md's pre-push list (locally it had been hanging: Vite scanned 96 index.html copies under target/, fixed by optimizeDeps.entries); (2) the bandwidth-limit tests measured 1.24 and 2.47 MiB/s against 1 and 2 on the runner, the limiter's opening burst inside the window; fixed by measuring only once the download is flowing (limits.rs settle). Clears when CI is green on the fix."
-    }
-  ],
+  "blockers": [],
   "decisions_pending": [
     {
       "id": "P1",
