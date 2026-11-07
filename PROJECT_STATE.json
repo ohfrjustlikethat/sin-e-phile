@@ -21,8 +21,8 @@
       {
         "id": "14.2",
         "text": "Profiles in the app: the picker on launch only with two or more (ADR-0043), the avatar in the masthead with a switcher, create and edit with an optional PIN, the kids profile failing closed (TMDB certification within the limit when the profile has a key, otherwise Family or Animation titles that are not adult nor tagged with an adult genre); switching timed to a re-rendered Home (E5); pad-complete in tools/uiaudit/controller.mjs. The frontend's personal browser storage (playback choice, recent searches) is scoped by profile and reloaded on a switch; machine settings (controller, last destination) stay shared.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "272b54f"
       },
       {
         "id": "14.3",
@@ -1701,8 +1701,8 @@
         {
           "id": "14.2",
           "text": "Profiles in the app: the picker on launch only with two or more (ADR-0043), the avatar in the masthead with a switcher, create and edit with an optional PIN, the kids profile failing closed (TMDB certification within the limit when the profile has a key, otherwise Family or Animation titles that are not adult nor tagged with an adult genre); switching timed to a re-rendered Home (E5); pad-complete in tools/uiaudit/controller.mjs. The frontend's personal browser storage (playback choice, recent searches) is scoped by profile and reloaded on a switch; machine settings (controller, last destination) stay shared.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "272b54f"
         },
         {
           "id": "14.3",
@@ -2342,7 +2342,7 @@
       ]
     }
   ],
-  "next_action": "Phase 14 subtask 14.2 (docs/phases/phase-14-profiles.md): add src-tauri/src/commands/profiles.rs (profiles, create_profile, update_profile, delete_profile, switch_profile with PIN check then AppState::set_profile, ProfileRepository::touch and rebuild_manager, set_profile_pin, clear_profile_pin), regenerate bindings, then the picker (src/features/profiles/ProfilePicker.tsx, on launch only with 2+ profiles), the masthead avatar and switcher, profile-scoped browser storage in src/lib/playbackChoice.ts and recentSearches.ts, and the kids filter.",
+  "next_action": "Phase 14 subtask 14.3 (docs/phases/phase-14-profiles.md): create crates/imports with parsers for a Letterboxd export (watched.csv, ratings.csv, diary.csv, watchlist.csv: Name, Year, Letterboxd URI, Rating), a Trakt JSON export, an IMDb ratings CSV (Const, Your Rating, Title, Year) and MAL/AniList XML, matched to the catalogue by IMDb id where given else exact title plus year, recorded per profile (ratings, completed watches, watchlist); a 500+ row Letterboxd fixture in fixtures/imports built from catalogue titles; tests and the match rate for E2.",
   "blockers": [],
   "decisions_pending": [
     {
@@ -3018,6 +3018,11 @@
       "id": "D80",
       "text": "Upstream (librqbit 9.0.1): create_torrent writes one piece hash too many when the content is a whole number of pieces (500 bytes of hashes for 24 pieces of 256 KiB); libtorrent refuses such a torrent as invalid (stays fetching metadata, then errors; a .torrent of it is never added). The app never creates torrents, so only test fixtures are affected; crates/downloads/tests/qbittorrent_real.rs uses a size that is not a whole number. Worth reporting upstream (the author's call: an outward-facing issue).",
       "phase_raised": 13
+    },
+    {
+      "id": "D81",
+      "text": "Kids profiles filter by genre (MovieLens 'Children' or IMDb 'Family', not adult, none of Adult/Horror/Thriller/Crime/War/Film-Noir) because the free catalogue has no certifications. The kids_limit column waits for TMDB release-date certifications, which are not fetched yet; until then a profile's limit is not a certification. Home rails (Phases 16-18) must ask MediaRepository::suitable_for_children like search does.",
+      "phase_raised": 14
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."
