@@ -12,16 +12,16 @@
 
 **Phase 12 — Local Library Engine** (`in_progress`, branch `phase/12-local-library-engine`)
 
-3 of 6 exit criteria met with evidence.
+5 of 6 exit criteria met with evidence.
 
 > Opened 2026-11-07 when Phase 11 merged (cc3ca3c, tag phase-11). Inherits: absolute_number is NULL by design (ADR-0031), so an anime-style absolute number goes to the review queue rather than a lookup; Phase 8's carried criterion (search, click and watch a local file) is discharged by 12.5; the confidence threshold is measured, not chosen (DECISIONS_PENDING). Release-group names in fixtures are invented: real ones would be naming content sources by the back door (2.1). Author checks still outstanding: real controller (Phase 8 E5), VPN drop (Phase 7 E7), both carried to 13.
 
-### Subtasks — 3/6 complete
+### Subtasks — 4/6 complete
 
 - [x] **12.1** crates/filename-parser (MIT/Apache, pure, no I/O): title, year, season, episode (S01E02, 1x02, multi-episode ranges), absolute episode for anime-style 'Title - 059', resolution, source, codec, audio, language, release group (bracket prefix or dash suffix, recognised by position, never by a list of names). fixtures/filenames/: 500+ hand-labelled names covering scene, anime fansub, multi-episode, messy and adversarial cases; every group name invented (2.1); a per-field accuracy test. Documented with a runnable README example (E6). · `8c3a377`
 - [x] **12.2** Migration 0021 library: library_folders (the user's own roots, machine-specific like local_files.path; the portability test's allow-list grows by that column with the reason), local_files gains folder_id and a missing_since for moves; match_memory (a normalised name pattern -> media item, from the user's decisions). LibraryRepository with a repository_surface line per method. · `9de8483`
 - [x] **12.3** crates/library identification: candidates from the catalogue by title (FTS) and year, scored on independent weak signals (title similarity, year, duration vs runtime from FFprobe, episode exists, folder and sibling context, remembered decisions), a confidence in [0,1], auto-accepted above a threshold set from measurement (DECISIONS_PENDING), else the review queue. tools/eval 'identify' harness over fixtures/filenames labelled with catalogue ids: top-1 (E1 > 95%) and false-confident (E2 < 1%); numbers to docs/eval-results.md. · `c0eda95`
-- [ ] **12.4** Scanner and watcher: register a folder, walk it recursively, probe only what identification needs, in parallel, off the UI thread with progress events; the notify crate (ReadDirectoryChangesW) applies creates, deletes, renames and moves without a rescan; a rename or move keeps the row (no duplicate, E4). Measured: 10,000 files under 3 minutes with the UI responsive (E3).
+- [x] **12.4** Scanner and watcher: register a folder, walk it recursively, probe only what identification needs, in parallel, off the UI thread with progress events; the notify crate (ReadDirectoryChangesW) applies creates, deletes, renames and moves without a rescan; a rename or move keeps the row (no duplicate, E4). Measured: 10,000 files under 3 minutes with the UI responsive (E3). · `96a73fa`
 - [ ] **12.5** The review queue (Settings or Library): side-by-side candidates, typographic when there is no artwork, one click or one A press resolves, manual search for the rest, one decision settles a whole series' files; remembered for similar names. The library feeds LocalFileBackend so a local film is found by search and plays from its page (discharges Phase 8's carried criterion). Pad-only flow in tools/uiaudit/controller.mjs; resolving 20 items timed (E5).
 - [ ] **12.6** docs/specs/library.md, learning note, README and HOW_IT_WORKS, regression check, close.
 
@@ -31,8 +31,10 @@
       - *Evidence:* c0eda95: cargo run --release -p eval -- identify (2026-11-07, full catalogue): tuning set fixtures/filenames/names.psv 549 names, 2 labels not in the catalogue left out, top-1 523/528 = 99.05%; held out heldout.psv 108/108 = 100%. Method and every tuning step with its measured number in docs/eval-results.md (Phase 12, Identification). crates/library/tests/identify.rs: 7 tests (year, duration, episode over film namesake, folders, remembered decision, no guess); seen to fail when the kind signal was neutralised.
 - [x] **E2** < 1% false-confident rate — being wrong while confident is the worst failure mode here.
       - *Evidence:* c0eda95: same run, at the library's own threshold sinephile_library::ACCEPT_AT = 0.75: tuning set 2/510 accepted were wrong = 0.39% (0.37% of all names; strict reading: of accepted names, and a '?'-labelled name accepted counts as wrong); held out 0/103. Asked (review queue) 6.8% and 5.5%. The lowest threshold under 1% was 0.615 at 0.97%; 0.75 keeps a margin. 9 of 549 labels were corrected, each reason recorded in docs/eval-results.md.
-- [ ] **E3** Scanning 10,000 files completes in under 3 minutes and does not block the UI.
-- [ ] **E4** Renaming a file outside the app is detected and does not create a duplicate.
+- [x] **E3** Scanning 10,000 files completes in under 3 minutes and does not block the UI.
+      - *Evidence:* 96a73fa: cargo run --release -p eval -- scan (2026-11-07, full catalogue, real FFprobe): 10,000 distinct films sampled from the catalogue, one scene-named file each in its own folder, scanned in 37.1 s, 35.3 s and 35.0 s (target 180 s), 3.5-3.7 ms a file, identification 7 at a time. Not blocking the UI: the queries a page issues ran alongside, p95 24.6-24.7 ms idle and 33.5-34.9 ms during the scan (515-542 runs). Scans run on background tasks (src-tauri/src/commands/library.rs start_scan) with progress events. Accuracy on the sample: best right 99.45-99.54%, accepted wrong 1/9,279. Table in docs/eval-results.md.
+- [x] **E4** Renaming a file outside the app is detected and does not create a duplicate.
+      - *Evidence:* 96a73fa: crates/library/tests/scan.rs a_scan_finds_identifies_and_keeps_a_renamed_file (renamed while closed: same row, same match, no duplicate) and the_watcher_sees_a_rename_and_keeps_one_row (the real notify watcher on a temp folder); both seen to fail with move detection disabled. Real window 2026-11-07: a 2.2 GB file in a library folder renamed in place while the app ran (the watcher reported a removal then an arrival: Missing(1) then Moved), one row, the same id, matched to Heat (1995) at 1.0; relaunched, the startup scan reported unchanged 1 moved 0; moved to another folder and renamed Heat.mkv while closed, the next launch reported moved 1, the same row and match.
 - [ ] **E5** The review queue is genuinely pleasant to use — resolving 20 ambiguous items takes under a minute.
 - [x] **E6** `crates/filename-parser` is documented and independently useful.
       - *Evidence:* 8c3a377: crates/filename-parser (MIT OR Apache-2.0, one dependency: regex =1.13.1, no I/O) documented by README.md included as the crate doc, whose example runs as a doctest (cargo test -p filename-parser: 1 doctest passed), plus examples/parse.rs for the command line. Measured: tests/corpus.rs the_corpus_reads_as_a_human_reads_it, 549 hand-labelled names in fixtures/filenames/names.psv, 100% on every field after tuning (98.36% before); names_it_was_never_tuned_on_read_as_well, 109 names in heldout.psv written after tuning, 109/109 on the first run; tests/fields.rs (7 tests: languages, edition, flags, audio, dates, episode titles, extension, comparable). Seen to fail: dropping the year made both corpus tests fail (year 32.24% < 97%). Release groups in the fixtures are invented (2.1).
@@ -41,7 +43,7 @@
 
 ## What's next
 
-Phase 12 subtask 12.4 (docs/phases/phase-12-local-library-engine.md): crates/library/src/scan.rs: walk a folder (std::fs, recursive, video extensions only), upsert each file, detect moves (a new path whose size matches a missing file with the same content hash of the first+last 64 KiB, via sinephile_subtitles::hash or a local copy), probe with FFprobe only files that identification needs, identify in parallel with a per-series cache, write matches/candidates; then the notify watcher in src-tauri applying create/remove/rename events through the same functions. Measure 10,000 files under 3 minutes (E3) with a generated tree of small files.
+Phase 12 subtask 12.5 (docs/phases/phase-12-local-library-engine.md): review queue commands in src-tauri/src/commands/library.rs (library_review: files from LibraryRepository::review_queue with candidates; resolve(file, media_item) = set_match confirmed + remember(pattern) + re-identify the other queued files with the same pattern; not_this; search for a manual pick); src/features/library/ReviewQueue.tsx: side-by-side typographic candidates, A/click resolves, pad flow in tools/uiaudit/controller.mjs, 20 items timed (E5). Then LocalFileBackend (crates/sources/src/backends/local.rs) answers from LibraryRepository::files_for_item, and its description in Settings loses 'Folders are added in a later version' (discharges Phase 8's carried criterion).
 
 ---
 
@@ -69,7 +71,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 7/7 |
 | [x] | 10 | Subtitle Pipeline | B | 8 | 2 | 6/6 |
 | [x] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 6/6 |
-| [~] | 12 | Local Library Engine | B | 4 | 2–3 | 3/6 |
+| [~] | 12 | Local Library Engine | B | 4 | 2–3 | 5/6 |
 | [ ] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 0/8 |
 | [ ] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 0/6 |
 | [ ] | 15 | Taste Model | B | 5, 14 | 2 | 0/5 |

@@ -33,8 +33,8 @@
       {
         "id": "12.4",
         "text": "Scanner and watcher: register a folder, walk it recursively, probe only what identification needs, in parallel, off the UI thread with progress events; the notify crate (ReadDirectoryChangesW) applies creates, deletes, renames and moves without a rescan; a rename or move keeps the row (no duplicate, E4). Measured: 10,000 files under 3 minutes with the UI responsive (E3).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "96a73fa"
       },
       {
         "id": "12.5",
@@ -65,14 +65,14 @@
       {
         "id": "E3",
         "text": "Scanning 10,000 files completes in under 3 minutes and does not block the UI.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "96a73fa: cargo run --release -p eval -- scan (2026-11-07, full catalogue, real FFprobe): 10,000 distinct films sampled from the catalogue, one scene-named file each in its own folder, scanned in 37.1 s, 35.3 s and 35.0 s (target 180 s), 3.5-3.7 ms a file, identification 7 at a time. Not blocking the UI: the queries a page issues ran alongside, p95 24.6-24.7 ms idle and 33.5-34.9 ms during the scan (515-542 runs). Scans run on background tasks (src-tauri/src/commands/library.rs start_scan) with progress events. Accuracy on the sample: best right 99.45-99.54%, accepted wrong 1/9,279. Table in docs/eval-results.md."
       },
       {
         "id": "E4",
         "text": "Renaming a file outside the app is detected and does not create a duplicate.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "96a73fa: crates/library/tests/scan.rs a_scan_finds_identifies_and_keeps_a_renamed_file (renamed while closed: same row, same match, no duplicate) and the_watcher_sees_a_rename_and_keeps_one_row (the real notify watcher on a temp folder); both seen to fail with move detection disabled. Real window 2026-11-07: a 2.2 GB file in a library folder renamed in place while the app ran (the watcher reported a removal then an arrival: Missing(1) then Moved), one row, the same id, matched to Heat (1995) at 1.0; relaunched, the startup scan reported unchanged 1 moved 0; moved to another folder and renamed Heat.mkv while closed, the next launch reported moved 1, the same row and match."
       },
       {
         "id": "E5",
@@ -1485,14 +1485,14 @@
         {
           "id": "E3",
           "text": "Scanning 10,000 files completes in under 3 minutes and does not block the UI.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "96a73fa: cargo run --release -p eval -- scan (2026-11-07, full catalogue, real FFprobe): 10,000 distinct films sampled from the catalogue, one scene-named file each in its own folder, scanned in 37.1 s, 35.3 s and 35.0 s (target 180 s), 3.5-3.7 ms a file, identification 7 at a time. Not blocking the UI: the queries a page issues ran alongside, p95 24.6-24.7 ms idle and 33.5-34.9 ms during the scan (515-542 runs). Scans run on background tasks (src-tauri/src/commands/library.rs start_scan) with progress events. Accuracy on the sample: best right 99.45-99.54%, accepted wrong 1/9,279. Table in docs/eval-results.md."
         },
         {
           "id": "E4",
           "text": "Renaming a file outside the app is detected and does not create a duplicate.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "96a73fa: crates/library/tests/scan.rs a_scan_finds_identifies_and_keeps_a_renamed_file (renamed while closed: same row, same match, no duplicate) and the_watcher_sees_a_rename_and_keeps_one_row (the real notify watcher on a temp folder); both seen to fail with move detection disabled. Real window 2026-11-07: a 2.2 GB file in a library folder renamed in place while the app ran (the watcher reported a removal then an arrival: Missing(1) then Moved), one row, the same id, matched to Heat (1995) at 1.0; relaunched, the startup scan reported unchanged 1 moved 0; moved to another folder and renamed Heat.mkv while closed, the next launch reported moved 1, the same row and match."
         },
         {
           "id": "E5",
@@ -1529,8 +1529,8 @@
         {
           "id": "12.4",
           "text": "Scanner and watcher: register a folder, walk it recursively, probe only what identification needs, in parallel, off the UI thread with progress events; the notify crate (ReadDirectoryChangesW) applies creates, deletes, renames and moves without a rescan; a rename or move keeps the row (no duplicate, E4). Measured: 10,000 files under 3 minutes with the UI responsive (E3).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "96a73fa"
         },
         {
           "id": "12.5",
@@ -2264,7 +2264,7 @@
       ]
     }
   ],
-  "next_action": "Phase 12 subtask 12.4 (docs/phases/phase-12-local-library-engine.md): crates/library/src/scan.rs: walk a folder (std::fs, recursive, video extensions only), upsert each file, detect moves (a new path whose size matches a missing file with the same content hash of the first+last 64 KiB, via sinephile_subtitles::hash or a local copy), probe with FFprobe only files that identification needs, identify in parallel with a per-series cache, write matches/candidates; then the notify watcher in src-tauri applying create/remove/rename events through the same functions. Measure 10,000 files under 3 minutes (E3) with a generated tree of small files.",
+  "next_action": "Phase 12 subtask 12.5 (docs/phases/phase-12-local-library-engine.md): review queue commands in src-tauri/src/commands/library.rs (library_review: files from LibraryRepository::review_queue with candidates; resolve(file, media_item) = set_match confirmed + remember(pattern) + re-identify the other queued files with the same pattern; not_this; search for a manual pick); src/features/library/ReviewQueue.tsx: side-by-side typographic candidates, A/click resolves, pad flow in tools/uiaudit/controller.mjs, 20 items timed (E5). Then LocalFileBackend (crates/sources/src/backends/local.rs) answers from LibraryRepository::files_for_item, and its description in Settings loses 'Folders are added in a later version' (discharges Phase 8's carried criterion).",
   "blockers": [],
   "decisions_pending": [
     {
