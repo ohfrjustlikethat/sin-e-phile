@@ -10,6 +10,7 @@
 
 use std::path::Path;
 
+mod advise;
 mod embed;
 mod error;
 mod identify;
@@ -72,6 +73,14 @@ async fn main() {
         ),
         "identify" if args.iter().any(|a| a == "--timing") => {
             identify::timing(Path::new(&data_dir)).await
+        }
+        "advise" => {
+            let set = if args.iter().any(|a| a == "--tuned") {
+                "tuned"
+            } else {
+                "fresh"
+            };
+            advise::run(set).await
         }
         "scan" => {
             let files = args

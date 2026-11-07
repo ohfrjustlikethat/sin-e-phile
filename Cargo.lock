@@ -1431,17 +1431,21 @@ name = "eval"
 version = "0.1.0"
 dependencies = [
  "filename-parser",
+ "librqbit",
  "serde",
  "serde_json",
  "sinephile-catalogue",
+ "sinephile-downloads",
  "sinephile-embedder",
  "sinephile-embedding",
  "sinephile-library",
  "sinephile-persistence",
  "sinephile-search-engine",
+ "sinephile-torrent",
  "sinephile-vector-index",
  "sqlx",
  "subtitle-align",
+ "tempfile",
  "thiserror 2.0.20",
  "tokio",
 ]
