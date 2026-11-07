@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { DESTINATIONS, type Destination, useUi } from "@/lib/store";
 import { inProgress } from "@/features/downloads/format";
 import { useDownloads } from "@/features/downloads/useDownloads";
+import { Avatar } from "@/features/profiles/Avatar";
+import { useProfiles } from "@/features/profiles/useProfiles";
 
 /**
  * The masthead — SPEC.md §3.1 and §9.4, ADR-0037.
@@ -19,7 +21,7 @@ import { useDownloads } from "@/features/downloads/useDownloads";
  * - Empty space is the drag region, so the bar still moves the window.
  *
  * Downloads (Phase 13) is a word too, with the number in progress beside it, shown only
- * when there is one. The profile avatar joins the right-hand group in Phase 14.
+ * when there is one. The profile's avatar (Phase 14) opens Who's watching?.
  */
 
 export const LABELS: Record<Destination, string> = {
@@ -47,6 +49,8 @@ export function Masthead({
   const controls = useWindowControls();
   const downloads = useDownloads();
   const busy = inProgress(downloads.data ?? []).length;
+  const { active } = useProfiles();
+  const setPickerOpen = useUi((s) => s.setPickerOpen);
 
   const go = (d: Destination) => {
     setSettingsOpen(false);
@@ -149,6 +153,17 @@ export function Masthead({
             </span>
           )}
         </button>
+
+        {active && (
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            aria-label={`${active.name}: switch profile`}
+            className="grid h-8 w-8 place-items-center"
+          >
+            <Avatar name={active.name} colour={active.avatar_colour} />
+          </button>
+        )}
 
         <button
           type="button"

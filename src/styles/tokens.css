@@ -78,6 +78,16 @@
   --danger: #d9503f; /* vermilion, clearly hotter than oxblood */
   --info: #608295;
 
+  /* ── Avatars (Phase 14) — six muted, warm-leaning grounds for a profile's initial.
+   *    Never oxblood (that is intent) and never a semantic colour, so a profile is
+   *    never read as an error or a success. Ink on each clears 4.5:1. ──────────── */
+  --avatar-slate: #45505a;
+  --avatar-sage: #4a5a4b;
+  --avatar-ochre: #6b5028;
+  --avatar-plum: #553a51;
+  --avatar-clay: #66412f;
+  --avatar-teal: #2d5250;
+
   /* ── Type families (ADR-0024) ───────────────────────────────────────────────
    * Bricolage Grotesque is the identity. Instrument Serif is for FILM TITLES
    * ONLY — using it for UI headings collapses the distinction that makes it read

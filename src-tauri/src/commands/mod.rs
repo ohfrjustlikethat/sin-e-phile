@@ -6,14 +6,18 @@
 
 pub mod assets;
 pub mod downloads;
+pub mod home;
+pub mod imports;
 pub mod library;
 pub mod overlay;
 pub mod playback;
 pub mod player;
+pub mod profiles;
 pub mod search;
 pub mod series;
 pub mod sources;
 pub mod subtitles;
 pub mod system;
+pub mod taste;
 pub mod thumbs;
 pub mod torrent;

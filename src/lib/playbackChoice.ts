@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { profileStorage } from "@/lib/profileStorage";
 
 /**
  * The viewer's audio language and quality (SPEC.md Phase 9). Remembered across films,
@@ -33,7 +34,8 @@ export const usePlaybackChoice = create<PlaybackChoice>()(
       setQuality: (quality) => set({ quality }),
       setDetails: (details) => set({ details }),
     }),
-    { name: "sinephile.choice" },
+    // Personal: each profile has its own (Phase 14).
+    { name: "sinephile.choice", storage: profileStorage },
   ),
 );
 

@@ -102,6 +102,11 @@ impl Engine {
         self.semantic.is_some()
     }
 
+    /// The vector half itself, for the taste seed (Phase 14): `None` without it.
+    pub fn semantic_mut(&mut self) -> Option<&mut Semantic> {
+        self.semantic.as_mut()
+    }
+
     /// "More like this" (SPEC.md Phase 11): the nearest neighbours of a title's own
     /// catalogue document, embedded the way the artefact embedded it — so a film finds
     /// the films the index already places near it, not ones that share a word of its

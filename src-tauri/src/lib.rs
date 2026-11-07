@@ -116,6 +116,21 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::downloads::qbittorrent_check,
             commands::downloads::downloads_storage,
             commands::downloads::download_clear,
+            commands::profiles::profiles,
+            commands::profiles::create_profile,
+            commands::profiles::update_profile,
+            commands::profiles::delete_profile,
+            commands::profiles::switch_profile,
+            commands::profiles::set_profile_pin,
+            commands::imports::pick_import_file,
+            commands::imports::import_history,
+            commands::taste::taste_input,
+            commands::taste::set_taste_input,
+            commands::taste::taste_preview,
+            commands::taste::taste_round,
+            commands::home::home,
+            commands::home::onboarding_done,
+            commands::home::finish_onboarding,
         ])
         // `AssetProgress` travels as an EVENT payload, so no command signature mentions it
         // and specta would not export it. Registered explicitly rather than hand-written in

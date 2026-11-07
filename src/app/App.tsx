@@ -11,6 +11,11 @@ import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { ReviewScreen } from "@/features/library/ReviewScreen";
 import { DownloadsScreen } from "@/features/downloads/DownloadsScreen";
 import { DownloadNotices } from "@/features/downloads/DownloadNotices";
+import { ProfilePicker } from "@/features/profiles/ProfilePicker";
+import { Onboarding } from "@/features/onboarding/Onboarding";
+import { HomeScreen } from "@/features/home/HomeScreen";
+import { commands as ipc } from "@/lib/ipc";
+import { useProfileSync, useProfiles } from "@/features/profiles/useProfiles";
 import { SearchScreen } from "@/features/search/SearchScreen";
 import { DesignGallery } from "@/features/design/DesignGallery";
 import { CommandPalette, type Command } from "@/design-system";
@@ -58,6 +63,24 @@ export function App() {
   const playing = useUi((s) => s.playing);
   const reviewOpen = useUi((s) => s.reviewOpen);
   const downloadsOpen = useUi((s) => s.downloadsOpen);
+  const pickerOpen = useUi((s) => s.pickerOpen);
+  const setPickerOpen = useUi((s) => s.setPickerOpen);
+  const { profiles, loading: profilesLoading } = useProfiles();
+  useProfileSync();
+  // First run (Phase 14): the wizard, once. `null` until asked.
+  const [onboarding, setOnboarding] = useState<boolean | null>(null);
+  useEffect(() => {
+    // Inside a promise: outside the Tauri shell (the UI audit's browser) the call throws at
+    // once, and that is "no wizard", not a crashed page.
+    void Promise.resolve()
+      .then(() => ipc.onboardingDone())
+      .then((r) => setOnboarding(r.status === "ok" ? !r.data : false))
+      .catch(() => setOnboarding(false));
+  }, []);
+  // ADR-0043: ask who is watching on launch only when there is more than one profile.
+  useEffect(() => {
+    if (pickerOpen === null && !profilesLoading) setPickerOpen(profiles.length >= 2);
+  }, [pickerOpen, profilesLoading, profiles.length, setPickerOpen]);
   const mini = useUi((s) => s.mini);
   const detail = useUi((s) => s.detail);
   useDropToPlay();
@@ -244,6 +267,8 @@ export function App() {
               <DetailScreen />
             ) : searching ? (
               <SearchScreen />
+            ) : destination === "home" ? (
+              <HomeScreen />
             ) : (
               <Placeholder destination={destination} />
             )}
@@ -258,6 +283,8 @@ export function App() {
         </div>
       )}
       <DownloadNotices />
+      {onboarding && !full && <Onboarding onDone={() => setOnboarding(false)} />}
+      {pickerOpen && !onboarding && !full && <ProfilePicker onDone={() => setPickerOpen(false)} />}
       {playing && (
         <div
           className={

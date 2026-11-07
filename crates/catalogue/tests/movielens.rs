@@ -204,3 +204,67 @@ async fn ratings_are_counted_without_being_stored() {
         .expect("columns");
     assert!(columns.contains(&"profile_id".to_string()), "{columns:?}");
 }
+
+#[tokio::test]
+async fn films_filed_under_children_get_a_children_genre_and_no_others_do() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("ml-kids.zip");
+    {
+        let file = std::fs::File::create(&path).expect("create");
+        let mut zip = zip::ZipWriter::new(file);
+        let options: zip::write::FileOptions<()> = zip::write::FileOptions::default();
+        zip.start_file("ml-kids/movies.csv", options)
+            .expect("entry");
+        // A quoted title with commas: the genres are the LAST field, the id the first.
+        zip.write_all(
+            b"movieId,title,genres\n\
+              1,Toy Story (1995),Adventure|Animation|Children|Comedy|Fantasy\n\
+              2,\"Party, Sausage (2016)\",Animation|Comedy\n\
+              3,\"Lion King, The (1994)\",Adventure|Animation|Children|Drama|Musical|IMAX\n\
+              4,Childrens Hour (1961),Drama\n",
+        )
+        .expect("write");
+        zip.finish().expect("finish");
+    }
+    assert_eq!(ml::children(&path).expect("children"), vec![1, 3]);
+
+    let db = Db::in_memory().await.expect("db");
+    let toy = film(&db, "tt0114709", "Toy Story").await;
+    let party = film(&db, "tt1700841", "Sausage Party").await;
+    for (id, ml_id) in [(toy, "1"), (party, "2")] {
+        sqlx::query(
+            "INSERT INTO external_ids (media_item_id, source, external_id) VALUES (?, 'movielens', ?)",
+        )
+        .bind(id)
+        .bind(ml_id)
+        .execute(db.pool())
+        .await
+        .expect("movielens id");
+    }
+    let mut job = Job::begin(&db, "movielens").await.expect("job");
+    // 3 is filed under Children but not in this catalogue: nothing to mark.
+    ml::load_children(&mut job, Arc::new(vec![1, 3]))
+        .await
+        .expect("load_children");
+    job.finish().await.expect("finish");
+
+    let children = |id: i64| {
+        let db = db.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM media_genres mg JOIN genres g ON g.id = mg.genre_id
+                 WHERE mg.media_item_id = ? AND g.name = 'Children'",
+            )
+            .bind(id)
+            .fetch_one(db.pool())
+            .await
+            .expect("count")
+        }
+    };
+    assert_eq!(children(toy).await, 1);
+    assert_eq!(
+        children(party).await,
+        0,
+        "same IMDb genres, not a children's film"
+    );
+}

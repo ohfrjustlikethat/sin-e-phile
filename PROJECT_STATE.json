@@ -4,99 +4,95 @@
   "last_updated": "2026-11-06",
   "sessions_completed": 21,
   "current_phase": {
-    "number": 13,
-    "slug": "download-manager",
-    "title": "Download Manager and the Stream-vs-Download Advisor",
+    "number": 14,
+    "slug": "profiles",
+    "title": "Profiles and First-Run Onboarding",
     "status": "in_progress",
-    "branch": "phase/13-download-manager",
-    "started_at": "2026-11-07T08:00:00Z",
-    "note": "Opened 2026-11-07 when Phase 12 merged (b5dccda, tag phase-12). qBittorrent is not installed on this machine; installing software on the author's PC is outside the repository, so the backend is built and tested against a local stand-in of its Web API and the one real round trip joins the batched author checks (13.6). The taste model (Phase 15) does not exist yet: the advisor takes its input through an interface with a neutral stand-in, recorded rather than faked. Author checks carried here: Phase 7 E7, Phase 8 E5.",
+    "branch": "phase/14-profiles",
+    "started_at": "2026-11-07T12:50:33Z",
+    "note": "E1 and E6 need a person and the author; built and tested as far as code allows, asked for in the batch after Phase 15 (ADR-0040).",
     "subtasks": [
       {
-        "id": "13.1",
-        "text": "The download queue (crates/downloads): items with priority, state (queued, active, paused, done, failed), per-item and global limits, a schedule window (start after a time), surviving restart (migration), a backend trait with librqbit as the default; completion files the item into the library through sinephile_library::scan (E5, E6).",
+        "id": "14.1",
+        "text": "Profiles in the backend: migration 0024 (avatar colour, PIN salt and hash, kids flag and limit, last used); ProfileRepository create/rename/delete (never the last)/set_pin/verify_pin/set_kids/touch, each with a line in repository_surface.rs; an active profile in AppState replacing every ensure_default() call in src-tauri; a crate test that watchlist, positions, ratings, watch events, settings and keys never cross profiles (E5).",
         "status": "complete",
-        "commit": "163095b"
+        "commit": "f671bc2"
       },
       {
-        "id": "13.2",
-        "text": "The qBittorrent backend over its Web API (ADR-0029): configured by the user (address, credentials kept like other secrets), detected, never bundled or required; falls back to librqbit when not running (E3); a transport only, with a guard rule rejecting any read of search plugins, RSS or tracker lists (E4), seen to fail. Tested against a local stand-in Web API; one real-qBittorrent check batched for the author (E2).",
+        "id": "14.2",
+        "text": "Profiles in the app: the picker on launch only with two or more (ADR-0043), the avatar in the masthead with a switcher, create and edit with an optional PIN, the kids profile failing closed (TMDB certification within the limit when the profile has a key, otherwise Family or Animation titles that are not adult nor tagged with an adult genre); switching timed to a re-rendered Home (E5); pad-complete in tools/uiaudit/controller.mjs. The frontend's personal browser storage (playback choice, recent searches) is scoped by profile and reloaded on a switch; machine settings (controller, last destination) stay shared.",
         "status": "complete",
-        "commit": "f5345b5"
+        "commit": "272b54f"
       },
       {
-        "id": "13.3",
-        "text": "Bandwidth limits measured: a local seeder and a timed transfer under each limit, numbers to docs/eval-results.md (E7).",
+        "id": "14.3",
+        "text": "Imports (crates/imports): Letterboxd CSV (watched, ratings, diary, watchlist), Trakt JSON, IMDb ratings CSV, MAL and AniList XML, each matched to the catalogue (an IMDb id where the file gives one, else title and year through the library's identifier), recorded per profile as ratings, completed watches and watchlist, unmatched rows listed in words; a 500+ entry Letterboxd fixture built from catalogue titles, match rate recorded (E2).",
         "status": "complete",
-        "commit": "be543da"
+        "commit": "cace2eb"
       },
       {
-        "id": "13.4",
-        "text": "The advisor (crates/downloads advise.rs): stall probability from swarm throughput against the file's bitrate, free disk and an existing local copy, time-of-day network history, and the taste model's input (a neutral stand-in until Phase 15), giving one recommendation and one readable sentence (E8); trials recorded for E1.",
+        "id": "14.4",
+        "text": "Taste input: the six taste statements (pace, ambiguity, era, subtitles, runtime, formal experimentation) stored per profile; the free-text 'what you love' embedded with the query embedder and stored; a seed taste vector from imports and statements, so E2's 'reflected in the taste model' is measurable now (nearest titles to the vector against the imported favourites) and Phase 15 builds on it.",
         "status": "complete",
-        "commit": "92c070d"
+        "commit": "8174b82"
       },
       {
-        "id": "13.5",
-        "text": "The Downloads page (masthead Downloads button with a live count, ADR-0037): queue, progress, speed, seeds/peers, ETA, the reason each was queued, pause/resume/cancel, priorities, limits; storage budget and a cleanup view. Pad-complete in tools/uiaudit/controller.mjs.",
+        "id": "14.5",
+        "text": "The onboarding wizard: profile, taste (imports, statements, free text, and the adaptive typographic title-card grid as an extra round: 3-4 rounds, picks spread for information gain), sources (paste a URL, the Internet Archive, add a folder inline), each skippable and never a dead end; shown on first run only; E3 and E4 tested with no key and no sources; pad-complete.",
         "status": "complete",
-        "commit": "5d06e81"
+        "commit": "3848f41"
       },
       {
-        "id": "13.6",
-        "text": "Author checks batched in one message: real controller (Phase 8 E5), VPN adapter pulled mid-download (Phase 7 E7), a real qBittorrent round trip (E2), the review screen's feel, D77's release-build console check. Then docs/specs/downloads.md, learning note, README and HOW_IT_WORKS, regression, close.",
+        "id": "14.6",
+        "text": "Author checks batched after Phase 15 (E1 a first-time user timed to a populated Home; E6 sign-off on the onboarding screens) with the earlier ones; docs/specs/profiles.md, learning note, README and HOW_IT_WORKS, regression, close.",
         "status": "complete",
-        "commit": "fca4cf6"
+        "commit": "89e50d6"
       }
     ],
     "exit_criteria": [
       {
         "id": "E1",
-        "text": "The advisor's recommendation is correct (matches what actually happens) in at least 8 of 10 manual trials across varied swarm conditions.",
-        "met": true,
-        "evidence": "92c070d: cargo run --release -p eval -- advise (2026-11-07), ten fresh loopback swarm conditions chosen after the model's last change and run once (bitrates 0.8, 2 and 3 MB/s; one to four capped seeders; 0.6x to 2.5x the bitrate): each measured as the app measures, advised, then played from a fresh engine at its bitrate after a 3-second buffer. 9 of 10 right (target at least 8): the miss was four slow peers at 0.86 MB/s for a 0.8 MB/s film, judged 4% likely to pause, which paused once. The first run on twelve other conditions scored 7/12 and found the engine's speed bug (7e18942); both runs and every change between them are in docs/eval-results.md. Caveat recorded there: a loopback swarm is steadier than the internet."
+        "text": "A first-time user with no technical knowledge reaches a populated Home screen in under two minutes. Test this on an actual person.",
+        "met": false,
+        "evidence": "MEASURED: the whole first run is pad-complete in tools/uiaudit/controller.mjs and ends on a Home that is never empty (crates/taste/tests/home.rs); a first-time person timing it is the author's to arrange.",
+        "carried_to_phase": 16,
+        "carried_reason": "It needs an actual first-time person (SPEC says so); batched with the author checks after Phase 15, so Phase 16 receives it."
       },
       {
         "id": "E2",
-        "text": "A download completed through the qBittorrent backend files into the library identically to one completed through librqbit, verified by comparing the resulting rows.",
-        "met": true,
-        "evidence": "cargo test -p sinephile-downloads --test qbittorrent_real -- --ignored --nocapture (2026-11-07, qBittorrent v5.2.0 installed here; two instances isolated from the user's own by --profile, Web UIs on 127.0.0.1, each verified as the isolated one before use): the same 6,303,801-byte download through the app's Qbittorrent backend and through librqbit filed identically field by field: Done, done/total 6,303,801, file Heat/Heat.1995.1080p.mkv relative to Downloads, library size 6,303,801, match Heat 1.0 confirmed Metadata covers 1, folder registered. Seen to fail first on the real thing: qBittorrent's copy landed at Heat.1995.1080p/... until the backend used the per-title folder (contentLayout=NoSubfolder). docs/eval-results.md 'E2: a real qBittorrent round trip'."
+        "text": "A Letterboxd export of 500+ films imports correctly and is reflected in the taste model.",
+        "met": false,
+        "evidence": "MEASURED: the import half is met: eval import on a fresh set of 600 films (ranks 601-1200), 98.83% right, 0 wrong, a second import adds nothing. The reflection half is not: eval taste on three real MovieLens histories, the seed finds 11.06% of held-out favourites among its 500 nearest against 35.64% for popularity (27x chance, 0.31x popularity). docs/eval-results.md.",
+        "carried_to_phase": 15,
+        "carried_reason": "'Reflected in the taste model' needs the taste model, which is Phase 15's deliverable (taste modes, not one mean); Phase 15 must beat popularity on eval taste."
       },
       {
         "id": "E3",
-        "text": "With qBittorrent configured but not running, a queued download falls back to librqbit rather than failing.",
+        "text": "Skipping the sources step leaves a functional, non-empty app.",
         "met": true,
-        "evidence": "f5345b5: crates/downloads/tests/queue.rs a_configured_qbittorrent_that_is_not_running_falls_back_to_librqbit: the backends are [qBittorrent at an address nothing answers, librqbit]; a download meant for qBittorrent is started on the first tick (not failed), its row says librqbit moved the bytes, and it completes from a loopback seeder. Seen to fail with the fallback removed from Manager::usable. qBittorrent's availability is its app/version answering (crates/downloads/tests/qbittorrent.rs not_running_is_unavailable_and_running_is_available)."
+        "evidence": "3848f41: src/features/onboarding/Onboarding.test.tsx 'skipping every step still finishes, and nothing is a dead end' (Skip, Skip, Back, Skip, 'Skip, and start' reaches the app); crates/taste/tests/home.rs a_new_profile_with_nothing_still_has_a_home (no history, no sources, no vector half: the 'Widely loved' rail from the offline catalogue alone, seen to fail with the kids filter broken); the whole first run by pad in tools/uiaudit/controller.mjs ('the whole first run by pad, and it ends in the app'); docs/evidence/phase-14/onboarding-*.png (the real window on the full catalogue, no TMDB key)."
       },
       {
         "id": "E4",
-        "text": "`tools/guard` rejects any code path that reads qBittorrent's search plugins, RSS feeds or tracker configuration.",
-        "met": true,
-        "evidence": "f5345b5: tools/guard/guard.py rule qbittorrent-content (search and RSS endpoints, the tracker-list endpoints, the setting that adds trackers to every torrent), with four must-fire vectors and two must-not-fire vectors (the transport endpoints the backend does use) in tools/guard/tests/vectors.py; python tools/guard/guard.py --selftest passes all, and was seen to fail: a quoting slip turned the rule's word boundaries into control characters and the self-test reported the two tracker vectors missed until fixed. The backend's own module lists the only endpoints it uses."
+        "text": "Completing onboarding with no TMDB key produces a working, populated, good-looking app (ADR-0013). Every artwork-bearing surface has a designed artwork-free state — a typographic fallback, never a grey rectangle.",
+        "met": false,
+        "evidence": "MEASURED: no TMDB key anywhere in Phase 14; Home's cards are PosterCard's designed typographic state (no 'Uncatalogued', no grey rectangles); the onboarding screens on the full catalogue in docs/evidence/phase-14/; 'good-looking' is the author's judgement.",
+        "carried_to_phase": 16,
+        "carried_reason": "'Good-looking' is the author's sign-off, asked with E6 after Phase 15; Phase 16 receives it."
       },
       {
         "id": "E5",
-        "text": "Downloads survive an app restart and resume.",
+        "text": "Profile switching is instant and leaks no state between profiles.",
         "met": true,
-        "evidence": "163095b: crates/downloads/tests/queue.rs the_queue_survives_a_restart_and_carries_on: a 16 MiB download from a slow loopback seeder stopped mid-way (engine stopped, manager dropped), a new engine on the same folder and a new manager over the same queue: the row is still active, the download is added back from the queue's own row with the pieces on disk kept (progress >= before), and it completes. Seen to fail with re-adding disabled. Engine-level persistence: crates/torrent/tests/swarm.rs a_download_survives_a_restart (Phase 7)."
+        "evidence": "eval switch (2026-11-07/08): a switch (touch, then the new profile's Home rails with the taste seed) takes 2.1-2.5 ms for an empty profile and 10.9-11.5 ms for one with 650 imported films, warm; 112.1 ms the first time after an import, from disk (D82). No state leaks: crates/persistence/tests/profiles.rs nothing_one_profile_does_is_visible_to_another and deleting_a_profile_takes_all_of_its_own_and_nothing_else (seen to fail with a profile filter removed); browser storage per profile in src/lib/profileStorage.test.ts (seen to fail with reset-then-read). docs/eval-results.md 'E5: switching profiles'."
       },
       {
         "id": "E6",
-        "text": "A completed download is automatically matched and appears in the local library with no user action.",
-        "met": true,
-        "evidence": "163095b: crates/downloads/tests/queue.rs a_finished_download_files_itself_into_the_library_already_matched: a download for Heat (1995) completes through the manager, lands in the Downloads folder (registered as a library folder), and has a library row matched to Heat, confirmed, with files_for_item(Heat) offering it; a download with no catalogue item is identified like any library file (identify_file)."
-      },
-      {
-        "id": "E7",
-        "text": "Bandwidth limits are actually respected, verified by measurement.",
-        "met": true,
-        "evidence": "be543da: crates/downloads/tests/limits.rs (cargo test -p sinephile-downloads --test limits -- --nocapture --test-threads=1), a loopback seeder with no limit and a 48 MiB file through the queue: a per-download limit of 1.00 MiB/s measured 1.02 MiB/s (twice); the global limit of 2.00 MiB/s (Engine::set_limits) measured 2.01 and 2.00 MiB/s; with no limit the same swarm ran at 157.2 MiB/s (48 MiB in 0.31 s), so the limit is what held it. Each held to within 15%. Numbers in docs/eval-results.md (Phase 13)."
-      },
-      {
-        "id": "E8",
-        "text": "The recommendation reason is a single readable sentence.",
-        "met": true,
-        "evidence": "92c070d: crates/downloads/src/advise.rs tests: every branch (stream, download, tonight, no room, local copy, nobody sharing, a favourite) is checked by one_sentence (a single full stop at the end, no other sentence break, no line break, at most 160 characters); every sentence in the twenty-two trials read as one, e.g. 'It would pause to buffer if streamed (1.8 MB/s against the 2.0 MB/s it needs), so download it first, about a minute.'"
+        "text": "Every onboarding screen is beautiful — this is the first impression.",
+        "met": false,
+        "evidence": "MEASURED: the three onboarding steps captured in the real window (docs/evidence/phase-14/onboarding-*.png) and by the pad flow (tools/uiaudit/out/controller/00a, 00b).",
+        "carried_to_phase": 16,
+        "carried_reason": "'Beautiful' is the author's sign-off on these screens, batched after Phase 15; Phase 16 receives it."
       }
     ]
   },
@@ -1013,8 +1009,8 @@
           "text": "Binding to a specific network interface works, verified by disabling that adapter mid-download and confirming traffic stops rather than falling back.",
           "met": false,
           "evidence": "MEASURED 2026-11-05, carried (ADR-0036): crates/torrent/tests/binding.rs (a279415) — an unknown adapter stops the engine starting; bound to loopback, local traffic flows and an outside address is unreachable (seen to fail with IP_UNICAST_IF removed). Probe: bound to the VPN adapter a connection succeeds, bound to a disconnected adapter it fails WSAENETUNREACH instead of using Wi-Fi.",
-          "carried_to_phase": 13,
-          "carried_reason": "Needs the author to drop their VPN mid-download with the engine bound to it; built and tested as far as code allows (binding.rs). Re-asked in the batched author checks. Carried again 9 -> 13 on 2026-11-06: the author asked (mid Phase 9) to be involved only after Phases 9-13, so the batched author checks are asked at the end of Phase 13."
+          "carried_to_phase": 16,
+          "carried_reason": "Needs the author to drop their VPN mid-download with the engine bound to it; built and tested as far as code allows (binding.rs). Re-asked in the batched author checks. Carried again 9 -> 13 on 2026-11-06: the author asked (mid Phase 9) to be involved only after Phases 9-13, so the batched author checks are asked at the end of Phase 13. Carried again at Phase 13's close (2026-11-07): it needs the author's hands, and the author asked to be involved after Phases 13-15; the check is in that batch, so Phase 16 receives it."
         },
         {
           "id": "E8",
@@ -1129,8 +1125,8 @@
           "text": "With only an Xbox controller, a user can browse to a film, start it, pause, seek and leave the player — tested with a simulated gamepad in CI and confirmed once by the author with a real controller.",
           "met": false,
           "evidence": "Simulated half met: tools/uiaudit/controller.mjs (npm run audit:controller, CI step 'Controller flow (simulated Xbox pad)') drives the built app in headless Chrome with only pad buttons - Y, D-pad+A on the new on-screen keyboard (src/app/PadKeyboard.tsx), A result, A Play, A pause, RT seek, B leave - 8/8 checks pass 2026-11-06; seen to fail with Play's focus effect removed. Outstanding: the author's one-time check with a real controller (one is paired over Bluetooth on the dev machine).",
-          "carried_to_phase": 13,
-          "carried_reason": "The simulated half is met and runs in CI; the criterion also needs the author's one-time check with a real Xbox controller, which only the author can do. Asked for in the batched author checks. Carried again 9 -> 13 on 2026-11-06: the author asked (mid Phase 9) to be involved only after Phases 9-13, so the batched author checks are asked at the end of Phase 13."
+          "carried_to_phase": 16,
+          "carried_reason": "The simulated half is met and runs in CI; the criterion also needs the author's one-time check with a real Xbox controller, which only the author can do. Asked for in the batched author checks. Carried again 9 -> 13 on 2026-11-06: the author asked (mid Phase 9) to be involved only after Phases 9-13, so the batched author checks are asked at the end of Phase 13. Carried again at Phase 13's close (2026-11-07): it needs the author's hands, and the author asked to be involved after Phases 13-15; the check is in that batch, so Phase 16 receives it."
         },
         {
           "id": "E6",
@@ -1566,8 +1562,8 @@
       "title": "Download Manager and the Stream-vs-Download Advisor",
       "depends_on": "7, 9, 12",
       "sessions": "1–2",
-      "status": "in_progress",
-      "completion_commit": null,
+      "status": "complete",
+      "completion_commit": "1d1184a",
       "exit_criteria": [
         {
           "id": "E1",
@@ -1663,44 +1659,90 @@
       "title": "Profiles and First-Run Onboarding",
       "depends_on": "3, 5",
       "sessions": "2",
-      "status": "not_started",
+      "status": "in_progress",
       "completion_commit": null,
       "exit_criteria": [
         {
           "id": "E1",
           "text": "A first-time user with no technical knowledge reaches a populated Home screen in under two minutes. Test this on an actual person.",
           "met": false,
-          "evidence": null
+          "evidence": "MEASURED: the whole first run is pad-complete in tools/uiaudit/controller.mjs and ends on a Home that is never empty (crates/taste/tests/home.rs); a first-time person timing it is the author's to arrange.",
+          "carried_to_phase": 16,
+          "carried_reason": "It needs an actual first-time person (SPEC says so); batched with the author checks after Phase 15, so Phase 16 receives it."
         },
         {
           "id": "E2",
           "text": "A Letterboxd export of 500+ films imports correctly and is reflected in the taste model.",
           "met": false,
-          "evidence": null
+          "evidence": "MEASURED: the import half is met: eval import on a fresh set of 600 films (ranks 601-1200), 98.83% right, 0 wrong, a second import adds nothing. The reflection half is not: eval taste on three real MovieLens histories, the seed finds 11.06% of held-out favourites among its 500 nearest against 35.64% for popularity (27x chance, 0.31x popularity). docs/eval-results.md.",
+          "carried_to_phase": 15,
+          "carried_reason": "'Reflected in the taste model' needs the taste model, which is Phase 15's deliverable (taste modes, not one mean); Phase 15 must beat popularity on eval taste."
         },
         {
           "id": "E3",
           "text": "Skipping the sources step leaves a functional, non-empty app.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "3848f41: src/features/onboarding/Onboarding.test.tsx 'skipping every step still finishes, and nothing is a dead end' (Skip, Skip, Back, Skip, 'Skip, and start' reaches the app); crates/taste/tests/home.rs a_new_profile_with_nothing_still_has_a_home (no history, no sources, no vector half: the 'Widely loved' rail from the offline catalogue alone, seen to fail with the kids filter broken); the whole first run by pad in tools/uiaudit/controller.mjs ('the whole first run by pad, and it ends in the app'); docs/evidence/phase-14/onboarding-*.png (the real window on the full catalogue, no TMDB key)."
         },
         {
           "id": "E4",
           "text": "Completing onboarding with no TMDB key produces a working, populated, good-looking app (ADR-0013). Every artwork-bearing surface has a designed artwork-free state — a typographic fallback, never a grey rectangle.",
           "met": false,
-          "evidence": null
+          "evidence": "MEASURED: no TMDB key anywhere in Phase 14; Home's cards are PosterCard's designed typographic state (no 'Uncatalogued', no grey rectangles); the onboarding screens on the full catalogue in docs/evidence/phase-14/; 'good-looking' is the author's judgement.",
+          "carried_to_phase": 16,
+          "carried_reason": "'Good-looking' is the author's sign-off, asked with E6 after Phase 15; Phase 16 receives it."
         },
         {
           "id": "E5",
           "text": "Profile switching is instant and leaks no state between profiles.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "eval switch (2026-11-07/08): a switch (touch, then the new profile's Home rails with the taste seed) takes 2.1-2.5 ms for an empty profile and 10.9-11.5 ms for one with 650 imported films, warm; 112.1 ms the first time after an import, from disk (D82). No state leaks: crates/persistence/tests/profiles.rs nothing_one_profile_does_is_visible_to_another and deleting_a_profile_takes_all_of_its_own_and_nothing_else (seen to fail with a profile filter removed); browser storage per profile in src/lib/profileStorage.test.ts (seen to fail with reset-then-read). docs/eval-results.md 'E5: switching profiles'."
         },
         {
           "id": "E6",
           "text": "Every onboarding screen is beautiful — this is the first impression.",
           "met": false,
-          "evidence": null
+          "evidence": "MEASURED: the three onboarding steps captured in the real window (docs/evidence/phase-14/onboarding-*.png) and by the pad flow (tools/uiaudit/out/controller/00a, 00b).",
+          "carried_to_phase": 16,
+          "carried_reason": "'Beautiful' is the author's sign-off on these screens, batched after Phase 15; Phase 16 receives it."
+        }
+      ],
+      "subtasks": [
+        {
+          "id": "14.1",
+          "text": "Profiles in the backend: migration 0024 (avatar colour, PIN salt and hash, kids flag and limit, last used); ProfileRepository create/rename/delete (never the last)/set_pin/verify_pin/set_kids/touch, each with a line in repository_surface.rs; an active profile in AppState replacing every ensure_default() call in src-tauri; a crate test that watchlist, positions, ratings, watch events, settings and keys never cross profiles (E5).",
+          "status": "complete",
+          "commit": "f671bc2"
+        },
+        {
+          "id": "14.2",
+          "text": "Profiles in the app: the picker on launch only with two or more (ADR-0043), the avatar in the masthead with a switcher, create and edit with an optional PIN, the kids profile failing closed (TMDB certification within the limit when the profile has a key, otherwise Family or Animation titles that are not adult nor tagged with an adult genre); switching timed to a re-rendered Home (E5); pad-complete in tools/uiaudit/controller.mjs. The frontend's personal browser storage (playback choice, recent searches) is scoped by profile and reloaded on a switch; machine settings (controller, last destination) stay shared.",
+          "status": "complete",
+          "commit": "272b54f"
+        },
+        {
+          "id": "14.3",
+          "text": "Imports (crates/imports): Letterboxd CSV (watched, ratings, diary, watchlist), Trakt JSON, IMDb ratings CSV, MAL and AniList XML, each matched to the catalogue (an IMDb id where the file gives one, else title and year through the library's identifier), recorded per profile as ratings, completed watches and watchlist, unmatched rows listed in words; a 500+ entry Letterboxd fixture built from catalogue titles, match rate recorded (E2).",
+          "status": "complete",
+          "commit": "cace2eb"
+        },
+        {
+          "id": "14.4",
+          "text": "Taste input: the six taste statements (pace, ambiguity, era, subtitles, runtime, formal experimentation) stored per profile; the free-text 'what you love' embedded with the query embedder and stored; a seed taste vector from imports and statements, so E2's 'reflected in the taste model' is measurable now (nearest titles to the vector against the imported favourites) and Phase 15 builds on it.",
+          "status": "complete",
+          "commit": "8174b82"
+        },
+        {
+          "id": "14.5",
+          "text": "The onboarding wizard: profile, taste (imports, statements, free text, and the adaptive typographic title-card grid as an extra round: 3-4 rounds, picks spread for information gain), sources (paste a URL, the Internet Archive, add a folder inline), each skippable and never a dead end; shown on first run only; E3 and E4 tested with no key and no sources; pad-complete.",
+          "status": "complete",
+          "commit": "3848f41"
+        },
+        {
+          "id": "14.6",
+          "text": "Author checks batched after Phase 15 (E1 a first-time user timed to a populated Home; E6 sign-off on the onboarding screens) with the earlier ones; docs/specs/profiles.md, learning note, README and HOW_IT_WORKS, regression, close.",
+          "status": "complete",
+          "commit": "89e50d6"
         }
       ]
     },
@@ -2316,7 +2358,7 @@
       ]
     }
   ],
-  "next_action": "Phase 13 close (docs/phases/phase-13-download-manager.md, subtask 13.6): every criterion now has evidence (E2 met against a real qBittorrent). Run the full pre-push list, commit, push, wait for CI green on phase/13-download-manager, merge --no-ff into main, CI green on main, tag phase-13, write the phase record (status complete, completion_commit = the merge) and the SESSION_LOG retrospective, then python tools/phasedoc/generate.py --close 13 and --open 14, and author Phase 14 subtasks from SPEC.md §15.",
+  "next_action": "Phase 14 close (docs/phases/phase-14-profiles.md): push, wait for CI green on phase/14-profiles, merge --no-ff into main, CI green on main, tag phase-14, write the phase record (complete, completion_commit = the merge), python tools/phasedoc/generate.py --close 14 and --open 15, and author Phase 15 subtasks from SPEC.md §15 (taste modes that beat popularity on eval taste).",
   "blockers": [],
   "decisions_pending": [
     {
@@ -2992,6 +3034,16 @@
       "id": "D80",
       "text": "Upstream (librqbit 9.0.1): create_torrent writes one piece hash too many when the content is a whole number of pieces (500 bytes of hashes for 24 pieces of 256 KiB); libtorrent refuses such a torrent as invalid (stays fetching metadata, then errors; a .torrent of it is never added). The app never creates torrents, so only test fixtures are affected; crates/downloads/tests/qbittorrent_real.rs uses a size that is not a whole number. Worth reporting upstream (the author's call: an outward-facing issue).",
       "phase_raised": 13
+    },
+    {
+      "id": "D81",
+      "text": "Kids profiles filter by genre (MovieLens 'Children' or IMDb 'Family', not adult, none of Adult/Horror/Thriller/Crime/War/Film-Noir) because the free catalogue has no certifications. The kids_limit column waits for TMDB release-date certifications, which are not fetched yet; until then a profile's limit is not a certification. Home rails (Phases 16-18) must ask MediaRepository::suitable_for_children like search does.",
+      "phase_raised": 14
+    },
+    {
+      "id": "D82",
+      "text": "The first profile switch after launch costs about 112 ms (index and catalogue pages read from disk) against 11 ms warm. Touch the vector index and the votes index in the background after launch so the first switch, and the first Home, are warm.",
+      "phase_raised": 14
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

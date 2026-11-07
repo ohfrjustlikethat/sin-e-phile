@@ -1438,9 +1438,11 @@ dependencies = [
  "sinephile-downloads",
  "sinephile-embedder",
  "sinephile-embedding",
+ "sinephile-imports",
  "sinephile-library",
  "sinephile-persistence",
  "sinephile-search-engine",
+ "sinephile-taste",
  "sinephile-torrent",
  "sinephile-vector-index",
  "sqlx",
@@ -1448,6 +1450,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "zip",
 ]
 
 [[package]]
@@ -5349,6 +5352,7 @@ dependencies = [
  "sinephile-downloads",
  "sinephile-embedder",
  "sinephile-embedding",
+ "sinephile-imports",
  "sinephile-library",
  "sinephile-metadata-api",
  "sinephile-persistence",
@@ -5358,6 +5362,7 @@ dependencies = [
  "sinephile-selection",
  "sinephile-sources",
  "sinephile-subtitles",
+ "sinephile-taste",
  "sinephile-tiers",
  "sinephile-torrent",
  "sinephile-vector-index",
@@ -5448,6 +5453,22 @@ dependencies = [
  "sha2",
  "tempfile",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "sinephile-imports"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "quick-xml",
+ "serde",
+ "serde_json",
+ "sinephile-persistence",
+ "sqlx",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "zip",
 ]
 
 [[package]]
@@ -5590,6 +5611,19 @@ dependencies = [
  "subtitle-align",
  "tempfile",
  "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
+name = "sinephile-taste"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sinephile-embedding",
+ "sinephile-persistence",
+ "sinephile-search-engine",
+ "sqlx",
  "tokio",
 ]
 

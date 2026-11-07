@@ -2623,3 +2623,108 @@ meaning **0.0472**, filter **1.0000** (carried); p95 **43.8 ms** cold, **15.8 ms
 false accepts **0/10**; identify **99.05% / 0.39%** (held out 100% / 0%), 44.7 ms per name. Unchanged
 from Phase 12. Rust tests 739 passed, 0 failed, 6 ignored (E2's real round trip among them, run on
 demand); frontend 136. `npm run audit:ui`: rail p95 16.8 ms, 0 dropped, 45 focus stops all ringed.
+
+## Phase 14 — Profiles and onboarding
+
+### E2: a Letterboxd export of 600 films, first run
+
+2026-11-07, `cargo run --release -p eval -- import` (the export made at run time from the local
+`ml-25m.zip`: the 600 most-rated films, titles as MovieLens writes them turned into Letterboxd's form,
+each film's IMDb id as ground truth; never committed, as MovieLens and IMDb data may not be
+redistributed). 550 watched, 50 on the watchlist:
+
+| | Films | Share |
+|---|---|---|
+| right | 592 | **98.67%** (target at least 95%) |
+| wrong | 1 | **0.17%** (target under 1%) |
+| asked | 7 | 1.17% |
+
+Recorded 347 ratings, 543 dated watches, 50 watchlist entries in 0.2 s; imported again, 0 new watches.
+The wrong one: "300" (2007 in MovieLens) placed on an obscure 2007 "300" (15 votes) rather than the 2006
+film (924,388 votes). The asked: five punctuation differences ("&"/"and", a trailing "?", "X-Files"/"X
+Files", a possessive prefix) and two harness bugs (titles with two parentheticals not fully stripped).
+The matcher is being changed in the light of this set, so a fresh set judges it next.
+
+### E2: a fresh set after the changes, met
+
+Changes made after the first run: a title a year either side with 100 times the votes beats an obscure
+exact-year one (`choose`); when the exact name finds nothing, names are compared normalised ("&"/"and",
+punctuation, a leading "the") a year either side (`normalised`, `MediaRepository::titles_released_between`);
+the harness strips every parenthetical. Then the next 600 films by ratings (ranks 601-1200, disjoint),
+chosen before running and run once: `cargo run --release -p eval -- import --from 600`, 2026-11-07.
+
+| | Fresh set (601-1200) | Tuned set (1-600), for comparison |
+|---|---|---|
+| right | **592 = 98.83%** | 598 = 99.67% |
+| wrong | **0 = 0.00%** | 0 = 0.00% |
+| asked | 7 = 1.17% | 2 = 0.33% |
+| import time | 7.5 s | 2.5 s |
+
+E2 met on the fresh set: at least 500 films, at least 95% right, under 1% wrong, and imported again
+adds nothing. Of the seven asked, two are genuinely ambiguous (two "Daredevil" of 2003, two "Emma" of
+1996, close in votes), four are names written very differently ("Men in Black III" / "Men in Black 3"),
+and one is the harness cutting "Birdman: Or (The Unexpected Virtue of Ignorance)" short. The fallback's
+cost is the time: each miss scans three years of names (about a second for the worst).
+
+### E2: is an imported history reflected? First measurement (not met; carried to Phase 15)
+
+2026-11-07, `cargo run --release -p eval -- taste`: the first three MovieLens users with 600-900 ratings
+(users 3, 12, 72), each one's real history written as a Letterboxd export (their half stars, their dates),
+imported through `sinephile_imports` into a temporary profile (deleted after), then five-fold
+cross-validation over their four- and five-star favourites: the seed (`sinephile_taste::seed`, the
+weighted mean of the liked titles' vectors) is built from four fifths, and the held-out fifth is looked
+for among the 500 titles nearest it. Bar fixed before running: beat popularity, and 20 times chance.
+
+| User | Rated / matched | Favourites held out | Seed | Popularity |
+|---|---|---|---|---|
+| 3 | 656 / 649 | 494 | 15.8% | 57.1% |
+| 12 | 736 / 725 | 404 | 7.4% | 24.3% |
+| 72 | 813 / 808 | 404 | 8.9% | 20.8% |
+| **all** | | 1,302 | **11.06%** | **35.64%** |
+
+Chance is 0.417% (500 of 119,874 indexed). **Reflected, but not well enough**: 27 times chance, and 0.31
+times popularity. One mean over about 400 liked titles is a centroid of everything they like, which is
+what SPEC.md Phase 15 warns against ("not one average vector"); MovieLens favourites are also mostly
+popular films, which flatters the popularity baseline. The import half of E2 is met (above); this half is
+carried to Phase 15, whose taste modes must beat popularity on this harness.
+
+### The films most people know: an index, measured
+
+2026-11-07, found in the real window: onboarding's first round of title cards took several seconds to
+appear (the log showed each decade's query over a second). On the full catalogue (Python `sqlite3`
+against `data/sinephile.db`, the queries exactly as `MediaRepository` runs them):
+
+| Query | Before | After 0025 |
+|---|---|---|
+| most-voted films (Home's "Widely loved") | 2.13 s | **0.001 s** |
+| a round of eleven decades (title cards) | 2.27 s | **0.067 s** |
+
+Migration 0025: a partial index on votes. The decade query walks it in vote order with year and kind
+kept out of the index choice (`+`), the same answers in every decade (checked). A second index on
+(year, votes) was tried and not used by the planner, so it is not in the migration.
+
+### E5: switching profiles, timed
+
+2026-11-07, `cargo run --release -p eval -- switch`: a switch is one write (`touch`) and the new
+profile's Home (`sinephile_taste::home::rails`, the taste seed included), on the full catalogue with the
+vector half; a profile with nothing, and one with MovieLens user 3's real history imported (650 films,
+498 liked). Five switches each, three runs:
+
+| Profile | Run 1 (cold, straight after the import) | Runs 2 and 3 |
+|---|---|---|
+| nothing yet | 3.8 ms | 2.1 / 2.5 ms |
+| 650 films imported | **112.1 ms** | **11.5 / 10.9 ms** |
+
+Where the warm 11 ms goes: `liked()` 0.6 ms, the seed of 498 vectors 0.3 ms, the nearest search 0.8 ms,
+the other rails 2.7 ms. The cold 112 ms is the index and catalogue pages being read from disk the first
+time; it is the case a switch right after launch will see. Isolation: `crates/persistence/tests/profiles.rs`
+(seen to fail with a profile filter removed). The page's own cost (rehydrating two stores and refetching)
+is not in these numbers.
+
+### Regression check before merging Phase 14 (rule 13)
+
+2026-11-08, `cargo run --release -p eval -- all` twice and `-- vector --report`: E2 **43/43**; E3 meaning
+**0.0472**, filter **1.0000** (carried); p95 **27.3 ms** cold, **16.4 ms** warm (15.8 at Phase 13: noise);
+recall@10 **0.9760**; subtitles **80/80**, held out 32/32, false accepts **0/10**; identify **99.05% /
+0.39%** (held out 100% / 0%). Unchanged from Phase 13. Phase 14's own, rerun after migration 0025: import
+(fresh set) 98.83% / 0 wrong; taste seed 11.06% against popularity 35.64% (carried); switch 2.1 / 11.5 ms.

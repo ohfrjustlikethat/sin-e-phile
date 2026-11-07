@@ -95,12 +95,35 @@ const FAKE = `(() => {
     downloads_storage: () => ({ used_bytes: 0, free_bytes: 200 * 1024 ** 3, budget_bytes: null, items: [] }),
     downloads_settings: () => ({ max_active: 3, budget_gib: null, qbittorrent_address: null,
       qbittorrent_user: null, qbittorrent_has_password: false }),
+    // Phase 14: first run (the wizard), then Home's rails.
+    onboarding_done: () => window.__onboarded,
+    finish_onboarding: () => { window.__onboarded = true; return null; },
+    update_profile: () => null,
+    rate_title: () => null,
+    taste_round: () => Array.from({ length: 12 }, (_, i) => ({ id: 100 + i, title: "Film " + (i + 1),
+      year: 1930 + i * 8, made_by: "A Director" })),
+    taste_input: () => ({ statements: { pace: null, ambiguity: null, era: null, subtitles: null, runtime: null, form: null }, love: null }),
+    taste_preview: () => [],
+    home: () => [{ key: "loved", title: "Widely loved", items: [{ id: 7, title: "Sunrise", year: 1927,
+      made_by: "F. W. Murnau", runtime_minutes: 94 }] }],
+    // Phase 14: two profiles, so Who's watching? opens on launch; Jon's has a PIN.
+    profiles: () => window.__profiles,
+    switch_profile: (a) => {
+      if (a.id === 1 && a.pin !== "2468") throw "that PIN is not right";
+      window.__profiles.forEach((p) => { p.active = p.id === a.id; });
+      return window.__profiles.find((p) => p.id === a.id);
+    },
     subtitle_settings: () => ({ settings: { languages: ["en"], always: false, font: "Segoe UI", size: 46,
       position: 95, background: false }, has_key: false, used_today: 0, budget: 5, server_remaining: null }),
   };
   let nextId = 1;
   window.__calls = [];
   window.__downloads = [];
+  window.__onboarded = false;
+  window.__profiles = [
+    { id: 1, name: "Jon", is_default: true, avatar_colour: "slate", is_kids: false, has_pin: true, active: true },
+    { id: 2, name: "Mina", is_default: false, avatar_colour: "ochre", is_kids: false, has_pin: false, active: false },
+  ];
   const monster = (id, kind, runtime) => ({ media_item_id: id, kind, title: "Monster", year: 2004,
     runtime_minutes: runtime, made_by: null, synopsis: null });
   window.__review = Array.from({ length: 20 }, (_, i) => ({ file_id: i + 1,
@@ -325,8 +348,68 @@ const steerTo = async (label) => {
   throw new Error(`the D-pad could not reach ${label}`);
 };
 
+/** Steer the D-pad to the button labelled `label` (its aria-label or text). */
+const steerToButton = async (label) => {
+  for (let i = 0; i < 24; i++) {
+    const a = await active();
+    if (a?.text === label) return;
+    const goal = await evalJs(`(() => { const b = [...document.querySelectorAll('button')].find((x) =>
+      (x.getAttribute("aria-label") || x.textContent || "").trim() === ${JSON.stringify(label)}); if (!b) return null;
+      const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    if (!goal || !a) throw new Error(`no button ${label}`);
+    const dx = goal.x - a.x;
+    const dy = goal.y - a.y;
+    if (Math.abs(dy) > 8) await press(dy > 0 ? B.DOWN : B.UP);
+    else await press(dx > 0 ? B.RIGHT : B.LEFT);
+  }
+  throw new Error(`the D-pad could not reach ${label}`);
+};
+
 // ── the flow ────────────────────────────────────────────────────────────────
 try {
+  // Phase 14: first run is the wizard, by pad: a name field first, Continue, a title card
+  // picked with A, Continue, then Start watching.
+  await waitFor(() => evalJs(`document.body.textContent.includes("Who's this for?")`), "the first-run wizard", 40);
+  check(await evalJs(`document.activeElement?.tagName === "INPUT"`), "first run opens on the wizard, focus on the name field");
+  await shoot("00a-onboarding");
+  await steerToButton("Continue");
+  await press(B.A);
+  await waitFor(() => evalJs(`document.body.textContent.includes("What do you like?")`), "step 2", 25);
+  await waitFor(() => evalJs(`document.body.textContent.includes("Film 1")`), "the title cards", 25);
+  await steerToButton("Film 1A Director · 1930");
+  await press(B.A);
+  check((await calls("rate_title")).some((a) => a.id === 100 && a.stars === 4), "A on a title card picks it (liked, four stars)");
+  await shoot("00b-title-cards");
+  await steerToButton("Continue");
+  await press(B.A);
+  await waitFor(() => evalJs(`document.body.textContent.includes("Where to watch")`), "step 3", 25);
+  await steerToButton("Start watching");
+  await press(B.A);
+  await waitFor(async () => (await calls("finish_onboarding")).length === 1, "the wizard to finish", 25);
+  check(true, "the whole first run by pad, and it ends in the app");
+
+  // Phase 14: two profiles, so launch asks who is watching (ADR-0043), focus on the first.
+  await waitFor(() => evalJs(`document.body.textContent.includes("Who's watching?")`), "the profile picker", 40);
+  await waitFor(async () => (await active())?.text === "Jon, PIN", "focus on the first profile", 25);
+  check(true, "with two profiles, launch asks who is watching, and focus is on the first");
+  await shoot("00-profiles");
+  await press(B.A);
+  await waitFor(() => evalJs(`document.body.textContent.includes("Jon's PIN")`), "the PIN pad", 25);
+  check((await active())?.text === "1", "a profile with a PIN opens the pad, focus on 1");
+  for (const d of ["1", "1", "1", "1"]) {
+    await steerToButton(d);
+    await press(B.A);
+  }
+  await waitFor(() => evalJs(`document.body.textContent.includes("that PIN is not right")`), "the wrong PIN", 25);
+  check(true, "a wrong PIN says so and changes nothing");
+  for (const d of ["2", "4", "6", "8"]) {
+    await steerToButton(d);
+    await press(B.A);
+  }
+  await waitFor(() => evalJs(`!document.body.textContent.includes("Who's watching?")`), "the picker to close", 25);
+  const switched = await calls("switch_profile");
+  check(switched.length === 2 && switched[1].pin === "2468", "the right PIN, typed with the D-pad and A, opens the profile");
+  check(await evalJs(`!!document.querySelector('[aria-label="Jon: switch profile"]')`), "the masthead shows who is watching");
   await shoot("01-home");
 
   await press(B.Y);

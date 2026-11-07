@@ -23,7 +23,7 @@ use crate::error::EvalError;
 /// Silence would be the bug here — a missing model would quietly turn every future E1
 /// number into a keyword-only measurement wearing a hybrid label — so the caller prints
 /// which one it got.
-fn engine(data_dir: &Path) -> Result<(Engine, bool), EvalError> {
+pub(crate) fn engine(data_dir: &Path) -> Result<(Engine, bool), EvalError> {
     let models = Path::new("models");
     let model = models.join("bge-small-en-v1.5-int8.onnx");
     let tokenizer = models.join("bge-small-en-v1.5-tokenizer.json");

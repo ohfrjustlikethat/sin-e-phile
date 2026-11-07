@@ -162,6 +162,12 @@ export function nearest(from: Box, candidates: Box[], direction: Direction): num
   const gapY = (c: Box) => Math.max(0, c.y - (from.y + from.height), from.y - (c.y + c.height));
   let best = -1;
   let bestScore = Infinity;
+  // The beam: a target that overlaps the focused one across the direction of travel (on
+  // its row, moving left or right; in its column, moving up or down) always beats one that
+  // does not, however close. Without it, Right from Back went to the button above-right
+  // instead of along the row to Continue (found by the Phase 14 pad flow).
+  let beam = -1;
+  let beamScore = Infinity;
   candidates.forEach((c, i) => {
     // Centre distance only breaks ties between boxes that overlap equally.
     const tie = 0.01 * Math.hypot(c.x + c.width / 2 - cx, c.y + c.height / 2 - cy);
@@ -194,8 +200,35 @@ export function nearest(from: Box, candidates: Box[], direction: Direction): num
       bestScore = score;
       best = i;
     }
+    if (across === 0 && score < beamScore) {
+      beamScore = score;
+      beam = i;
+    }
   });
-  return best;
+  return beam >= 0 ? beam : best;
+}
+
+/**
+ * [`nearest`], staying in the focused element's own region (the page, the masthead, a
+ * dialog) while anything lies that way in it. Without this, the visible masthead beat a
+ * button just off screen above, so on a long page up oscillated between the masthead
+ * and the page and never climbed it (found by the Phase 14 pad flow).
+ */
+export function nearestInRegion(
+  from: Box,
+  candidates: Box[],
+  sameRegion: boolean[],
+  direction: Direction,
+): number {
+  const inside = candidates.map((c, i) => (sameRegion[i] ? c : null));
+  const indices = inside.flatMap((c, i) => (c ? [i] : []));
+  const local = nearest(
+    from,
+    indices.map((i) => candidates[i] as Box),
+    direction,
+  );
+  if (local >= 0) return indices[local] as number;
+  return nearest(from, candidates, direction);
 }
 
 /** How long a direction is held before it repeats, and how fast it then repeats. */
@@ -217,6 +250,11 @@ function visibleFocusables(): HTMLElement[] {
   });
 }
 
+/** The part of the screen an element belongs to: a dialog, the masthead, the page. */
+function region(el: Element): Element | null {
+  return el.closest('[role="dialog"], [aria-label="On-screen keyboard"], header, main');
+}
+
 function box(el: Element): Box {
   const r = el.getBoundingClientRect();
   return { x: r.x, y: r.y, width: r.width, height: r.height };
@@ -231,7 +269,13 @@ export function moveFocus(direction: Direction): boolean {
     return !!all[0];
   }
   const others = all.filter((el) => el !== current);
-  const i = nearest(box(current), others.map(box), direction);
+  const mine = region(current);
+  const i = nearestInRegion(
+    box(current),
+    others.map(box),
+    others.map((el) => region(el) === mine),
+    direction,
+  );
   const target = others[i];
   if (!target) return false;
   target.focus({ preventScroll: true });

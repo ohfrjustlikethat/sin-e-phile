@@ -2103,3 +2103,55 @@ qBittorrent before reading the torrent's bytes. A command of mine was refused fo
 
 **Carry forward.** Author checks, batched after Phase 15: a real controller (Phase 8 E5), a VPN cut
 mid-download (Phase 7 E7), the review screen's feel, the release-build console check (D77). D78–D80.
+
+### Session 22, continued (2026-11-07 → 08) — Phase 14: profiles and first-run onboarding
+
+**Built.** Profiles proper (migration 0024; create, edit, delete never the last, default handed on, PINs
+wrapped like keys; an active profile in `AppState` replacing every `ensure_default`); the picker on launch
+with two or more, the masthead avatar, Settings → Profiles; personal browser storage per profile. Kids
+profiles that fail closed, on MovieLens "Children" (now ingested as a genre) or IMDb "Family".
+`crates/imports` (Letterboxd, Trakt, IMDb, MyAnimeList/AniList; matched by id, exact name and year, then
+the name normalised; asked, never guessed; idempotent). `crates/taste` (statements, the seed vector, Home's
+rails, onboarding's rounds). The first-run wizard (three steps, each skippable), the title-card grid, and
+Home's first version (never empty). Migration 0025 (votes index). Harnesses `eval import`, `eval taste`,
+`eval switch`, all building their data at run time from the local MovieLens files.
+
+**Numbers.** Import, fresh 600: 98.83% right, 0 wrong. Taste seed 11.06% against popularity 35.64% (27x
+chance): carried. Switch 11 ms warm, 112 ms cold. Title-card round 2.27 s → 0.067 s; Home's loved rail
+2.13 s → 0.001 s. Kids rule on the real catalogue: Toy Story, Up, Coco, The Lion King in; Sausage Party,
+Akira, Fritz the Cat out; 65,903 films for a kids profile. Rust tests 739 → 761; frontend 136 → 157.
+
+**Regression (rule 13).** E2 43/43, E3 0.0472 / 1.0000 (carried), warm p95 16.4 ms, recall@10 0.9760,
+subtitles 80/80 and 0/10, identify 99.05% / 0.39%: unchanged from Phase 13.
+
+**Bugs, and what each teaches.**
+- Up on a long page bounced between the masthead and the page: navigation chose the visible masthead
+  over a button just off screen. Now regions first. *The nearest thing on screen is not the next thing.*
+- Right from Back went to a button above-right instead of along the row: no beam. *A row is a promise.*
+- Switching stores reset first and wrote blanks over the profile's saved values, because persistence
+  writes on every set. *Read before you reset when the reset is itself a write.*
+- "300" (2007 in one source, 2006 in the other) went to an obscure 2007 "300". *An exact year is weaker
+  evidence than sixty thousand times the votes.*
+- The title cards were right in every test and took seconds on the real catalogue. *Run it for real.*
+- A `git checkout` used to undo a mutation also undid an hour's uncommitted functions. Recovered from the
+  session's own text; mutations are now undone line by line. *Never restore a file you have not committed.*
+- The UI audit's browser crashed on an IPC call made outside a query. *Every call into the shell can throw.*
+
+**Decisions.** Kids profiles fail closed on Children/Family (D81: certifications later). A pick is four
+stars. Same-name-same-year: ten times the votes or ask. Home's first version built here because Phase 14's
+criteria need a populated Home. Harness data built at run time, never committed. E1, E4, E6 carried to 16;
+E2 to 15. D81, D82.
+
+**Spec amendments.** None.
+
+#### Phase 14 retrospective
+
+**Went well.** Every harness was judged on data chosen before the run, and the real window found the one
+problem no test could.
+
+**Went badly.** I lost work to a careless restore, and wrote a tautological assertion that I caught only
+on rereading. The taste half of E2 is not met.
+
+**Carry forward.** The author batch after Phase 15: a real controller, a VPN cut, the review screen's feel,
+D77, a first-time person through onboarding (E1), and sign-off on the onboarding screens and Home (E4, E6).
+Phase 15 must beat popularity on `eval taste`.

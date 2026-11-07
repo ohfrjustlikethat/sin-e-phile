@@ -7,9 +7,7 @@ use std::sync::{Arc, Mutex};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use sinephile_persistence::repositories::{
-    CredentialRepository, ProfileRepository, SubtitleRepository,
-};
+use sinephile_persistence::repositories::{CredentialRepository, SubtitleRepository};
 use sinephile_player::SubtitleStyle;
 use sinephile_subtitles::opensubtitles::{OpenSubtitles, FREE_DAILY};
 use sinephile_subtitles::plan::{self, Alignment, Ffmpeg, Film, Show, Track, Wants};
@@ -90,10 +88,7 @@ fn today() -> String {
 
 pub(crate) async fn settings(state: &AppState) -> Result<SubtitleSettings, String> {
     let db = state.db().ok_or("the library is still opening")?;
-    let profile = ProfileRepository::new(&db)
-        .ensure_default()
-        .await
-        .map_err(err)?;
+    let profile = state.profile().await?;
     let raw = CredentialRepository::new(&db)
         .get(profile, SETTINGS_KEY)
         .await
@@ -107,10 +102,7 @@ pub(crate) async fn settings(state: &AppState) -> Result<SubtitleSettings, Strin
 #[specta::specta]
 pub async fn subtitle_settings(state: State<'_, AppState>) -> Result<SubtitleSettingsView, String> {
     let db = state.db().ok_or("the library is still opening")?;
-    let profile = ProfileRepository::new(&db)
-        .ensure_default()
-        .await
-        .map_err(err)?;
+    let profile = state.profile().await?;
     let has_key = CredentialRepository::new(&db)
         .opensubtitles_key(profile)
         .await
@@ -136,10 +128,7 @@ pub async fn set_subtitle_settings(
     settings: SubtitleSettings,
 ) -> Result<(), String> {
     let db = state.db().ok_or("the library is still opening")?;
-    let profile = ProfileRepository::new(&db)
-        .ensure_default()
-        .await
-        .map_err(err)?;
+    let profile = state.profile().await?;
     let json = serde_json::to_string(&settings).map_err(err)?;
     CredentialRepository::new(&db)
         .set(profile, SETTINGS_KEY, &json)
@@ -158,10 +147,7 @@ pub async fn set_subtitle_settings(
 #[specta::specta]
 pub async fn set_opensubtitles_key(state: State<'_, AppState>, key: String) -> Result<(), String> {
     let db = state.db().ok_or("the library is still opening")?;
-    let profile = ProfileRepository::new(&db)
-        .ensure_default()
-        .await
-        .map_err(err)?;
+    let profile = state.profile().await?;
     CredentialRepository::new(&db)
         .set_opensubtitles_key(profile, &key)
         .await
@@ -172,10 +158,7 @@ pub async fn set_opensubtitles_key(state: State<'_, AppState>, key: String) -> R
 #[specta::specta]
 pub async fn clear_opensubtitles_key(state: State<'_, AppState>) -> Result<bool, String> {
     let db = state.db().ok_or("the library is still opening")?;
-    let profile = ProfileRepository::new(&db)
-        .ensure_default()
-        .await
-        .map_err(err)?;
+    let profile = state.profile().await?;
     CredentialRepository::new(&db)
         .clear_opensubtitles_key(profile)
         .await
@@ -220,10 +203,7 @@ pub(crate) async fn open_for(
     let db = state.db().ok_or("the library is still opening")?;
     let wanted = settings(state).await?;
     rt.player.set_subtitle_style(&wanted.style()).map_err(err)?;
-    let profile = ProfileRepository::new(&db)
-        .ensure_default()
-        .await
-        .map_err(err)?;
+    let profile = state.profile().await?;
     let key = CredentialRepository::new(&db)
         .opensubtitles_key(profile)
         .await

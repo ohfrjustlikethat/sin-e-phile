@@ -264,6 +264,43 @@ export const commands = {
 	downloadsStorage: () => typedError<StorageView, string>(__TAURI_INVOKE("downloads_storage")),
 	/**  Delete a finished download from disk and from the library. */
 	downloadClear: (id: number) => typedError<null, string>(__TAURI_INVOKE("download_clear", { id })),
+	/**  Every profile, the most recently used first. */
+	profiles: () => typedError<ProfileView[], string>(__TAURI_INVOKE("profiles")),
+	createProfile: (name: string, avatarColour: string | null, isKids: boolean, pin: string | null) => typedError<ProfileView, string>(__TAURI_INVOKE("create_profile", { name, avatarColour, isKids, pin })),
+	/**
+	 *  Name, avatar and kids setting. Only the profile watching may change itself, or any
+	 *  profile when the one watching is not a kids profile.
+	 */
+	updateProfile: (id: number, name: string, avatarColour: string | null, isKids: boolean) => typedError<null, string>(__TAURI_INVOKE("update_profile", { id, name, avatarColour, isKids })),
+	/**
+	 *  Delete a profile and its history, ratings, watchlist and settings. Never the last;
+	 *  never from a kids profile. Deleting the one watching switches to the default.
+	 */
+	deleteProfile: (id: number) => typedError<boolean, string>(__TAURI_INVOKE("delete_profile", { id })),
+	/**  Switch who is watching. A PIN is checked first; a wrong one changes nothing. */
+	switchProfile: (id: number, pin: string | null) => typedError<ProfileView, string>(__TAURI_INVOKE("switch_profile", { id, pin })),
+	/**  Set or clear the watching profile's own PIN (`None` clears it). */
+	setProfilePin: (pin: string | null) => typedError<null, string>(__TAURI_INVOKE("set_profile_pin", { pin })),
+	/**  Windows' file picker for an export. `None` when cancelled. */
+	pickImportFile: () => typedError<string | null, string>(__TAURI_INVOKE("pick_import_file")),
+	/**  Read an export and record it for the profile watching. */
+	importHistory: (path: string) => typedError<ImportView, string>(__TAURI_INVOKE("import_history", { path })),
+	tasteInput: () => typedError<TasteInputView, string>(__TAURI_INVOKE("taste_input")),
+	setTasteInput: (statements: StatementsView, love: string | null) => typedError<null, string>(__TAURI_INVOKE("set_taste_input", { statements, love })),
+	/**
+	 *  The titles nearest the profile's taste so far (what it liked, and what it said it
+	 *  loves), leaving out what it has seen. Empty without the vector half.
+	 */
+	tastePreview: (limit: number | null) => typedError<TastePick[], string>(__TAURI_INVOKE("taste_preview", { limit })),
+	/**
+	 *  One round of onboarding's title cards: `size` films not in `shown`, spread across the
+	 *  decades and, once something is liked, half near the taste so far.
+	 */
+	tasteRound: (shown: number[], size: number | null) => typedError<TastePick[], string>(__TAURI_INVOKE("taste_round", { shown, size })),
+	home: () => typedError<RailView[], string>(__TAURI_INVOKE("home")),
+	/**  Whether the first-run wizard has been finished or skipped. */
+	onboardingDone: () => typedError<boolean, string>(__TAURI_INVOKE("onboarding_done")),
+	finishOnboarding: () => typedError<null, string>(__TAURI_INVOKE("finish_onboarding")),
 };
 
 /* Types */
@@ -487,6 +524,27 @@ export type HardwareProfile = {
 	overridden: boolean,
 };
 
+export type HomeCard = {
+	id: number,
+	title: string,
+	year: number | null,
+	made_by: string | null,
+	runtime_minutes: number | null,
+};
+
+export type ImportView = {
+	/**  "Letterboxd" | "Trakt" | "IMDb" | "MyAnimeList" */
+	from: string,
+	entries: number,
+	matched: number,
+	ratings: number,
+	watches: number,
+	watchlist: number,
+	/**  What could not be placed, in words (the first hundred). */
+	unmatched: UnmatchedView[],
+	unmatched_total: number,
+};
+
 export type ItemDetail = {
 	id: number,
 	title: string,
@@ -608,6 +666,23 @@ export type PlayerStateView = {
 	/**  Frames the video output has dropped (the stats overlay; Phase 11 E2). */
 	dropped_frames: number | null,
 	tracks: TrackView[],
+};
+
+export type ProfileView = {
+	id: number,
+	name: string,
+	is_default: boolean,
+	avatar_colour: string | null,
+	is_kids: boolean,
+	has_pin: boolean,
+	/**  The one watching now. */
+	active: boolean,
+};
+
+export type RailView = {
+	key: string,
+	title: string,
+	items: HomeCard[],
 };
 
 export type RatingView = {
@@ -749,6 +824,16 @@ export type StatView = {
 	value: string,
 };
 
+/**  Each -1, 0 or 1; `None` when not answered (see `sinephile_taste::Statements`). */
+export type StatementsView = {
+	pace: number | null,
+	ambiguity: number | null,
+	era: number | null,
+	subtitles: number | null,
+	runtime: number | null,
+	form: number | null,
+};
+
 export type StorageView = {
 	used_bytes: number | null,
 	free_bytes: number | null,
@@ -785,6 +870,18 @@ export type SubtitleSettingsView = {
 	budget: number,
 	/**  What OpenSubtitles last said is left today, if it said. */
 	server_remaining: number | null,
+};
+
+export type TasteInputView = {
+	statements: StatementsView,
+	love: string | null,
+};
+
+export type TastePick = {
+	id: number,
+	title: string,
+	year: number | null,
+	made_by: string | null,
 };
 
 /**  A score term exactly as `sinephile_selection::Term` holds it. */
@@ -857,6 +954,12 @@ export type TrackView = {
 	lang: string | null,
 	title: string | null,
 	selected: boolean,
+};
+
+export type UnmatchedView = {
+	title: string,
+	year: number | null,
+	why: string,
 };
 
 /**

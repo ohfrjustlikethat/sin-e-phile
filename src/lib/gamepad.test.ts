@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  BUTTON, heldDirections, navAction, nearest, newlyPressed, playerIntent, shouldRepeat,
+  BUTTON, heldDirections, navAction, nearest, nearestInRegion, newlyPressed, playerIntent, shouldRepeat,
   startGamepad, tiltFor, TILT_MAX, type Box, type PadFrame,
 } from "./gamepad";
 
@@ -156,3 +156,36 @@ describe("nearest, wide targets (Phase 9)", () => {
   });
 });
 
+
+describe("nearestInRegion (Phase 14)", () => {
+  it("climbs the page to a button off screen above before it leaves for the masthead", () => {
+    // A field near the top of the view; the masthead just above it; the page's previous
+    // button scrolled 1,300 px up. Plain nearest takes the masthead.
+    const field = { x: 64, y: 249, width: 640, height: 40 };
+    const masthead = { x: 680, y: 49, width: 40, height: 20 };
+    const offScreen = { x: 64, y: -1293, width: 120, height: 32 };
+    expect(nearest(field, [masthead, offScreen], "up")).toBe(0);
+    expect(nearestInRegion(field, [masthead, offScreen], [false, true], "up")).toBe(1);
+  });
+
+  it("leaves the region when nothing more lies that way in it", () => {
+    const top = { x: 64, y: 120, width: 640, height: 40 };
+    const masthead = { x: 680, y: 49, width: 40, height: 20 };
+    const below = { x: 64, y: 300, width: 640, height: 40 };
+    expect(nearestInRegion(top, [masthead, below], [false, true], "up")).toBe(0);
+    expect(nearestInRegion(top, [masthead, below], [false, true], "down")).toBe(1);
+  });
+});
+
+describe("nearest, the beam (Phase 14)", () => {
+  it("moves along the row to a far target rather than to a nearer one off it", () => {
+    // Back, Skip and Continue on one row; a wide button above-right of Back, closer.
+    const back = { x: 449, y: 932, width: 104, height: 48 };
+    const more = { x: 449, y: 790, width: 328, height: 50 };
+    const skip = { x: 1210, y: 932, width: 72, height: 48 };
+    const next = { x: 1307, y: 932, width: 142, height: 48 };
+    expect(nearest(back, [more, skip, next], "right")).toBe(1);
+    // With nothing on the row, the general rule still finds the button off it.
+    expect(nearest(back, [more], "right")).toBe(0);
+  });
+});

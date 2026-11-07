@@ -109,6 +109,13 @@
   --color-danger: var(--danger);
   --color-info: var(--info);
 
+  --color-avatar-slate: var(--avatar-slate);
+  --color-avatar-sage: var(--avatar-sage);
+  --color-avatar-ochre: var(--avatar-ochre);
+  --color-avatar-plum: var(--avatar-plum);
+  --color-avatar-clay: var(--avatar-clay);
+  --color-avatar-teal: var(--avatar-teal);
+
   --font-display: var(--font-display);
   --font-serif: var(--font-serif);
   --font-ui: var(--font-ui);

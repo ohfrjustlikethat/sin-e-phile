@@ -41,6 +41,11 @@ const AVAILABILITY: Record<
   download: { label: "Download", tone: "neutral" },
 };
 
+/** "Michael Mann · 1995", leaving out whichever the catalogue does not know. */
+export function byline(film: Pick<PosterFilm, "director" | "year">): string {
+  return [film.director || null, film.year || null].filter(Boolean).join(" · ");
+}
+
 export function PosterCard({
   film,
   size = "md",
@@ -64,7 +69,7 @@ export function PosterCard({
         onMouseLeave={() => setHovered(false)}
         onFocus={() => setHovered(true)}
         onBlur={() => setHovered(false)}
-        aria-label={`${film.title}, ${film.director}, ${film.year}`}
+        aria-label={[film.title, film.director || null, film.year || null].filter(Boolean).join(", ")}
         className={[
           "relative block w-full overflow-hidden rounded-sm border text-left",
           "aspect-[3/4] bg-surface transition-colors",
@@ -129,7 +134,7 @@ export function PosterCard({
             <h3 className="font-serif text-[17px] leading-[1.12] text-ink">{film.title}</h3>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="text-[10px] uppercase tracking-[0.08em] text-ink-faint">
-                {film.director} · {film.year}
+                {byline(film)}
               </span>
             </div>
           </>
@@ -174,7 +179,7 @@ function TypographicCard({
         {film.title}
       </span>
       <span className="label">
-        {film.director} · {film.year}
+        {byline(film)}
       </span>
     </div>
   );

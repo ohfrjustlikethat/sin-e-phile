@@ -251,6 +251,20 @@ the bytes instead, but only the bytes: its search and feeds are never touched.
 **The analogy:** a weather forecast for the evening's film, "70% chance of buffering", with
 the umbrella (download it first) handed to you rather than lectured about.
 
+### Profiles and a first run — who is watching, and what they like `✅ Phase 14`
+
+Each profile is its own person: history, watchlist, ratings and taste never cross. A first run asks
+three things, and every one can be skipped: a name; what you like, by picking films from a spread
+across a century, by saying it ("slow and patient", "endings left open"), or by importing a history
+from Letterboxd, Trakt, IMDb or MyAnimeList; and where to watch. An import is matched to the
+catalogue carefully: where two films share a name and a year, it asks rather than guesses.
+
+Kids profiles show only what is positively known to suit children, because a guess that lets the
+wrong film through is worse than a smaller shelf.
+
+**The analogy:** a good video shop's regulars each have a card; the clerk who knows your card does not
+recommend from someone else's.
+
 ### Taste and discovery — the reason to use this at all `⬜ Phases 15–17`
 
 The taste model does not average you into one vector, because someone who loves both
@@ -391,6 +405,12 @@ parallel, probe only the uncertain), watches (ReadDirectoryChangesW through `not
 rename kept a rename) and runs the review queue. The local source answers from the library,
 so a film on this PC sits beside every other copy on its page. How it all fits:
 `docs/specs/library.md`.
+
+### Profiles ✅ `Phase 14`
+
+Migration 0024 and an active profile in `AppState`; `crates/imports` (four services' exports, matched
+without guessing); `crates/taste` (statements, the seed vector, Home's rails, onboarding's rounds); the
+first-run wizard and Home's first version. How it all fits: `docs/specs/profiles.md`.
 
 ### Downloads ✅ `Phase 13`
 

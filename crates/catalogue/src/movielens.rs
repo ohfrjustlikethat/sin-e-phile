@@ -346,6 +346,88 @@ async fn insert(tx: &mut SqliteTx<'_>, pairs: &[(i64, i64)]) -> Result<(), JobEr
     Ok(())
 }
 
+/// The MovieLens ids GroupLens files under "Children", from `movies.csv`. The only
+/// suitability signal the free datasets carry that tells a children's film from an adult
+/// animated comedy (IMDb gives Toy Story and Sausage Party the same three genres); the
+/// kids profile is built on it (Phase 14).
+pub fn children(path: &Path) -> Result<Vec<i64>, JobError> {
+    let mut zip = archive(path)?;
+    let entry = open_entry(&mut zip, "movies.csv")?;
+    let mut reader = BufReader::new(entry);
+    let mut header = String::new();
+    reader
+        .read_line(&mut header)
+        .map_err(|e| JobError::step("movielens", e.to_string()))?;
+    if !header.starts_with("movieId,title,genres") {
+        return Err(JobError::step(
+            "movielens",
+            format!("movies.csv header changed: {}", header.trim()),
+        ));
+    }
+    let mut out = Vec::new();
+    for line in reader.lines() {
+        let line = line.map_err(|e| JobError::step("movielens", e.to_string()))?;
+        // The title may hold commas (it is quoted then); the id is first, genres last.
+        let (Some((id, _)), Some((_, genres))) = (line.split_once(','), line.rsplit_once(','))
+        else {
+            continue;
+        };
+        if genres.trim().split('|').any(|g| g == "Children") {
+            if let Ok(id) = id.parse::<i64>() {
+                out.push(id);
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Mark the catalogue items MovieLens files under "Children" with a `Children` genre.
+pub async fn load_children(
+    job: &mut Job<'_>,
+    ids: std::sync::Arc<Vec<i64>>,
+) -> Result<(), JobError> {
+    job.run_step("movielens.children", move |tx, cursor| {
+        let ids = std::sync::Arc::clone(&ids);
+        Box::pin(async move {
+            let from: usize = cursor.as_deref().and_then(|c| c.parse().ok()).unwrap_or(0);
+            if from == 0 {
+                sqlx::query("INSERT INTO genres (name) VALUES ('Children') ON CONFLICT DO NOTHING")
+                    .execute(&mut **tx)
+                    .await
+                    .map_err(|e| JobError::step("movielens.children", e.to_string()))?;
+            }
+            if from >= ids.len() {
+                return Ok(Batch::finished(0));
+            }
+            let end = (from + 500).min(ids.len());
+            let chunk = &ids[from..end];
+            let sql = format!(
+                "INSERT INTO media_genres (media_item_id, genre_id)
+                 SELECT e.media_item_id, (SELECT id FROM genres WHERE name = 'Children')
+                 FROM external_ids e
+                 WHERE e.source = 'movielens' AND e.external_id IN ({})
+                 ON CONFLICT DO NOTHING",
+                vec!["?"; chunk.len()].join(", ")
+            );
+            let mut query = sqlx::query(&sql);
+            for id in chunk {
+                query = query.bind(id.to_string());
+            }
+            query
+                .execute(&mut **tx)
+                .await
+                .map_err(|e| JobError::step("movielens.children", e.to_string()))?;
+            Ok(if end >= ids.len() {
+                Batch::finished((end - from) as i64)
+            } else {
+                Batch::more(end.to_string(), (end - from) as i64)
+            })
+        })
+    })
+    .await?;
+    Ok(())
+}
+
 /// How many catalogue items carry a MovieLens id.
 pub async fn mapped(db: &Db) -> Result<i64, JobError> {
     Ok(

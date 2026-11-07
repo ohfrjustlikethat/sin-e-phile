@@ -13,6 +13,8 @@ use crate::secrets;
 const TMDB_KEY: &str = "tmdb.api_key";
 /// The settings key a profile's OpenSubtitles key is stored under.
 const OPENSUBTITLES_KEY: &str = "opensubtitles.api_key";
+/// The has_pin column in profiles.rs reads this key too.
+const PIN: &str = "pin";
 
 /// Whether a profile can reach TMDB.
 ///
@@ -291,6 +293,48 @@ impl<'a> CredentialRepository<'a> {
         .await?
         .rows_affected();
         Ok(removed > 0)
+    }
+
+    /// A profile's PIN: four digits, kept wrapped like a key (Phase 14). A PIN keeps a
+    /// child out of a parent's profile; it is not security against the machine's owner,
+    /// and is not claimed to be.
+    pub async fn set_pin(&self, profile_id: i64, pin: &str) -> Result<(), DbError> {
+        if pin.len() != 4 || !pin.chars().all(|c| c.is_ascii_digit()) {
+            return Err(DbError::Invalid("a PIN is four digits".into()));
+        }
+        self.set_secret(profile_id, PIN, pin).await
+    }
+
+    pub async fn clear_pin(&self, profile_id: i64) -> Result<bool, DbError> {
+        self.clear_secret(profile_id, PIN).await
+    }
+
+    /// Whether `pin` opens the profile. No PIN opens it. A PIN that will not unwrap here
+    /// (the data folder moved to another Windows account) opens it too, as a key that
+    /// will not unwrap degrades rather than locks: the user sets a PIN again.
+    pub async fn verify_pin(&self, profile_id: i64, pin: &str) -> Result<bool, DbError> {
+        let stored: Option<Vec<u8>> = sqlx::query_scalar(
+            "SELECT value FROM profile_settings WHERE profile_id = ? AND key = ? AND is_secret = 1",
+        )
+        .bind(profile_id)
+        .bind(PIN)
+        .fetch_optional(self.db.pool())
+        .await?;
+        let Some(stored) = stored else {
+            return Ok(true);
+        };
+        Ok(match secrets::unwrap(&stored) {
+            Some(real) => {
+                // Same length and every byte compared, whatever matches first.
+                real.len() == pin.len()
+                    && real
+                        .bytes()
+                        .zip(pin.bytes())
+                        .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+                        == 0
+            }
+            None => true,
+        })
     }
 
     /// How many profiles have supplied a key. For the settings screen, and for making

@@ -1,6 +1,6 @@
 # Phase 13 — Download Manager and the Stream-vs-Download Advisor
 
-**Status:** in_progress · **Depends on:** 7, 9, 12 · **Sessions:** 1–2
+**Status:** complete · **Depends on:** 7, 9, 12 · **Sessions:** 1–2
 
 > The single file a session reads to know what it is doing. Generated from
 > `SPEC.md` §15 by `tools/phasedoc/generate.py`. Working file, not a document.
@@ -48,3 +48,55 @@ Estimating whether a stream will stall; bitrate versus throughput; why the taste
 - **13.4** The advisor (crates/downloads advise.rs): stall probability from swarm throughput against the fi · `92c070d`
 - **13.5** The Downloads page (masthead Downloads button with a live count, ADR-0037): queue, progress, spe · `5d06e81`
 - **13.6** Author checks batched in one message: real controller (Phase 8 E5), VPN adapter pulled mid-downl · `fca4cf6`
+
+<!-- closed: written at phase end -->
+
+---
+
+## Outcome
+
+**Complete.** Merged as `1d1184a`.
+
+### Evidence per criterion
+
+**E1** — The advisor's recommendation is correct (matches what actually happens) in at least 8 of 10 manual trials across varied swarm conditions.
+
+> 92c070d: cargo run --release -p eval -- advise (2026-11-07), ten fresh loopback swarm conditions chosen after the model's last change and run once (bitrates 0.8, 2 and 3 MB/s; one to four capped seeders; 0.6x to 2.5x the bitrate): each measured as the app measures, advised, then played from a fresh engine at its bitrate after a 3-second buffer. 9 of 10 right (target at least 8): the miss was four slow peers at 0.86 MB/s for a 0.8 MB/s film, judged 4% likely to pause, which paused once. The first run on twelve other conditions scored 7/12 and found the engine's speed bug (7e18942); both runs and every change between them are in docs/eval-results.md. Caveat recorded there: a loopback swarm is steadier than the internet.
+
+**E2** — A download completed through the qBittorrent backend files into the library identically to one completed through librqbit, verified by comparing the resulting rows.
+
+> cargo test -p sinephile-downloads --test qbittorrent_real -- --ignored --nocapture (2026-11-07, qBittorrent v5.2.0 installed here; two instances isolated from the user's own by --profile, Web UIs on 127.0.0.1, each verified as the isolated one before use): the same 6,303,801-byte download through the app's Qbittorrent backend and through librqbit filed identically field by field: Done, done/total 6,303,801, file Heat/Heat.1995.1080p.mkv relative to Downloads, library size 6,303,801, match Heat 1.0 confirmed Metadata covers 1, folder registered. Seen to fail first on the real thing: qBittorrent's copy landed at Heat.1995.1080p/... until the backend used the per-title folder (contentLayout=NoSubfolder). docs/eval-results.md 'E2: a real qBittorrent round trip'.
+
+**E3** — With qBittorrent configured but not running, a queued download falls back to librqbit rather than failing.
+
+> f5345b5: crates/downloads/tests/queue.rs a_configured_qbittorrent_that_is_not_running_falls_back_to_librqbit: the backends are [qBittorrent at an address nothing answers, librqbit]; a download meant for qBittorrent is started on the first tick (not failed), its row says librqbit moved the bytes, and it completes from a loopback seeder. Seen to fail with the fallback removed from Manager::usable. qBittorrent's availability is its app/version answering (crates/downloads/tests/qbittorrent.rs not_running_is_unavailable_and_running_is_available).
+
+**E4** — `tools/guard` rejects any code path that reads qBittorrent's search plugins, RSS feeds or tracker configuration.
+
+> f5345b5: tools/guard/guard.py rule qbittorrent-content (search and RSS endpoints, the tracker-list endpoints, the setting that adds trackers to every torrent), with four must-fire vectors and two must-not-fire vectors (the transport endpoints the backend does use) in tools/guard/tests/vectors.py; python tools/guard/guard.py --selftest passes all, and was seen to fail: a quoting slip turned the rule's word boundaries into control characters and the self-test reported the two tracker vectors missed until fixed. The backend's own module lists the only endpoints it uses.
+
+**E5** — Downloads survive an app restart and resume.
+
+> 163095b: crates/downloads/tests/queue.rs the_queue_survives_a_restart_and_carries_on: a 16 MiB download from a slow loopback seeder stopped mid-way (engine stopped, manager dropped), a new engine on the same folder and a new manager over the same queue: the row is still active, the download is added back from the queue's own row with the pieces on disk kept (progress >= before), and it completes. Seen to fail with re-adding disabled. Engine-level persistence: crates/torrent/tests/swarm.rs a_download_survives_a_restart (Phase 7).
+
+**E6** — A completed download is automatically matched and appears in the local library with no user action.
+
+> 163095b: crates/downloads/tests/queue.rs a_finished_download_files_itself_into_the_library_already_matched: a download for Heat (1995) completes through the manager, lands in the Downloads folder (registered as a library folder), and has a library row matched to Heat, confirmed, with files_for_item(Heat) offering it; a download with no catalogue item is identified like any library file (identify_file).
+
+**E7** — Bandwidth limits are actually respected, verified by measurement.
+
+> be543da: crates/downloads/tests/limits.rs (cargo test -p sinephile-downloads --test limits -- --nocapture --test-threads=1), a loopback seeder with no limit and a 48 MiB file through the queue: a per-download limit of 1.00 MiB/s measured 1.02 MiB/s (twice); the global limit of 2.00 MiB/s (Engine::set_limits) measured 2.01 and 2.00 MiB/s; with no limit the same swarm ran at 157.2 MiB/s (48 MiB in 0.31 s), so the limit is what held it. Each held to within 15%. Numbers in docs/eval-results.md (Phase 13).
+
+**E8** — The recommendation reason is a single readable sentence.
+
+> 92c070d: crates/downloads/src/advise.rs tests: every branch (stream, download, tonight, no room, local copy, nobody sharing, a favourite) is checked by one_sentence (a single full stop at the end, no other sentence break, no line break, at most 160 characters); every sentence in the twenty-two trials read as one, e.g. 'It would pause to buffer if streamed (1.8 MB/s against the 2.0 MB/s it needs), so download it first, about a minute.'
+
+### Debt incurred
+
+- **D78** Completion notices are in-app toasts only (src/features/downloads/DownloadNotices.tsx). A Windows notification when the window is not in front needs the Tauri notification plugin; adding a plugin upgraded Tauri last time (the dialog plugin), so it waits for Phase 20's Windows integration, alongside the media controls.
+- **D79** The advisor runs only for a torrent copy the film page already started (the plan's chosen candidate). A web stream is not downloadable, so nothing is offered; a title whose best copy is a web stream but which also has a torrent copy is not offered the torrent to download. Revisit with the Phase 15 taste input.
+- **D80** Upstream (librqbit 9.0.1): create_torrent writes one piece hash too many when the content is a whole number of pieces (500 bytes of hashes for 24 pieces of 256 KiB); libtorrent refuses such a torrent as invalid (stays fetching metadata, then errors; a .torrent of it is never added). The app never creates torrents, so only test fixtures are affected; crates/downloads/tests/qbittorrent_real.rs uses a size that is not a whole number. Worth reporting upstream (the author's call: an outward-facing issue).
+
+### Next phase starts by
+
+Phase 14 subtask 14.1 (docs/phases/phase-14-profiles.md): write migration 0024_profiles in crates/persistence/migrations (avatar_colour, pin_salt, pin_hash, is_kids, kids_limit, last_used_at), extend ProfileRepository with create/rename/delete/set_pin/verify_pin/set_kids/touch plus lines in tests/repository_surface.rs, then add AppState::profile() in src-tauri/src/state.rs and replace the 14 ensure_default() calls in src-tauri/src/commands.

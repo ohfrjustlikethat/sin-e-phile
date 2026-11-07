@@ -23,8 +23,8 @@ use sinephile_persistence::model::EpisodeNumbering;
 use sinephile_persistence::repositories::profiles::PlaybackPosition;
 use sinephile_persistence::repositories::{
     BackfillRepository, CatalogueRepository, CredentialRepository, DirectLinkRepository,
-    EpisodeRepository, MatchReason, MediaRepository, ProfileRepository, Readiness, Sample,
-    SearchRepository, SourceRepository, TmdbAccess, WikipediaRepository,
+    EpisodeRepository, MatchReason, MediaRepository, NewProfile, ProfileRepository, Readiness,
+    Sample, SearchRepository, SourceRepository, TmdbAccess, WikipediaRepository,
 };
 use sinephile_persistence::repositories::{CachedSubtitle, QuotaDay, SubtitleRepository};
 use sinephile_persistence::{Db, IdSource, MediaKind, NewMediaItem, TitleVariant};
@@ -100,6 +100,97 @@ async fn media_repository_surface() {
 
     // count
     assert_eq!(repo.count().await.expect("count"), 3);
+
+    // suitable_for_children — filed for children or family, and nothing excluded
+    let genre = |name: &'static str, item: i64| {
+        let db = db.clone();
+        async move {
+            sqlx::query("INSERT INTO genres (name) VALUES (?) ON CONFLICT DO NOTHING")
+                .bind(name)
+                .execute(db.pool())
+                .await
+                .unwrap();
+            sqlx::query(
+                "INSERT INTO media_genres (media_item_id, genre_id)
+                 SELECT ?, id FROM genres WHERE name = ?",
+            )
+            .bind(item)
+            .bind(name)
+            .execute(db.pool())
+            .await
+            .unwrap();
+        }
+    };
+    let toy = repo
+        .insert(&NewMediaItem::film("Toy Story", 1995))
+        .await
+        .unwrap();
+    let paddington = repo
+        .insert(&NewMediaItem::film("Paddington", 2014))
+        .await
+        .unwrap();
+    let party = repo
+        .insert(&NewMediaItem::film("Sausage Party", 2016))
+        .await
+        .unwrap();
+    let scary = repo
+        .insert(&NewMediaItem::film("Goosebumps", 2015))
+        .await
+        .unwrap();
+    for g in ["Animation", "Comedy", "Children"] {
+        genre(g, toy).await;
+    }
+    genre("Family", paddington).await;
+    for g in ["Animation", "Comedy"] {
+        genre(g, party).await;
+    }
+    for g in ["Family", "Horror"] {
+        genre(g, scary).await;
+    }
+    let ok = repo
+        .suitable_for_children(&[toy, paddington, party, scary, film])
+        .await
+        .expect("suitable_for_children");
+    assert_eq!(ok, [toy, paddington].into_iter().collect());
+    assert!(repo.suitable_for_children(&[]).await.unwrap().is_empty());
+
+    // titles_released_between — films and series only, every name, in the years given
+    let near = repo
+        .titles_released_between(2014, 2016)
+        .await
+        .expect("titles_released_between");
+    assert!(near
+        .iter()
+        .any(|(id, t, y, _)| *id == paddington && t == "Paddington" && *y == 2014));
+    assert!(near.iter().all(|(_, _, y, _)| (2014..=2016).contains(y)));
+    assert!(!near.iter().any(|(id, ..)| *id == toy), "1995 is outside");
+
+    // most_voted_films — films only, by votes; nothing without votes
+    let famous = repo
+        .insert(&NewMediaItem {
+            rating_votes: Some(900_000),
+            ..NewMediaItem::film("Heat", 1995)
+        })
+        .await
+        .unwrap();
+    let known = repo
+        .insert(&NewMediaItem {
+            rating_votes: Some(1_000),
+            ..NewMediaItem::film("Thief", 1981)
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        repo.most_voted_films(2).await.expect("most_voted_films"),
+        vec![famous, known]
+    );
+    // most_voted_films_between — only the years asked for
+    assert_eq!(
+        repo.most_voted_films_between(1980, 1989, 5)
+            .await
+            .expect("most_voted_films_between"),
+        vec![known]
+    );
 }
 
 /// Exercise every public method on `EpisodeRepository`.
@@ -341,6 +432,25 @@ async fn profile_repository_surface() {
         "another profile's"
     );
 
+    // record_watch_at — dated, and once per moment
+    assert!(repo
+        .record_watch_at(second, other, 5_400, true, "2019-04-02 00:00:00")
+        .await
+        .expect("record_watch_at"));
+    assert!(
+        !repo
+            .record_watch_at(second, other, 5_400, true, "2019-04-02 00:00:00")
+            .await
+            .unwrap(),
+        "the same watch imported again is not new"
+    );
+    assert!(
+        repo.record_watch_at(second, other, 5_400, true, "2021-01-09 00:00:00")
+            .await
+            .unwrap(),
+        "a rewatch on another day is"
+    );
+
     // record_watch
     repo.record_watch(second, film, 3_000, true)
         .await
@@ -349,6 +459,22 @@ async fn profile_repository_surface() {
         repo.finished(second, film).await.unwrap(),
         "a completed watch"
     );
+
+    // liked — five and four stars, then completed unrated watches; a low rating is not liking
+    let third = media
+        .insert(&NewMediaItem::film("Early Summer", 1951))
+        .await
+        .expect("film");
+    repo.rate(second, other, Some(5)).await.unwrap();
+    repo.rate(second, third, Some(2)).await.unwrap();
+    repo.record_watch(second, third, 6_000, true).await.unwrap();
+    let liked = repo.liked(second).await.expect("liked");
+    assert_eq!(
+        liked,
+        vec![(other, 1.0), (film, 0.3)],
+        "rated 2 and watched is not liked"
+    );
+    assert!(repo.liked(first).await.unwrap().is_empty());
 
     // save_position — insert and ON CONFLICT update
     let position = PlaybackPosition {
@@ -415,6 +541,72 @@ async fn profile_repository_surface() {
         .await
         .expect("setting miss")
         .is_none());
+
+    // ── Phase 14 ──
+    // create_with — never the default; get — hit and miss
+    let kid = repo
+        .create_with(&NewProfile {
+            name: "  Mina ",
+            avatar_colour: Some("slate"),
+            is_kids: true,
+            kids_limit: Some("PG"),
+        })
+        .await
+        .expect("create_with");
+    let got = repo.get(kid).await.expect("get").expect("there");
+    assert_eq!(
+        (
+            got.name.as_str(),
+            got.is_default,
+            got.is_kids,
+            got.kids_limit.as_deref()
+        ),
+        ("Mina", false, true, Some("PG"))
+    );
+    assert_eq!(got.avatar_colour.as_deref(), Some("slate"));
+    assert!(!got.has_pin && got.last_used_at.is_none());
+    assert!(repo.get(9_999).await.expect("get miss").is_none());
+
+    // update
+    repo.update(
+        kid,
+        &NewProfile {
+            name: "Mina",
+            avatar_colour: Some("ochre"),
+            is_kids: false,
+            kids_limit: None,
+        },
+    )
+    .await
+    .expect("update");
+    let got = repo.get(kid).await.unwrap().unwrap();
+    assert_eq!(
+        (got.avatar_colour.as_deref(), got.is_kids),
+        (Some("ochre"), false)
+    );
+
+    // touch — and all() lists the most recently used first
+    repo.touch(kid).await.expect("touch");
+    assert!(repo.get(kid).await.unwrap().unwrap().last_used_at.is_some());
+    assert_eq!(repo.all().await.unwrap()[0].id, kid, "most recent first");
+
+    // set_default — exactly one default after
+    repo.set_default(kid).await.expect("set_default");
+    let all = repo.all().await.unwrap();
+    assert_eq!(all.iter().filter(|p| p.is_default).count(), 1);
+    assert_eq!(repo.default_profile().await.unwrap().unwrap().id, kid);
+
+    // delete — the default hands over to the most recently used; the last never goes
+    repo.touch(first).await.unwrap();
+    assert!(repo.delete(kid).await.expect("delete"));
+    assert_eq!(repo.default_profile().await.unwrap().unwrap().id, first);
+    assert!(
+        !repo.delete(kid).await.expect("delete again"),
+        "already gone"
+    );
+    assert!(repo.delete(second).await.unwrap());
+    assert!(!repo.delete(first).await.unwrap(), "never the last profile");
+    assert_eq!(repo.all().await.unwrap().len(), 1);
 }
 
 /// Exercise every public method on `Archiver`.
@@ -628,6 +820,32 @@ async fn db_surface() {
         .clear_secret(profile, "qbittorrent.password")
         .await
         .unwrap());
+
+    // set_pin / verify_pin / clear_pin (Phase 14); has_pin reads the same key
+    assert!(creds
+        .verify_pin(profile, "0000")
+        .await
+        .expect("no PIN opens"));
+    assert!(
+        creds.set_pin(profile, "12a4").await.is_err(),
+        "four digits only"
+    );
+    assert!(creds.set_pin(profile, "123").await.is_err());
+    creds.set_pin(profile, "2468").await.expect("set_pin");
+    assert!(
+        ProfileRepository::new(&db)
+            .get(profile)
+            .await
+            .unwrap()
+            .unwrap()
+            .has_pin
+    );
+    assert!(creds.verify_pin(profile, "2468").await.unwrap());
+    assert!(!creds.verify_pin(profile, "2469").await.unwrap());
+    assert!(!creds.verify_pin(profile, "24680").await.unwrap());
+    assert!(creds.clear_pin(profile).await.expect("clear_pin"));
+    assert!(!creds.clear_pin(profile).await.unwrap());
+    assert!(creds.verify_pin(profile, "9999").await.unwrap());
 
     // ── SearchRepository ──────────────────────────────────────────────────────
     let search = SearchRepository::new(&db);

@@ -56,6 +56,9 @@ pub struct AppState {
     torrent: tokio::sync::OnceCell<Arc<TorrentRuntime>>,
     /// The player and its video window, created on the first play (Phase 8).
     player: RwLock<Option<Arc<crate::commands::player::PlayerRuntime>>>,
+    /// Who is watching (Phase 14): every personal read and write is this profile's.
+    /// `None` until first asked, then the default profile until someone switches.
+    profile: RwLock<Option<i64>>,
 }
 
 pub struct TorrentRuntime {
@@ -92,6 +95,7 @@ impl AppState {
             data_dir: RwLock::new(None),
             torrent: tokio::sync::OnceCell::new(),
             player: RwLock::new(None),
+            profile: RwLock::new(None),
         }
     }
 
@@ -122,6 +126,25 @@ impl AppState {
     /// "never", and a UI thread waiting on a disk is how a splash screen becomes a hang.
     pub fn db(&self) -> Option<Arc<Db>> {
         self.db.read().expect("db lock poisoned").clone()
+    }
+
+    /// The active profile's id: the one switched to, or the default profile.
+    pub async fn profile(&self) -> Result<i64, String> {
+        if let Some(id) = *self.profile.read().expect("profile lock poisoned") {
+            return Ok(id);
+        }
+        let db = self.db().ok_or("the library is still opening")?;
+        let id = sinephile_persistence::repositories::ProfileRepository::new(&db)
+            .ensure_default()
+            .await
+            .map_err(|e| e.to_string())?;
+        *self.profile.write().expect("profile lock poisoned") = Some(id);
+        Ok(id)
+    }
+
+    /// Switch who is watching. The caller has checked the PIN.
+    pub fn set_profile(&self, id: i64) {
+        *self.profile.write().expect("profile lock poisoned") = Some(id);
     }
 
     pub fn player(&self) -> Option<Arc<crate::commands::player::PlayerRuntime>> {

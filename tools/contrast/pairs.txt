@@ -60,3 +60,11 @@
 --line-strong      | --surface   | decorative | card and panel outlines
 --line             | --base      | decorative | panel edges, the player chrome top rule
 --line-subtle      | --surface   | decorative | hairline rules between rows
+
+# Phase 14: a profile's initial on its avatar (in the masthead at 13px bold, in the picker large).
+--ink             | --avatar-slate | body | a profile's initial on its avatar
+--ink             | --avatar-sage  | body | a profile's initial on its avatar
+--ink             | --avatar-ochre | body | a profile's initial on its avatar
+--ink             | --avatar-plum  | body | a profile's initial on its avatar
+--ink             | --avatar-clay  | body | a profile's initial on its avatar
+--ink             | --avatar-teal  | body | a profile's initial on its avatar
