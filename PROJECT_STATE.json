@@ -39,8 +39,8 @@
       {
         "id": "13.5",
         "text": "The Downloads page (masthead Downloads button with a live count, ADR-0037): queue, progress, speed, seeds/peers, ETA, the reason each was queued, pause/resume/cancel, priorities, limits; storage budget and a cleanup view. Pad-complete in tools/uiaudit/controller.mjs.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "5d06e81"
       },
       {
         "id": "13.6",
@@ -1646,8 +1646,8 @@
         {
           "id": "13.5",
           "text": "The Downloads page (masthead Downloads button with a live count, ADR-0037): queue, progress, speed, seeds/peers, ETA, the reason each was queued, pause/resume/cancel, priorities, limits; storage budget and a cleanup view. Pad-complete in tools/uiaudit/controller.mjs.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "5d06e81"
         },
         {
           "id": "13.6",
@@ -2316,7 +2316,7 @@
       ]
     }
   ],
-  "next_action": "Phase 13 subtask 13.5 (docs/phases/phase-13-download-manager.md): the Downloads page (src/features/downloads/DownloadsScreen.tsx) reached from the masthead Downloads button with a live count; commands in src-tauri/src/commands/downloads.rs for add (from the film page: the chosen torrent candidate, the advisor sentence as reason), priority, limit, schedule, global limits and the qBittorrent settings (rebuild_manager on change); the film page shows the advisor (prepare_play measures the swarm it already started); storage: a size budget and a cleanup view of watched downloads by size and age. Pad-complete in tools/uiaudit/controller.mjs.",
+  "next_action": "Phase 13 subtask 13.6 (docs/phases/phase-13-download-manager.md): write docs/specs/downloads.md (queue, backends, advisor, storage, the IPC surface in src-tauri/src/commands/downloads.rs), docs/learning/phase-13-notes.md (four sections, concepts as file:line), README and HOW_IT_WORKS stubs; run the regression (cargo run --release -p eval -- all against docs/eval-results.md); then close Phase 13 with E2 carried to Phase 16 under ADR-0036 (needs a real qBittorrent, which needs the author; batched with the author checks after Phase 15), merge --no-ff, tag phase-13, open Phase 14.",
   "blockers": [],
   "decisions_pending": [
     {
@@ -2977,6 +2977,16 @@
       "id": "D77",
       "text": "CREATE_NO_WINDOW is now set on FFprobe and the subtitle aligner's FFmpeg; confirm in a release build (windows subsystem) that no console window flashes during a scan or an alignment. Batched with the Phase 13 author checks.",
       "phase_raised": 12
+    },
+    {
+      "id": "D78",
+      "text": "Completion notices are in-app toasts only (src/features/downloads/DownloadNotices.tsx). A Windows notification when the window is not in front needs the Tauri notification plugin; adding a plugin upgraded Tauri last time (the dialog plugin), so it waits for Phase 20's Windows integration, alongside the media controls.",
+      "phase_raised": 13
+    },
+    {
+      "id": "D79",
+      "text": "The advisor runs only for a torrent copy the film page already started (the plan's chosen candidate). A web stream is not downloadable, so nothing is offered; a title whose best copy is a web stream but which also has a torrent copy is not offered the torrent to download. Revisit with the Phase 15 taste input.",
+      "phase_raised": 13
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

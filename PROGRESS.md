@@ -16,13 +16,13 @@
 
 > Opened 2026-11-07 when Phase 12 merged (b5dccda, tag phase-12). qBittorrent is not installed on this machine; installing software on the author's PC is outside the repository, so the backend is built and tested against a local stand-in of its Web API and the one real round trip joins the batched author checks (13.6). The taste model (Phase 15) does not exist yet: the advisor takes its input through an interface with a neutral stand-in, recorded rather than faked. Author checks carried here: Phase 7 E7, Phase 8 E5.
 
-### Subtasks — 4/6 complete
+### Subtasks — 5/6 complete
 
 - [x] **13.1** The download queue (crates/downloads): items with priority, state (queued, active, paused, done, failed), per-item and global limits, a schedule window (start after a time), surviving restart (migration), a backend trait with librqbit as the default; completion files the item into the library through sinephile_library::scan (E5, E6). · `163095b`
 - [x] **13.2** The qBittorrent backend over its Web API (ADR-0029): configured by the user (address, credentials kept like other secrets), detected, never bundled or required; falls back to librqbit when not running (E3); a transport only, with a guard rule rejecting any read of search plugins, RSS or tracker lists (E4), seen to fail. Tested against a local stand-in Web API; one real-qBittorrent check batched for the author (E2). · `f5345b5`
 - [x] **13.3** Bandwidth limits measured: a local seeder and a timed transfer under each limit, numbers to docs/eval-results.md (E7). · `be543da`
 - [x] **13.4** The advisor (crates/downloads advise.rs): stall probability from swarm throughput against the file's bitrate, free disk and an existing local copy, time-of-day network history, and the taste model's input (a neutral stand-in until Phase 15), giving one recommendation and one readable sentence (E8); trials recorded for E1. · `92c070d`
-- [ ] **13.5** The Downloads page (masthead Downloads button with a live count, ADR-0037): queue, progress, speed, seeds/peers, ETA, the reason each was queued, pause/resume/cancel, priorities, limits; storage budget and a cleanup view. Pad-complete in tools/uiaudit/controller.mjs.
+- [x] **13.5** The Downloads page (masthead Downloads button with a live count, ADR-0037): queue, progress, speed, seeds/peers, ETA, the reason each was queued, pause/resume/cancel, priorities, limits; storage budget and a cleanup view. Pad-complete in tools/uiaudit/controller.mjs. · `5d06e81`
 - [ ] **13.6** Author checks batched in one message: real controller (Phase 8 E5), VPN adapter pulled mid-download (Phase 7 E7), a real qBittorrent round trip (E2), the review screen's feel, D77's release-build console check. Then docs/specs/downloads.md, learning note, README and HOW_IT_WORKS, regression, close.
 
 ### Exit criteria
@@ -47,7 +47,7 @@
 
 ## What's next
 
-Phase 13 subtask 13.5 (docs/phases/phase-13-download-manager.md): the Downloads page (src/features/downloads/DownloadsScreen.tsx) reached from the masthead Downloads button with a live count; commands in src-tauri/src/commands/downloads.rs for add (from the film page: the chosen torrent candidate, the advisor sentence as reason), priority, limit, schedule, global limits and the qBittorrent settings (rebuild_manager on change); the film page shows the advisor (prepare_play measures the swarm it already started); storage: a size budget and a cleanup view of watched downloads by size and age. Pad-complete in tools/uiaudit/controller.mjs.
+Phase 13 subtask 13.6 (docs/phases/phase-13-download-manager.md): write docs/specs/downloads.md (queue, backends, advisor, storage, the IPC surface in src-tauri/src/commands/downloads.rs), docs/learning/phase-13-notes.md (four sections, concepts as file:line), README and HOW_IT_WORKS stubs; run the regression (cargo run --release -p eval -- all against docs/eval-results.md); then close Phase 13 with E2 carried to Phase 16 under ADR-0036 (needs a real qBittorrent, which needs the author; batched with the author checks after Phase 15), merge --no-ff, tag phase-13, open Phase 14.
 
 ---
 
@@ -175,6 +175,8 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D75** (raised in Phase 12) The held-out filename corpus (109 names) was written by the same hand that tuned the parser, and its identification labels were seen in --report output while tuning. A truly independent check is a real user's library: count asked, accepted and wrong after a first real scan (Phase 14's onboarding test is the natural moment).
 - **D76** (raised in Phase 12) Two remakes with the same title and year (rare, but real) can only be told apart by duration, which needs FFprobe; a file FFprobe cannot read stays in the review queue. Container title tags (probed) are stored but not yet weighed as a signal.
 - **D77** (raised in Phase 12) CREATE_NO_WINDOW is now set on FFprobe and the subtitle aligner's FFmpeg; confirm in a release build (windows subsystem) that no console window flashes during a scan or an alignment. Batched with the Phase 13 author checks.
+- **D78** (raised in Phase 13) Completion notices are in-app toasts only (src/features/downloads/DownloadNotices.tsx). A Windows notification when the window is not in front needs the Tauri notification plugin; adding a plugin upgraded Tauri last time (the dialog plugin), so it waits for Phase 20's Windows integration, alongside the media controls.
+- **D79** (raised in Phase 13) The advisor runs only for a torrent copy the film page already started (the plan's chosen candidate). A web stream is not downloadable, so nothing is offered; a title whose best copy is a web stream but which also has a torrent copy is not offered the torrent to download. Revisit with the Phase 15 taste input.
 
 ---
 

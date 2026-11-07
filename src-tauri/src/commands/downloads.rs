@@ -205,6 +205,18 @@ pub async fn downloads_loop(app: AppHandle) {
                 if !t.finished.is_empty() {
                     let _ = app.emit("library-changed", 0);
                 }
+                // Completion notices, by title: the page shows them wherever the viewer is.
+                let repo = DownloadRepository::new(&db);
+                for (event, ids) in [
+                    ("download-finished", &t.finished),
+                    ("download-failed", &t.failed),
+                ] {
+                    for id in ids {
+                        if let Ok(Some(d)) = repo.get(*id).await {
+                            let _ = app.emit(event, d.title);
+                        }
+                    }
+                }
             }
             Err(error) => tracing::warn!(%error, "downloads tick failed"),
         }

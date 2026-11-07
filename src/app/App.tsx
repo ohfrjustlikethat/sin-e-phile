@@ -10,6 +10,7 @@ import { PadKeyboard, closePadKeyboard } from "@/app/PadKeyboard";
 import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { ReviewScreen } from "@/features/library/ReviewScreen";
 import { DownloadsScreen } from "@/features/downloads/DownloadsScreen";
+import { DownloadNotices } from "@/features/downloads/DownloadNotices";
 import { SearchScreen } from "@/features/search/SearchScreen";
 import { DesignGallery } from "@/features/design/DesignGallery";
 import { CommandPalette, type Command } from "@/design-system";
@@ -256,6 +257,7 @@ export function App() {
           <FocusLayer />
         </div>
       )}
+      <DownloadNotices />
       {playing && (
         <div
           className={

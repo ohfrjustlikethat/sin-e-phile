@@ -267,10 +267,7 @@ mod tests {
         match source_of(&with_source(source)).unwrap() {
             Source::InfoHash { hash, trackers } => {
                 assert_eq!(hash, "abc123");
-                assert_eq!(
-                    trackers,
-                    ["http://example.org/x", "udp://example.net:6969"]
-                );
+                assert_eq!(trackers, ["http://example.org/x", "udp://example.net:6969"]);
             }
             _ => panic!("an info hash"),
         }
