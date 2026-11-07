@@ -22,6 +22,7 @@ mod search;
 mod subs;
 mod switching;
 mod taste;
+mod update;
 mod vector;
 
 #[tokio::main]
@@ -98,6 +99,7 @@ async fn main() {
         "identify" => identify::run(Path::new(&data_dir), report).await,
         "taste" => taste::run(Path::new(&data_dir), args.iter().any(|a| a == "--tune")).await,
         "switch" => switching::run(Path::new(&data_dir)).await,
+        "update" => update::run(Path::new(&data_dir)).await,
         "modes" => modes::run(Path::new(&data_dir), args.iter().any(|a| a == "--prove")).await,
         "import" => {
             let from = args

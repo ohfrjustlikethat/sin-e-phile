@@ -332,7 +332,9 @@ pub async fn rate_title(
     profiles
         .rate(profile, i64::from(id), stars.map(i64::from))
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    crate::commands::home::refresh_model(&state, profile);
+    Ok(())
 }
 
 #[tauri::command]
@@ -370,8 +372,10 @@ pub async fn end_viewing(
     ProfileRepository::new(&db)
         .record_viewing(me, i64::from(id), played as i64, completed, position as i64)
         .await
-        .map(|_| ())
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    // E5: the model follows the watch within 2 s, off the command's path.
+    crate::commands::home::refresh_model(&state, me);
+    Ok(())
 }
 
 /// A light signal: "search" (a title opened from search results). Detail views are

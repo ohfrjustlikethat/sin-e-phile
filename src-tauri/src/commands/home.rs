@@ -136,3 +136,28 @@ pub async fn warm_models(app: tauri::AppHandle) {
         }
     }
 }
+
+/// Rebuild a profile's taste model in the background after a signal is written (Phase 15
+/// E5): the command that wrote it returns at once, and Home's next look finds the model
+/// current. About 130 ms for a 650-film profile (`eval update`); searches wait on the
+/// engine lock for that long at most, the UI not at all.
+pub(crate) fn refresh_model(state: &AppState, profile: i64) {
+    let (Some(db), Some(engine)) = (state.db(), state.engine()) else {
+        return;
+    };
+    tauri::async_runtime::spawn(async move {
+        let today = sinephile_taste::model::day_of(&sinephile_downloads::now_iso()).unwrap_or(0.0);
+        let started = std::time::Instant::now();
+        let mut engine = engine.lock().await;
+        if let Some(s) = engine.semantic_mut() {
+            match MODELS.get(&db, s, profile, today).await {
+                Ok(_) => tracing::debug!(
+                    profile,
+                    ms = started.elapsed().as_millis() as u64,
+                    "taste model updated"
+                ),
+                Err(error) => tracing::warn!(%error, profile, "taste model not updated"),
+            }
+        }
+    });
+}

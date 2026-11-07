@@ -2778,3 +2778,20 @@ run (94.9% then 98.3%); the titles are now taken in a fixed order, as the app's 
 `-- switch` again: building a profile's model is 25 ms (nothing yet) and 160 ms (650 films), done in the
 background at launch for every profile (`warm_models`, D82); a switch after that is **20.8 / 29.8 ms
 p95** (the prior ranks a 3,000-title pool). E5 holds.
+
+### The model after a watch (Phase 15 E5)
+
+`cargo run --release -p eval -- update`, 2026-11-08, on 59a1d6d plus the uncommitted harness: a
+650-film profile (MovieLens user 3) watches five well-known films it had not met, and each is timed
+from the viewing's write to the rebuilt model through the app's `ModelCache`. **125.7 to 133.2 ms**
+(target under 2,000 ms); every watched film is a member of the model it timed; with nothing new, the
+cached model costs 0.3 ms. The model at launch: 162.3 ms. In the app the rebuild runs in a background
+task after `end_viewing` and `rate_title` return (`commands::home::refresh_model`), so the UI
+does not wait. **Seen to fail**: with `ModelCache::get` made to ignore the fingerprint, the update
+"takes" 0.5 ms and no watched film is in its model: E5 NOT MET.
+
+The same run of `-- modes` now says the modes in words (15.4), on the real catalogue:
+"You gravitate toward horror and drama, mostly from the 2000s and 2010s (The Silence of the Lambs,
+The Shining, Alien)" (47%); "You also love documentary and biography … (Bowling for Columbine,
+Fahrenheit 9/11, The Social Dilemma)" (42%); and the 10% edge-case mode, "documentary and action …,
+Jeff Tremaine above all (Get Out, Saw, Super Size Me)", which says honestly that it is a mixture.
