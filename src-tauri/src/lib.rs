@@ -129,6 +129,8 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::taste::taste_preview,
             commands::taste::taste_round,
             commands::home::home,
+            commands::playback::end_viewing,
+            commands::playback::record_signal,
             commands::home::onboarding_done,
             commands::home::finish_onboarding,
         ])

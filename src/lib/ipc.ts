@@ -298,6 +298,16 @@ export const commands = {
 	 */
 	tasteRound: (shown: number[], size: number | null) => typedError<TastePick[], string>(__TAURI_INVOKE("taste_round", { shown, size })),
 	home: () => typedError<RailView[], string>(__TAURI_INVOKE("home")),
+	/**
+	 *  The player left a title (Phase 15): seconds actually played, where it stopped, its
+	 *  length. Recorded as a viewing, completed or abandoned at its point; a skim is not.
+	 */
+	endViewing: (id: number, played: number | null, position: number | null, duration: number | null) => typedError<null, string>(__TAURI_INVOKE("end_viewing", { id, played, position, duration })),
+	/**
+	 *  A light signal: "search" (a title opened from search results). Detail views are
+	 *  recorded by `item_detail` itself.
+	 */
+	recordSignal: (id: number, kind: string) => typedError<null, string>(__TAURI_INVOKE("record_signal", { id, kind })),
 	/**  Whether the first-run wizard has been finished or skipped. */
 	onboardingDone: () => typedError<boolean, string>(__TAURI_INVOKE("onboarding_done")),
 	finishOnboarding: () => typedError<null, string>(__TAURI_INVOKE("finish_onboarding")),

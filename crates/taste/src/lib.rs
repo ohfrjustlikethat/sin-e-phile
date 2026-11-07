@@ -9,6 +9,7 @@
 
 pub mod home;
 pub mod rounds;
+pub mod signals;
 
 use std::collections::HashSet;
 

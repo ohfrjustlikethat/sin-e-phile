@@ -45,6 +45,12 @@ pub async fn item_detail(
     if !allowed(&state, &db, i64::from(id)).await? {
         return Ok(None);
     }
+    // A detail page opened (Phase 15). A failure here costs a signal, never the page.
+    if let Ok(me) = state.profile().await {
+        let _ = ProfileRepository::new(&db)
+            .record_signal(me, i64::from(id), "detail")
+            .await;
+    }
     let Some(item) = media
         .by_id(i64::from(id))
         .await
@@ -340,4 +346,50 @@ pub async fn title_rating(state: State<'_, AppState>, id: i32) -> Result<Option<
         .await
         .map_err(|e| e.to_string())?
         .map(|s| s as i32))
+}
+
+/// The player left a title (Phase 15): seconds actually played, where it stopped, its
+/// length. Recorded as a viewing, completed or abandoned at its point; a skim is not.
+#[tauri::command]
+#[specta::specta]
+pub async fn end_viewing(
+    state: State<'_, AppState>,
+    id: i32,
+    played: f64,
+    position: f64,
+    duration: Option<f64>,
+) -> Result<(), String> {
+    use sinephile_taste::signals::{outcome, Outcome};
+    let db = state.db().ok_or("the library is still opening")?;
+    let completed = match outcome(played, position, duration) {
+        Outcome::Skimmed => return Ok(()),
+        Outcome::Completed => true,
+        Outcome::Abandoned { .. } => false,
+    };
+    let me = state.profile().await?;
+    ProfileRepository::new(&db)
+        .record_viewing(me, i64::from(id), played as i64, completed, position as i64)
+        .await
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+/// A light signal: "search" (a title opened from search results). Detail views are
+/// recorded by `item_detail` itself.
+#[tauri::command]
+#[specta::specta]
+pub async fn record_signal(
+    state: State<'_, AppState>,
+    id: i32,
+    kind: String,
+) -> Result<(), String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    if kind != "search" {
+        return Err("only search signals come from the page".into());
+    }
+    let me = state.profile().await?;
+    ProfileRepository::new(&db)
+        .record_signal(me, i64::from(id), &kind)
+        .await
+        .map_err(|e| e.to_string())
 }

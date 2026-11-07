@@ -157,6 +157,13 @@ function Entry({
 
 export function SearchScreen() {
   const openDetail = useUi((s) => s.openDetail);
+  // Opened from a search: a light signal for the taste model (Phase 15). Never in the way.
+  const open = (id: number) => {
+    void Promise.resolve()
+      .then(() => commands.recordSignal(id, "search"))
+      .catch(() => {});
+    openDetail(id);
+  };
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [searching, setSearching] = useState(false);
@@ -252,7 +259,7 @@ export function SearchScreen() {
       const hit = hits[focused];
       if (hit) {
         event.preventDefault();
-        openDetail(hit.id);
+        open(hit.id);
       }
     }
   }
@@ -356,7 +363,7 @@ export function SearchScreen() {
                         weight={index === 0 ? "lead" : index < 3 ? "second" : "list"}
                         focused={focused === index}
                         onFocus={() => setFocused(index)}
-                        onOpen={() => openDetail(hit.id)}
+                        onOpen={() => open(hit.id)}
                       />
                     </li>
                   );

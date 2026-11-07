@@ -460,6 +460,35 @@ async fn profile_repository_surface() {
         "a completed watch"
     );
 
+    // record_viewing / viewings — the stopping point kept (Phase 15)
+    repo.record_viewing(first, film, 300, false, 310)
+        .await
+        .expect("record_viewing");
+    let seen = repo.viewings(first).await.expect("viewings");
+    assert_eq!(seen.len(), 1);
+    assert_eq!(
+        (
+            seen[0].watched_seconds,
+            seen[0].completed,
+            seen[0].stopped_at_seconds
+        ),
+        (300, false, Some(310))
+    );
+    assert!(repo.viewings(9_999).await.unwrap().is_empty());
+
+    // record_signal / signals — one per title and kind within a minute; the kind is checked
+    repo.record_signal(first, film, "detail")
+        .await
+        .expect("record_signal");
+    repo.record_signal(first, film, "detail").await.unwrap();
+    repo.record_signal(first, film, "search").await.unwrap();
+    assert_eq!(
+        repo.signals(first, "detail").await.expect("signals").len(),
+        1
+    );
+    assert_eq!(repo.signals(first, "search").await.unwrap().len(), 1);
+    assert!(repo.record_signal(first, film, "nonsense").await.is_err());
+
     // liked — five and four stars, then completed unrated watches; a low rating is not liking
     let third = media
         .insert(&NewMediaItem::film("Early Summer", 1951))
