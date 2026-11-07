@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Input } from "@/design-system";
+import { onEvent } from "@/lib/events";
 import { commands, type LibraryFolderView, type LibraryScanEvent } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
 
@@ -58,14 +58,14 @@ export function LibrarySection() {
       void client.invalidateQueries({ queryKey: KEY });
       void client.invalidateQueries({ queryKey: REVIEW });
     };
-    const scanned = listen<LibraryScanEvent>("library-scan", (e) => {
-      setProgress((p) => ({ ...p, [e.payload.folder_id]: e.payload }));
-      if (e.payload.phase === "done" || e.payload.phase === "failed") refresh();
+    const scanned = onEvent<LibraryScanEvent>("library-scan", (e) => {
+      setProgress((p) => ({ ...p, [e.folder_id]: e }));
+      if (e.phase === "done" || e.phase === "failed") refresh();
     });
-    const changed = listen<number>("library-changed", refresh);
+    const changed = onEvent<number>("library-changed", refresh);
     return () => {
-      void scanned.then((off) => off());
-      void changed.then((off) => off());
+      scanned();
+      changed();
     };
   }, [client]);
 

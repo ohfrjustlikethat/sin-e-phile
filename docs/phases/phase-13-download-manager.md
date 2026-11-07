@@ -16,7 +16,7 @@ A download manager: queue with priorities, pause/resume/cancel, per-download and
 ## Exit criteria
 
 - [x] **E1** The advisor's recommendation is correct (matches what actually happens) in at least 8 of 10 manual trials across varied swarm conditions.
-- [ ] **E2** A download completed through the qBittorrent backend files into the library identically to one completed through librqbit, verified by comparing the resulting rows.
+- [x] **E2** A download completed through the qBittorrent backend files into the library identically to one completed through librqbit, verified by comparing the resulting rows.
 - [x] **E3** With qBittorrent configured but not running, a queued download falls back to librqbit rather than failing.
 - [x] **E4** `tools/guard` rejects any code path that reads qBittorrent's search plugins, RSS feeds or tracker configuration.
 - [x] **E5** Downloads survive an app restart and resume.

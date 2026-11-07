@@ -1,6 +1,7 @@
-//! The qBittorrent backend against a scripted stand-in of its Web API (no qBittorrent is
-//! installed here; one real round trip is an author check, Phase 13 E2). The stand-in
-//! records every request, so what is sent is asserted as much as what is read.
+//! The qBittorrent backend against a scripted stand-in of its Web API: every answer each
+//! version gives, fast and without qBittorrent. The stand-in records every request, so
+//! what is sent is asserted as much as what is read. The real round trip (Phase 13 E2) is
+//! `tests/qbittorrent_real.rs`.
 
 use std::path::Path;
 use std::sync::Arc;
@@ -85,7 +86,7 @@ async fn a_403_logs_in_once_and_the_retry_carries_the_cookie() {
 }
 
 #[tokio::test]
-async fn adding_sends_the_hash_the_folder_and_the_limit() {
+async fn adding_sends_the_link_the_folder_and_the_limit() {
     let fake = Arc::new(FakeTransport::new());
     fake.push(Response::new(200, "Ok."));
     let qb = client(&fake, false);
@@ -96,9 +97,18 @@ async fn adding_sends_the_hash_the_folder_and_the_limit() {
     let r = fake.last_request().unwrap();
     assert_eq!(r.method, Method::Post);
     assert!(r.url.ends_with("/api/v2/torrents/add"));
+    // The hash goes as a link (built by `qbittorrent::link`, which carries any trackers).
+    let link = sinephile_downloads::qbittorrent::link(&d).unwrap();
+    let encoded: String = url::form_urlencoded::byte_serialize(link.as_bytes()).collect();
+    assert!(link.contains(&hash()), "{link}");
     assert_eq!(
         r.body.as_deref(),
-        Some(format!("urls={}&savepath=D%3A%5CDownloads&dlLimit=524288", hash()).as_str())
+        Some(
+            format!(
+                "urls={encoded}&savepath=D%3A%5CDownloads%5CHeat&contentLayout=NoSubfolder&root_folder=false&dlLimit=524288"
+            )
+            .as_str()
+        )
     );
     // A .torrent file's bytes are not qBittorrent's to take.
     let mut file = download("a torrent file");

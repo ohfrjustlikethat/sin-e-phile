@@ -82,6 +82,29 @@ pub fn info_hash(d: &Download) -> Option<String> {
     }
 }
 
+/// What `torrents/add` is given for a download: its magnet as the source gave it, or one
+/// built here from the info hash and the trackers the source named at run time, so
+/// qBittorrent finds the swarm as quickly as librqbit does. The hash is hex and needs no
+/// escaping; each tracker is percent-encoded whole. The app holds no link of its own (§2.1).
+pub fn link(d: &Download) -> Option<String> {
+    if d.source.starts_with("magnet:") {
+        return Some(d.source.clone());
+    }
+    let hash = info_hash(d)?;
+    let trackers = match crate::backend::source_of(d).ok()? {
+        sinephile_torrent::Source::InfoHash { trackers, .. } => trackers,
+        _ => Vec::new(),
+    };
+    let mut query = format!("xt=urn:btih:{hash}");
+    for t in &trackers {
+        query.push_str("&tr=");
+        query.extend(url::form_urlencoded::byte_serialize(t.as_bytes()));
+    }
+    let mut magnet = url::Url::parse("magnet:").ok()?;
+    magnet.set_query(Some(&query));
+    Some(magnet.into())
+}
+
 fn valid_hex(h: &str) -> Option<String> {
     (h.len() == 40 && h.chars().all(|c| c.is_ascii_hexdigit())).then(|| h.to_ascii_lowercase())
 }
@@ -232,6 +255,21 @@ impl Qbittorrent {
     }
 }
 
+/// Whether `torrents/add` took it. Before 5.2: 200 and "Ok." (or "Fails."). From 5.2:
+/// 200, or 202 while it is still being fetched, with counts in JSON.
+fn took(status: u16, body: &str) -> bool {
+    if !(200..300).contains(&status) || body.trim() == "Fails." {
+        return false;
+    }
+    match serde_json::from_str::<serde_json::Value>(body) {
+        Ok(v) if v.is_object() => {
+            let n = |k: &str| v[k].as_u64().unwrap_or(0);
+            n("failure_count") == 0 || n("success_count") + n("pending_count") > 0
+        }
+        _ => true,
+    }
+}
+
 /// Finished, by qBittorrent's states: everything after the download is an "UP" state.
 fn finished(i: &Info) -> bool {
     i.progress >= 1.0 || i.state.ends_with("UP")
@@ -264,25 +302,31 @@ impl Backend for Qbittorrent {
         let hash = info_hash(d).ok_or_else(|| {
             BackendError::Refused(format!("cannot hand {} to qBittorrent", d.title))
         })?;
-        // A magnet as given; otherwise the bare hash, which qBittorrent accepts as a link.
-        let link = if d.source.starts_with("magnet:") {
-            d.source.clone()
-        } else {
-            hash.clone()
-        };
+        let link = link(d).unwrap_or_else(|| hash.clone());
         let limit = d
             .limit_kib
             .map(|k| (k * 1024).to_string())
             .unwrap_or_default();
-        let save = dir.to_string_lossy().into_owned();
-        let mut fields = vec![("urls", link.as_str()), ("savepath", save.as_str())];
+        // Laid out as librqbit lays it out, so a download files identically either way
+        // (E2): its own folder named for the title, the torrent's files straight inside.
+        let save = dir
+            .join(crate::backend::folder_name(&d.title))
+            .to_string_lossy()
+            .into_owned();
+        let mut fields = vec![
+            ("urls", link.as_str()),
+            ("savepath", save.as_str()),
+            ("contentLayout", "NoSubfolder"),
+            // The same, as qBittorrent before 4.3.2 asks for it.
+            ("root_folder", "false"),
+        ];
         if !limit.is_empty() {
             fields.push(("dlLimit", limit.as_str()));
         }
         let r = self
             .call(Method::Post, "torrents/add", Some(form(&fields)))
             .await?;
-        if r.status != 200 || r.body.trim() == "Fails." {
+        if !took(r.status, &r.body) {
             return Err(BackendError::Refused(format!(
                 "qBittorrent did not take {}",
                 d.title
@@ -412,6 +456,58 @@ mod tests {
         );
         assert_eq!(info_hash(&d("infohash:not-a-hash")), None);
         assert_eq!(info_hash(&d("a torrent file")), None);
+    }
+
+    #[test]
+    fn a_hash_and_its_trackers_go_to_qbittorrent_as_one_link() {
+        let hex = "0123456789abcdef".repeat(3);
+        let hex = &hex[..40];
+        let l = link(&d(&format!(
+            "infohash:{hex}|udp://example.net:6969|http://example.org/x?a=1&b=2"
+        )))
+        .unwrap();
+        let parsed = url::Url::parse(&l).unwrap();
+        assert_eq!(parsed.scheme(), "magnet");
+        let pairs: Vec<(String, String)> = parsed.query_pairs().into_owned().collect();
+        assert_eq!(pairs[0], ("xt".into(), format!("urn:btih:{hex}")));
+        assert!(
+            l.contains(&format!("xt=urn:btih:{hex}")),
+            "the hash unescaped: {l}"
+        );
+        assert_eq!(
+            pairs[1..],
+            [
+                ("tr".into(), "udp://example.net:6969".into()),
+                ("tr".into(), "http://example.org/x?a=1&b=2".into()),
+            ],
+            "every tracker, each one whole"
+        );
+        // No trackers: the hash alone, still a link qBittorrent takes.
+        let bare = url::Url::parse(&link(&d(&format!("infohash:{hex}"))).unwrap()).unwrap();
+        assert_eq!(bare.query_pairs().count(), 1);
+        assert_eq!(link(&d("a torrent file")), None);
+    }
+
+    #[test]
+    fn an_add_is_taken_as_each_version_answers_it() {
+        assert!(took(200, "Ok."), "before 5.2");
+        assert!(!took(200, "Fails."));
+        assert!(took(
+            200,
+            r#"{"added_torrent_ids":["x"],"failure_count":0,"pending_count":0,"success_count":1}"#
+        ));
+        assert!(
+            took(
+                202,
+                r#"{"added_torrent_ids":[],"failure_count":0,"pending_count":1,"success_count":0}"#
+            ),
+            "5.2, still fetching"
+        );
+        assert!(!took(
+            200,
+            r#"{"added_torrent_ids":[],"failure_count":1,"pending_count":0,"success_count":0}"#
+        ));
+        assert!(!took(415, ""));
     }
 
     #[test]

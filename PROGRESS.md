@@ -12,7 +12,7 @@
 
 **Phase 13 — Download Manager and the Stream-vs-Download Advisor** (`in_progress`, branch `phase/13-download-manager`)
 
-7 of 8 exit criteria met with evidence.
+8 of 8 exit criteria met with evidence.
 
 > Opened 2026-11-07 when Phase 12 merged (b5dccda, tag phase-12). qBittorrent is not installed on this machine; installing software on the author's PC is outside the repository, so the backend is built and tested against a local stand-in of its Web API and the one real round trip joins the batched author checks (13.6). The taste model (Phase 15) does not exist yet: the advisor takes its input through an interface with a neutral stand-in, recorded rather than faked. Author checks carried here: Phase 7 E7, Phase 8 E5.
 
@@ -29,7 +29,8 @@
 
 - [x] **E1** The advisor's recommendation is correct (matches what actually happens) in at least 8 of 10 manual trials across varied swarm conditions.
       - *Evidence:* 92c070d: cargo run --release -p eval -- advise (2026-11-07), ten fresh loopback swarm conditions chosen after the model's last change and run once (bitrates 0.8, 2 and 3 MB/s; one to four capped seeders; 0.6x to 2.5x the bitrate): each measured as the app measures, advised, then played from a fresh engine at its bitrate after a 3-second buffer. 9 of 10 right (target at least 8): the miss was four slow peers at 0.86 MB/s for a 0.8 MB/s film, judged 4% likely to pause, which paused once. The first run on twelve other conditions scored 7/12 and found the engine's speed bug (7e18942); both runs and every change between them are in docs/eval-results.md. Caveat recorded there: a loopback swarm is steadier than the internet.
-- [ ] **E2** A download completed through the qBittorrent backend files into the library identically to one completed through librqbit, verified by comparing the resulting rows.
+- [x] **E2** A download completed through the qBittorrent backend files into the library identically to one completed through librqbit, verified by comparing the resulting rows.
+      - *Evidence:* cargo test -p sinephile-downloads --test qbittorrent_real -- --ignored --nocapture (2026-11-07, qBittorrent v5.2.0 installed here; two instances isolated from the user's own by --profile, Web UIs on 127.0.0.1, each verified as the isolated one before use): the same 6,303,801-byte download through the app's Qbittorrent backend and through librqbit filed identically field by field: Done, done/total 6,303,801, file Heat/Heat.1995.1080p.mkv relative to Downloads, library size 6,303,801, match Heat 1.0 confirmed Metadata covers 1, folder registered. Seen to fail first on the real thing: qBittorrent's copy landed at Heat.1995.1080p/... until the backend used the per-title folder (contentLayout=NoSubfolder). docs/eval-results.md 'E2: a real qBittorrent round trip'.
 - [x] **E3** With qBittorrent configured but not running, a queued download falls back to librqbit rather than failing.
       - *Evidence:* f5345b5: crates/downloads/tests/queue.rs a_configured_qbittorrent_that_is_not_running_falls_back_to_librqbit: the backends are [qBittorrent at an address nothing answers, librqbit]; a download meant for qBittorrent is started on the first tick (not failed), its row says librqbit moved the bytes, and it completes from a loopback seeder. Seen to fail with the fallback removed from Manager::usable. qBittorrent's availability is its app/version answering (crates/downloads/tests/qbittorrent.rs not_running_is_unavailable_and_running_is_available).
 - [x] **E4** `tools/guard` rejects any code path that reads qBittorrent's search plugins, RSS feeds or tracker configuration.
@@ -47,13 +48,13 @@
 
 ## What's next
 
-Phase 13 subtask 13.6 (docs/phases/phase-13-download-manager.md): write docs/specs/downloads.md (queue, backends, advisor, storage, the IPC surface in src-tauri/src/commands/downloads.rs), docs/learning/phase-13-notes.md (four sections, concepts as file:line), README and HOW_IT_WORKS stubs; run the regression (cargo run --release -p eval -- all against docs/eval-results.md); then close Phase 13 with E2 carried to Phase 16 under ADR-0036 (needs a real qBittorrent, which needs the author; batched with the author checks after Phase 15), merge --no-ff, tag phase-13, open Phase 14.
+Phase 13 close (docs/phases/phase-13-download-manager.md, subtask 13.6): every criterion now has evidence (E2 met against a real qBittorrent). Run the full pre-push list, commit, push, wait for CI green on phase/13-download-manager, merge --no-ff into main, CI green on main, tag phase-13, write the phase record (status complete, completion_commit = the merge) and the SESSION_LOG retrospective, then python tools/phasedoc/generate.py --close 13 and --open 14, and author Phase 14 subtasks from SPEC.md §15.
 
 ---
 
 ## Blockers
 
-None.
+- **B13** CI failed on phase/13 at c594a0c: (1) the UI audit's plain browser threw because the masthead's download count called Tauri's listen() on every page outside the shell; fixed by src/lib/events.ts onEvent, used by every always-mounted listener, and npm run audit:ui added to CLAUDE.md's pre-push list (locally it had been hanging: Vite scanned 96 index.html copies under target/, fixed by optimizeDeps.entries); (2) the bandwidth-limit tests measured 1.24 and 2.47 MiB/s against 1 and 2 on the runner, the limiter's opening burst inside the window; fixed by measuring only once the download is flowing (limits.rs settle). Clears when CI is green on the fix.
 
 ---
 
@@ -76,7 +77,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 10 | Subtitle Pipeline | B | 8 | 2 | 6/6 |
 | [x] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 6/6 |
 | [x] | 12 | Local Library Engine | B | 4 | 2–3 | 6/6 |
-| [~] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 7/8 |
+| [~] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 8/8 |
 | [ ] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 0/6 |
 | [ ] | 15 | Taste Model | B | 5, 14 | 2 | 0/5 |
 | [ ] | 16 | Recommendation Engine | B | 15 | 2–3 | 0/6 |
@@ -177,6 +178,7 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D77** (raised in Phase 12) CREATE_NO_WINDOW is now set on FFprobe and the subtitle aligner's FFmpeg; confirm in a release build (windows subsystem) that no console window flashes during a scan or an alignment. Batched with the Phase 13 author checks.
 - **D78** (raised in Phase 13) Completion notices are in-app toasts only (src/features/downloads/DownloadNotices.tsx). A Windows notification when the window is not in front needs the Tauri notification plugin; adding a plugin upgraded Tauri last time (the dialog plugin), so it waits for Phase 20's Windows integration, alongside the media controls.
 - **D79** (raised in Phase 13) The advisor runs only for a torrent copy the film page already started (the plan's chosen candidate). A web stream is not downloadable, so nothing is offered; a title whose best copy is a web stream but which also has a torrent copy is not offered the torrent to download. Revisit with the Phase 15 taste input.
+- **D80** (raised in Phase 13) Upstream (librqbit 9.0.1): create_torrent writes one piece hash too many when the content is a whole number of pieces (500 bytes of hashes for 24 pieces of 256 KiB); libtorrent refuses such a torrent as invalid (stays fetching metadata, then errors; a .torrent of it is never added). The app never creates torrents, so only test fixtures are affected; crates/downloads/tests/qbittorrent_real.rs uses a size that is not a whole number. Worth reporting upstream (the author's call: an outward-facing issue).
 
 ---
 

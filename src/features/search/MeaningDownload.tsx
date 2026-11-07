@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
+import { onEvent } from "@/lib/events";
 import { commands, type AssetPlan, type AssetProgress } from "@/lib/ipc";
 import { Button, ProgressBar } from "@/design-system";
 
@@ -58,14 +58,7 @@ export function MeaningDownload({ onDone }: { onDone?: () => void }) {
     void commands.optionalAssets().then(setPlan);
   }, []);
 
-  useEffect(() => {
-    const unlisten = listen<AssetProgress>("asset-progress", (event) =>
-      setProgress(event.payload),
-    );
-    return () => {
-      void unlisten.then((off) => off());
-    };
-  }, []);
+  useEffect(() => onEvent<AssetProgress>("asset-progress", setProgress), []);
 
   if (!plan || plan.complete) return null;
 

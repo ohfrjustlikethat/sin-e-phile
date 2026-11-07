@@ -80,3 +80,21 @@ export function status(row: DownloadRow, now: Date = new Date()): string {
 export function inProgress(rows: DownloadRow[]): DownloadRow[] {
   return rows.filter((r) => ["active", "queued", "paused", "failed"].includes(r.download.state));
 }
+
+/**
+ * Move one download a place up (-1) or down (+1): the list is renumbered so one press is
+ * always exactly one place, whatever priorities it had. Returns only the changes, as
+ * [id, priority], highest priority first in queue order.
+ */
+export function reorder(rows: DownloadRow[], index: number, delta: -1 | 1): Array<[number, number]> {
+  const to = index + delta;
+  if (to < 0 || to >= rows.length) return [];
+  const order = [...rows];
+  const [moved] = order.splice(index, 1);
+  if (!moved) return [];
+  order.splice(to, 0, moved);
+  return order
+    .map((r, i): [number, number, number] => [r.download.id, order.length - i, r.download.priority])
+    .filter(([, next, was]) => next !== was)
+    .map(([id, next]) => [id, next]);
+}

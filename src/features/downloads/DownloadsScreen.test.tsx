@@ -79,7 +79,9 @@ describe("Downloads (SPEC.md Phase 13)", () => {
     expect(commands.downloadPause).toHaveBeenCalledWith(1);
     expect(within(first).getByRole("button", { name: "Move Sunrise up" })).toBeDisabled();
     fireEvent.click(within(first).getByRole("button", { name: "Move Sunrise down" }));
-    expect(commands.downloadPriority).toHaveBeenCalledWith(1, -1);
+    // Renumbered so it is exactly one place down: Tabu 2, Sunrise 1.
+    await waitFor(() => expect(commands.downloadPriority).toHaveBeenCalledWith(1, 1));
+    expect(commands.downloadPriority).toHaveBeenCalledWith(2, 2);
     fireEvent.click(within(first).getByRole("button", { name: "Tonight" }));
     expect(commands.downloadTonight).toHaveBeenCalledWith(1, true);
     fireEvent.change(within(first).getByLabelText("Speed limit for Sunrise"), { target: { value: "2048" } });

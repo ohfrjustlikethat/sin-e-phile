@@ -293,3 +293,12 @@ JSON document naming it and its two endpoints. Data, never code (ADR-0038).
 
 **Backfill** *(Phase 6)* — A catalogue entry created because a search missed and a
 source found the film anyway (ADR-0030 layer 3). Marked, so it can be reconciled.
+
+**Stall probability** *(Phase 13)* — How likely a stream is to pause to buffer: the swarm's
+measured rate against the rate the film needs, allowing for wobble and for few sharers.
+
+**Advisor** *(Phase 13)* — The sentence under Play that says whether to stream or download,
+and why.
+
+**Transport only** *(Phase 13, ADR-0029)* — The user's qBittorrent moves bytes for the app and
+nothing more; its search plugins, feeds and tracker lists are never read.

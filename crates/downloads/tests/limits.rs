@@ -82,7 +82,33 @@ fn no_probe(_: &Path) -> Option<Probe> {
     None
 }
 
-/// Download under the given limits; the mean rate from 1 s to 7 s after it started.
+/// Tick until the download has moved `bytes` past `from`: it is flowing, and whatever burst
+/// the limiter allowed while peers connected is spent. A fixed wait was not enough on a slow
+/// CI runner, where connecting took longer and the burst fell inside the measured window
+/// (1.24 and 2.47 MiB/s measured against 1 and 2).
+async fn settle(m: &Manager, db: &Db, id: i64, from: i64, bytes: i64) {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        m.tick(NOW).await.unwrap();
+        let done = DownloadRepository::new(db)
+            .get(id)
+            .await
+            .unwrap()
+            .unwrap()
+            .done_bytes;
+        if done >= from + bytes {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "never flowed: {done} of {}",
+            from + bytes
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
+/// Download under the given limits; the mean rate over six seconds once it is flowing.
 async fn rate(per_download_kib: Option<i64>, global_bps: Option<u32>) -> f64 {
     let work = TempDir::new().unwrap();
     let (_seeder, torrent, peer) = seed(work.path(), "Limit.Test", 48 * MIB).await;
@@ -121,8 +147,12 @@ async fn rate(per_download_kib: Option<i64>, global_bps: Option<u32>) -> f64 {
             .unwrap()
             .done_bytes
     };
-    tokio::time::sleep(Duration::from_secs(1)).await;
-    m.tick(NOW).await.unwrap();
+    // Two seconds' worth at the limit under test.
+    let limit = per_download_kib
+        .map(|k| k * 1024)
+        .or(global_bps.map(i64::from))
+        .unwrap_or(MIB as i64);
+    settle(&m, &db, id, 0, 2 * limit).await;
     let (t0, b0) = (Instant::now(), done(db.clone()).await);
     for _ in 0..12 {
         tokio::time::sleep(Duration::from_millis(500)).await;
@@ -263,8 +293,8 @@ async fn a_limit_changed_while_running_takes_effect_and_keeps_the_pieces() {
 
     m.set_limit(id, Some(3 * 1024)).await.unwrap();
     m.tick(NOW).await.unwrap();
-    tokio::time::sleep(Duration::from_secs(1)).await;
-    m.tick(NOW).await.unwrap();
+    // Re-added: flowing again at the new limit before the window opens.
+    settle(&m, &db, id, before, 2 * 3 * MIB as i64).await;
     let (t0, b0) = (
         Instant::now(),
         repo.get(id).await.unwrap().unwrap().done_bytes,

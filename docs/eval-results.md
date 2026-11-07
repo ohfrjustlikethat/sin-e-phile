@@ -2583,3 +2583,43 @@ past the ramp-up. Then ten **fresh** conditions, chosen before they ran and run 
 **9 of 10 right** (target at least 8). The miss: four slow peers barely above the bitrate, judged
 safe at 4%, paused once. Every reason was one sentence. Caveat: a loopback swarm is steadier than the
 internet; the trials test the model's arithmetic and the measurement, not real-world peer churn.
+
+### E2: a real qBittorrent round trip, met
+
+2026-11-07, qBittorrent **v5.2.0** (installed on this machine), `cargo test -p sinephile-downloads
+--test qbittorrent_real -- --ignored --nocapture`. Two instances isolated from the user's own
+(separate `--profile` folders, Web UIs on 127.0.0.1, DHT/PeX/LSD/port forwarding off; each checked to
+be the isolated one before anything was added; only those processes stopped): one seeds a 6.0 MB
+file, the other is driven only through the app's `Qbittorrent` backend, by link. The same download
+through librqbit, compared field by field:
+
+| Field | librqbit | qBittorrent |
+|---|---|---|
+| state, done, total | Done, 6,303,801, 6,303,801 | Done, 6,303,801, 6,303,801 |
+| file, relative to Downloads | `Heat/Heat.1995.1080p.mkv` | `Heat/Heat.1995.1080p.mkv` |
+| library row size | 6,303,801 | 6,303,801 |
+| match | Heat, 1.0, confirmed, Metadata, covers 1 | the same |
+| downloads folder registered | yes | yes |
+
+**Seen to fail first**, on the real thing: before the fix the qBittorrent copy landed at
+`Heat.1995.1080p/Heat.1995.1080p.mkv`, because the backend gave qBittorrent the downloads folder
+rather than the per-title folder librqbit uses. Fixed (`savepath` = the title's folder,
+`contentLayout=NoSubfolder`). The real run also found two more bugs the stand-in could not:
+
+- qBittorrent 5.2 answers `torrents/add` with **202** and JSON counts while it fetches; the backend
+  treated anything but 200 as refused. Fixed (`took`), with a test of every version's answer.
+- A download found by a source (`infohash:` with trackers) reached qBittorrent as the bare hash,
+  **without its trackers**; it now goes as a link carrying them (`qbittorrent::link`).
+
+And one upstream fault, recorded as D80: librqbit's `create_torrent` writes one piece hash too many
+when a file is a whole number of pieces (500 bytes of hashes for 24 pieces); libtorrent refuses such a
+torrent as invalid. The app never makes torrents; the test's file is deliberately not a whole number.
+
+### Regression check before merging Phase 13 (rule 13)
+
+2026-11-07, `cargo run --release -p eval -- all` twice and `-- vector --report`: E2 **43/43**; E3
+meaning **0.0472**, filter **1.0000** (carried); p95 **43.8 ms** cold, **15.8 ms** warm (15.2 at Phase
+12; 14.8 to 15.6 across recent runs: noise); recall@10 **0.9760**; subtitles **80/80**, held out 32/32,
+false accepts **0/10**; identify **99.05% / 0.39%** (held out 100% / 0%), 44.7 ms per name. Unchanged
+from Phase 12. Rust tests 739 passed, 0 failed, 6 ignored (E2's real round trip among them, run on
+demand); frontend 136. `npm run audit:ui`: rail p95 16.8 ms, 0 dropped, 45 focus stops all ringed.

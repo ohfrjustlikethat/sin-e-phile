@@ -59,8 +59,8 @@
       {
         "id": "E2",
         "text": "A download completed through the qBittorrent backend files into the library identically to one completed through librqbit, verified by comparing the resulting rows.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "cargo test -p sinephile-downloads --test qbittorrent_real -- --ignored --nocapture (2026-11-07, qBittorrent v5.2.0 installed here; two instances isolated from the user's own by --profile, Web UIs on 127.0.0.1, each verified as the isolated one before use): the same 6,303,801-byte download through the app's Qbittorrent backend and through librqbit filed identically field by field: Done, done/total 6,303,801, file Heat/Heat.1995.1080p.mkv relative to Downloads, library size 6,303,801, match Heat 1.0 confirmed Metadata covers 1, folder registered. Seen to fail first on the real thing: qBittorrent's copy landed at Heat.1995.1080p/... until the backend used the per-title folder (contentLayout=NoSubfolder). docs/eval-results.md 'E2: a real qBittorrent round trip'."
       },
       {
         "id": "E3",
@@ -1578,8 +1578,8 @@
         {
           "id": "E2",
           "text": "A download completed through the qBittorrent backend files into the library identically to one completed through librqbit, verified by comparing the resulting rows.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "cargo test -p sinephile-downloads --test qbittorrent_real -- --ignored --nocapture (2026-11-07, qBittorrent v5.2.0 installed here; two instances isolated from the user's own by --profile, Web UIs on 127.0.0.1, each verified as the isolated one before use): the same 6,303,801-byte download through the app's Qbittorrent backend and through librqbit filed identically field by field: Done, done/total 6,303,801, file Heat/Heat.1995.1080p.mkv relative to Downloads, library size 6,303,801, match Heat 1.0 confirmed Metadata covers 1, folder registered. Seen to fail first on the real thing: qBittorrent's copy landed at Heat.1995.1080p/... until the backend used the per-title folder (contentLayout=NoSubfolder). docs/eval-results.md 'E2: a real qBittorrent round trip'."
         },
         {
           "id": "E3",
@@ -2316,8 +2316,15 @@
       ]
     }
   ],
-  "next_action": "Phase 13 subtask 13.6 (docs/phases/phase-13-download-manager.md): write docs/specs/downloads.md (queue, backends, advisor, storage, the IPC surface in src-tauri/src/commands/downloads.rs), docs/learning/phase-13-notes.md (four sections, concepts as file:line), README and HOW_IT_WORKS stubs; run the regression (cargo run --release -p eval -- all against docs/eval-results.md); then close Phase 13 with E2 carried to Phase 16 under ADR-0036 (needs a real qBittorrent, which needs the author; batched with the author checks after Phase 15), merge --no-ff, tag phase-13, open Phase 14.",
-  "blockers": [],
+  "next_action": "Phase 13 close (docs/phases/phase-13-download-manager.md, subtask 13.6): every criterion now has evidence (E2 met against a real qBittorrent). Run the full pre-push list, commit, push, wait for CI green on phase/13-download-manager, merge --no-ff into main, CI green on main, tag phase-13, write the phase record (status complete, completion_commit = the merge) and the SESSION_LOG retrospective, then python tools/phasedoc/generate.py --close 13 and --open 14, and author Phase 14 subtasks from SPEC.md §15.",
+  "blockers": [
+    {
+      "id": "B13",
+      "raised": "2026-11-07T10:15:00Z",
+      "needs_user": false,
+      "description": "CI failed on phase/13 at c594a0c: (1) the UI audit's plain browser threw because the masthead's download count called Tauri's listen() on every page outside the shell; fixed by src/lib/events.ts onEvent, used by every always-mounted listener, and npm run audit:ui added to CLAUDE.md's pre-push list (locally it had been hanging: Vite scanned 96 index.html copies under target/, fixed by optimizeDeps.entries); (2) the bandwidth-limit tests measured 1.24 and 2.47 MiB/s against 1 and 2 on the runner, the limiter's opening burst inside the window; fixed by measuring only once the download is flowing (limits.rs settle). Clears when CI is green on the fix."
+    }
+  ],
   "decisions_pending": [
     {
       "id": "P1",
@@ -2986,6 +2993,11 @@
     {
       "id": "D79",
       "text": "The advisor runs only for a torrent copy the film page already started (the plan's chosen candidate). A web stream is not downloadable, so nothing is offered; a title whose best copy is a web stream but which also has a torrent copy is not offered the torrent to download. Revisit with the Phase 15 taste input.",
+      "phase_raised": 13
+    },
+    {
+      "id": "D80",
+      "text": "Upstream (librqbit 9.0.1): create_torrent writes one piece hash too many when the content is a whole number of pieces (500 bytes of hashes for 24 pieces of 256 KiB); libtorrent refuses such a torrent as invalid (stays fetching metadata, then errors; a .torrent of it is never added). The app never creates torrents, so only test fixtures are affected; crates/downloads/tests/qbittorrent_real.rs uses a size that is not a whole number. Worth reporting upstream (the author's call: an outward-facing issue).",
       "phase_raised": 13
     }
   ],

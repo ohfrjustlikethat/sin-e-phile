@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { listen } from "@tauri-apps/api/event";
+import { onEvent } from "@/lib/events";
 import { commands } from "@/lib/ipc";
 
 export const DOWNLOADS = ["downloads"];
@@ -18,13 +18,12 @@ async function ok<T>(p: Promise<{ status: "ok"; data: T } | { status: "error"; e
  */
 export function useDownloads() {
   const client = useQueryClient();
-  useEffect(() => {
-    const off = listen("downloads-changed", () => {
-      void client.invalidateQueries({ queryKey: DOWNLOADS });
-    });
-    return () => {
-      void off.then((f) => f()).catch(() => {});
-    };
-  }, [client]);
+  useEffect(
+    () =>
+      onEvent("downloads-changed", () => {
+        void client.invalidateQueries({ queryKey: DOWNLOADS });
+      }),
+    [client],
+  );
   return useQuery({ queryKey: DOWNLOADS, queryFn: () => ok(commands.downloads()) });
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DownloadRow } from "@/lib/ipc";
-import { age, inProgress, rate, size, status, timeLeft } from "./format";
+import { age, inProgress, rate, reorder, size, status, timeLeft } from "./format";
 
 const MB = 1024 * 1024;
 
@@ -46,6 +46,27 @@ describe("the Downloads page's words (SPEC.md Phase 13)", () => {
     expect(status(tonight, new Date("2026-11-07T20:00:00Z"))).toMatch(/^Starts at \d\d:\d\d$/);
     expect(status(tonight, new Date("2026-11-08T02:00:00Z"))).toBe("Waiting its turn");
     expect(status(row({ total_bytes: 100, done_bytes: null }, null, 1))).toBe("0% · waiting for someone to share it");
+  });
+
+  it("moves a download exactly one place, whatever the priorities were", () => {
+    // Queue order: A (5), B (5), C (0), D (0).
+    const rows = [
+      row({ id: 1, priority: 5 }), row({ id: 2, priority: 5 }), row({ id: 3, priority: 0 }), row({ id: 4, priority: 0 }),
+    ];
+    // C up one: A, C, B, D numbered 4, 3, 2, 1; every priority changes.
+    expect(reorder(rows, 2, -1)).toEqual([[1, 4], [3, 3], [2, 2], [4, 1]]);
+    // Applying it and sorting by priority (desc, then id) gives exactly that order.
+    const next = new Map(reorder(rows, 2, -1));
+    const sorted = rows
+      .map((r) => ({ id: r.download.id, p: next.get(r.download.id) ?? r.download.priority }))
+      .sort((a, b) => b.p - a.p || a.id - b.id)
+      .map((r) => r.id);
+    expect(sorted).toEqual([1, 3, 2, 4]);
+    expect(reorder(rows, 0, -1)).toEqual([]);
+    expect(reorder(rows, 3, 1)).toEqual([]);
+    // Already numbered: only the two that swap change.
+    const numbered = [row({ id: 1, priority: 3 }), row({ id: 2, priority: 2 }), row({ id: 3, priority: 1 })];
+    expect(reorder(numbered, 2, -1)).toEqual([[3, 2], [2, 1]]);
   });
 
   it("counts what is in progress, not what is done", () => {

@@ -45,6 +45,8 @@ could hurt the whole app.* So:
   `cargo test --workspace` · `npm run lint` · `npm test` · `npm run build` ·
   `node tools/uiaudit/controller.mjs` (the pad flow against the built `dist/`; it runs
   locally, and a changed IPC shape breaks its fake backend before it breaks CI) ·
+  `npm run audit:ui` (CI runs it in a plain browser in dev mode, where anything that calls the
+  Tauri API without `src/lib/events.ts`'s guard throws) ·
   `python tools/state/build_state.py --check` (CI runs it; the state's criteria must match §15) ·
   `python tools/guard/guard.py --staged` (the hook) · `python tools/guard/secretscan.py --tree` ·
   **gitleaks over full history** (CI runs it; the regex scanner does not catch what it

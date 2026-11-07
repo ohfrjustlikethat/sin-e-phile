@@ -233,6 +233,24 @@ failure here, so it is measured separately: 0.39% of what it accepts, against a 
 came from and how long each runs, and putting aside only the ones where two films share a
 name and a year.
 
+### Downloads — stream it, or fetch it first? `✅ Phase 13`
+
+A swarm that delivers a little less than a film needs will play for a while and then pause.
+So before Play is pressed, the film's page watches the swarm for three seconds and asks how
+likely a pause is: the measured rate against the rate the film needs, allowing for how much
+the rate wobbles and for how few people are sharing. Under a 10% chance, stream; otherwise
+download, and say how long. A large film on a slow evening, on a connection that is much
+faster at night, is suggested for tonight. The answer is one sentence, and the other choice is
+always one press away.
+
+A download goes into a queue that survives a restart and keeps the pieces it has, whatever
+happens to it. When it finishes it is filed into the library already matched, so a
+downloaded film is indistinguishable from one you already had. Your own qBittorrent can move
+the bytes instead, but only the bytes: its search and feeds are never touched.
+
+**The analogy:** a weather forecast for the evening's film, "70% chance of buffering", with
+the umbrella (download it first) handed to you rather than lectured about.
+
 ### Taste and discovery — the reason to use this at all `⬜ Phases 15–17`
 
 The taste model does not average you into one vector, because someone who loves both
@@ -373,6 +391,14 @@ parallel, probe only the uncertain), watches (ReadDirectoryChangesW through `not
 rename kept a rename) and runs the review queue. The local source answers from the library,
 so a film on this PC sits beside every other copy on its page. How it all fits:
 `docs/specs/library.md`.
+
+### Downloads ✅ `Phase 13`
+
+`crates/downloads`: a pure queue planner, a manager ticked once a second, two backends
+(librqbit, the user's qBittorrent over its Web API, falling back), filing into the library,
+the advisor (stall probability, disk, the hour, taste) and storage (watched first, clearing a
+download's own folder). The Downloads page and the advisor under Play are pad-complete. How
+it all fits: `docs/specs/downloads.md`.
 
 ### The posture guard ✅ `Phase 0`
 

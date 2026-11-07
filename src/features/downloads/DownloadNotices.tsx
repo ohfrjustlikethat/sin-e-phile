@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
 import { ToastStack, type ToastMessage } from "@/design-system";
+import { onEvent } from "@/lib/events";
 
 /**
  * Completion notices (SPEC.md Phase 13): "Sunrise has downloaded" wherever the viewer
@@ -15,15 +15,15 @@ export function DownloadNotices() {
     let n = 0;
     const push = (text: string, tone: "success" | "danger") =>
       setToasts((t) => [...t, { id: `download-${Date.now()}-${n++}`, text, tone }]);
-    const finished = listen<string>("download-finished", (e) =>
-      push(`${e.payload} has downloaded, and is in your library.`, "success"),
+    const finished = onEvent<string>("download-finished", (title) =>
+      push(`${title} has downloaded, and is in your library.`, "success"),
     );
-    const failed = listen<string>("download-failed", (e) =>
-      push(`${e.payload} stopped downloading. Downloads says why.`, "danger"),
+    const failed = onEvent<string>("download-failed", (title) =>
+      push(`${title} stopped downloading. Downloads says why.`, "danger"),
     );
     return () => {
-      void finished.then((f) => f()).catch(() => {});
-      void failed.then((f) => f()).catch(() => {});
+      finished();
+      failed();
     };
   }, []);
 

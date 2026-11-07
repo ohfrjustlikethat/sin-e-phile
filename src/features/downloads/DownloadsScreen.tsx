@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge, Button, EmptyState, Input, ProgressBar, Select } from "@/design-system";
 import { commands, type DownloadRow, type DownloadsSettingsView, type StoredView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
-import { age, fraction, inProgress, n, rate, size, status } from "./format";
+import { age, fraction, inProgress, n, rate, reorder, size, status } from "./format";
 import { DOWNLOADS, STORAGE, useDownloads } from "./useDownloads";
 
 /**
@@ -93,7 +93,13 @@ export function DownloadsScreen() {
         ) : (
           <ol className="flex flex-col">
             {rows.map((r, i) => (
-              <DownloadItem key={r.download.id} row={r} first={i === 0} last={i === rows.length - 1} />
+              <DownloadItem
+                key={r.download.id}
+                row={r}
+                first={i === 0}
+                last={i === rows.length - 1}
+                move={(delta) => reorder(rows, i, delta)}
+              />
             ))}
           </ol>
         )}
@@ -112,6 +118,17 @@ export function DownloadsScreen() {
   );
 }
 
+/** Several priority changes as one action: the first error, if any. */
+async function setPriorities(
+  changes: Array<[number, number]>,
+): Promise<{ status: "ok"; data: null } | { status: "error"; error: string }> {
+  for (const [id, priority] of changes) {
+    const r = await commands.downloadPriority(id, priority);
+    if (r.status === "error") return r;
+  }
+  return { status: "ok", data: null };
+}
+
 function useAct() {
   const client = useQueryClient();
   return useMutation({
@@ -123,7 +140,17 @@ function useAct() {
   });
 }
 
-function DownloadItem({ row, first, last }: { row: DownloadRow; first: boolean; last: boolean }) {
+function DownloadItem({
+  row,
+  first,
+  last,
+  move,
+}: {
+  row: DownloadRow;
+  first: boolean;
+  last: boolean;
+  move: (delta: -1 | 1) => Array<[number, number]>;
+}) {
   const d = row.download;
   const act = useAct();
   const openDetail = useUi((s) => s.openDetail);
@@ -173,7 +200,7 @@ function DownloadItem({ row, first, last }: { row: DownloadRow; first: boolean; 
           variant="ghost"
           disabled={first}
           aria-label={`Move ${d.title} up`}
-          onClick={() => act.mutate(commands.downloadPriority(d.id, d.priority + 1))}
+          onClick={() => act.mutate(setPriorities(move(-1)))}
         >
           Sooner
         </Button>
@@ -182,7 +209,7 @@ function DownloadItem({ row, first, last }: { row: DownloadRow; first: boolean; 
           variant="ghost"
           disabled={last}
           aria-label={`Move ${d.title} down`}
-          onClick={() => act.mutate(commands.downloadPriority(d.id, d.priority - 1))}
+          onClick={() => act.mutate(setPriorities(move(1)))}
         >
           Later
         </Button>
