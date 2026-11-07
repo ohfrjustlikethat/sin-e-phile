@@ -33,8 +33,8 @@
       {
         "id": "14.4",
         "text": "Taste input: the six taste statements (pace, ambiguity, era, subtitles, runtime, formal experimentation) stored per profile; the free-text 'what you love' embedded with the query embedder and stored; a seed taste vector from imports and statements, so E2's 'reflected in the taste model' is measurable now (nearest titles to the vector against the imported favourites) and Phase 15 builds on it.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "8174b82"
       },
       {
         "id": "14.5",
@@ -1713,8 +1713,8 @@
         {
           "id": "14.4",
           "text": "Taste input: the six taste statements (pace, ambiguity, era, subtitles, runtime, formal experimentation) stored per profile; the free-text 'what you love' embedded with the query embedder and stored; a seed taste vector from imports and statements, so E2's 'reflected in the taste model' is measurable now (nearest titles to the vector against the imported favourites) and Phase 15 builds on it.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "8174b82"
         },
         {
           "id": "14.5",
@@ -2342,7 +2342,7 @@
       ]
     }
   ],
-  "next_action": "Phase 14 subtask 14.4 (docs/phases/phase-14-profiles.md): taste input. Store the six taste statements (pace, ambiguity, era, subtitles, runtime, formal experimentation) and the free-text \"what you love\" per profile (profile_settings via CredentialRepository::set), embed the free text with the query embedder, and build a seed taste vector (crates/taste: the mean of the catalogue vectors of titles rated 4-5 or completed, plus the free-text vector); measure E2's second half with eval import: the nearest titles to the seed vector against the imported favourites.",
+  "next_action": "Phase 14 subtask 14.5 (docs/phases/phase-14-profiles.md): the onboarding wizard in src/features/onboarding/Onboarding.tsx, shown on first run only (a setting onboarding.done): step 1 the profile (name, colour); step 2 taste (ImportHistory, TasteInput, and an adaptive typographic title-card round: 3-4 rounds of well-known films chosen to spread across the catalogue, each later round from near the picks so far); step 3 sources (paste a URL, the Internet Archive on by default, add a folder inline); each skippable, never a dead end; pad-complete in tools/uiaudit/controller.mjs; E3 and E4 tested with no key and no sources.",
   "blockers": [],
   "decisions_pending": [
     {

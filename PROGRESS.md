@@ -16,12 +16,12 @@
 
 > E1 and E6 need a person and the author; built and tested as far as code allows, asked for in the batch after Phase 15 (ADR-0040).
 
-### Subtasks — 3/6 complete
+### Subtasks — 4/6 complete
 
 - [x] **14.1** Profiles in the backend: migration 0024 (avatar colour, PIN salt and hash, kids flag and limit, last used); ProfileRepository create/rename/delete (never the last)/set_pin/verify_pin/set_kids/touch, each with a line in repository_surface.rs; an active profile in AppState replacing every ensure_default() call in src-tauri; a crate test that watchlist, positions, ratings, watch events, settings and keys never cross profiles (E5). · `f671bc2`
 - [x] **14.2** Profiles in the app: the picker on launch only with two or more (ADR-0043), the avatar in the masthead with a switcher, create and edit with an optional PIN, the kids profile failing closed (TMDB certification within the limit when the profile has a key, otherwise Family or Animation titles that are not adult nor tagged with an adult genre); switching timed to a re-rendered Home (E5); pad-complete in tools/uiaudit/controller.mjs. The frontend's personal browser storage (playback choice, recent searches) is scoped by profile and reloaded on a switch; machine settings (controller, last destination) stay shared. · `272b54f`
 - [x] **14.3** Imports (crates/imports): Letterboxd CSV (watched, ratings, diary, watchlist), Trakt JSON, IMDb ratings CSV, MAL and AniList XML, each matched to the catalogue (an IMDb id where the file gives one, else title and year through the library's identifier), recorded per profile as ratings, completed watches and watchlist, unmatched rows listed in words; a 500+ entry Letterboxd fixture built from catalogue titles, match rate recorded (E2). · `cace2eb`
-- [ ] **14.4** Taste input: the six taste statements (pace, ambiguity, era, subtitles, runtime, formal experimentation) stored per profile; the free-text 'what you love' embedded with the query embedder and stored; a seed taste vector from imports and statements, so E2's 'reflected in the taste model' is measurable now (nearest titles to the vector against the imported favourites) and Phase 15 builds on it.
+- [x] **14.4** Taste input: the six taste statements (pace, ambiguity, era, subtitles, runtime, formal experimentation) stored per profile; the free-text 'what you love' embedded with the query embedder and stored; a seed taste vector from imports and statements, so E2's 'reflected in the taste model' is measurable now (nearest titles to the vector against the imported favourites) and Phase 15 builds on it. · `8174b82`
 - [ ] **14.5** The onboarding wizard: profile, taste (imports, statements, free text, and the adaptive typographic title-card grid as an extra round: 3-4 rounds, picks spread for information gain), sources (paste a URL, the Internet Archive, add a folder inline), each skippable and never a dead end; shown on first run only; E3 and E4 tested with no key and no sources; pad-complete.
 - [ ] **14.6** Author checks batched after Phase 15 (E1 a first-time user timed to a populated Home; E6 sign-off on the onboarding screens) with the earlier ones; docs/specs/profiles.md, learning note, README and HOW_IT_WORKS, regression, close.
 
@@ -38,7 +38,7 @@
 
 ## What's next
 
-Phase 14 subtask 14.4 (docs/phases/phase-14-profiles.md): taste input. Store the six taste statements (pace, ambiguity, era, subtitles, runtime, formal experimentation) and the free-text "what you love" per profile (profile_settings via CredentialRepository::set), embed the free text with the query embedder, and build a seed taste vector (crates/taste: the mean of the catalogue vectors of titles rated 4-5 or completed, plus the free-text vector); measure E2's second half with eval import: the nearest titles to the seed vector against the imported favourites.
+Phase 14 subtask 14.5 (docs/phases/phase-14-profiles.md): the onboarding wizard in src/features/onboarding/Onboarding.tsx, shown on first run only (a setting onboarding.done): step 1 the profile (name, colour); step 2 taste (ImportHistory, TasteInput, and an adaptive typographic title-card round: 3-4 rounds of well-known films chosen to spread across the catalogue, each later round from near the picks so far); step 3 sources (paste a URL, the Internet Archive on by default, add a folder inline); each skippable, never a dead end; pad-complete in tools/uiaudit/controller.mjs; E3 and E4 tested with no key and no sources.
 
 ---
 
