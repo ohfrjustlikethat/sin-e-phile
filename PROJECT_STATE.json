@@ -27,8 +27,8 @@
       {
         "id": "15.3",
         "text": "Axes and negatives: preferred eras, runtimes, countries, languages, subtitle tolerance and directors from the signals, the taste statements as priors; negative preferences from abandons (5 minutes in means less than 80, E2); a temporal-decay test on a profile whose taste shifts over simulated time (E4).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "9310430"
       },
       {
         "id": "15.4",
@@ -53,8 +53,8 @@
       {
         "id": "E2",
         "text": "Abandonment is weighted correctly — abandoning at 5 minutes and at 80 minutes mean different things.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "9310430: crates/taste/tests/model.rs abandoning_at_five_minutes_and_at_eighty_mean_different_things (record_viewing at 300 s and 4,800 s of a 100-minute film, read back through model::signals and weigh: -0.575 against -0.2, and the early abandon's genre first among the axes' avoids); crates/taste/src/modes.rs abandoning_at_five_minutes_means_more_than_at_eighty; seen to fail with the abandon weight made flat."
       },
       {
         "id": "E3",
@@ -65,8 +65,8 @@
       {
         "id": "E4",
         "text": "Temporal decay is tested with a synthetic profile whose taste shifts over simulated time.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "9310430: crates/taste/tests/model.rs a_taste_that_moves_is_followed_and_the_old_one_fades (a synthetic profile: twelve horror films completed two years ago, twelve documentaries last month; the strongest mode is the documentaries with over 70% of the weight, and with the dates swapped it is the horror); crates/taste/src/modes.rs signals_fade_with_age_and_strong_ones_fade_slower; seen to fail with decay switched off."
       },
       {
         "id": "E5",
@@ -1742,8 +1742,8 @@
         {
           "id": "E2",
           "text": "Abandonment is weighted correctly — abandoning at 5 minutes and at 80 minutes mean different things.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "9310430: crates/taste/tests/model.rs abandoning_at_five_minutes_and_at_eighty_mean_different_things (record_viewing at 300 s and 4,800 s of a 100-minute film, read back through model::signals and weigh: -0.575 against -0.2, and the early abandon's genre first among the axes' avoids); crates/taste/src/modes.rs abandoning_at_five_minutes_means_more_than_at_eighty; seen to fail with the abandon weight made flat."
         },
         {
           "id": "E3",
@@ -1754,8 +1754,8 @@
         {
           "id": "E4",
           "text": "Temporal decay is tested with a synthetic profile whose taste shifts over simulated time.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "9310430: crates/taste/tests/model.rs a_taste_that_moves_is_followed_and_the_old_one_fades (a synthetic profile: twelve horror films completed two years ago, twelve documentaries last month; the strongest mode is the documentaries with over 70% of the weight, and with the dates swapped it is the horror); crates/taste/src/modes.rs signals_fade_with_age_and_strong_ones_fade_slower; seen to fail with decay switched off."
         },
         {
           "id": "E5",
@@ -1780,8 +1780,8 @@
         {
           "id": "15.3",
           "text": "Axes and negatives: preferred eras, runtimes, countries, languages, subtitle tolerance and directors from the signals, the taste statements as priors; negative preferences from abandons (5 minutes in means less than 80, E2); a temporal-decay test on a profile whose taste shifts over simulated time (E4).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "9310430"
         },
         {
           "id": "15.4",
@@ -2368,7 +2368,7 @@
       ]
     }
   ],
-  "next_action": "Phase 15 subtask 15.3 (docs/phases/phase-15-taste-model.md): axes in crates/taste/src/axes.rs from the weighted signals and the catalogue (preferred decades, runtimes, countries, original languages and so subtitle tolerance, directors, each with the statements as priors), negatives from early abandons and low ratings, and a temporal-decay test: a synthetic profile whose taste shifts from one genre to another over two simulated years must have its strongest mode follow the shift (E4).",
+  "next_action": "Phase 15 subtask 15.4 (docs/phases/phase-15-taste-model.md): the taste profile screen src/features/taste/TasteProfile.tsx, reached from the masthead avatar menu and Settings -> Profiles: each mode named by what it holds (its strongest genres and directors, its three best-known members), its share, the axes and avoids in sentences (a describe() in crates/taste/src/describe.rs, tested), and corrections per mode (more of this, less, not me) stored per profile and applied as weights; a taste_profile command; pad-complete in tools/uiaudit/controller.mjs.",
   "blockers": [],
   "decisions_pending": [
     {
@@ -3059,6 +3059,11 @@
       "id": "D83",
       "text": "crates/torrent/tests/swarm.rs a_download_survives_a_restart failed once in CI (run 42396646470, 2026-11-07, at ec78b82): 10,223,616 bytes before the stop, 0 after wait_ready on the restarted engine. Passes 5/5 locally and in every earlier CI run; code unchanged since Phase 13. Rerun. If it recurs: check that Engine::stop lets librqbit flush its writes and persistence before the session ends (a slow runner may lose the race).",
       "phase_raised": 14
+    },
+    {
+      "id": "D84",
+      "text": "The offline catalogue has no countries or original languages (IMDb's free datasets do not carry them; the columns are empty), so the taste model cannot learn country or language preferences, or subtitle tolerance, from behaviour; the statements stand in. Fill them from TMDB for profiles with a key (and Wikidata, which is keyless) and add the axes in crates/taste/src/axes.rs.",
+      "phase_raised": 15
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

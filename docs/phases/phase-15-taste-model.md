@@ -16,16 +16,16 @@ Signal collection with weights: completed (strong positive), abandoned early (st
 ## Exit criteria
 
 - [x] **E1** The model produces distinct, recognisable clusters for a synthetic profile with two deliberately unrelated tastes.
-- [ ] **E2** Abandonment is weighted correctly — abandoning at 5 minutes and at 80 minutes mean different things.
+- [x] **E2** Abandonment is weighted correctly — abandoning at 5 minutes and at 80 minutes mean different things.
 - [ ] **E3** The taste profile screen describes a test profile in a way the author agrees is accurate.
-- [ ] **E4** Temporal decay is tested with a synthetic profile whose taste shifts over simulated time.
+- [x] **E4** Temporal decay is tested with a synthetic profile whose taste shifts over simulated time.
 - [ ] **E5** The model updates within 2 s of a watch event, without blocking the UI.
 
 ## Subtasks
 
 - [x] **15.1** Signals (migration 0026 and the player): a watch recorded when the player leaves (completed past 90%, otherwise abandoned with its point), rewatches, searches that led to a title, detail pages opened and not played (a weak negative), with the time of day and the session's length; repository methods with surface lines; the player and the detail page write them.
 - [x] **15.2** Taste modes (crates/taste): the positive signals weighted (completed, rewatched, rated, watchlisted, imported) and decayed by age, with a longer half-life for strongly held ones; clustered into 3 to 8 modes (k-means over the catalogue vectors, k by silhouette), each with a vector, weight and recency; recommendations interleaved across modes in proportion to weight. Judged on eval taste against popularity (Phase 14 E2's carried half) and on a synthetic two-taste profile (E1).
-- [ ] **15.3** Axes and negatives: preferred eras, runtimes, countries, languages, subtitle tolerance and directors from the signals, the taste statements as priors; negative preferences from abandons (5 minutes in means less than 80, E2); a temporal-decay test on a profile whose taste shifts over simulated time (E4).
+- [x] **15.3** Axes and negatives: preferred eras, runtimes, countries, languages, subtitle tolerance and directors from the signals, the taste statements as priors; negative preferences from abandons (5 minutes in means less than 80, E2); a temporal-decay test on a profile whose taste shifts over simulated time (E4).
 - [ ] **15.4** The taste profile screen (src/features/taste/TasteProfile.tsx): the model described in plain language (modes named by what they hold, axes in words), each mode and axis correctable (more, less, not me), pad-complete; Home's taste rail follows the modes.
 - [ ] **15.5** The author check batch after this phase (ADR-0040): Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, and E3 here (the screen describes a profile accurately); then docs/specs/taste-model.md, learning note, README and HOW_IT_WORKS, regression, close.
 
@@ -40,3 +40,4 @@ User modelling; why a single average vector fails; clustering; implicit versus e
 ## Work log
 - **15.1** Signals (migration 0026 and the player): a watch recorded when the player leaves (completed past · `db5dfb3`
 - **15.2** Taste modes (crates/taste): the positive signals weighted (completed, rewatched, rated, watchlis · `85f5cc2`
+- **15.3** Axes and negatives: preferred eras, runtimes, countries, languages, subtitle tolerance and direc · `9310430`
