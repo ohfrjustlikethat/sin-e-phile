@@ -1,7 +1,7 @@
 {
   "spec_version": "3.3.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-11-06",
+  "last_updated": "2026-11-08",
   "sessions_completed": 21,
   "current_phase": {
     "number": 15,
@@ -33,8 +33,8 @@
       {
         "id": "15.4",
         "text": "The taste profile screen (src/features/taste/TasteProfile.tsx): the model described in plain language (modes named by what they hold, axes in words), each mode and axis correctable (more, less, not me), pad-complete; Home's taste rail follows the modes.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "86eec57"
       },
       {
         "id": "15.5",
@@ -1786,8 +1786,8 @@
         {
           "id": "15.4",
           "text": "The taste profile screen (src/features/taste/TasteProfile.tsx): the model described in plain language (modes named by what they hold, axes in words), each mode and axis correctable (more, less, not me), pad-complete; Home's taste rail follows the modes.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "86eec57"
         },
         {
           "id": "15.5",
@@ -2368,7 +2368,7 @@
       ]
     }
   ],
-  "next_action": "Phase 15 subtask 15.4 (docs/phases/phase-15-taste-model.md): the taste profile screen src/features/taste/TasteProfile.tsx, reached from the masthead avatar menu and Settings -> Profiles: each mode named by what it holds (its strongest genres and directors, its three best-known members), its share, the axes and avoids in sentences (a describe() in crates/taste/src/describe.rs, tested), and corrections per mode (more of this, less, not me) stored per profile and applied as weights; a taste_profile command; pad-complete in tools/uiaudit/controller.mjs.",
+  "next_action": "Phase 15 subtask 15.5 (docs/phases/phase-15-taste-model.md). First E5, the one criterion not yet worked: after a watch event the model must update within 2 s without blocking the UI. In src-tauri/src/commands/playback.rs end_viewing (and record_signal), spawn a background rebuild through crate::commands::home::MODELS.get (a tokio task; it takes the engine lock only for the build), and prove it with a test in crates/taste/tests/model.rs that records a viewing, rebuilds through ModelCache::get and asserts the fingerprint moved and the modes changed, plus a measured rebuild time in eval switch (record in docs/eval-results.md). Then the author check batch (Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, Phase 15 E3 on the taste profile screen: Settings -> Profiles -> See <name>'s taste), docs/specs/taste-model.md, docs/learning/phase-15-notes.md, README and HOW_IT_WORKS, regression (eval all, import --from 600, taste, switch, modes), session log with retrospective and the decision that leanings are corrected through the statements, then close.",
   "blockers": [],
   "decisions_pending": [
     {

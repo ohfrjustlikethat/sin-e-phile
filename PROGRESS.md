@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 3.3.0** · 21 session(s) completed · last updated 2026-11-06
+**Spec version 3.3.0** · 21 session(s) completed · last updated 2026-11-08
 
 ---
 
@@ -16,12 +16,12 @@
 
 > Receives Phase 14 E2's reflection half: the modes must beat popularity on eval taste (the seed: 11.06% against 35.64%). E3 needs the author's agreement, asked in the batch at this phase's end.
 
-### Subtasks — 3/5 complete
+### Subtasks — 4/5 complete
 
 - [x] **15.1** Signals (migration 0026 and the player): a watch recorded when the player leaves (completed past 90%, otherwise abandoned with its point), rewatches, searches that led to a title, detail pages opened and not played (a weak negative), with the time of day and the session's length; repository methods with surface lines; the player and the detail page write them. · `db5dfb3`
 - [x] **15.2** Taste modes (crates/taste): the positive signals weighted (completed, rewatched, rated, watchlisted, imported) and decayed by age, with a longer half-life for strongly held ones; clustered into 3 to 8 modes (k-means over the catalogue vectors, k by silhouette), each with a vector, weight and recency; recommendations interleaved across modes in proportion to weight. Judged on eval taste against popularity (Phase 14 E2's carried half) and on a synthetic two-taste profile (E1). · `85f5cc2`
 - [x] **15.3** Axes and negatives: preferred eras, runtimes, countries, languages, subtitle tolerance and directors from the signals, the taste statements as priors; negative preferences from abandons (5 minutes in means less than 80, E2); a temporal-decay test on a profile whose taste shifts over simulated time (E4). · `9310430`
-- [ ] **15.4** The taste profile screen (src/features/taste/TasteProfile.tsx): the model described in plain language (modes named by what they hold, axes in words), each mode and axis correctable (more, less, not me), pad-complete; Home's taste rail follows the modes.
+- [x] **15.4** The taste profile screen (src/features/taste/TasteProfile.tsx): the model described in plain language (modes named by what they hold, axes in words), each mode and axis correctable (more, less, not me), pad-complete; Home's taste rail follows the modes. · `86eec57`
 - [ ] **15.5** The author check batch after this phase (ADR-0040): Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, and E3 here (the screen describes a profile accurately); then docs/specs/taste-model.md, learning note, README and HOW_IT_WORKS, regression, close.
 
 ### Exit criteria
@@ -39,7 +39,7 @@
 
 ## What's next
 
-Phase 15 subtask 15.4 (docs/phases/phase-15-taste-model.md): the taste profile screen src/features/taste/TasteProfile.tsx, reached from the masthead avatar menu and Settings -> Profiles: each mode named by what it holds (its strongest genres and directors, its three best-known members), its share, the axes and avoids in sentences (a describe() in crates/taste/src/describe.rs, tested), and corrections per mode (more of this, less, not me) stored per profile and applied as weights; a taste_profile command; pad-complete in tools/uiaudit/controller.mjs.
+Phase 15 subtask 15.5 (docs/phases/phase-15-taste-model.md). First E5, the one criterion not yet worked: after a watch event the model must update within 2 s without blocking the UI. In src-tauri/src/commands/playback.rs end_viewing (and record_signal), spawn a background rebuild through crate::commands::home::MODELS.get (a tokio task; it takes the engine lock only for the build), and prove it with a test in crates/taste/tests/model.rs that records a viewing, rebuilds through ModelCache::get and asserts the fingerprint moved and the modes changed, plus a measured rebuild time in eval switch (record in docs/eval-results.md). Then the author check batch (Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, Phase 15 E3 on the taste profile screen: Settings -> Profiles -> See <name>'s taste), docs/specs/taste-model.md, docs/learning/phase-15-notes.md, README and HOW_IT_WORKS, regression (eval all, import --from 600, taste, switch, modes), session log with retrospective and the decision that leanings are corrected through the statements, then close.
 
 ---
 
