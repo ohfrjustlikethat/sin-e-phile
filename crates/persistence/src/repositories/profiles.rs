@@ -307,6 +307,34 @@ impl<'a> ProfileRepository<'a> {
         .await?)
     }
 
+    /// A cheap fingerprint of everything the taste model reads for a profile: it changes
+    /// whenever a viewing, a rating or the watchlist changes, so a cached model can be
+    /// trusted while it does not (Phase 15).
+    pub async fn signal_fingerprint(&self, profile_id: i64) -> Result<String, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT
+                 (SELECT COUNT(*) || '/' || COALESCE(MAX(id), 0) FROM watch_events WHERE profile_id = ?1)
+                 || ':' ||
+                 (SELECT COUNT(*) || '/' || COALESCE(MAX(rated_at), '') || '/' || COALESCE(SUM(stars * media_item_id), 0)
+                    FROM ratings WHERE profile_id = ?1)
+                 || ':' ||
+                 (SELECT COUNT(*) || '/' || COALESCE(SUM(media_item_id), 0) FROM watchlist_items WHERE profile_id = ?1)",
+        )
+        .bind(profile_id)
+        .fetch_one(self.db.pool())
+        .await?)
+    }
+
+    /// Every rating with when it was given: (title, stars, rated_at), oldest first.
+    pub async fn ratings(&self, profile_id: i64) -> Result<Vec<(i64, i64, String)>, DbError> {
+        Ok(sqlx::query_as(
+            "SELECT media_item_id, stars, rated_at FROM ratings WHERE profile_id = ? ORDER BY rated_at, media_item_id",
+        )
+        .bind(profile_id)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
     /// Every viewing in the log, oldest first.
     pub async fn viewings(&self, profile_id: i64) -> Result<Vec<Viewing>, DbError> {
         let rows: Vec<(i64, String, i64, i64, Option<i64>)> = sqlx::query_as(

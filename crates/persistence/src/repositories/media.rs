@@ -351,6 +351,20 @@ impl<'a> MediaRepository<'a> {
         .await?)
     }
 
+    /// The most-voted titles with their votes, films and series, not adult: the pool the
+    /// taste model's popularity prior draws from (Phase 15).
+    pub async fn most_voted_with_votes(&self, limit: i64) -> Result<Vec<(i64, i64)>, DbError> {
+        Ok(sqlx::query_as(
+            "SELECT id, rating_votes FROM media_items
+             WHERE +kind IN ('film', 'anime_film', 'series', 'anime_series')
+               AND is_adult = 0 AND rating_votes IS NOT NULL
+             ORDER BY rating_votes DESC, id LIMIT ?",
+        )
+        .bind(limit)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
     /// The most-voted films released from `from` to `to`: onboarding's title cards are
     /// drawn decade by decade, so the first round spreads across eras (Phase 14).
     pub async fn most_voted_films_between(

@@ -8,6 +8,8 @@
 //!   seed is enough to show that an import is reflected and to start a Home screen.
 
 pub mod home;
+pub mod model;
+pub mod modes;
 pub mod rounds;
 pub mod signals;
 

@@ -2728,3 +2728,53 @@ is not in these numbers.
 recall@10 **0.9760**; subtitles **80/80**, held out 32/32, false accepts **0/10**; identify **99.05% /
 0.39%** (held out 100% / 0%). Unchanged from Phase 13. Phase 14's own, rerun after migration 0025: import
 (fresh set) 98.83% / 0 wrong; taste seed 11.06% against popularity 35.64% (carried); switch 2.1 / 11.5 ms.
+
+## Phase 15 — Taste model
+
+### Taste modes with a popularity prior: Phase 14 E2's carried half, met
+
+2026-11-08, `cargo run --release -p eval -- taste` (the same three MovieLens users, folds and 500 slots
+as Phase 14's measurement; nothing about them changed). Steps, each measured on the same harness:
+
+| Model | Held-out favourites in the 500 |
+|---|---|
+| Phase 14 seed (one weighted mean) | 11.06% |
+| taste modes (k-means, k 3-8 by silhouette, weighted and decayed signals) | 12.75% |
+| **modes with a popularity prior of 0.5** | **40.32%** |
+| the 500 most popular (the bar) | 35.64% |
+| chance | 0.417% |
+
+**The prior was chosen on other users**: `eval taste --tune` runs the next three users in the same band
+(120, 166, 171), never the three that judge. There: popularity 19.79%; modes alone 9.63%; with the prior
+0.0 10.16%, 0.1 23.88%, 0.2 25.07%, 0.3 25.07%, **0.5 25.66%**, 0.75 25.40%, 1.0 24.74%, 1.5 23.61%, 2.0
+23.28%. A broad plateau from 0.2 to 0.75; 0.5 was taken and the judging users run once.
+
+What the numbers say: the embeddings know what a film is about, not how widely it is seen, and these
+users' favourites are mostly widely seen; closeness to a taste mode plus being widely seen beats either
+alone (97 times chance, 1.13 times popularity). The margin over popularity is 4.7 points on these users.
+
+Second run on the judging users after an engineering change (the silhouette sampled at 160 points for
+speed, nothing tuned): **40.63%** against popularity 35.64%; 97x chance, 1.14x popularity. Unchanged.
+
+### E1: two unrelated tastes, two sets of modes
+
+2026-11-08, `cargo run --release -p eval -- modes`: a profile that loves the 30 most-voted horror films
+and the 30 most-voted documentaries (none in both), five stars each, clustered on the real vectors:
+
+| Mode | Weight | Horror | Documentary | Purity |
+|---|---|---|---|---|
+| 1 | 47% | 28 | 0 | 100% |
+| 2 | 42% | 0 | 25 | 100% |
+| 3 | 10% | 2 | 4 | 67% |
+
+(three identical runs; weighted purity **96.6%**, target at least 90%; each taste in modes of its own; the
+small third mode holds the two tastes' edge cases, which is where a mixed mode belongs).
+**Seen to fail**: `-- modes --prove` shuffles the vectors between titles, and purity falls to 59.3%
+(chance is 50%), E1 NOT MET. The first version iterated a hash map, so k-means' seeding changed run to
+run (94.9% then 98.3%); the titles are now taken in a fixed order, as the app's model takes them.
+
+### Switching, with the taste model
+
+`-- switch` again: building a profile's model is 25 ms (nothing yet) and 160 ms (650 films), done in the
+background at launch for every profile (`warm_models`, D82); a switch after that is **20.8 / 29.8 ms
+p95** (the prior ranks a 3,000-title pool). E5 holds.

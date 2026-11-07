@@ -13,6 +13,10 @@ use crate::state::AppState;
 /// Set once the first-run wizard is finished or skipped; app-wide, not per profile.
 const ONBOARDED: &str = "onboarding.done";
 
+/// Each profile's taste model, kept until its signals change (Phase 15).
+pub(crate) static MODELS: std::sync::LazyLock<sinephile_taste::model::ModelCache> =
+    std::sync::LazyLock::new(Default::default);
+
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct HomeCard {
     pub id: i32,
@@ -42,10 +46,17 @@ pub async fn home(state: State<'_, AppState>) -> Result<Vec<RailView>, String> {
     let rails = match state.engine() {
         Some(engine) => {
             let mut engine = engine.lock().await;
-            sinephile_taste::home::rails(&db, engine.semantic_mut(), me, kids, love.as_deref())
-                .await
+            sinephile_taste::home::rails(
+                &db,
+                engine.semantic_mut(),
+                me,
+                kids,
+                love.as_deref(),
+                &MODELS,
+            )
+            .await
         }
-        None => sinephile_taste::home::rails(&db, None, me, kids, love.as_deref()).await,
+        None => sinephile_taste::home::rails(&db, None, me, kids, love.as_deref(), &MODELS).await,
     }
     .map_err(|e| e.to_string())?;
 
@@ -99,4 +110,29 @@ pub async fn finish_onboarding(state: State<'_, AppState>) -> Result<(), String>
         .set_setting(ONBOARDED, &sinephile_downloads::now_iso())
         .await
         .map_err(|e| e.to_string())
+}
+
+/// Build every profile's taste model in the background once the vector index is loaded,
+/// so the first switch to a profile, and its first Home, do not pay for it (Phase 15, D82).
+pub async fn warm_models(app: tauri::AppHandle) {
+    use tauri::Manager as _;
+    let state = app.state::<AppState>();
+    let (db, engine) = loop {
+        if let (Some(db), Some(engine)) = (state.db(), state.engine()) {
+            break (db, engine);
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    };
+    let Ok(profiles) = ProfileRepository::new(&db).all().await else {
+        return;
+    };
+    let today = sinephile_taste::model::day_of(&sinephile_downloads::now_iso()).unwrap_or(0.0);
+    for p in profiles {
+        let mut engine = engine.lock().await;
+        if let Some(s) = engine.semantic_mut() {
+            if let Err(error) = MODELS.get(&db, s, p.id, today).await {
+                tracing::warn!(%error, profile = p.id, "taste model not built");
+            }
+        }
+    }
 }

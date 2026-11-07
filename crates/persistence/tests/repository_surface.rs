@@ -184,6 +184,13 @@ async fn media_repository_surface() {
         repo.most_voted_films(2).await.expect("most_voted_films"),
         vec![famous, known]
     );
+    // most_voted_with_votes — ids with their votes, most first
+    let pool = repo
+        .most_voted_with_votes(2)
+        .await
+        .expect("most_voted_with_votes");
+    assert_eq!(pool, vec![(famous, 900_000), (known, 1_000)]);
+
     // most_voted_films_between — only the years asked for
     assert_eq!(
         repo.most_voted_films_between(1980, 1989, 5)
@@ -475,6 +482,34 @@ async fn profile_repository_surface() {
         (300, false, Some(310))
     );
     assert!(repo.viewings(9_999).await.unwrap().is_empty());
+
+    // signal_fingerprint — moves with a viewing, a rating and the watchlist
+    let f0 = repo
+        .signal_fingerprint(first)
+        .await
+        .expect("signal_fingerprint");
+    repo.rate(first, film, Some(4)).await.unwrap();
+    let f1 = repo.signal_fingerprint(first).await.unwrap();
+    assert_ne!(f0, f1, "a rating moves it");
+    repo.rate(first, film, Some(2)).await.unwrap();
+    assert_ne!(
+        repo.signal_fingerprint(first).await.unwrap(),
+        f1,
+        "so does changing one"
+    );
+    repo.rate(first, film, None).await.unwrap();
+    assert_eq!(
+        repo.signal_fingerprint(first).await.unwrap(),
+        f0,
+        "and clearing it puts it back"
+    );
+
+    // ratings — every rating with its date
+    repo.rate(first, film, Some(3)).await.unwrap();
+    let rated = repo.ratings(first).await.expect("ratings");
+    assert_eq!((rated.len(), rated[0].0, rated[0].1), (1, film, 3));
+    assert!(rated[0].2.len() >= 10, "dated");
+    repo.rate(first, film, None).await.unwrap();
 
     // record_signal / signals — one per title and kind within a minute; the kind is checked
     repo.record_signal(first, film, "detail")

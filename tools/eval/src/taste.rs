@@ -51,7 +51,9 @@ fn day(unix: i64) -> String {
     format!("{y:04}-{m:02}-{d:02}")
 }
 
-pub async fn run(data_dir: &Path) -> Result<bool, EvalError> {
+/// `tune`: the next three users in the band, never the three that judge, and a sweep of
+/// the popularity prior; without it, the three judging users at the chosen prior.
+pub async fn run(data_dir: &Path, tune: bool) -> Result<bool, EvalError> {
     let path = data_dir.join("datasets").join("ml-25m.zip");
     let (mut engine, hybrid) = crate::search::engine(data_dir)?;
     let Some(semantic) = engine.semantic_mut() else {
@@ -116,7 +118,17 @@ pub async fn run(data_dir: &Path) -> Result<bool, EvalError> {
         .map(|(u, _)| *u)
         .collect();
     users.sort_unstable();
-    users.truncate(USERS);
+    let users: Vec<i64> = if tune {
+        users.into_iter().skip(USERS).take(USERS).collect()
+    } else {
+        users.into_iter().take(USERS).collect()
+    };
+    let priors: Vec<f64> = if tune {
+        vec![0.0, 0.1, 0.2, 0.3, 0.5, 0.75, 1.0, 1.5, 2.0]
+    } else {
+        vec![sinephile_taste::model::POPULARITY_PRIOR]
+    };
+    let mut prior_hits = vec![0usize; priors.len()];
 
     let db = Db::open_in(data_dir).await?;
     // What the index holds, and how popular each is: the baselines' population.
@@ -135,9 +147,16 @@ pub async fn run(data_dir: &Path) -> Result<bool, EvalError> {
     .collect();
     let mut popular: Vec<i64> = indexed.clone();
     popular.sort_by_key(|id| std::cmp::Reverse(votes.get(id).copied().unwrap_or(0)));
+    // The pool the prior draws from: the 3,000 most-voted indexed titles, with their votes.
+    let popular_votes: Vec<(i64, i64)> = popular
+        .iter()
+        .take(3_000)
+        .map(|id| (*id, votes.get(id).copied().unwrap_or(0)))
+        .collect();
     let chance = K as f64 / indexed.len().max(1) as f64;
 
     let (mut seed_hits, mut pop_hits, mut held_total) = (0usize, 0usize, 0usize);
+    let mut modes_hits = 0usize;
     for user in &users {
         let ratings = &by_user[user];
         // Their history as a Letterboxd export: watched, ratings (their half stars), a diary.
@@ -179,11 +198,19 @@ pub async fn run(data_dir: &Path) -> Result<bool, EvalError> {
         let result = async {
             let summary = import(&db, me, &entries, "2026-11-07 12:00:00").await?;
             let liked = profiles.liked(me).await?;
-            Ok::<_, EvalError>((summary, liked))
+            // Every signal, aged relative to this person's latest (MovieLens histories are
+            // years old; what matters is recent against older).
+            let raw = sinephile_taste::model::signals(&db, me, 1e9).await?;
+            let newest = raw.iter().map(|(_, _, a)| *a).fold(f64::INFINITY, f64::min);
+            let signals: Vec<_> = raw
+                .into_iter()
+                .map(|(id, s, a)| (id, s, a - newest))
+                .collect();
+            Ok::<_, EvalError>((summary, liked, signals))
         }
         .await;
         profiles.delete(me).await?;
-        let (summary, liked) = result?;
+        let (summary, liked, signals) = result?;
 
         // Favourites (four and five stars) that the index holds: what is held out.
         let index_set: HashSet<i64> = indexed.iter().copied().collect();
@@ -193,6 +220,8 @@ pub async fn run(data_dir: &Path) -> Result<bool, EvalError> {
             .map(|(id, _)| *id)
             .collect();
         let (mut u_seed, mut u_pop, mut u_held) = (0, 0, 0);
+        let mut u_modes = 0;
+        let mut mode_counts = Vec::new();
         for fold in 0..FOLDS {
             let held: HashSet<i64> = favourites
                 .iter()
@@ -218,25 +247,76 @@ pub async fn run(data_dir: &Path) -> Result<bool, EvalError> {
                 .take(K)
                 .copied()
                 .collect();
+            // The modes (Phase 15), from the same training signals.
+            let train_signals: Vec<_> = signals
+                .iter()
+                .filter(|(id, _, _)| !held.contains(id))
+                .cloned()
+                .collect();
+            let weighed = sinephile_taste::modes::weigh(&train_signals);
+            let seen_all: HashSet<i64> = weighed.iter().map(|(id, _)| *id).collect();
+            let liked_v: Vec<(i64, Vec<f32>, f64)> = weighed
+                .into_iter()
+                .filter(|(_, w)| *w > 0.0)
+                .filter_map(|(id, w)| {
+                    let v = semantic.index.vector(id)?;
+                    Some((id, v.iter().map(|x| f32::from(*x)).collect(), w))
+                })
+                .collect();
+            let modes = sinephile_taste::modes::modes(&liked_v);
+            mode_counts.push(modes.len());
+            let by_modes: HashSet<i64> =
+                sinephile_taste::model::recommend(semantic, &modes, K, &seen_all)
+                    .into_iter()
+                    .collect();
+            u_modes += held.iter().filter(|id| by_modes.contains(id)).count();
+            for (i, prior) in priors.iter().enumerate() {
+                let got: HashSet<i64> = sinephile_taste::model::recommend_with_prior(
+                    semantic,
+                    &modes,
+                    K,
+                    &seen_all,
+                    &popular_votes,
+                    *prior,
+                )
+                .into_iter()
+                .collect();
+                prior_hits[i] += held.iter().filter(|id| got.contains(id)).count();
+            }
             u_seed += held.iter().filter(|id| near.contains(id)).count();
             u_pop += held.iter().filter(|id| pop.contains(id)).count();
             u_held += held.len();
         }
         println!(
-            "  user {user:>6}: {} rated, {} matched, {} liked, {} favourites held out in turn: seed {:.1}%, popularity {:.1}%",
+            "  user {user:>6}: {} rated, {} matched, {} liked, {} favourites held out in turn: seed {:.1}%, modes {:.1}% ({:?} modes), popularity {:.1}%",
             ratings.len(),
             summary.matched,
             liked.len(),
             u_held,
             100.0 * u_seed as f64 / u_held.max(1) as f64,
+            100.0 * u_modes as f64 / u_held.max(1) as f64,
+            mode_counts,
             100.0 * u_pop as f64 / u_held.max(1) as f64
         );
+        modes_hits += u_modes;
         seed_hits += u_seed;
         pop_hits += u_pop;
         held_total += u_held;
     }
 
     let seed = seed_hits as f64 / held_total.max(1) as f64;
+    let by_modes = modes_hits as f64 / held_total.max(1) as f64;
+    println!(
+        "\n  held-out favourites among the {K} the modes recommend: {:.2}%",
+        100.0 * by_modes
+    );
+    for (prior, hits) in priors.iter().zip(&prior_hits) {
+        println!(
+            "  modes with a popularity prior of {prior:.2}:            {:.2}%",
+            100.0 * *hits as f64 / held_total.max(1) as f64
+        );
+    }
+    let judged = prior_hits[0] as f64 / held_total.max(1) as f64;
     let pop = pop_hits as f64 / held_total.max(1) as f64;
     println!(
         "\n  held-out favourites among the {K} nearest the seed: {:.2}%",
@@ -252,11 +332,15 @@ pub async fn run(data_dir: &Path) -> Result<bool, EvalError> {
         100.0 * chance
     );
     println!(
-        "  lift over chance {:.0}x, over popularity {:.2}x",
-        seed / chance.max(1e-9),
+        "  the model as shipped: lift over chance {:.0}x, over popularity {:.2}x (the seed alone: {:.2}x)",
+        judged / chance.max(1e-9),
+        judged / pop.max(1e-9),
         seed / pop.max(1e-9)
     );
-    let ok = seed > pop && seed > 20.0 * chance;
+    // Phase 15 (carrying Phase 14 E2): the modes must beat popularity.
+    // Judged on the model as shipped: the modes with the chosen prior.
+    let _ = by_modes;
+    let ok = !tune && judged > pop && judged > 20.0 * chance;
     println!(
         "\n  E2 (reflected in the taste model) {}",
         if ok { "MET" } else { "NOT MET" }
