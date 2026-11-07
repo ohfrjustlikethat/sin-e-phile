@@ -17,7 +17,7 @@ Profile system: creation, avatar, optional PIN, Netflix-style picker on launch *
 
 - [ ] **E1** A first-time user with no technical knowledge reaches a populated Home screen in under two minutes. Test this on an actual person.
 - [ ] **E2** A Letterboxd export of 500+ films imports correctly and is reflected in the taste model.
-- [ ] **E3** Skipping the sources step leaves a functional, non-empty app.
+- [x] **E3** Skipping the sources step leaves a functional, non-empty app.
 - [ ] **E4** Completing onboarding with no TMDB key produces a working, populated, good-looking app (ADR-0013). Every artwork-bearing surface has a designed artwork-free state — a typographic fallback, never a grey rectangle.
 - [ ] **E5** Profile switching is instant and leaks no state between profiles.
 - [ ] **E6** Every onboarding screen is beautiful — this is the first impression.
@@ -28,7 +28,7 @@ Profile system: creation, avatar, optional PIN, Netflix-style picker on launch *
 - [x] **14.2** Profiles in the app: the picker on launch only with two or more (ADR-0043), the avatar in the masthead with a switcher, create and edit with an optional PIN, the kids profile failing closed (TMDB certification within the limit when the profile has a key, otherwise Family or Animation titles that are not adult nor tagged with an adult genre); switching timed to a re-rendered Home (E5); pad-complete in tools/uiaudit/controller.mjs. The frontend's personal browser storage (playback choice, recent searches) is scoped by profile and reloaded on a switch; machine settings (controller, last destination) stay shared.
 - [x] **14.3** Imports (crates/imports): Letterboxd CSV (watched, ratings, diary, watchlist), Trakt JSON, IMDb ratings CSV, MAL and AniList XML, each matched to the catalogue (an IMDb id where the file gives one, else title and year through the library's identifier), recorded per profile as ratings, completed watches and watchlist, unmatched rows listed in words; a 500+ entry Letterboxd fixture built from catalogue titles, match rate recorded (E2).
 - [x] **14.4** Taste input: the six taste statements (pace, ambiguity, era, subtitles, runtime, formal experimentation) stored per profile; the free-text 'what you love' embedded with the query embedder and stored; a seed taste vector from imports and statements, so E2's 'reflected in the taste model' is measurable now (nearest titles to the vector against the imported favourites) and Phase 15 builds on it.
-- [ ] **14.5** The onboarding wizard: profile, taste (imports, statements, free text, and the adaptive typographic title-card grid as an extra round: 3-4 rounds, picks spread for information gain), sources (paste a URL, the Internet Archive, add a folder inline), each skippable and never a dead end; shown on first run only; E3 and E4 tested with no key and no sources; pad-complete.
+- [x] **14.5** The onboarding wizard: profile, taste (imports, statements, free text, and the adaptive typographic title-card grid as an extra round: 3-4 rounds, picks spread for information gain), sources (paste a URL, the Internet Archive, add a folder inline), each skippable and never a dead end; shown on first run only; E3 and E4 tested with no key and no sources; pad-complete.
 - [ ] **14.6** Author checks batched after Phase 15 (E1 a first-time user timed to a populated Home; E6 sign-off on the onboarding screens) with the earlier ones; docs/specs/profiles.md, learning note, README and HOW_IT_WORKS, regression, close.
 
 ## Learning note
@@ -44,3 +44,4 @@ Cold-start in recommender systems; why an import beats a questionnaire; informat
 - **14.2** Profiles in the app: the picker on launch only with two or more (ADR-0043), the avatar in the ma · `272b54f`
 - **14.3** Imports (crates/imports): Letterboxd CSV (watched, ratings, diary, watchlist), Trakt JSON, IMDb  · `cace2eb`
 - **14.4** Taste input: the six taste statements (pace, ambiguity, era, subtitles, runtime, formal experime · `8174b82`
+- **14.5** The onboarding wizard: profile, taste (imports, statements, free text, and the adaptive typograp · `3848f41`
