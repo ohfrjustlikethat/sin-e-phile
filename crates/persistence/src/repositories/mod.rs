@@ -7,6 +7,7 @@
 pub mod backfill;
 pub mod catalogue;
 pub mod credentials;
+pub mod downloads;
 pub mod episodes;
 pub mod library;
 pub mod media;
@@ -21,6 +22,7 @@ pub use catalogue::{
     MIN_SYNOPSIS,
 };
 pub use credentials::{CredentialRepository, TmdbAccess};
+pub use downloads::{Download, DownloadRepository, DownloadState, NewDownload};
 pub use episodes::{EpisodeRepository, EpisodeRow};
 pub use library::{
     Candidate, CandidateFacts, FileMatch, LibraryFolder, LibraryRepository, LocalFile, MatchMethod,

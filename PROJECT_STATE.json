@@ -4,87 +4,99 @@
   "last_updated": "2026-11-06",
   "sessions_completed": 21,
   "current_phase": {
-    "number": 12,
-    "slug": "local-library-engine",
-    "title": "Local Library Engine",
+    "number": 13,
+    "slug": "download-manager",
+    "title": "Download Manager and the Stream-vs-Download Advisor",
     "status": "in_progress",
-    "branch": "phase/12-local-library-engine",
-    "started_at": "2026-11-07T01:30:00Z",
-    "note": "Opened 2026-11-07 when Phase 11 merged (cc3ca3c, tag phase-11). Inherits: absolute_number is NULL by design (ADR-0031), so an anime-style absolute number goes to the review queue rather than a lookup; Phase 8's carried criterion (search, click and watch a local file) is discharged by 12.5; the confidence threshold is measured, not chosen (DECISIONS_PENDING). Release-group names in fixtures are invented: real ones would be naming content sources by the back door (2.1). Author checks still outstanding: real controller (Phase 8 E5), VPN drop (Phase 7 E7), both carried to 13.",
+    "branch": "phase/13-download-manager",
+    "started_at": "2026-11-07T08:00:00Z",
+    "note": "Opened 2026-11-07 when Phase 12 merged (b5dccda, tag phase-12). qBittorrent is not installed on this machine; installing software on the author's PC is outside the repository, so the backend is built and tested against a local stand-in of its Web API and the one real round trip joins the batched author checks (13.6). The taste model (Phase 15) does not exist yet: the advisor takes its input through an interface with a neutral stand-in, recorded rather than faked. Author checks carried here: Phase 7 E7, Phase 8 E5.",
     "subtasks": [
       {
-        "id": "12.1",
-        "text": "crates/filename-parser (MIT/Apache, pure, no I/O): title, year, season, episode (S01E02, 1x02, multi-episode ranges), absolute episode for anime-style 'Title - 059', resolution, source, codec, audio, language, release group (bracket prefix or dash suffix, recognised by position, never by a list of names). fixtures/filenames/: 500+ hand-labelled names covering scene, anime fansub, multi-episode, messy and adversarial cases; every group name invented (2.1); a per-field accuracy test. Documented with a runnable README example (E6).",
+        "id": "13.1",
+        "text": "The download queue (crates/downloads): items with priority, state (queued, active, paused, done, failed), per-item and global limits, a schedule window (start after a time), surviving restart (migration), a backend trait with librqbit as the default; completion files the item into the library through sinephile_library::scan (E5, E6).",
         "status": "complete",
-        "commit": "8c3a377"
+        "commit": "163095b"
       },
       {
-        "id": "12.2",
-        "text": "Migration 0021 library: library_folders (the user's own roots, machine-specific like local_files.path; the portability test's allow-list grows by that column with the reason), local_files gains folder_id and a missing_since for moves; match_memory (a normalised name pattern -> media item, from the user's decisions). LibraryRepository with a repository_surface line per method.",
+        "id": "13.2",
+        "text": "The qBittorrent backend over its Web API (ADR-0029): configured by the user (address, credentials kept like other secrets), detected, never bundled or required; falls back to librqbit when not running (E3); a transport only, with a guard rule rejecting any read of search plugins, RSS or tracker lists (E4), seen to fail. Tested against a local stand-in Web API; one real-qBittorrent check batched for the author (E2).",
         "status": "complete",
-        "commit": "9de8483"
+        "commit": "f5345b5"
       },
       {
-        "id": "12.3",
-        "text": "crates/library identification: candidates from the catalogue by title (FTS) and year, scored on independent weak signals (title similarity, year, duration vs runtime from FFprobe, episode exists, folder and sibling context, remembered decisions), a confidence in [0,1], auto-accepted above a threshold set from measurement (DECISIONS_PENDING), else the review queue. tools/eval 'identify' harness over fixtures/filenames labelled with catalogue ids: top-1 (E1 > 95%) and false-confident (E2 < 1%); numbers to docs/eval-results.md.",
+        "id": "13.3",
+        "text": "Bandwidth limits measured: a local seeder and a timed transfer under each limit, numbers to docs/eval-results.md (E7).",
         "status": "complete",
-        "commit": "c0eda95"
+        "commit": "be543da"
       },
       {
-        "id": "12.4",
-        "text": "Scanner and watcher: register a folder, walk it recursively, probe only what identification needs, in parallel, off the UI thread with progress events; the notify crate (ReadDirectoryChangesW) applies creates, deletes, renames and moves without a rescan; a rename or move keeps the row (no duplicate, E4). Measured: 10,000 files under 3 minutes with the UI responsive (E3).",
+        "id": "13.4",
+        "text": "The advisor (crates/downloads advise.rs): stall probability from swarm throughput against the file's bitrate, free disk and an existing local copy, time-of-day network history, and the taste model's input (a neutral stand-in until Phase 15), giving one recommendation and one readable sentence (E8); trials recorded for E1.",
         "status": "complete",
-        "commit": "96a73fa"
+        "commit": "92c070d"
       },
       {
-        "id": "12.5",
-        "text": "The review queue (Settings or Library): side-by-side candidates, typographic when there is no artwork, one click or one A press resolves, manual search for the rest, one decision settles a whole series' files; remembered for similar names. The library feeds LocalFileBackend so a local film is found by search and plays from its page (discharges Phase 8's carried criterion). Pad-only flow in tools/uiaudit/controller.mjs; resolving 20 items timed (E5).",
+        "id": "13.5",
+        "text": "The Downloads page (masthead Downloads button with a live count, ADR-0037): queue, progress, speed, seeds/peers, ETA, the reason each was queued, pause/resume/cancel, priorities, limits; storage budget and a cleanup view. Pad-complete in tools/uiaudit/controller.mjs.",
         "status": "complete",
-        "commit": "b96f9fd"
+        "commit": "5d06e81"
       },
       {
-        "id": "12.6",
-        "text": "docs/specs/library.md, learning note, README and HOW_IT_WORKS, regression check, close.",
+        "id": "13.6",
+        "text": "Author checks batched in one message: real controller (Phase 8 E5), VPN adapter pulled mid-download (Phase 7 E7), a real qBittorrent round trip (E2), the review screen's feel, D77's release-build console check. Then docs/specs/downloads.md, learning note, README and HOW_IT_WORKS, regression, close.",
         "status": "complete",
-        "commit": "c0a782e"
+        "commit": "fca4cf6"
       }
     ],
     "exit_criteria": [
       {
         "id": "E1",
-        "text": "> 95% top-1 accuracy on the fixture corpus.",
+        "text": "The advisor's recommendation is correct (matches what actually happens) in at least 8 of 10 manual trials across varied swarm conditions.",
         "met": true,
-        "evidence": "c0eda95: cargo run --release -p eval -- identify (2026-11-07, full catalogue): tuning set fixtures/filenames/names.psv 549 names, 2 labels not in the catalogue left out, top-1 523/528 = 99.05%; held out heldout.psv 108/108 = 100%. Method and every tuning step with its measured number in docs/eval-results.md (Phase 12, Identification). crates/library/tests/identify.rs: 7 tests (year, duration, episode over film namesake, folders, remembered decision, no guess); seen to fail when the kind signal was neutralised."
+        "evidence": "92c070d: cargo run --release -p eval -- advise (2026-11-07), ten fresh loopback swarm conditions chosen after the model's last change and run once (bitrates 0.8, 2 and 3 MB/s; one to four capped seeders; 0.6x to 2.5x the bitrate): each measured as the app measures, advised, then played from a fresh engine at its bitrate after a 3-second buffer. 9 of 10 right (target at least 8): the miss was four slow peers at 0.86 MB/s for a 0.8 MB/s film, judged 4% likely to pause, which paused once. The first run on twelve other conditions scored 7/12 and found the engine's speed bug (7e18942); both runs and every change between them are in docs/eval-results.md. Caveat recorded there: a loopback swarm is steadier than the internet."
       },
       {
         "id": "E2",
-        "text": "< 1% false-confident rate — being wrong while confident is the worst failure mode here.",
+        "text": "A download completed through the qBittorrent backend files into the library identically to one completed through librqbit, verified by comparing the resulting rows.",
         "met": true,
-        "evidence": "c0eda95: same run, at the library's own threshold sinephile_library::ACCEPT_AT = 0.75: tuning set 2/510 accepted were wrong = 0.39% (0.37% of all names; strict reading: of accepted names, and a '?'-labelled name accepted counts as wrong); held out 0/103. Asked (review queue) 6.8% and 5.5%. The lowest threshold under 1% was 0.615 at 0.97%; 0.75 keeps a margin. 9 of 549 labels were corrected, each reason recorded in docs/eval-results.md."
+        "evidence": "cargo test -p sinephile-downloads --test qbittorrent_real -- --ignored --nocapture (2026-11-07, qBittorrent v5.2.0 installed here; two instances isolated from the user's own by --profile, Web UIs on 127.0.0.1, each verified as the isolated one before use): the same 6,303,801-byte download through the app's Qbittorrent backend and through librqbit filed identically field by field: Done, done/total 6,303,801, file Heat/Heat.1995.1080p.mkv relative to Downloads, library size 6,303,801, match Heat 1.0 confirmed Metadata covers 1, folder registered. Seen to fail first on the real thing: qBittorrent's copy landed at Heat.1995.1080p/... until the backend used the per-title folder (contentLayout=NoSubfolder). docs/eval-results.md 'E2: a real qBittorrent round trip'."
       },
       {
         "id": "E3",
-        "text": "Scanning 10,000 files completes in under 3 minutes and does not block the UI.",
+        "text": "With qBittorrent configured but not running, a queued download falls back to librqbit rather than failing.",
         "met": true,
-        "evidence": "96a73fa: cargo run --release -p eval -- scan (2026-11-07, full catalogue, real FFprobe): 10,000 distinct films sampled from the catalogue, one scene-named file each in its own folder, scanned in 37.1 s, 35.3 s and 35.0 s (target 180 s), 3.5-3.7 ms a file, identification 7 at a time. Not blocking the UI: the queries a page issues ran alongside, p95 24.6-24.7 ms idle and 33.5-34.9 ms during the scan (515-542 runs). Scans run on background tasks (src-tauri/src/commands/library.rs start_scan) with progress events. Accuracy on the sample: best right 99.45-99.54%, accepted wrong 1/9,279. Table in docs/eval-results.md."
+        "evidence": "f5345b5: crates/downloads/tests/queue.rs a_configured_qbittorrent_that_is_not_running_falls_back_to_librqbit: the backends are [qBittorrent at an address nothing answers, librqbit]; a download meant for qBittorrent is started on the first tick (not failed), its row says librqbit moved the bytes, and it completes from a loopback seeder. Seen to fail with the fallback removed from Manager::usable. qBittorrent's availability is its app/version answering (crates/downloads/tests/qbittorrent.rs not_running_is_unavailable_and_running_is_available)."
       },
       {
         "id": "E4",
-        "text": "Renaming a file outside the app is detected and does not create a duplicate.",
+        "text": "`tools/guard` rejects any code path that reads qBittorrent's search plugins, RSS feeds or tracker configuration.",
         "met": true,
-        "evidence": "96a73fa: crates/library/tests/scan.rs a_scan_finds_identifies_and_keeps_a_renamed_file (renamed while closed: same row, same match, no duplicate) and the_watcher_sees_a_rename_and_keeps_one_row (the real notify watcher on a temp folder); both seen to fail with move detection disabled. Real window 2026-11-07: a 2.2 GB file in a library folder renamed in place while the app ran (the watcher reported a removal then an arrival: Missing(1) then Moved), one row, the same id, matched to Heat (1995) at 1.0; relaunched, the startup scan reported unchanged 1 moved 0; moved to another folder and renamed Heat.mkv while closed, the next launch reported moved 1, the same row and match."
+        "evidence": "f5345b5: tools/guard/guard.py rule qbittorrent-content (search and RSS endpoints, the tracker-list endpoints, the setting that adds trackers to every torrent), with four must-fire vectors and two must-not-fire vectors (the transport endpoints the backend does use) in tools/guard/tests/vectors.py; python tools/guard/guard.py --selftest passes all, and was seen to fail: a quoting slip turned the rule's word boundaries into control characters and the self-test reported the two tracker vectors missed until fixed. The backend's own module lists the only endpoints it uses."
       },
       {
         "id": "E5",
-        "text": "The review queue is genuinely pleasant to use — resolving 20 ambiguous items takes under a minute.",
+        "text": "Downloads survive an app restart and resume.",
         "met": true,
-        "evidence": "b96f9fd: tools/uiaudit/controller.mjs (CI step, pad only): from Settings the D-pad reaches 'Check them', and 20 waiting files are answered by A alone in 5.3 s (each A answers the focused first card). Real window 2026-11-07 against the full catalogue: a library of 22 files (21 genuinely ambiguous: 12 remakes with no year, 5 Monster episodes, 4 The Office episodes with no country) scanned in 1.3 s with 21 asked; answered by keyboard, 14 answers settled all 21 (one answer per series settled its other episodes), the app taking 20-290 ms per answer from key to the next file on screen (0.8 s in all), so the minute is the person's reading time. src/features/library/ReviewScreen.test.tsx (5 tests) and crates/library/tests/review.rs one_answer_settles_the_whole_series_and_is_remembered (seen to fail without remembering). The author's own impression of the screen joins the Phase 13 batch of author checks with the screenshot."
+        "evidence": "163095b: crates/downloads/tests/queue.rs the_queue_survives_a_restart_and_carries_on: a 16 MiB download from a slow loopback seeder stopped mid-way (engine stopped, manager dropped), a new engine on the same folder and a new manager over the same queue: the row is still active, the download is added back from the queue's own row with the pieces on disk kept (progress >= before), and it completes. Seen to fail with re-adding disabled. Engine-level persistence: crates/torrent/tests/swarm.rs a_download_survives_a_restart (Phase 7)."
       },
       {
         "id": "E6",
-        "text": "`crates/filename-parser` is documented and independently useful.",
+        "text": "A completed download is automatically matched and appears in the local library with no user action.",
         "met": true,
-        "evidence": "8c3a377: crates/filename-parser (MIT OR Apache-2.0, one dependency: regex =1.13.1, no I/O) documented by README.md included as the crate doc, whose example runs as a doctest (cargo test -p filename-parser: 1 doctest passed), plus examples/parse.rs for the command line. Measured: tests/corpus.rs the_corpus_reads_as_a_human_reads_it, 549 hand-labelled names in fixtures/filenames/names.psv, 100% on every field after tuning (98.36% before); names_it_was_never_tuned_on_read_as_well, 109 names in heldout.psv written after tuning, 109/109 on the first run; tests/fields.rs (7 tests: languages, edition, flags, audio, dates, episode titles, extension, comparable). Seen to fail: dropping the year made both corpus tests fail (year 32.24% < 97%). Release groups in the fixtures are invented (2.1)."
+        "evidence": "163095b: crates/downloads/tests/queue.rs a_finished_download_files_itself_into_the_library_already_matched: a download for Heat (1995) completes through the manager, lands in the Downloads folder (registered as a library folder), and has a library row matched to Heat, confirmed, with files_for_item(Heat) offering it; a download with no catalogue item is identified like any library file (identify_file)."
+      },
+      {
+        "id": "E7",
+        "text": "Bandwidth limits are actually respected, verified by measurement.",
+        "met": true,
+        "evidence": "be543da: crates/downloads/tests/limits.rs (cargo test -p sinephile-downloads --test limits -- --nocapture --test-threads=1), a loopback seeder with no limit and a 48 MiB file through the queue: a per-download limit of 1.00 MiB/s measured 1.02 MiB/s (twice); the global limit of 2.00 MiB/s (Engine::set_limits) measured 2.01 and 2.00 MiB/s; with no limit the same swarm ran at 157.2 MiB/s (48 MiB in 0.31 s), so the limit is what held it. Each held to within 15%. Numbers in docs/eval-results.md (Phase 13)."
+      },
+      {
+        "id": "E8",
+        "text": "The recommendation reason is a single readable sentence.",
+        "met": true,
+        "evidence": "92c070d: crates/downloads/src/advise.rs tests: every branch (stream, download, tonight, no room, local copy, nobody sharing, a favourite) is checked by one_sentence (a single full stop at the end, no other sentence break, no line break, at most 160 characters); every sentence in the twenty-two trials read as one, e.g. 'It would pause to buffer if streamed (1.8 MB/s against the 2.0 MB/s it needs), so download it first, about a minute.'"
       }
     ]
   },
@@ -1469,8 +1481,8 @@
       "title": "Local Library Engine",
       "depends_on": "4",
       "sessions": "2–3",
-      "status": "in_progress",
-      "completion_commit": null,
+      "status": "complete",
+      "completion_commit": "b5dccda",
       "exit_criteria": [
         {
           "id": "E1",
@@ -1554,56 +1566,94 @@
       "title": "Download Manager and the Stream-vs-Download Advisor",
       "depends_on": "7, 9, 12",
       "sessions": "1–2",
-      "status": "not_started",
+      "status": "in_progress",
       "completion_commit": null,
       "exit_criteria": [
         {
           "id": "E1",
           "text": "The advisor's recommendation is correct (matches what actually happens) in at least 8 of 10 manual trials across varied swarm conditions.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "92c070d: cargo run --release -p eval -- advise (2026-11-07), ten fresh loopback swarm conditions chosen after the model's last change and run once (bitrates 0.8, 2 and 3 MB/s; one to four capped seeders; 0.6x to 2.5x the bitrate): each measured as the app measures, advised, then played from a fresh engine at its bitrate after a 3-second buffer. 9 of 10 right (target at least 8): the miss was four slow peers at 0.86 MB/s for a 0.8 MB/s film, judged 4% likely to pause, which paused once. The first run on twelve other conditions scored 7/12 and found the engine's speed bug (7e18942); both runs and every change between them are in docs/eval-results.md. Caveat recorded there: a loopback swarm is steadier than the internet."
         },
         {
           "id": "E2",
           "text": "A download completed through the qBittorrent backend files into the library identically to one completed through librqbit, verified by comparing the resulting rows.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "cargo test -p sinephile-downloads --test qbittorrent_real -- --ignored --nocapture (2026-11-07, qBittorrent v5.2.0 installed here; two instances isolated from the user's own by --profile, Web UIs on 127.0.0.1, each verified as the isolated one before use): the same 6,303,801-byte download through the app's Qbittorrent backend and through librqbit filed identically field by field: Done, done/total 6,303,801, file Heat/Heat.1995.1080p.mkv relative to Downloads, library size 6,303,801, match Heat 1.0 confirmed Metadata covers 1, folder registered. Seen to fail first on the real thing: qBittorrent's copy landed at Heat.1995.1080p/... until the backend used the per-title folder (contentLayout=NoSubfolder). docs/eval-results.md 'E2: a real qBittorrent round trip'."
         },
         {
           "id": "E3",
           "text": "With qBittorrent configured but not running, a queued download falls back to librqbit rather than failing.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "f5345b5: crates/downloads/tests/queue.rs a_configured_qbittorrent_that_is_not_running_falls_back_to_librqbit: the backends are [qBittorrent at an address nothing answers, librqbit]; a download meant for qBittorrent is started on the first tick (not failed), its row says librqbit moved the bytes, and it completes from a loopback seeder. Seen to fail with the fallback removed from Manager::usable. qBittorrent's availability is its app/version answering (crates/downloads/tests/qbittorrent.rs not_running_is_unavailable_and_running_is_available)."
         },
         {
           "id": "E4",
           "text": "`tools/guard` rejects any code path that reads qBittorrent's search plugins, RSS feeds or tracker configuration.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "f5345b5: tools/guard/guard.py rule qbittorrent-content (search and RSS endpoints, the tracker-list endpoints, the setting that adds trackers to every torrent), with four must-fire vectors and two must-not-fire vectors (the transport endpoints the backend does use) in tools/guard/tests/vectors.py; python tools/guard/guard.py --selftest passes all, and was seen to fail: a quoting slip turned the rule's word boundaries into control characters and the self-test reported the two tracker vectors missed until fixed. The backend's own module lists the only endpoints it uses."
         },
         {
           "id": "E5",
           "text": "Downloads survive an app restart and resume.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "163095b: crates/downloads/tests/queue.rs the_queue_survives_a_restart_and_carries_on: a 16 MiB download from a slow loopback seeder stopped mid-way (engine stopped, manager dropped), a new engine on the same folder and a new manager over the same queue: the row is still active, the download is added back from the queue's own row with the pieces on disk kept (progress >= before), and it completes. Seen to fail with re-adding disabled. Engine-level persistence: crates/torrent/tests/swarm.rs a_download_survives_a_restart (Phase 7)."
         },
         {
           "id": "E6",
           "text": "A completed download is automatically matched and appears in the local library with no user action.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "163095b: crates/downloads/tests/queue.rs a_finished_download_files_itself_into_the_library_already_matched: a download for Heat (1995) completes through the manager, lands in the Downloads folder (registered as a library folder), and has a library row matched to Heat, confirmed, with files_for_item(Heat) offering it; a download with no catalogue item is identified like any library file (identify_file)."
         },
         {
           "id": "E7",
           "text": "Bandwidth limits are actually respected, verified by measurement.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "be543da: crates/downloads/tests/limits.rs (cargo test -p sinephile-downloads --test limits -- --nocapture --test-threads=1), a loopback seeder with no limit and a 48 MiB file through the queue: a per-download limit of 1.00 MiB/s measured 1.02 MiB/s (twice); the global limit of 2.00 MiB/s (Engine::set_limits) measured 2.01 and 2.00 MiB/s; with no limit the same swarm ran at 157.2 MiB/s (48 MiB in 0.31 s), so the limit is what held it. Each held to within 15%. Numbers in docs/eval-results.md (Phase 13)."
         },
         {
           "id": "E8",
           "text": "The recommendation reason is a single readable sentence.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "92c070d: crates/downloads/src/advise.rs tests: every branch (stream, download, tonight, no room, local copy, nobody sharing, a favourite) is checked by one_sentence (a single full stop at the end, no other sentence break, no line break, at most 160 characters); every sentence in the twenty-two trials read as one, e.g. 'It would pause to buffer if streamed (1.8 MB/s against the 2.0 MB/s it needs), so download it first, about a minute.'"
+        }
+      ],
+      "subtasks": [
+        {
+          "id": "13.1",
+          "text": "The download queue (crates/downloads): items with priority, state (queued, active, paused, done, failed), per-item and global limits, a schedule window (start after a time), surviving restart (migration), a backend trait with librqbit as the default; completion files the item into the library through sinephile_library::scan (E5, E6).",
+          "status": "complete",
+          "commit": "163095b"
+        },
+        {
+          "id": "13.2",
+          "text": "The qBittorrent backend over its Web API (ADR-0029): configured by the user (address, credentials kept like other secrets), detected, never bundled or required; falls back to librqbit when not running (E3); a transport only, with a guard rule rejecting any read of search plugins, RSS or tracker lists (E4), seen to fail. Tested against a local stand-in Web API; one real-qBittorrent check batched for the author (E2).",
+          "status": "complete",
+          "commit": "f5345b5"
+        },
+        {
+          "id": "13.3",
+          "text": "Bandwidth limits measured: a local seeder and a timed transfer under each limit, numbers to docs/eval-results.md (E7).",
+          "status": "complete",
+          "commit": "be543da"
+        },
+        {
+          "id": "13.4",
+          "text": "The advisor (crates/downloads advise.rs): stall probability from swarm throughput against the file's bitrate, free disk and an existing local copy, time-of-day network history, and the taste model's input (a neutral stand-in until Phase 15), giving one recommendation and one readable sentence (E8); trials recorded for E1.",
+          "status": "complete",
+          "commit": "92c070d"
+        },
+        {
+          "id": "13.5",
+          "text": "The Downloads page (masthead Downloads button with a live count, ADR-0037): queue, progress, speed, seeds/peers, ETA, the reason each was queued, pause/resume/cancel, priorities, limits; storage budget and a cleanup view. Pad-complete in tools/uiaudit/controller.mjs.",
+          "status": "complete",
+          "commit": "5d06e81"
+        },
+        {
+          "id": "13.6",
+          "text": "Author checks batched in one message: real controller (Phase 8 E5), VPN adapter pulled mid-download (Phase 7 E7), a real qBittorrent round trip (E2), the review screen's feel, D77's release-build console check. Then docs/specs/downloads.md, learning note, README and HOW_IT_WORKS, regression, close.",
+          "status": "complete",
+          "commit": "fca4cf6"
         }
       ]
     },
@@ -2266,7 +2316,7 @@
       ]
     }
   ],
-  "next_action": "Close Phase 12: CI green on phase/12-local-library-engine, merge --no-ff into main, CI green on main, tag phase-12, python /c/Users/hashi/AppData/Local/Temp/claude/C--Users-hashi-Documents-sin-e-phile/02bfad50-f550-4fd9-bb12-04c75dab39ba/scratchpad/open13.py-style close record (completion_commit = merge), generate.py --close 12 and --open 13.",
+  "next_action": "Phase 13 close (docs/phases/phase-13-download-manager.md, subtask 13.6): every criterion now has evidence (E2 met against a real qBittorrent). Run the full pre-push list, commit, push, wait for CI green on phase/13-download-manager, merge --no-ff into main, CI green on main, tag phase-13, write the phase record (status complete, completion_commit = the merge) and the SESSION_LOG retrospective, then python tools/phasedoc/generate.py --close 13 and --open 14, and author Phase 14 subtasks from SPEC.md §15.",
   "blockers": [],
   "decisions_pending": [
     {
@@ -2927,6 +2977,21 @@
       "id": "D77",
       "text": "CREATE_NO_WINDOW is now set on FFprobe and the subtitle aligner's FFmpeg; confirm in a release build (windows subsystem) that no console window flashes during a scan or an alignment. Batched with the Phase 13 author checks.",
       "phase_raised": 12
+    },
+    {
+      "id": "D78",
+      "text": "Completion notices are in-app toasts only (src/features/downloads/DownloadNotices.tsx). A Windows notification when the window is not in front needs the Tauri notification plugin; adding a plugin upgraded Tauri last time (the dialog plugin), so it waits for Phase 20's Windows integration, alongside the media controls.",
+      "phase_raised": 13
+    },
+    {
+      "id": "D79",
+      "text": "The advisor runs only for a torrent copy the film page already started (the plan's chosen candidate). A web stream is not downloadable, so nothing is offered; a title whose best copy is a web stream but which also has a torrent copy is not offered the torrent to download. Revisit with the Phase 15 taste input.",
+      "phase_raised": 13
+    },
+    {
+      "id": "D80",
+      "text": "Upstream (librqbit 9.0.1): create_torrent writes one piece hash too many when the content is a whole number of pieces (500 bytes of hashes for 24 pieces of 256 KiB); libtorrent refuses such a torrent as invalid (stays fetching metadata, then errors; a .torrent of it is never added). The app never creates torrents, so only test fixtures are affected; crates/downloads/tests/qbittorrent_real.rs uses a size that is not a whole number. Worth reporting upstream (the author's call: an outward-facing issue).",
+      "phase_raised": 13
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

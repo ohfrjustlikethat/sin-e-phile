@@ -1431,17 +1431,21 @@ name = "eval"
 version = "0.1.0"
 dependencies = [
  "filename-parser",
+ "librqbit",
  "serde",
  "serde_json",
  "sinephile-catalogue",
+ "sinephile-downloads",
  "sinephile-embedder",
  "sinephile-embedding",
  "sinephile-library",
  "sinephile-persistence",
  "sinephile-search-engine",
+ "sinephile-torrent",
  "sinephile-vector-index",
  "sqlx",
  "subtitle-align",
+ "tempfile",
  "thiserror 2.0.20",
  "tokio",
 ]
@@ -5342,6 +5346,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sinephile-catalogue",
+ "sinephile-downloads",
  "sinephile-embedder",
  "sinephile-embedding",
  "sinephile-library",
@@ -5405,6 +5410,25 @@ dependencies = [
  "tracing-subscriber",
  "unicode-normalization",
  "zip",
+]
+
+[[package]]
+name = "sinephile-downloads"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "librqbit",
+ "serde",
+ "serde_json",
+ "sinephile-library",
+ "sinephile-metadata-api",
+ "sinephile-persistence",
+ "sinephile-torrent",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "url",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

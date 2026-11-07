@@ -172,7 +172,8 @@ async fn nothing_in_the_database_records_where_it_lives() {
         vec![
             "local_files.path".to_string(),
             "subtitle_cache.relative_path".to_string(),
-            "library_folders.path".to_string()
+            "library_folders.path".to_string(),
+            "downloads.file_path".to_string()
         ],
         "a new path-shaped column appeared; if it holds an absolute path, copying \
          the app folder no longer preserves it (SPEC.md §2.4, Phase 3 E4)"

@@ -100,6 +100,22 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::library::library_review,
             commands::library::resolve_review,
             commands::library::not_a_title,
+            commands::downloads::downloads,
+            commands::downloads::download_pause,
+            commands::downloads::download_resume,
+            commands::downloads::download_cancel,
+            commands::downloads::downloads_folder,
+            commands::downloads::download_advice,
+            commands::downloads::download_title,
+            commands::downloads::download_priority,
+            commands::downloads::download_limit,
+            commands::downloads::download_tonight,
+            commands::downloads::downloads_settings,
+            commands::downloads::set_downloads_settings,
+            commands::downloads::set_qbittorrent,
+            commands::downloads::qbittorrent_check,
+            commands::downloads::downloads_storage,
+            commands::downloads::download_clear,
         ])
         // `AssetProgress` travels as an EVENT payload, so no command signature mentions it
         // and specta would not export it. Registered explicitly rather than hand-written in
@@ -142,6 +158,7 @@ pub fn run() {
             tauri::async_runtime::spawn(commands::torrent::progress_loop(app.handle().clone()));
             tauri::async_runtime::spawn(commands::player::state_loop(app.handle().clone()));
             tauri::async_runtime::spawn(commands::library::library_loop(app.handle().clone()));
+            tauri::async_runtime::spawn(commands::downloads::downloads_loop(app.handle().clone()));
 
             // THE DATABASE OPENS OFF THE STARTUP PATH, and the catalogue refreshes
             // itself behind it (D37, ADR-0030). Both on a background task, because

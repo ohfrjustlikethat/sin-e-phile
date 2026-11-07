@@ -197,6 +197,26 @@ impl<'a> ProfileRepository<'a> {
         .transpose()
     }
 
+    /// Whether this profile has seen it through: a completed watch, or a saved position
+    /// past 95% (the line continue-watching draws, for the same reason: credits).
+    pub async fn finished(&self, profile_id: i64, media_item_id: i64) -> Result<bool, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT EXISTS (
+                 SELECT 1 FROM watch_events
+                 WHERE profile_id = ?1 AND media_item_id = ?2 AND completed = 1
+             ) OR EXISTS (
+                 SELECT 1 FROM playback_positions
+                 WHERE profile_id = ?1 AND media_item_id = ?2
+                   AND duration_seconds IS NOT NULL
+                   AND position_seconds >= (duration_seconds * 95 / 100)
+             )",
+        )
+        .bind(profile_id)
+        .bind(media_item_id)
+        .fetch_one(self.db.pool())
+        .await?)
+    }
+
     /// Continue-watching, most recent first.
     pub async fn continue_watching(
         &self,

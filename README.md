@@ -228,8 +228,9 @@ off means the pause overlay shows the full cast list, beautifully.
 
 ## What actually works today
 
-**Phases 0–12 — the shell, the design system, the catalogue, search, sources, torrents,
-the player, choosing a source, subtitles, the player experience, and the local library.**
+**Phases 0–13 — the shell, the design system, the catalogue, search, sources, torrents,
+the player, choosing a source, subtitles, the player experience, the local library, and
+downloads.**
 Honestly:
 
 - ✅ Posture guard, secret scanner, and prerequisite doctor — all three verified by
@@ -329,6 +330,16 @@ Honestly:
   app open or closed, keeps it as the same file. Search, click and play: a local film's first
   frame in 388 ms. `crates/filename-parser` is its own MIT/Apache crate, measured on 658
   hand-labelled names.
+- ✅ **Stream or download, said in one sentence.** A film's page measures the swarm for
+  three seconds and weighs it against the film's bitrate, the free disk and how fast this
+  connection is at night: "It would pause to buffer if streamed (1.8 MB/s against the
+  2.0 MB/s it needs), so download it first, about a minute." Right in 9 of 10 trials chosen
+  after the model was last changed. Downloads queue with priorities, tonight, and limits
+  that hold to within 2% when measured; they survive a restart, keep their pieces when
+  moved, and file into the library already matched. Your own qBittorrent can do the
+  downloading, as a transport only; if it is closed, the built-in engine carries on. A cleanup
+  view lists what is kept, watched films first. Measuring this found that every speed the
+  app had shown since Phase 7 was 8.4 times too low; fixed, with a test.
 - ⬜ Everything else described above this section
 
 ---

@@ -2523,3 +2523,103 @@ Then *Heat* searched, its 1995 result clicked, Play: the page said "Your files",
 warm (14.8 at Phase 11: noise); recall@10 **0.9760**; subtitles **80/80**, held out 32/32, false accepts
 **0/10**; identify unchanged at 99.05% / 0.39% (held out 100% / 0%). Unchanged from Phase 11. Rust tests
 687 passed, 0 failed; frontend 116.
+
+## Phase 13 — Download manager
+
+### E7: bandwidth limits, measured
+
+2026-11-07, `cargo test -p sinephile-downloads --test limits -- --nocapture --test-threads=1`: a
+loopback seeder with no limit of its own and a 48 MiB file, downloaded through the queue; the rate is
+the mean of `done_bytes` from one to seven seconds after the start.
+
+| Limit | Measured |
+|---|---|
+| this download's own, 1.00 MiB/s | **1.02 MiB/s** (run 1), **1.02 MiB/s** (run 2) |
+| global (`Engine::set_limits`), 2.00 MiB/s | **2.01 MiB/s**, **2.00 MiB/s** |
+| none (control) | 48 MiB in 0.31 s, **157.2 MiB/s** |
+
+The test holds each limit to within 15%. The control shows the swarm would run 80 times faster, so the
+limit is what held it.
+
+### E1: the advisor's trials, first run (not met), and a bug in the engine
+
+2026-11-07, `cargo run --release -p eval -- advise`: twelve loopback swarms (one to four seeders, each
+capped), measured as the app measures, the advisor asked, then the film played from a fresh engine at
+its bitrate after a 3-second buffer; right when "stream" played without a pause or "download" paused.
+
+The first runs measured every swarm at one eighth of its cap. **That was an engine bug from Phase 7**:
+librqbit's `mbps` is mebibytes per second and the engine read it as megabits, so every reported speed
+(the torrents list, the player's statistics) was 8.4 times too low. Fixed, with
+`crates/torrent/tests/swarm.rs the_reported_rate_is_the_rate_bytes_arrive_at` (4.01 reported against
+4.04 MiB/s arriving; 0.48 with the old conversion).
+
+With true rates: **7 of 12 right**. Misses: a swarm measured during its ramp-up (1.5 MB/s of capacity
+read as 0.74); swarms just below the bitrate on a 20-second film, which a 3-second buffer covers (the
+model ignored the buffer and the runtime); single peers at 1.4x and 1.0x the bitrate judged unsafe by a
+conservative headroom (1.15) and thin-swarm allowance (0.25). The model is being changed in the light of
+these trials, so they no longer judge it: a fresh set of conditions does.
+
+### E1: the advisor on fresh conditions, met
+
+Changes made after the first run: the stall model now asks whether the swarm can deliver the film's
+bytes over its runtime **plus the player's buffer** (`needed_rate`), headroom 1.05 (from 1.15), the
+thin-swarm allowance 0.10 (from 0.25), and the swarm is measured over the later half of five seconds,
+past the ramp-up. Then ten **fresh** conditions, chosen before they ran and run once
+(`cargo run --release -p eval -- advise`; the first twelve stay available as `--tuned`):
+
+| Film MB/s | Swarm | Measured | Stall p | Advice | Pauses | Right |
+|---|---|---|---|---|---|---|
+| 2.0 | 1 x 5.00 | 5.03 | 0.00 | Stream | 0 | yes |
+| 2.0 | 1 x 2.60 | 2.61 | 0.00 | Stream | 0 | yes |
+| 2.0 | 2 x 0.90 | 1.80 | 0.57 | Download | 16 | yes |
+| 2.0 | 1 x 1.20 | 1.20 | 1.00 | Download | 20 | yes |
+| 0.8 | 2 x 1.00 | 2.02 | 0.00 | Stream | 0 | yes |
+| 0.8 | 4 x 0.22 | 0.86 | 0.04 | Stream | 1 | **no** |
+| 0.8 | 1 x 0.85 | 0.85 | 0.07 | Stream | 0 | yes |
+| 0.8 | 3 x 0.20 | 0.60 | 1.00 | Download | 7 | yes |
+| 3.0 | 3 x 2.00 | 6.00 | 0.00 | Stream | 0 | yes |
+| 3.0 | 2 x 1.20 | 2.40 | 0.98 | Download | 10 | yes |
+
+**9 of 10 right** (target at least 8). The miss: four slow peers barely above the bitrate, judged
+safe at 4%, paused once. Every reason was one sentence. Caveat: a loopback swarm is steadier than the
+internet; the trials test the model's arithmetic and the measurement, not real-world peer churn.
+
+### E2: a real qBittorrent round trip, met
+
+2026-11-07, qBittorrent **v5.2.0** (installed on this machine), `cargo test -p sinephile-downloads
+--test qbittorrent_real -- --ignored --nocapture`. Two instances isolated from the user's own
+(separate `--profile` folders, Web UIs on 127.0.0.1, DHT/PeX/LSD/port forwarding off; each checked to
+be the isolated one before anything was added; only those processes stopped): one seeds a 6.0 MB
+file, the other is driven only through the app's `Qbittorrent` backend, by link. The same download
+through librqbit, compared field by field:
+
+| Field | librqbit | qBittorrent |
+|---|---|---|
+| state, done, total | Done, 6,303,801, 6,303,801 | Done, 6,303,801, 6,303,801 |
+| file, relative to Downloads | `Heat/Heat.1995.1080p.mkv` | `Heat/Heat.1995.1080p.mkv` |
+| library row size | 6,303,801 | 6,303,801 |
+| match | Heat, 1.0, confirmed, Metadata, covers 1 | the same |
+| downloads folder registered | yes | yes |
+
+**Seen to fail first**, on the real thing: before the fix the qBittorrent copy landed at
+`Heat.1995.1080p/Heat.1995.1080p.mkv`, because the backend gave qBittorrent the downloads folder
+rather than the per-title folder librqbit uses. Fixed (`savepath` = the title's folder,
+`contentLayout=NoSubfolder`). The real run also found two more bugs the stand-in could not:
+
+- qBittorrent 5.2 answers `torrents/add` with **202** and JSON counts while it fetches; the backend
+  treated anything but 200 as refused. Fixed (`took`), with a test of every version's answer.
+- A download found by a source (`infohash:` with trackers) reached qBittorrent as the bare hash,
+  **without its trackers**; it now goes as a link carrying them (`qbittorrent::link`).
+
+And one upstream fault, recorded as D80: librqbit's `create_torrent` writes one piece hash too many
+when a file is a whole number of pieces (500 bytes of hashes for 24 pieces); libtorrent refuses such a
+torrent as invalid. The app never makes torrents; the test's file is deliberately not a whole number.
+
+### Regression check before merging Phase 13 (rule 13)
+
+2026-11-07, `cargo run --release -p eval -- all` twice and `-- vector --report`: E2 **43/43**; E3
+meaning **0.0472**, filter **1.0000** (carried); p95 **43.8 ms** cold, **15.8 ms** warm (15.2 at Phase
+12; 14.8 to 15.6 across recent runs: noise); recall@10 **0.9760**; subtitles **80/80**, held out 32/32,
+false accepts **0/10**; identify **99.05% / 0.39%** (held out 100% / 0%), 44.7 ms per name. Unchanged
+from Phase 12. Rust tests 739 passed, 0 failed, 6 ignored (E2's real round trip among them, run on
+demand); frontend 136. `npm run audit:ui`: rail p95 16.8 ms, 0 dropped, 45 focus stops all ringed.

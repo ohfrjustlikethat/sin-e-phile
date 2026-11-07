@@ -330,3 +330,36 @@ async fn a_resolved_torrent_the_engine_holds_plays_without_being_added_again() {
         Target::Url("https://films.example/a.mp4".into())
     );
 }
+
+/// Found in Phase 13 by the advisor's trials: the reported download rate was 8.4 times too
+/// low (librqbit's "mbps" is mebibytes per second, read as megabits). The rate the engine
+/// reports must match the rate the bytes actually arrive at.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn the_reported_rate_is_the_rate_bytes_arrive_at() {
+    let s = swarm(&[("Test.Film.1922.mkv", 48 * MIB)], Some(4 * MIB as u32)).await;
+    let dir = temp();
+    let (leech, id) = s.leecher(dir.path(), SeedingPolicy::KeepSeeding).await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    let a = leech.status(&id).unwrap();
+    let t = std::time::Instant::now();
+    let mut reported = Vec::new();
+    for _ in 0..8 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        reported.push(leech.status(&id).unwrap().download_bps);
+    }
+    let b = leech.status(&id).unwrap();
+    assert!(!b.finished, "too fast to measure");
+    let actual = (b.progress_bytes - a.progress_bytes) as f64 / t.elapsed().as_secs_f64();
+    let shown = reported.iter().sum::<f64>() / reported.len() as f64;
+    println!(
+        "bytes arrived at {:.2} MiB/s; the engine reported {:.2} MiB/s",
+        actual / MIB as f64,
+        shown / MIB as f64
+    );
+    assert!(
+        (shown - actual).abs() <= actual * 0.35,
+        "reported {:.2} MiB/s, actual {:.2} MiB/s",
+        shown / MIB as f64,
+        actual / MIB as f64
+    );
+}

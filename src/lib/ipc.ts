@@ -214,6 +214,56 @@ export const commands = {
 	resolveReview: (fileId: number, mediaItemId: number) => typedError<number, string>(__TAURI_INVOKE("resolve_review", { fileId, mediaItemId })),
 	/**  "Not a film or episode": never asked about again. */
 	notATitle: (fileId: number) => typedError<null, string>(__TAURI_INVOKE("not_a_title", { fileId })),
+	downloads: () => typedError<DownloadRow[], string>(__TAURI_INVOKE("downloads")),
+	downloadPause: (id: number) => typedError<null, string>(__TAURI_INVOKE("download_pause", { id })),
+	downloadResume: (id: number) => typedError<null, string>(__TAURI_INVOKE("download_resume", { id })),
+	downloadCancel: (id: number, deleteFiles: boolean) => typedError<null, string>(__TAURI_INVOKE("download_cancel", { id, deleteFiles })),
+	/**  Where downloads land (a library folder of their own). */
+	downloadsFolder: () => __TAURI_INVOKE<string>("downloads_folder"),
+	/**
+	 *  Stream or download? Measured on the swarm the page already started (D61): three
+	 *  seconds of the engine's rate, the later half kept. `None` when there is nothing to
+	 *  advise on: no plan for this title, a copy that is not a torrent, or no runtime to
+	 *  judge a stream by.
+	 */
+	downloadAdvice: (id: number) => typedError<{
+	/**  "play-local" | "stream" | "download" | "download-tonight" */
+	choice: string,
+	sentence: string,
+	/**  The estimated chance a stream pauses, 0 to 1. */
+	stall: number | null,
+	size_bytes: number | null,
+	/**  This title's download, if it is already queued, running or done. */
+	download: DownloadView | null,
+} | null, string>(__TAURI_INVOKE("download_advice", { id })),
+	/**
+	 *  Download the copy the last plan chose for `id`: now, or from one in the morning. The
+	 *  advisor's sentence is kept as the reason. A title already downloading is not added
+	 *  twice.
+	 */
+	downloadTitle: (id: number, tonight: boolean, reason: string | null) => typedError<DownloadView, string>(__TAURI_INVOKE("download_title", { id, tonight, reason })),
+	/**  Higher runs first. */
+	downloadPriority: (id: number, priority: number) => typedError<null, string>(__TAURI_INVOKE("download_priority", { id, priority })),
+	/**  This download's own speed limit, KiB/s; `None` for none. */
+	downloadLimit: (id: number, limitKib: number | null) => typedError<null, string>(__TAURI_INVOKE("download_limit", { id, limitKib })),
+	/**
+	 *  Start it from one in the morning (`true`), or as soon as there is room (`false`). A
+	 *  running download moved to tonight stops and waits like any other.
+	 */
+	downloadTonight: (id: number, tonight: boolean) => typedError<null, string>(__TAURI_INVOKE("download_tonight", { id, tonight })),
+	downloadsSettings: () => typedError<DownloadsSettingsView, string>(__TAURI_INVOKE("downloads_settings")),
+	/**  How many run at once (1 to 10) and the size budget (GiB; `None` for the whole disk). */
+	setDownloadsSettings: (maxActive: number, budgetGib: number | null) => typedError<null, string>(__TAURI_INVOKE("set_downloads_settings", { maxActive, budgetGib })),
+	/**
+	 *  The user's own qBittorrent (ADR-0029): its Web API address, user and password. An
+	 *  empty address removes it; `password: None` keeps the one stored, `Some("")` clears it.
+	 */
+	setQbittorrent: (address: string, user: string, password: string | null) => typedError<null, string>(__TAURI_INVOKE("set_qbittorrent", { address, user, password })),
+	/**  Whether the configured qBittorrent answers and accepts the login. */
+	qbittorrentCheck: () => typedError<boolean, string>(__TAURI_INVOKE("qbittorrent_check")),
+	downloadsStorage: () => typedError<StorageView, string>(__TAURI_INVOKE("downloads_storage")),
+	/**  Delete a finished download from disk and from the library. */
+	downloadClear: (id: number) => typedError<null, string>(__TAURI_INVOKE("download_clear", { id })),
 };
 
 /* Types */
@@ -235,6 +285,18 @@ export type AddonPreview = {
 	host: string,
 	homepage: string | null,
 	replaces: boolean,
+};
+
+/**  The advisor's answer for the title whose page is open (SPEC.md Phase 13). */
+export type AdviceView = {
+	/**  "play-local" | "stream" | "download" | "download-tonight" */
+	choice: string,
+	sentence: string,
+	/**  The estimated chance a stream pauses, 0 to 1. */
+	stall: number | null,
+	size_bytes: number | null,
+	/**  This title's download, if it is already queued, running or done. */
+	download: DownloadView | null,
 };
 
 export type AiringView = {
@@ -360,6 +422,39 @@ export type CutoutRect = {
 	width: number | null,
 	height: number | null,
 	radius: number | null,
+};
+
+/**  One download as the Downloads page lists it, with its live rate. */
+export type DownloadRow = {
+	download: DownloadView,
+	/**  Bytes per second now (0 unless it is running). */
+	speed: number | null,
+	peers: number,
+};
+
+export type DownloadView = {
+	id: number,
+	media_item_id: number | null,
+	title: string,
+	/**  "queued" | "active" | "paused" | "done" | "failed" | "cancelled" */
+	state: string,
+	backend: string,
+	priority: number,
+	done_bytes: number | null,
+	total_bytes: number | null,
+	limit_kib: number | null,
+	not_before: string | null,
+	reason: string | null,
+	error: string | null,
+	file_path: string | null,
+};
+
+export type DownloadsSettingsView = {
+	max_active: number,
+	budget_gib: number | null,
+	qbittorrent_address: string | null,
+	qbittorrent_user: string | null,
+	qbittorrent_has_password: boolean,
 };
 
 export type EpisodeView = {
@@ -652,6 +747,21 @@ export type SourcesView = {
 export type StatView = {
 	name: string,
 	value: string,
+};
+
+export type StorageView = {
+	used_bytes: number | null,
+	free_bytes: number | null,
+	budget_bytes: number | null,
+	/**  Finished downloads, the best to clear first. */
+	items: StoredView[],
+};
+
+export type StoredView = {
+	download: DownloadView,
+	bytes: number | null,
+	age_days: number | null,
+	watched: boolean,
 };
 
 /**  The viewer's subtitle settings, per profile. */

@@ -1,0 +1,27 @@
+[package]
+name = "sinephile-downloads"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "The download queue: priorities, schedules, limits, a pluggable backend, and filing into the library (SPEC.md Phase 13)."
+
+# Logic, so it lives here and is tested here (ADR-0022); src-tauri only ticks it and relays.
+
+[dependencies]
+sinephile-persistence = { path = "../persistence" }
+sinephile-torrent = { path = "../torrent" }
+sinephile-library = { path = "../library" }
+async-trait = "=0.1.92"
+sinephile-metadata-api = { path = "../metadata-api" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+url = "=2.5.8"
+windows-sys = { version = "0.61.2", features = ["Win32_Storage_FileSystem", "Win32_Foundation", "Win32_System_SystemInformation"] }
+thiserror = "2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "time"] }
+tempfile = "3"
+# The test swarm creates its torrent with librqbit itself, as the torrent crate's tests do.
+librqbit = { version = "=9.0.1", default-features = false, features = ["rust-tls"] }

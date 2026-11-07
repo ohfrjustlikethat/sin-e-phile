@@ -9,6 +9,8 @@ import { Placeholder } from "@/app/Placeholder";
 import { PadKeyboard, closePadKeyboard } from "@/app/PadKeyboard";
 import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { ReviewScreen } from "@/features/library/ReviewScreen";
+import { DownloadsScreen } from "@/features/downloads/DownloadsScreen";
+import { DownloadNotices } from "@/features/downloads/DownloadNotices";
 import { SearchScreen } from "@/features/search/SearchScreen";
 import { DesignGallery } from "@/features/design/DesignGallery";
 import { CommandPalette, type Command } from "@/design-system";
@@ -55,6 +57,7 @@ export function App() {
     useUi();
   const playing = useUi((s) => s.playing);
   const reviewOpen = useUi((s) => s.reviewOpen);
+  const downloadsOpen = useUi((s) => s.downloadsOpen);
   const mini = useUi((s) => s.mini);
   const detail = useUi((s) => s.detail);
   useDropToPlay();
@@ -65,6 +68,7 @@ export function App() {
   const openSearch = useCallback(() => {
     const ui = useUi.getState();
     ui.setSettingsOpen(false);
+    ui.setDownloadsOpen(false);
     ui.closeDetail();
     setSearching(true);
   }, []);
@@ -185,6 +189,15 @@ export function App() {
       },
     })),
     {
+      id: "downloads",
+      label: "Open downloads",
+      group: "Navigate",
+      run: () => {
+        setSearching(false);
+        useUi.getState().setDownloadsOpen(true);
+      },
+    },
+    {
       id: "settings",
       label: "Open settings",
       group: "Settings",
@@ -225,6 +238,8 @@ export function App() {
               <ReviewScreen />
             ) : settingsOpen ? (
               <SettingsScreen />
+            ) : downloadsOpen ? (
+              <DownloadsScreen />
             ) : detail !== null ? (
               <DetailScreen />
             ) : searching ? (
@@ -242,6 +257,7 @@ export function App() {
           <FocusLayer />
         </div>
       )}
+      <DownloadNotices />
       {playing && (
         <div
           className={

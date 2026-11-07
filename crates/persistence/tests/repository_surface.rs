@@ -317,10 +317,38 @@ async fn profile_repository_surface() {
     // all
     assert_eq!(repo.all().await.expect("all").len(), 2);
 
+    // finished — neither yet, then by a position past 95%, then by a completed watch
+    let other = media
+        .insert(&NewMediaItem::film("Floating Weeds", 1959))
+        .await
+        .expect("film");
+    assert!(!repo.finished(second, film).await.expect("finished"));
+    repo.save_position(
+        second,
+        &PlaybackPosition {
+            media_item_id: other,
+            position_seconds: 7_800,
+            duration_seconds: Some(8_000),
+            audio_language: None,
+            subtitle_language: None,
+        },
+    )
+    .await
+    .expect("near the end");
+    assert!(repo.finished(second, other).await.unwrap(), "past 95%");
+    assert!(
+        !repo.finished(first, other).await.unwrap(),
+        "another profile's"
+    );
+
     // record_watch
     repo.record_watch(second, film, 3_000, true)
         .await
         .expect("record_watch");
+    assert!(
+        repo.finished(second, film).await.unwrap(),
+        "a completed watch"
+    );
 
     // save_position — insert and ON CONFLICT update
     let position = PlaybackPosition {
@@ -548,6 +576,58 @@ async fn db_surface() {
     assert!(creds.clear_opensubtitles_key(profile).await.unwrap());
     assert!(!creds.clear_opensubtitles_key(profile).await.unwrap());
     assert_eq!(creds.opensubtitles_key(profile).await.unwrap(), None);
+
+    // set_secret / secret / clear_secret (Phase 13: the qBittorrent password)
+    assert_eq!(
+        creds.secret(profile, "qbittorrent.password").await.unwrap(),
+        None
+    );
+    creds
+        .set_secret(profile, "qbittorrent.password", "a password with spaces")
+        .await
+        .expect("set_secret");
+    assert_eq!(
+        creds
+            .secret(profile, "qbittorrent.password")
+            .await
+            .unwrap()
+            .as_deref(),
+        Some("a password with spaces")
+    );
+    assert!(
+        creds.get(profile, "qbittorrent.password").await.is_err(),
+        "a secret is never read as plain text"
+    );
+    creds
+        .set(profile, "qbittorrent.address", "http://localhost:8080")
+        .await
+        .unwrap();
+    assert_eq!(
+        creds.secret(profile, "qbittorrent.address").await.unwrap(),
+        None,
+        "a plain setting is not a secret"
+    );
+    creds
+        .set_secret(profile, "qbittorrent.password", "")
+        .await
+        .unwrap();
+    assert_eq!(
+        creds.secret(profile, "qbittorrent.password").await.unwrap(),
+        None,
+        "empty clears"
+    );
+    creds
+        .set_secret(profile, "qbittorrent.password", "again")
+        .await
+        .unwrap();
+    assert!(creds
+        .clear_secret(profile, "qbittorrent.password")
+        .await
+        .unwrap());
+    assert!(!creds
+        .clear_secret(profile, "qbittorrent.password")
+        .await
+        .unwrap());
 
     // ── SearchRepository ──────────────────────────────────────────────────────
     let search = SearchRepository::new(&db);
@@ -1480,4 +1560,111 @@ async fn library_repository_surface() {
     repo.remove_folder(folder).await.expect("remove");
     assert!(repo.folders().await.unwrap().is_empty());
     assert_eq!(repo.file(again).await.unwrap(), None);
+}
+
+/// Exercise every public method on `DownloadRepository` (Phase 13, migration 0023).
+#[tokio::test]
+async fn download_repository_surface() {
+    use sinephile_persistence::repositories::{DownloadRepository, DownloadState, NewDownload};
+    let db = Db::in_memory().await.expect("open");
+    let heat = MediaRepository::new(&db)
+        .insert(&NewMediaItem::film("Heat", 1995))
+        .await
+        .unwrap();
+    let repo = DownloadRepository::new(&db);
+
+    // add / get
+    let low = repo
+        .add(&NewDownload {
+            title: "Thief",
+            source: "test-source-thief",
+            backend: "librqbit",
+            ..Default::default()
+        })
+        .await
+        .expect("add");
+    let high = repo
+        .add(&NewDownload {
+            media_item_id: Some(heat),
+            title: "Heat",
+            source: "test-source-heat",
+            torrent: Some(&[1, 2, 3]),
+            backend: "librqbit",
+            priority: 5,
+            limit_kib: Some(2048),
+            not_before: Some("2026-11-08T00:00:00Z"),
+            reason: Some("A favourite, worth the disk."),
+        })
+        .await
+        .expect("add");
+    let d = repo.get(high).await.unwrap().expect("row");
+    assert_eq!(d.state, DownloadState::Queued);
+    assert_eq!(
+        (d.priority, d.limit_kib, d.torrent.as_deref()),
+        (5, Some(2048), Some(&[1u8, 2, 3][..]))
+    );
+    assert_eq!(d.media_item_id, Some(heat));
+
+    // open / all: priority first
+    let open = repo.open().await.unwrap();
+    assert_eq!(
+        open.iter().map(|d| d.id).collect::<Vec<_>>(),
+        vec![high, low]
+    );
+
+    // set_backend_id / set_progress / set_state / set_priority / set_limit / set_not_before
+    repo.set_backend_id(high, "librqbit", "89ab").await.unwrap();
+    repo.set_progress(high, 100, Some(1000)).await.unwrap();
+    repo.set_progress(high, 200, None).await.unwrap();
+    repo.set_state(high, DownloadState::Active).await.unwrap();
+    repo.set_priority(low, 9).await.unwrap();
+    repo.set_limit(high, Some(0)).await.unwrap();
+    repo.set_not_before(high, None).await.unwrap();
+    let d = repo.get(high).await.unwrap().unwrap();
+    assert_eq!(
+        (
+            d.backend_id.as_deref(),
+            d.done_bytes,
+            d.total_bytes,
+            d.state,
+            d.limit_kib,
+            d.not_before
+        ),
+        (
+            Some("89ab"),
+            200,
+            Some(1000),
+            DownloadState::Active,
+            None,
+            None
+        )
+    );
+    assert_eq!(repo.open().await.unwrap()[0].id, low, "re-prioritised");
+
+    // finish / fail / remove; finished ones leave `open` and sort after the rest in `all`
+    repo.finish(high, r"D:\Downloads\Heat.mkv").await.unwrap();
+    let d = repo.get(high).await.unwrap().unwrap();
+    assert_eq!(
+        (d.state, d.done_bytes, d.file_path.as_deref()),
+        (DownloadState::Done, 1000, Some(r"D:\Downloads\Heat.mkv"))
+    );
+    assert!(d.finished_at.is_some());
+    repo.fail(low, "nobody is sharing this").await.unwrap();
+    assert_eq!(
+        repo.get(low).await.unwrap().unwrap().error.as_deref(),
+        Some("nobody is sharing this")
+    );
+    assert!(repo.open().await.unwrap().is_empty());
+    let third = repo
+        .add(&NewDownload {
+            title: "Collateral",
+            source: "test-source-collateral",
+            backend: "qbittorrent",
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(repo.all().await.unwrap()[0].id, third, "unfinished first");
+    repo.remove(low).await.unwrap();
+    assert_eq!(repo.get(low).await.unwrap(), None);
 }

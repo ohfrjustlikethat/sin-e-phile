@@ -119,7 +119,10 @@ function Form({ initial, onSaved }: { initial: TorrentSettingsView; onSaved: () 
         {save.isError && <span className="text-xs text-danger">{save.error.message}</span>}
         {saved && (
           <span className="text-xs text-success" role="status">
-            Saved.{initial.engine_running ? " These apply the next time sin-e-phile starts." : ""}
+            Saved.
+            {initial.engine_running
+              ? " The limits apply now; the adapter, peers and sharing the next time sin-e-phile starts."
+              : ""}
           </span>
         )}
       </div>

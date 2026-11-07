@@ -85,6 +85,19 @@ STRUCTURAL_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
         "A URL pointing at a .torrent file.",
     ),
     (
+        # ADR-0029: qBittorrent is a transport only. Its search plugins, RSS feeds and
+        # tracker lists are where content sources live inside it; reading them would be
+        # this rule's violation arriving by the back door. (The pattern's own source does
+        # not match itself: it reads "api/v2/(?:", the endpoints read "api/v2/search/".)
+        "qbittorrent-content",
+        re.compile(
+            r"api/v2/(?:search|rss)/"
+            r"|api/v2/torrents/(?:trackers|addTrackers|editTracker|removeTrackers)\b"
+            r"|\badd_trackers(?:_enabled)?\b",
+        ),
+        "A qBittorrent search, RSS or tracker endpoint or setting. ADR-0029: qBittorrent is a transport only.",
+    ),
+    (
         "default-source-key",
         re.compile(
             # A default-source key assigned a NON-EMPTY value: either a quoted
