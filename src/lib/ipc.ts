@@ -285,6 +285,13 @@ export const commands = {
 	pickImportFile: () => typedError<string | null, string>(__TAURI_INVOKE("pick_import_file")),
 	/**  Read an export and record it for the profile watching. */
 	importHistory: (path: string) => typedError<ImportView, string>(__TAURI_INVOKE("import_history", { path })),
+	tasteInput: () => typedError<TasteInputView, string>(__TAURI_INVOKE("taste_input")),
+	setTasteInput: (statements: StatementsView, love: string | null) => typedError<null, string>(__TAURI_INVOKE("set_taste_input", { statements, love })),
+	/**
+	 *  The titles nearest the profile's taste so far (what it liked, and what it said it
+	 *  loves), leaving out what it has seen. Empty without the vector half.
+	 */
+	tastePreview: (limit: number | null) => typedError<TastePick[], string>(__TAURI_INVOKE("taste_preview", { limit })),
 };
 
 /* Types */
@@ -794,6 +801,16 @@ export type StatView = {
 	value: string,
 };
 
+/**  Each -1, 0 or 1; `None` when not answered (see `sinephile_taste::Statements`). */
+export type StatementsView = {
+	pace: number | null,
+	ambiguity: number | null,
+	era: number | null,
+	subtitles: number | null,
+	runtime: number | null,
+	form: number | null,
+};
+
 export type StorageView = {
 	used_bytes: number | null,
 	free_bytes: number | null,
@@ -830,6 +847,18 @@ export type SubtitleSettingsView = {
 	budget: number,
 	/**  What OpenSubtitles last said is left today, if it said. */
 	server_remaining: number | null,
+};
+
+export type TasteInputView = {
+	statements: StatementsView,
+	love: string | null,
+};
+
+export type TastePick = {
+	id: number,
+	title: string,
+	year: number | null,
+	made_by: string | null,
 };
 
 /**  A score term exactly as `sinephile_selection::Term` holds it. */

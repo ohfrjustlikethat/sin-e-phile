@@ -375,6 +375,26 @@ impl<'a> ProfileRepository<'a> {
         .await?)
     }
 
+    /// What this profile liked, with a weight, strongest first (Phase 14's taste seed;
+    /// Phase 15 builds the full model on the same signals): five stars 1.0, four 0.7, and
+    /// a completed watch with no rating 0.3. Three stars and below are not liking.
+    pub async fn liked(&self, profile_id: i64) -> Result<Vec<(i64, f64)>, DbError> {
+        Ok(sqlx::query_as(
+            "SELECT media_item_id, CASE stars WHEN 5 THEN 1.0 ELSE 0.7 END AS weight
+             FROM ratings WHERE profile_id = ?1 AND stars >= 4
+             UNION ALL
+             SELECT DISTINCT w.media_item_id, 0.3
+             FROM watch_events w
+             WHERE w.profile_id = ?1 AND w.completed = 1
+               AND NOT EXISTS (SELECT 1 FROM ratings r
+                               WHERE r.profile_id = ?1 AND r.media_item_id = w.media_item_id)
+             ORDER BY weight DESC, media_item_id",
+        )
+        .bind(profile_id)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
     /// Continue-watching, most recent first.
     pub async fn continue_watching(
         &self,

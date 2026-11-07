@@ -2665,3 +2665,25 @@ adds nothing. Of the seven asked, two are genuinely ambiguous (two "Daredevil" o
 1996, close in votes), four are names written very differently ("Men in Black III" / "Men in Black 3"),
 and one is the harness cutting "Birdman: Or (The Unexpected Virtue of Ignorance)" short. The fallback's
 cost is the time: each miss scans three years of names (about a second for the worst).
+
+### E2: is an imported history reflected? First measurement (not met; carried to Phase 15)
+
+2026-11-07, `cargo run --release -p eval -- taste`: the first three MovieLens users with 600-900 ratings
+(users 3, 12, 72), each one's real history written as a Letterboxd export (their half stars, their dates),
+imported through `sinephile_imports` into a temporary profile (deleted after), then five-fold
+cross-validation over their four- and five-star favourites: the seed (`sinephile_taste::seed`, the
+weighted mean of the liked titles' vectors) is built from four fifths, and the held-out fifth is looked
+for among the 500 titles nearest it. Bar fixed before running: beat popularity, and 20 times chance.
+
+| User | Rated / matched | Favourites held out | Seed | Popularity |
+|---|---|---|---|---|
+| 3 | 656 / 649 | 494 | 15.8% | 57.1% |
+| 12 | 736 / 725 | 404 | 7.4% | 24.3% |
+| 72 | 813 / 808 | 404 | 8.9% | 20.8% |
+| **all** | | 1,302 | **11.06%** | **35.64%** |
+
+Chance is 0.417% (500 of 119,874 indexed). **Reflected, but not well enough**: 27 times chance, and 0.31
+times popularity. One mean over about 400 liked titles is a centroid of everything they like, which is
+what SPEC.md Phase 15 warns against ("not one average vector"); MovieLens favourites are also mostly
+popular films, which flatters the popularity baseline. The import half of E2 is met (above); this half is
+carried to Phase 15, whose taste modes must beat popularity on this harness.

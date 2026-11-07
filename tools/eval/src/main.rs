@@ -19,6 +19,7 @@ mod relevance;
 mod scan;
 mod search;
 mod subs;
+mod taste;
 mod vector;
 
 #[tokio::main]
@@ -93,6 +94,7 @@ async fn main() {
             scan::run(Path::new(&data_dir), files).await
         }
         "identify" => identify::run(Path::new(&data_dir), report).await,
+        "taste" => taste::run(Path::new(&data_dir)).await,
         "import" => {
             let from = args
                 .iter()

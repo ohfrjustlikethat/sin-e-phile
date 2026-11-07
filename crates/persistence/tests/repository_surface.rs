@@ -433,6 +433,22 @@ async fn profile_repository_surface() {
         "a completed watch"
     );
 
+    // liked — five and four stars, then completed unrated watches; a low rating is not liking
+    let third = media
+        .insert(&NewMediaItem::film("Early Summer", 1951))
+        .await
+        .expect("film");
+    repo.rate(second, other, Some(5)).await.unwrap();
+    repo.rate(second, third, Some(2)).await.unwrap();
+    repo.record_watch(second, third, 6_000, true).await.unwrap();
+    let liked = repo.liked(second).await.expect("liked");
+    assert_eq!(
+        liked,
+        vec![(other, 1.0), (film, 0.3)],
+        "rated 2 and watched is not liked"
+    );
+    assert!(repo.liked(first).await.unwrap().is_empty());
+
     // save_position — insert and ON CONFLICT update
     let position = PlaybackPosition {
         media_item_id: film,

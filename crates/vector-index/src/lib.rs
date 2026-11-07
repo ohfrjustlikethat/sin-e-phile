@@ -314,6 +314,20 @@ impl VectorIndex {
             .collect())
     }
 
+    /// A catalogue item's own stored vector, if it is in the graph (Phase 14: the seed
+    /// of a taste is built from the vectors of what a person liked).
+    pub fn vector(&self, media_item_id: i64) -> Option<Vec<i8>> {
+        let key = u64::try_from(media_item_id).ok()?;
+        if !self.index.contains(key) {
+            return None;
+        }
+        let mut out = vec![0i8; self.index.dimensions()];
+        match self.index.get(key, &mut out) {
+            Ok(n) if n > 0 => Some(out),
+            _ => None,
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.index.size()
     }
@@ -398,6 +412,14 @@ mod tests {
         let neighbours = [ids[9].expect("indexed"), ids[11].expect("indexed")];
         assert!(neighbours.contains(&hits[1].media_item_id), "{hits:?}");
         assert!(neighbours.contains(&hits[2].media_item_id), "{hits:?}");
+
+        // A stored vector reads back by catalogue id, from a viewed (mapped) index too.
+        assert_eq!(
+            index.vector(ids[10].expect("indexed")),
+            Some(vectors[10].clone())
+        );
+        assert_eq!(index.vector(4_999), None, "not in the graph");
+        assert_eq!(index.vector(-1), None);
     }
 
     #[test]

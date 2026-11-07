@@ -40,4 +40,5 @@ sinephile-torrent = { path = "../../crates/torrent" }
 librqbit = { version = "=9.0.1", default-features = false, features = ["rust-tls"] }
 tempfile = "3"
 sinephile-imports = { path = "../../crates/imports" }
+sinephile-taste = { path = "../../crates/taste" }
 zip = { version = "=8.6.0", default-features = false, features = ["deflate-flate2"] }

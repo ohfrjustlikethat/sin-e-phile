@@ -5,6 +5,7 @@ import { commands, type ProfileView } from "@/lib/ipc";
 import { AVATAR_COLOURS, Avatar, colourOf, type AvatarColour } from "@/features/profiles/Avatar";
 import { PROFILES, useProfiles } from "@/features/profiles/useProfiles";
 import { ImportHistory } from "@/features/profiles/ImportHistory";
+import { TasteInput } from "@/features/profiles/TasteInput";
 
 /**
  * Settings → Profiles — SPEC.md Phase 14. Add a profile (a name, a colour, kids or not,
@@ -47,6 +48,12 @@ export function ProfilesSection() {
         <div className="mt-8">
           <h3 className="mb-2 text-[13px] text-ink">Import {active.name}'s history</h3>
           <ImportHistory />
+        </div>
+      )}
+      {active && (
+        <div className="mt-8">
+          <h3 className="mb-3 text-[13px] text-ink">What {active.name} likes</h3>
+          <TasteInput />
         </div>
       )}
     </section>
