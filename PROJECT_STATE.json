@@ -21,8 +21,8 @@
       {
         "id": "15.2",
         "text": "Taste modes (crates/taste): the positive signals weighted (completed, rewatched, rated, watchlisted, imported) and decayed by age, with a longer half-life for strongly held ones; clustered into 3 to 8 modes (k-means over the catalogue vectors, k by silhouette), each with a vector, weight and recency; recommendations interleaved across modes in proportion to weight. Judged on eval taste against popularity (Phase 14 E2's carried half) and on a synthetic two-taste profile (E1).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "85f5cc2"
       },
       {
         "id": "15.3",
@@ -47,8 +47,8 @@
       {
         "id": "E1",
         "text": "The model produces distinct, recognisable clusters for a synthetic profile with two deliberately unrelated tastes.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "eval modes (2026-11-08): a synthetic profile loving the 30 most-voted horror films and the 30 most-voted documentaries, clustered by sinephile_taste::modes on the real catalogue vectors: 3 modes, weighted purity 96.6% (target 90%), horror in one mode and documentaries in two of their own, three identical runs; seen to fail with --prove (vectors shuffled between titles: 59.3%, NOT MET). Unit test crates/taste/src/modes.rs two_unrelated_tastes_become_two_separate_modes (seen to fail with one mode forced). docs/eval-results.md 'E1: two unrelated tastes'."
       },
       {
         "id": "E2",
@@ -1653,10 +1653,8 @@
         {
           "id": "E2",
           "text": "A Letterboxd export of 500+ films imports correctly and is reflected in the taste model.",
-          "met": false,
-          "evidence": "MEASURED: the import half is met: eval import on a fresh set of 600 films (ranks 601-1200), 98.83% right, 0 wrong, a second import adds nothing. The reflection half is not: eval taste on three real MovieLens histories, the seed finds 11.06% of held-out favourites among its 500 nearest against 35.64% for popularity (27x chance, 0.31x popularity). docs/eval-results.md.",
-          "carried_to_phase": 15,
-          "carried_reason": "'Reflected in the taste model' needs the taste model, which is Phase 15's deliverable (taste modes, not one mean); Phase 15 must beat popularity on eval taste."
+          "met": true,
+          "evidence": "Met in Phase 15: eval taste on the same three MovieLens users, folds and 500 slots: the taste modes with a popularity prior of 0.5 (chosen on three other users with eval taste --tune) find 40.63% of held-out favourites against 35.64% for popularity (97x chance). The import half: eval import on a fresh 600-film set, 98.83% right, 0 wrong, idempotent. docs/eval-results.md 'Taste modes with a popularity prior'."
         },
         {
           "id": "E3",
@@ -1738,8 +1736,8 @@
         {
           "id": "E1",
           "text": "The model produces distinct, recognisable clusters for a synthetic profile with two deliberately unrelated tastes.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "eval modes (2026-11-08): a synthetic profile loving the 30 most-voted horror films and the 30 most-voted documentaries, clustered by sinephile_taste::modes on the real catalogue vectors: 3 modes, weighted purity 96.6% (target 90%), horror in one mode and documentaries in two of their own, three identical runs; seen to fail with --prove (vectors shuffled between titles: 59.3%, NOT MET). Unit test crates/taste/src/modes.rs two_unrelated_tastes_become_two_separate_modes (seen to fail with one mode forced). docs/eval-results.md 'E1: two unrelated tastes'."
         },
         {
           "id": "E2",
@@ -1776,8 +1774,8 @@
         {
           "id": "15.2",
           "text": "Taste modes (crates/taste): the positive signals weighted (completed, rewatched, rated, watchlisted, imported) and decayed by age, with a longer half-life for strongly held ones; clustered into 3 to 8 modes (k-means over the catalogue vectors, k by silhouette), each with a vector, weight and recency; recommendations interleaved across modes in proportion to weight. Judged on eval taste against popularity (Phase 14 E2's carried half) and on a synthetic two-taste profile (E1).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "85f5cc2"
         },
         {
           "id": "15.3",
@@ -2370,7 +2368,7 @@
       ]
     }
   ],
-  "next_action": "Phase 15 subtask 15.2 (docs/phases/phase-15-taste-model.md): taste modes in crates/taste/src/modes.rs: weight each positive signal (completed 1.0, rewatched 1.5, rated by stars, watchlisted 0.4, imported as recorded) and decay it by age (half-life 180 days, 720 for five stars and rewatches); k-means over the liked titles' stored vectors for k in 3..=8 chosen by silhouette; recommend by interleaving each mode's nearest in proportion to its weight; judge on eval taste against popularity (11.06% seed vs 35.64%) and on a synthetic two-taste profile (E1).",
+  "next_action": "Phase 15 subtask 15.3 (docs/phases/phase-15-taste-model.md): axes in crates/taste/src/axes.rs from the weighted signals and the catalogue (preferred decades, runtimes, countries, original languages and so subtitle tolerance, directors, each with the statements as priors), negatives from early abandons and low ratings, and a temporal-decay test: a synthetic profile whose taste shifts from one genre to another over two simulated years must have its strongest mode follow the shift (E4).",
   "blockers": [],
   "decisions_pending": [
     {

@@ -16,7 +16,7 @@ Profile system: creation, avatar, optional PIN, Netflix-style picker on launch *
 ## Exit criteria
 
 - [ ] **E1** A first-time user with no technical knowledge reaches a populated Home screen in under two minutes. Test this on an actual person. — *carried to Phase 16*
-- [ ] **E2** A Letterboxd export of 500+ films imports correctly and is reflected in the taste model. — *carried to Phase 15*
+- [x] **E2** A Letterboxd export of 500+ films imports correctly and is reflected in the taste model.
 - [x] **E3** Skipping the sources step leaves a functional, non-empty app.
 - [ ] **E4** Completing onboarding with no TMDB key produces a working, populated, good-looking app (ADR-0013). Every artwork-bearing surface has a designed artwork-free state — a typographic fallback, never a grey rectangle. — *carried to Phase 16*
 - [x] **E5** Profile switching is instant and leaks no state between profiles.

@@ -12,21 +12,22 @@
 
 **Phase 15 — Taste Model** (`in_progress`, branch `phase/15-taste-model`)
 
-0 of 5 exit criteria met with evidence.
+1 of 5 exit criteria met with evidence.
 
 > Receives Phase 14 E2's reflection half: the modes must beat popularity on eval taste (the seed: 11.06% against 35.64%). E3 needs the author's agreement, asked in the batch at this phase's end.
 
-### Subtasks — 1/5 complete
+### Subtasks — 2/5 complete
 
 - [x] **15.1** Signals (migration 0026 and the player): a watch recorded when the player leaves (completed past 90%, otherwise abandoned with its point), rewatches, searches that led to a title, detail pages opened and not played (a weak negative), with the time of day and the session's length; repository methods with surface lines; the player and the detail page write them. · `db5dfb3`
-- [ ] **15.2** Taste modes (crates/taste): the positive signals weighted (completed, rewatched, rated, watchlisted, imported) and decayed by age, with a longer half-life for strongly held ones; clustered into 3 to 8 modes (k-means over the catalogue vectors, k by silhouette), each with a vector, weight and recency; recommendations interleaved across modes in proportion to weight. Judged on eval taste against popularity (Phase 14 E2's carried half) and on a synthetic two-taste profile (E1).
+- [x] **15.2** Taste modes (crates/taste): the positive signals weighted (completed, rewatched, rated, watchlisted, imported) and decayed by age, with a longer half-life for strongly held ones; clustered into 3 to 8 modes (k-means over the catalogue vectors, k by silhouette), each with a vector, weight and recency; recommendations interleaved across modes in proportion to weight. Judged on eval taste against popularity (Phase 14 E2's carried half) and on a synthetic two-taste profile (E1). · `85f5cc2`
 - [ ] **15.3** Axes and negatives: preferred eras, runtimes, countries, languages, subtitle tolerance and directors from the signals, the taste statements as priors; negative preferences from abandons (5 minutes in means less than 80, E2); a temporal-decay test on a profile whose taste shifts over simulated time (E4).
 - [ ] **15.4** The taste profile screen (src/features/taste/TasteProfile.tsx): the model described in plain language (modes named by what they hold, axes in words), each mode and axis correctable (more, less, not me), pad-complete; Home's taste rail follows the modes.
 - [ ] **15.5** The author check batch after this phase (ADR-0040): Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, and E3 here (the screen describes a profile accurately); then docs/specs/taste-model.md, learning note, README and HOW_IT_WORKS, regression, close.
 
 ### Exit criteria
 
-- [ ] **E1** The model produces distinct, recognisable clusters for a synthetic profile with two deliberately unrelated tastes.
+- [x] **E1** The model produces distinct, recognisable clusters for a synthetic profile with two deliberately unrelated tastes.
+      - *Evidence:* eval modes (2026-11-08): a synthetic profile loving the 30 most-voted horror films and the 30 most-voted documentaries, clustered by sinephile_taste::modes on the real catalogue vectors: 3 modes, weighted purity 96.6% (target 90%), horror in one mode and documentaries in two of their own, three identical runs; seen to fail with --prove (vectors shuffled between titles: 59.3%, NOT MET). Unit test crates/taste/src/modes.rs two_unrelated_tastes_become_two_separate_modes (seen to fail with one mode forced). docs/eval-results.md 'E1: two unrelated tastes'.
 - [ ] **E2** Abandonment is weighted correctly — abandoning at 5 minutes and at 80 minutes mean different things.
 - [ ] **E3** The taste profile screen describes a test profile in a way the author agrees is accurate.
 - [ ] **E4** Temporal decay is tested with a synthetic profile whose taste shifts over simulated time.
@@ -36,7 +37,7 @@
 
 ## What's next
 
-Phase 15 subtask 15.2 (docs/phases/phase-15-taste-model.md): taste modes in crates/taste/src/modes.rs: weight each positive signal (completed 1.0, rewatched 1.5, rated by stars, watchlisted 0.4, imported as recorded) and decay it by age (half-life 180 days, 720 for five stars and rewatches); k-means over the liked titles' stored vectors for k in 3..=8 chosen by silhouette; recommend by interleaving each mode's nearest in proportion to its weight; judge on eval taste against popularity (11.06% seed vs 35.64%) and on a synthetic two-taste profile (E1).
+Phase 15 subtask 15.3 (docs/phases/phase-15-taste-model.md): axes in crates/taste/src/axes.rs from the weighted signals and the catalogue (preferred decades, runtimes, countries, original languages and so subtitle tolerance, directors, each with the statements as priors), negatives from early abandons and low ratings, and a temporal-decay test: a synthetic profile whose taste shifts from one genre to another over two simulated years must have its strongest mode follow the shift (E4).
 
 ---
 
@@ -66,8 +67,8 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 6/6 |
 | [x] | 12 | Local Library Engine | B | 4 | 2–3 | 6/6 |
 | [x] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 8/8 |
-| [x] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 2/6 |
-| [~] | 15 | Taste Model | B | 5, 14 | 2 | 0/5 |
+| [x] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 3/6 |
+| [~] | 15 | Taste Model | B | 5, 14 | 2 | 1/5 |
 | [ ] | 16 | Recommendation Engine | B | 15 | 2–3 | 0/6 |
 | [ ] | 17 | Discovery Engine | B | 16 | 2 | 0/6 |
 | [ ] | 18 | Browsing Surfaces 🏁 | B | 17 | 4–5 | 0/13 |
