@@ -2702,3 +2702,29 @@ against `data/sinephile.db`, the queries exactly as `MediaRepository` runs them)
 Migration 0025: a partial index on votes. The decade query walks it in vote order with year and kind
 kept out of the index choice (`+`), the same answers in every decade (checked). A second index on
 (year, votes) was tried and not used by the planner, so it is not in the migration.
+
+### E5: switching profiles, timed
+
+2026-11-07, `cargo run --release -p eval -- switch`: a switch is one write (`touch`) and the new
+profile's Home (`sinephile_taste::home::rails`, the taste seed included), on the full catalogue with the
+vector half; a profile with nothing, and one with MovieLens user 3's real history imported (650 films,
+498 liked). Five switches each, three runs:
+
+| Profile | Run 1 (cold, straight after the import) | Runs 2 and 3 |
+|---|---|---|
+| nothing yet | 3.8 ms | 2.1 / 2.5 ms |
+| 650 films imported | **112.1 ms** | **11.5 / 10.9 ms** |
+
+Where the warm 11 ms goes: `liked()` 0.6 ms, the seed of 498 vectors 0.3 ms, the nearest search 0.8 ms,
+the other rails 2.7 ms. The cold 112 ms is the index and catalogue pages being read from disk the first
+time; it is the case a switch right after launch will see. Isolation: `crates/persistence/tests/profiles.rs`
+(seen to fail with a profile filter removed). The page's own cost (rehydrating two stores and refetching)
+is not in these numbers.
+
+### Regression check before merging Phase 14 (rule 13)
+
+2026-11-08, `cargo run --release -p eval -- all` twice and `-- vector --report`: E2 **43/43**; E3 meaning
+**0.0472**, filter **1.0000** (carried); p95 **27.3 ms** cold, **16.4 ms** warm (15.8 at Phase 13: noise);
+recall@10 **0.9760**; subtitles **80/80**, held out 32/32, false accepts **0/10**; identify **99.05% /
+0.39%** (held out 100% / 0%). Unchanged from Phase 13. Phase 14's own, rerun after migration 0025: import
+(fresh set) 98.83% / 0 wrong; taste seed 11.06% against popularity 35.64% (carried); switch 2.1 / 11.5 ms.

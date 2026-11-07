@@ -19,6 +19,7 @@ mod relevance;
 mod scan;
 mod search;
 mod subs;
+mod switching;
 mod taste;
 mod vector;
 
@@ -95,6 +96,7 @@ async fn main() {
         }
         "identify" => identify::run(Path::new(&data_dir), report).await,
         "taste" => taste::run(Path::new(&data_dir)).await,
+        "switch" => switching::run(Path::new(&data_dir)).await,
         "import" => {
             let from = args
                 .iter()

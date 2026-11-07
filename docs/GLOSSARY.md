@@ -302,3 +302,9 @@ and why.
 
 **Transport only** *(Phase 13, ADR-0029)* — The user's qBittorrent moves bytes for the app and
 nothing more; its search plugins, feeds and tracker lists are never read.
+
+**Profile** *(Phase 14)* — One person's history, watchlist, ratings and taste. Nothing crosses between them.
+
+**Fail closed** *(Phase 14)* — A kids profile shows only what is positively known to suit children; anything unknown is left out.
+
+**Seed taste vector** *(Phase 14)* — The direction in the catalogue's embedding space that a profile's liked films point, on average.

@@ -264,6 +264,84 @@ pub async fn run(data_dir: &Path) -> Result<bool, EvalError> {
     Ok(ok)
 }
 
+/// One MovieLens user's real history, written as a Letterboxd export and imported into
+/// `profile` (for `eval switch`).
+pub async fn import_user(
+    data_dir: &Path,
+    db: &Db,
+    profile: i64,
+    user: i64,
+) -> Result<(), EvalError> {
+    let path = data_dir.join("datasets").join("ml-25m.zip");
+    let file = std::fs::File::open(&path).map_err(missing)?;
+    let mut zip = zip::ZipArchive::new(file).map_err(missing)?;
+    let mut ratings = Vec::new();
+    {
+        let i = (0..zip.len())
+            .find(|i| {
+                zip.name_for_index(*i)
+                    .is_some_and(|n| n.ends_with("ratings.csv"))
+            })
+            .ok_or_else(|| missing("no ratings.csv"))?;
+        let reader = BufReader::with_capacity(1 << 20, zip.by_index(i).map_err(missing)?);
+        let prefix = format!("{user},");
+        for line in reader.lines().skip(1).map_while(Result::ok) {
+            if !line.starts_with(&prefix) {
+                if !ratings.is_empty() {
+                    break; // the file is grouped by user
+                }
+                continue;
+            }
+            let f: Vec<&str> = line.split(',').collect();
+            if let (Some(m), Some(r), Some(t)) = (f.get(1), f.get(2), f.get(3)) {
+                if let (Ok(m), Ok(r), Ok(t)) = (m.parse(), r.parse(), t.parse::<i64>()) {
+                    ratings.push(Rating {
+                        movie: m,
+                        stars: r,
+                        day: day(t),
+                    });
+                }
+            }
+        }
+    }
+    let mut movies_text = String::new();
+    {
+        let i = (0..zip.len())
+            .find(|i| {
+                zip.name_for_index(*i)
+                    .is_some_and(|n| n.ends_with("movies.csv"))
+            })
+            .ok_or_else(|| missing("no movies.csv"))?;
+        zip.by_index(i)
+            .map_err(missing)?
+            .read_to_string(&mut movies_text)
+            .map_err(missing)?;
+    }
+    let names: HashMap<i64, (String, i64)> = sinephile_imports::csv::records(&movies_text)
+        .into_iter()
+        .skip(1)
+        .filter_map(|r| Some((r.first()?.parse().ok()?, letterboxd_name(r.get(1)?)?)))
+        .collect();
+    let mut rated = String::from("Date,Name,Year,Letterboxd URI,Rating\n");
+    for r in &ratings {
+        let Some((name, year)) = names.get(&r.movie) else {
+            continue;
+        };
+        let n = if name.contains([',', '"']) {
+            format!("\"{}\"", name.replace('"', "\"\""))
+        } else {
+            name.clone()
+        };
+        rated.push_str(&format!("{},{n},{year},,{}\n", r.day, r.stars));
+    }
+    let dir = tempfile::tempdir().map_err(missing)?;
+    let csv = dir.path().join("ratings.csv");
+    std::fs::write(&csv, rated).map_err(missing)?;
+    let (_, entries) = read(&csv).map_err(missing)?;
+    import(db, profile, &entries, "2026-11-07 12:00:00").await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
