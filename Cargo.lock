@@ -5342,6 +5342,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sinephile-catalogue",
+ "sinephile-downloads",
  "sinephile-embedder",
  "sinephile-embedding",
  "sinephile-library",
@@ -5405,6 +5406,20 @@ dependencies = [
  "tracing-subscriber",
  "unicode-normalization",
  "zip",
+]
+
+[[package]]
+name = "sinephile-downloads"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "librqbit",
+ "sinephile-library",
+ "sinephile-persistence",
+ "sinephile-torrent",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
 ]
 
 [[package]]

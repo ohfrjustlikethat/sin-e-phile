@@ -214,6 +214,12 @@ export const commands = {
 	resolveReview: (fileId: number, mediaItemId: number) => typedError<number, string>(__TAURI_INVOKE("resolve_review", { fileId, mediaItemId })),
 	/**  "Not a film or episode": never asked about again. */
 	notATitle: (fileId: number) => typedError<null, string>(__TAURI_INVOKE("not_a_title", { fileId })),
+	downloads: () => typedError<DownloadView[], string>(__TAURI_INVOKE("downloads")),
+	downloadPause: (id: number) => typedError<null, string>(__TAURI_INVOKE("download_pause", { id })),
+	downloadResume: (id: number) => typedError<null, string>(__TAURI_INVOKE("download_resume", { id })),
+	downloadCancel: (id: number, deleteFiles: boolean) => typedError<null, string>(__TAURI_INVOKE("download_cancel", { id, deleteFiles })),
+	/**  Where downloads land (a library folder of their own). */
+	downloadsFolder: () => __TAURI_INVOKE<string>("downloads_folder"),
 };
 
 /* Types */
@@ -360,6 +366,23 @@ export type CutoutRect = {
 	width: number | null,
 	height: number | null,
 	radius: number | null,
+};
+
+export type DownloadView = {
+	id: number,
+	media_item_id: number | null,
+	title: string,
+	/**  "queued" | "active" | "paused" | "done" | "failed" | "cancelled" */
+	state: string,
+	backend: string,
+	priority: number,
+	done_bytes: number | null,
+	total_bytes: number | null,
+	limit_kib: number | null,
+	not_before: string | null,
+	reason: string | null,
+	error: string | null,
+	file_path: string | null,
 };
 
 export type EpisodeView = {

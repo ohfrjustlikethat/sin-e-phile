@@ -117,6 +117,11 @@ pub enum TorrentError {
     Engine(String),
 }
 
+/// A limit in bytes per second; nothing (or zero) is unlimited.
+fn limit(v: Option<u32>) -> Option<NonZeroU32> {
+    v.and_then(NonZeroU32::new)
+}
+
 fn engine_err(e: anyhow::Error) -> TorrentError {
     TorrentError::Engine(format!("{e:#}"))
 }
@@ -143,6 +148,9 @@ pub struct AddOptions {
     /// Where the files are, or go. `None` is `<data>/torrents/`. Set when seeding files
     /// that already exist (the test swarm does).
     pub output_folder: Option<PathBuf>,
+    /// This torrent's own download limit, bytes per second (Phase 13). The global limit
+    /// still applies on top.
+    pub download_limit: Option<u32>,
 }
 
 /// A torrent as the UI sees it.
@@ -183,7 +191,6 @@ impl Engine {
         for dir in [&downloads, &state] {
             std::fs::create_dir_all(dir).map_err(|e| TorrentError::Start(e.to_string()))?;
         }
-        let limit = |v: Option<u32>| v.and_then(NonZeroU32::new);
         let mut opts = SessionOptions {
             dht: if config.dht {
                 Some(librqbit::DhtSessionConfig {
@@ -241,6 +248,12 @@ impl Engine {
     }
 
     /// The address this engine accepts peers on.
+    /// Change the global limits while running, bytes per second; `None` is unlimited.
+    pub fn set_limits(&self, download: Option<u32>, upload: Option<u32>) {
+        self.session.ratelimits.set_download_bps(limit(download));
+        self.session.ratelimits.set_upload_bps(limit(upload));
+    }
+
     pub fn listen_addr(&self) -> Option<SocketAddr> {
         self.session.listen_addr()
     }
@@ -276,6 +289,10 @@ impl Engine {
             initial_peers: (!opts.initial_peers.is_empty()).then_some(opts.initial_peers),
             output_folder: opts.output_folder.map(|p| p.to_string_lossy().into_owned()),
             trackers,
+            ratelimits: librqbit::limits::LimitsConfig {
+                download_bps: limit(opts.download_limit),
+                upload_bps: None,
+            },
             ..Default::default()
         };
         let deadline = self.config.dead_swarm_after;
