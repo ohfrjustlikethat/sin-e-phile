@@ -16,10 +16,10 @@
 
 > E1 and E6 need a person and the author; built and tested as far as code allows, asked for in the batch after Phase 15 (ADR-0040).
 
-### Subtasks — 0/6 complete
+### Subtasks — 1/6 complete
 
-- [ ] **14.1** Profiles in the backend: migration 0024 (avatar colour, PIN salt and hash, kids flag and limit, last used); ProfileRepository create/rename/delete (never the last)/set_pin/verify_pin/set_kids/touch, each with a line in repository_surface.rs; an active profile in AppState replacing every ensure_default() call in src-tauri; a crate test that watchlist, positions, ratings, watch events, settings and keys never cross profiles (E5).
-- [ ] **14.2** Profiles in the app: the picker on launch only with two or more (ADR-0043), the avatar in the masthead with a switcher, create and edit with an optional PIN, the kids profile failing closed (TMDB certification within the limit when the profile has a key, otherwise Family or Animation titles that are not adult nor tagged with an adult genre); switching timed to a re-rendered Home (E5); pad-complete in tools/uiaudit/controller.mjs.
+- [x] **14.1** Profiles in the backend: migration 0024 (avatar colour, PIN salt and hash, kids flag and limit, last used); ProfileRepository create/rename/delete (never the last)/set_pin/verify_pin/set_kids/touch, each with a line in repository_surface.rs; an active profile in AppState replacing every ensure_default() call in src-tauri; a crate test that watchlist, positions, ratings, watch events, settings and keys never cross profiles (E5). · `f671bc2`
+- [ ] **14.2** Profiles in the app: the picker on launch only with two or more (ADR-0043), the avatar in the masthead with a switcher, create and edit with an optional PIN, the kids profile failing closed (TMDB certification within the limit when the profile has a key, otherwise Family or Animation titles that are not adult nor tagged with an adult genre); switching timed to a re-rendered Home (E5); pad-complete in tools/uiaudit/controller.mjs. The frontend's personal browser storage (playback choice, recent searches) is scoped by profile and reloaded on a switch; machine settings (controller, last destination) stay shared.
 - [ ] **14.3** Imports (crates/imports): Letterboxd CSV (watched, ratings, diary, watchlist), Trakt JSON, IMDb ratings CSV, MAL and AniList XML, each matched to the catalogue (an IMDb id where the file gives one, else title and year through the library's identifier), recorded per profile as ratings, completed watches and watchlist, unmatched rows listed in words; a 500+ entry Letterboxd fixture built from catalogue titles, match rate recorded (E2).
 - [ ] **14.4** Taste input: the six taste statements (pace, ambiguity, era, subtitles, runtime, formal experimentation) stored per profile; the free-text 'what you love' embedded with the query embedder and stored; a seed taste vector from imports and statements, so E2's 'reflected in the taste model' is measurable now (nearest titles to the vector against the imported favourites) and Phase 15 builds on it.
 - [ ] **14.5** The onboarding wizard: profile, taste (imports, statements, free text, and the adaptive typographic title-card grid as an extra round: 3-4 rounds, picks spread for information gain), sources (paste a URL, the Internet Archive, add a folder inline), each skippable and never a dead end; shown on first run only; E3 and E4 tested with no key and no sources; pad-complete.
@@ -38,7 +38,7 @@
 
 ## What's next
 
-Phase 14 subtask 14.1 (docs/phases/phase-14-profiles.md): write migration 0024_profiles in crates/persistence/migrations (avatar_colour, pin_salt, pin_hash, is_kids, kids_limit, last_used_at), extend ProfileRepository with create/rename/delete/set_pin/verify_pin/set_kids/touch plus lines in tests/repository_surface.rs, then add AppState::profile() in src-tauri/src/state.rs and replace the 14 ensure_default() calls in src-tauri/src/commands.
+Phase 14 subtask 14.2 (docs/phases/phase-14-profiles.md): add src-tauri/src/commands/profiles.rs (profiles, create_profile, update_profile, delete_profile, switch_profile with PIN check then AppState::set_profile, ProfileRepository::touch and rebuild_manager, set_profile_pin, clear_profile_pin), regenerate bindings, then the picker (src/features/profiles/ProfilePicker.tsx, on launch only with 2+ profiles), the masthead avatar and switcher, profile-scoped browser storage in src/lib/playbackChoice.ts and recentSearches.ts, and the kids filter.
 
 ---
 

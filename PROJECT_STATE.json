@@ -15,12 +15,12 @@
       {
         "id": "14.1",
         "text": "Profiles in the backend: migration 0024 (avatar colour, PIN salt and hash, kids flag and limit, last used); ProfileRepository create/rename/delete (never the last)/set_pin/verify_pin/set_kids/touch, each with a line in repository_surface.rs; an active profile in AppState replacing every ensure_default() call in src-tauri; a crate test that watchlist, positions, ratings, watch events, settings and keys never cross profiles (E5).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "f671bc2"
       },
       {
         "id": "14.2",
-        "text": "Profiles in the app: the picker on launch only with two or more (ADR-0043), the avatar in the masthead with a switcher, create and edit with an optional PIN, the kids profile failing closed (TMDB certification within the limit when the profile has a key, otherwise Family or Animation titles that are not adult nor tagged with an adult genre); switching timed to a re-rendered Home (E5); pad-complete in tools/uiaudit/controller.mjs.",
+        "text": "Profiles in the app: the picker on launch only with two or more (ADR-0043), the avatar in the masthead with a switcher, create and edit with an optional PIN, the kids profile failing closed (TMDB certification within the limit when the profile has a key, otherwise Family or Animation titles that are not adult nor tagged with an adult genre); switching timed to a re-rendered Home (E5); pad-complete in tools/uiaudit/controller.mjs. The frontend's personal browser storage (playback choice, recent searches) is scoped by profile and reloaded on a switch; machine settings (controller, last destination) stay shared.",
         "status": "not_started",
         "commit": null
       },
@@ -1695,12 +1695,12 @@
         {
           "id": "14.1",
           "text": "Profiles in the backend: migration 0024 (avatar colour, PIN salt and hash, kids flag and limit, last used); ProfileRepository create/rename/delete (never the last)/set_pin/verify_pin/set_kids/touch, each with a line in repository_surface.rs; an active profile in AppState replacing every ensure_default() call in src-tauri; a crate test that watchlist, positions, ratings, watch events, settings and keys never cross profiles (E5).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "f671bc2"
         },
         {
           "id": "14.2",
-          "text": "Profiles in the app: the picker on launch only with two or more (ADR-0043), the avatar in the masthead with a switcher, create and edit with an optional PIN, the kids profile failing closed (TMDB certification within the limit when the profile has a key, otherwise Family or Animation titles that are not adult nor tagged with an adult genre); switching timed to a re-rendered Home (E5); pad-complete in tools/uiaudit/controller.mjs.",
+          "text": "Profiles in the app: the picker on launch only with two or more (ADR-0043), the avatar in the masthead with a switcher, create and edit with an optional PIN, the kids profile failing closed (TMDB certification within the limit when the profile has a key, otherwise Family or Animation titles that are not adult nor tagged with an adult genre); switching timed to a re-rendered Home (E5); pad-complete in tools/uiaudit/controller.mjs. The frontend's personal browser storage (playback choice, recent searches) is scoped by profile and reloaded on a switch; machine settings (controller, last destination) stay shared.",
           "status": "not_started",
           "commit": null
         },
@@ -2342,7 +2342,7 @@
       ]
     }
   ],
-  "next_action": "Phase 14 subtask 14.1 (docs/phases/phase-14-profiles.md): write migration 0024_profiles in crates/persistence/migrations (avatar_colour, pin_salt, pin_hash, is_kids, kids_limit, last_used_at), extend ProfileRepository with create/rename/delete/set_pin/verify_pin/set_kids/touch plus lines in tests/repository_surface.rs, then add AppState::profile() in src-tauri/src/state.rs and replace the 14 ensure_default() calls in src-tauri/src/commands.",
+  "next_action": "Phase 14 subtask 14.2 (docs/phases/phase-14-profiles.md): add src-tauri/src/commands/profiles.rs (profiles, create_profile, update_profile, delete_profile, switch_profile with PIN check then AppState::set_profile, ProfileRepository::touch and rebuild_manager, set_profile_pin, clear_profile_pin), regenerate bindings, then the picker (src/features/profiles/ProfilePicker.tsx, on launch only with 2+ profiles), the masthead avatar and switcher, profile-scoped browser storage in src/lib/playbackChoice.ts and recentSearches.ts, and the kids filter.",
   "blockers": [],
   "decisions_pending": [
     {
