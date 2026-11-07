@@ -49,7 +49,7 @@ Phase 12 subtask 12.5 (docs/phases/phase-12-local-library-engine.md): review que
 
 ## Blockers
 
-None.
+- **B12** CI failed on phase/12 at 436e28b (docs(spec): 3.3.0, A34): build_state --check found PROJECT_STATE.json's new Phase 18/21/25/27 exit criteria in a different order from SPEC.md (the amendment script appended them; the spec inserts them mid-list). Fixed by python tools/state/build_state.py --write; build_state --check added to CLAUDE.md's pre-push list. Clears when CI is green on the fix.
 
 ---
 
