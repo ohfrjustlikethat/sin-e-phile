@@ -441,6 +441,9 @@ impl Engine {
     }
 }
 
+/// librqbit's speed unit, in bytes per second.
+const MIB_PER_SECOND: f64 = 1024.0 * 1024.0;
+
 fn status_of(h: &Handle) -> Status {
     let s = h.stats();
     let state = match s.state {
@@ -453,9 +456,13 @@ fn status_of(h: &Handle) -> Status {
         .live
         .as_ref()
         .map(|l| {
+            // librqbit's `mbps` is MEBIBYTES per second, despite the name: its estimator
+            // divides bytes per second by 1024 twice, and its own `Speed::as_bytes`
+            // multiplies back the same way. Read as megabits until Phase 13, which made
+            // every reported speed 8.4 times too low (found by the advisor's trials).
             (
-                l.download_speed.mbps * 1_000_000.0 / 8.0,
-                l.upload_speed.mbps * 1_000_000.0 / 8.0,
+                l.download_speed.mbps * MIB_PER_SECOND,
+                l.upload_speed.mbps * MIB_PER_SECOND,
                 l.snapshot.peer_stats.live,
             )
         })
