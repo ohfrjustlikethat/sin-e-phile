@@ -317,10 +317,38 @@ async fn profile_repository_surface() {
     // all
     assert_eq!(repo.all().await.expect("all").len(), 2);
 
+    // finished — neither yet, then by a position past 95%, then by a completed watch
+    let other = media
+        .insert(&NewMediaItem::film("Floating Weeds", 1959))
+        .await
+        .expect("film");
+    assert!(!repo.finished(second, film).await.expect("finished"));
+    repo.save_position(
+        second,
+        &PlaybackPosition {
+            media_item_id: other,
+            position_seconds: 7_800,
+            duration_seconds: Some(8_000),
+            audio_language: None,
+            subtitle_language: None,
+        },
+    )
+    .await
+    .expect("near the end");
+    assert!(repo.finished(second, other).await.unwrap(), "past 95%");
+    assert!(
+        !repo.finished(first, other).await.unwrap(),
+        "another profile's"
+    );
+
     // record_watch
     repo.record_watch(second, film, 3_000, true)
         .await
         .expect("record_watch");
+    assert!(
+        repo.finished(second, film).await.unwrap(),
+        "a completed watch"
+    );
 
     // save_position — insert and ON CONFLICT update
     let position = PlaybackPosition {

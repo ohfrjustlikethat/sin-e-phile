@@ -7,6 +7,7 @@ import { clock } from "@/features/player/intents";
 import { languageName, qualityLabel, usePlaybackChoice } from "@/lib/playbackChoice";
 import { ChoiceRow, type Choice } from "./ChoiceRow";
 import { SourcePanel } from "./SourcePanel";
+import { DownloadAdvice } from "./DownloadAdvice";
 import { SeriesSection } from "./SeriesSection";
 
 /**
@@ -176,6 +177,7 @@ export function DetailScreen() {
           {plan.plan.why}
         </p>
       )}
+      {plan.phase === "ready" && <DownloadAdvice id={d.id} plan={plan.plan.open} />}
 
       {offers && (offers.languages.length > 0 || audio || offers.qualities.length > 1 || quality) && (
         <div className="mt-8 flex flex-col gap-3">

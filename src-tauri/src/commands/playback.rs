@@ -129,6 +129,14 @@ pub(crate) struct Planned {
     pub open: String,
     pub backend: String,
     pub fallbacks: Vec<source_protocol::SourceCandidate>,
+    /// For the download advisor and Download (Phase 13): which title, what the chosen
+    /// copy resolved to, its size, whether it is already on this PC, and the runtime.
+    pub media_item_id: i64,
+    pub title: String,
+    pub stream: Option<source_protocol::PlayableStream>,
+    pub size_bytes: Option<u64>,
+    pub local: bool,
+    pub runtime_seconds: Option<f64>,
 }
 
 pub(crate) static PLANNED: Mutex<Option<Planned>> = Mutex::new(None);
@@ -182,10 +190,20 @@ pub async fn prepare_play(
     let plan = sinephile_playback::plan_with(&db, &resolver, torrent, i64::from(id), choice)
         .await
         .map_err(|e| e.to_string())?;
+    let chosen = plan.ranked.get(plan.chosen);
     *PLANNED.lock().expect("planned") = Some(Planned {
         open: plan.open.clone(),
         backend: plan.backend.clone(),
         fallbacks: plan.fallbacks(),
+        media_item_id: plan.media_item_id,
+        title: plan.title.clone(),
+        stream: plan.stream.clone(),
+        size_bytes: chosen.and_then(|(c, _)| c.size_bytes),
+        local: chosen.is_some_and(|(_, s)| s.local),
+        runtime_seconds: plan
+            .runtime_minutes
+            .map(|m| f64::from(m) * 60.0)
+            .or_else(|| chosen.and_then(|(c, _)| c.duration_seconds.map(f64::from))),
     });
     Ok(PlayPlanView {
         from: overview::display_name(&plan.backend, &ctx.addons),

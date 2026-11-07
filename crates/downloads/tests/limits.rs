@@ -221,3 +221,68 @@ async fn without_a_limit_it_runs_faster_so_the_limit_is_what_held_it() {
         r / MIB as f64
     );
 }
+
+/// A limit changed on a running download takes effect, and what it had is kept.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_limit_changed_while_running_takes_effect_and_keeps_the_pieces() {
+    let work = TempDir::new().unwrap();
+    let (_seeder, torrent, peer) = seed(work.path(), "Limit.Change", 64 * MIB).await;
+    let engine = Arc::new(
+        Engine::start(offline(&work.path().join("engine")))
+            .await
+            .unwrap(),
+    );
+    let mut rqbit = Rqbit::new(engine);
+    rqbit.initial_peers = vec![peer];
+    let db = Db::in_memory().await.unwrap();
+    let m = Manager::new(
+        db.clone(),
+        vec![Arc::new(rqbit)],
+        work.path().join("Downloads"),
+        no_probe as Prober,
+    );
+    let repo = DownloadRepository::new(&db);
+    let id = repo
+        .add(&NewDownload {
+            title: "Limit change",
+            source: "torrent",
+            torrent: Some(&torrent),
+            backend: "librqbit",
+            limit_kib: Some(1024),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    m.tick(NOW).await.unwrap();
+    for _ in 0..6 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        m.tick(NOW).await.unwrap();
+    }
+    let before = repo.get(id).await.unwrap().unwrap().done_bytes;
+    assert!(before > 2 * MIB as i64, "it was running: {before}");
+
+    m.set_limit(id, Some(3 * 1024)).await.unwrap();
+    m.tick(NOW).await.unwrap();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    m.tick(NOW).await.unwrap();
+    let (t0, b0) = (
+        Instant::now(),
+        repo.get(id).await.unwrap().unwrap().done_bytes,
+    );
+    assert!(b0 >= before, "the pieces were kept: {before} then {b0}");
+    for _ in 0..8 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        m.tick(NOW).await.unwrap();
+    }
+    let b1 = repo.get(id).await.unwrap().unwrap().done_bytes;
+    let r = (b1 - b0) as f64 / t0.elapsed().as_secs_f64();
+    println!(
+        "limit 1 then 3 MiB/s: {:.2} MiB/s after the change",
+        r / MIB as f64
+    );
+    assert!(
+        within(r, 3.0 * MIB as f64, 0.2),
+        "{:.2} MiB/s against 3 MiB/s",
+        r / MIB as f64
+    );
+}

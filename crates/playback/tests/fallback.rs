@@ -320,6 +320,8 @@ fn only_honest_copies_below_the_chosen_one_are_fallbacks() {
         original_language: None,
         chosen: 1,
         ranked,
+        stream: None,
+        runtime_minutes: None,
     };
     let keys: Vec<String> = plan.fallbacks().into_iter().map(|c| c.key).collect();
     assert_eq!(keys, ["c"], "not the one above, not the fake");

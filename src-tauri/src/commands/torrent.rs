@@ -79,7 +79,14 @@ pub async fn set_torrent_settings(
     ProfileRepository::new(&db)
         .set_setting(SETTINGS_KEY, &s.to_json())
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    // The limits apply at once to a running engine; the rest at its next start.
+    if let Some(rt) = state.torrent_if_started() {
+        let bps = |kib: Option<u32>| kib.map(|k| k.saturating_mul(1024));
+        rt.engine
+            .set_limits(bps(s.download_limit_kib), bps(s.upload_limit_kib));
+    }
+    Ok(())
 }
 
 /// One torrent, for the downloads surface and progress events.

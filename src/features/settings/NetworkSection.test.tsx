@@ -52,7 +52,7 @@ describe("NetworkSection", () => {
     await waitFor(() =>
       expect(commands.setTorrentSettings).toHaveBeenCalledWith(null, null, 128, false, "VPN"),
     );
-    expect(await screen.findByRole("status")).toHaveTextContent("apply the next time");
+    expect(await screen.findByRole("status")).toHaveTextContent("The limits apply now");
   });
 
   it("marks an adapter that is not connected", async () => {

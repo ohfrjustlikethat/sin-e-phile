@@ -1,12 +1,36 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render as rtlRender, screen, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Masthead } from "@/app/Masthead";
 import { useUi } from "@/lib/store";
+
+const ok = <T,>(data: T) => Promise.resolve({ status: "ok" as const, data });
+const row = (state: string) => ({ speed: 0, peers: 0, download: { id: state.length, state } });
+const commands = { downloads: vi.fn(() => ok<unknown[]>([])) };
+vi.mock("@/lib/ipc", () => ({ commands }));
+vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(() => Promise.resolve(() => undefined)) }));
+const { Masthead } = await import("@/app/Masthead");
+
+function render(ui: React.ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 /** SPEC.md §3.1 and §9.4, ADR-0037. */
 describe("Masthead", () => {
   beforeEach(() => {
-    useUi.setState({ destination: "home", settingsOpen: false });
+    useUi.setState({ destination: "home", settingsOpen: false, downloadsOpen: false });
+  });
+
+  it("has Downloads as a word, with the number in progress only when there is one", async () => {
+    commands.downloads.mockImplementationOnce(() => ok([row("active"), row("queued"), row("done")]));
+    render(<Masthead searching={false} onSearchChange={() => {}} />);
+    const button = await screen.findByRole("button", { name: "Downloads, 2 in progress" });
+    expect(button).toHaveTextContent("Downloads2");
+    fireEvent.click(button);
+    expect(useUi.getState().downloadsOpen).toBe(true);
+    expect(button).toHaveAttribute("aria-pressed", "true");
+    const nav = screen.getByRole("navigation", { name: "Primary" });
+    expect(within(nav).queryByRole("button", { current: "page" })).toBeNull();
   });
 
   it("shows every destination as a word, in §3.1's order", () => {

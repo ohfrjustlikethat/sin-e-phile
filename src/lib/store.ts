@@ -26,6 +26,9 @@ interface UiState {
   /** The library's review queue (Phase 12), opened from Settings → Library. */
   reviewOpen: boolean;
   setReviewOpen: (open: boolean) => void;
+  /** The Downloads page (Phase 13), opened from the masthead. */
+  downloadsOpen: boolean;
+  setDownloadsOpen: (open: boolean) => void;
   playing: Playing | null;
   /** The in-app mini player (ADR-0043): watching in a corner while browsing. */
   mini: boolean;
@@ -47,14 +50,18 @@ export const useUi = create<UiState>()(
       settingsOpen: false,
       reviewOpen: false,
       setReviewOpen: (reviewOpen) => set({ reviewOpen }),
+      downloadsOpen: false,
+      setDownloadsOpen: (downloadsOpen) =>
+        set(downloadsOpen ? { downloadsOpen, settingsOpen: false, reviewOpen: false, detail: null } : { downloadsOpen }),
       playing: null,
       mini: false,
       setMini: (mini) => set({ mini }),
       detail: null,
-      setDestination: (destination) => set({ destination, detail: null }),
-      setSettingsOpen: (settingsOpen) => set({ settingsOpen, reviewOpen: false }),
+      setDestination: (destination) => set({ destination, detail: null, downloadsOpen: false }),
+      setSettingsOpen: (settingsOpen) =>
+        set(settingsOpen ? { settingsOpen, reviewOpen: false, downloadsOpen: false } : { settingsOpen, reviewOpen: false }),
       play: (playing) => set({ playing }),
-      openDetail: (detail) => set({ detail, settingsOpen: false }),
+      openDetail: (detail) => set({ detail, settingsOpen: false, downloadsOpen: false }),
       closeDetail: () => set({ detail: null }),
       stopPlaying: () => set({ playing: null, mini: false }),
     }),

@@ -380,3 +380,54 @@ async fn a_torrent_already_streaming_becomes_the_download_and_keeps_its_pieces()
         "{file}"
     );
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_running_download_moved_to_tonight_waits_then_carries_on() {
+    // A slow seeder, so it is mid-download when it is moved.
+    let s = seed("Ronin.1998", 16 * MIB, Some(4 * MIB as u32)).await;
+    let db = Db::in_memory().await.unwrap();
+    let work = TempDir::new().unwrap();
+    let engine = Arc::new(
+        Engine::start(offline(&work.path().join("engine")))
+            .await
+            .unwrap(),
+    );
+    let m = manager(&db, engine, vec![s.peer], work.path().join("Downloads"));
+    let repo = DownloadRepository::new(&db);
+    let id = repo.add(&film("Ronin", &s.torrent)).await.unwrap();
+    m.tick(NOW).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    m.tick(NOW).await.unwrap();
+
+    m.schedule(id, Some("2026-11-08T01:00:00Z")).await.unwrap();
+    let held = repo.get(id).await.unwrap().unwrap();
+    assert_eq!(held.state, DownloadState::Queued);
+    assert!(
+        held.done_bytes > 0 && held.done_bytes < 16 * MIB as i64,
+        "{held:?}"
+    );
+    // Before one in the morning nothing runs, and nothing arrives.
+    for _ in 0..5 {
+        let t = m.tick(NOW).await.unwrap();
+        assert!(t.started.is_empty(), "{t:?}");
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+    assert_eq!(
+        repo.get(id).await.unwrap().unwrap().state,
+        DownloadState::Queued
+    );
+    assert!(m.live().is_empty(), "nothing is shown as running");
+    // At one, it carries on from where it was.
+    let t = m.tick("2026-11-08T01:00:00Z").await.unwrap();
+    assert_eq!(t.started, vec![id]);
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    loop {
+        m.tick("2026-11-08T01:00:01Z").await.unwrap();
+        let d = repo.get(id).await.unwrap().unwrap();
+        if d.state == DownloadState::Done {
+            break;
+        }
+        assert!(std::time::Instant::now() < deadline, "{d:?}");
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+}

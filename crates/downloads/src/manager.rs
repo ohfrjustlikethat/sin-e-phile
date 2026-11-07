@@ -26,6 +26,8 @@ pub enum ManagerError {
     Db(#[from] DbError),
     #[error(transparent)]
     Backend(#[from] BackendError),
+    #[error("could not delete the files: {0}")]
+    Io(String),
 }
 
 /// What one tick did, for the log and the tests.
@@ -271,6 +273,61 @@ impl Manager {
             repo.set_state(id, DownloadState::Paused).await?;
         }
         Ok(())
+    }
+
+    /// A download's own speed limit, KiB/s (`None` for none). librqbit fixes a torrent's
+    /// limit when it is added, so a running download is taken out of its backend (its
+    /// files kept) and queued: the next tick adds it again with the new limit, and the
+    /// pieces it has are checked rather than fetched again.
+    pub async fn set_limit(&self, id: i64, limit_kib: Option<i64>) -> Result<(), ManagerError> {
+        let repo = DownloadRepository::new(&self.db);
+        repo.set_limit(id, limit_kib).await?;
+        if let Some(d) = repo.get(id).await? {
+            if d.state == DownloadState::Active {
+                if let (Some(b), Some(bid)) = (self.backend(&d.backend), d.backend_id.as_deref()) {
+                    if b.holds(bid).await {
+                        b.remove(bid, false).await?;
+                    }
+                }
+                repo.set_state(id, DownloadState::Queued).await?;
+                if let Ok(mut live) = self.live.lock() {
+                    live.remove(&id);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// When it may start (`None`: as soon as there is room). A running download given a
+    /// later start is paused in its backend, keeping its pieces, and waits in the queue.
+    pub async fn schedule(&self, id: i64, not_before: Option<&str>) -> Result<(), ManagerError> {
+        let repo = DownloadRepository::new(&self.db);
+        repo.set_not_before(id, not_before).await?;
+        if not_before.is_none() {
+            return Ok(());
+        }
+        if let Some(d) = repo.get(id).await? {
+            if d.state == DownloadState::Active {
+                if let (Some(b), Some(bid)) = (self.backend(&d.backend), d.backend_id.as_deref()) {
+                    if b.holds(bid).await {
+                        b.pause(bid).await?;
+                    }
+                }
+                repo.set_state(id, DownloadState::Queued).await?;
+                if let Ok(mut live) = self.live.lock() {
+                    live.remove(&id);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Whether the named backend is configured and answering.
+    pub async fn backend_available(&self, name: &str) -> bool {
+        match self.backend(name) {
+            Some(b) => b.available().await,
+            None => false,
+        }
     }
 
     /// Back in the queue; the next tick starts it if there is room.

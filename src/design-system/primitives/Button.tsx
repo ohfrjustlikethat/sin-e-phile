@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode, Ref } from "react";
 
 /**
  * Button — SPEC.md §9, Phase 2.
@@ -27,6 +27,8 @@ interface Props extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className
   icon?: ReactNode;
   children?: ReactNode;
   className?: string;
+  /** React 19 passes `ref` as a prop; it reaches the <button> with the rest. */
+  ref?: Ref<HTMLButtonElement>;
 }
 
 const VARIANT: Record<ButtonVariant, string> = {

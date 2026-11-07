@@ -76,11 +76,31 @@ const FAKE = `(() => {
       window.__review = window.__review.filter((i) => i.file_id !== a.fileId);
       return 0;
     },
+    // Phase 13: the advisor under Play, Download, and the Downloads page.
+    download_advice: () => ({ choice: "download", stall: 0.6, size_bytes: 4.2 * 1024 ** 3,
+      sentence: "It would pause to buffer if streamed (1.8 MB/s against the 2.0 MB/s it needs), so download it first, about a minute.",
+      download: window.__downloads[0]?.download ?? null }),
+    download_title: (a) => {
+      const d = { id: 1, media_item_id: a.id, title: "Sunrise", state: "active", backend: "librqbit", priority: 0,
+        done_bytes: 1.7 * 1024 ** 3, total_bytes: 4.2 * 1024 ** 3, limit_kib: null, not_before: null,
+        reason: a.reason, error: null, file_path: null };
+      window.__downloads = [{ download: d, speed: 3.1 * 1024 ** 2, peers: 9 }];
+      return d;
+    },
+    downloads: () => window.__downloads,
+    download_pause: () => {
+      window.__downloads.forEach((r) => { r.download.state = "paused"; r.speed = 0; });
+      return null;
+    },
+    downloads_storage: () => ({ used_bytes: 0, free_bytes: 200 * 1024 ** 3, budget_bytes: null, items: [] }),
+    downloads_settings: () => ({ max_active: 3, budget_gib: null, qbittorrent_address: null,
+      qbittorrent_user: null, qbittorrent_has_password: false }),
     subtitle_settings: () => ({ settings: { languages: ["en"], always: false, font: "Segoe UI", size: 46,
       position: 95, background: false }, has_key: false, used_today: 0, budget: 5, server_remaining: null }),
   };
   let nextId = 1;
   window.__calls = [];
+  window.__downloads = [];
   const monster = (id, kind, runtime) => ({ media_item_id: id, kind, title: "Monster", year: 2004,
     runtime_minutes: runtime, made_by: null, synopsis: null });
   window.__review = Array.from({ length: 20 }, (_, i) => ({ file_id: i + 1,
@@ -388,6 +408,10 @@ try {
   await sleep(300);
 
   // Phase 9: the language choice is reachable with the pad, and choosing re-plans.
+  // Below Play: the advisor's Download (Phase 13), then the Audio row.
+  await waitFor(() => evalJs(`document.body.textContent.includes("so download it first")`), "the advisor's sentence", 25);
+  await press(B.DOWN);
+  check((await active())?.text.startsWith("Download"), `D-pad down from Play reaches Download (${(await active())?.text})`);
   await press(B.DOWN);
   await waitFor(async () => (await active())?.text === "Auto", "the Audio row", 25);
   await press(B.RIGHT);
@@ -397,7 +421,8 @@ try {
   const replanned = await waitFor(async () => (await calls("prepare_play"))[1], "a new plan", 25);
   check(replanned.language === "de" && replanned.quality === null, "A on a language plans again with it");
   await shoot("04b-language");
-  await press(B.UP);
+  // Up past Download, to Play.
+  for (let i = 0; i < 3 && (await active())?.text !== "Play"; i++) await press(B.UP);
   await waitFor(async () => (await active())?.text === "Play", "Play again", 25);
 
   await press(B.A);
@@ -421,6 +446,35 @@ try {
   await waitFor(async () => (await calls("player_close")).length > 0, "the player to close", 25);
   check(await evalJs(`document.body.textContent.includes("Sunrise")`), "B leaves the player, back to the film");
   await shoot("07-left");
+
+  // Phase 13: download from the film page, then pause it on the Downloads page, by pad.
+  await waitFor(async () => (await active())?.text === "Play", "Play after the player", 25);
+  await press(B.DOWN);
+  await waitFor(async () => (await active())?.text.startsWith("Download"), "Download", 25);
+  await press(B.A);
+  const asked = await waitFor(async () => (await calls("download_title"))[0], "the download", 25);
+  check(asked.id === 7 && asked.tonight === false && /download it first/.test(asked.reason ?? ""),
+    "A on Download queues the film, with the advisor's sentence as its reason");
+  await waitFor(async () => (await active())?.text === "See downloads", "focus to follow to See downloads", 25);
+  check(true, "focus follows to 'See downloads' instead of falling to the page");
+  check(await evalJs(`!!document.querySelector('[aria-label="Downloads, 1 in progress"]')`),
+    "the masthead counts the download");
+  await press(B.A);
+  await waitFor(() => evalJs(`document.body.textContent.includes("from 9 people")`), "the Downloads page", 25);
+  check(true, "A on See downloads opens the Downloads page, live: rate and people");
+  await shoot("07a-downloads");
+  let onPause = false;
+  for (let i = 0; i < 12 && !onPause; i++) {
+    await press(B.DOWN);
+    onPause = (await active())?.text === "Pause";
+  }
+  check(onPause, "the D-pad reaches Pause");
+  await press(B.A);
+  check((await calls("download_pause")).length === 1, "A pauses the download");
+  await waitFor(() => evalJs(`document.body.textContent.includes("Paused at 40%")`), "the paused line", 25);
+  await press(B.B);
+  await waitFor(() => evalJs(`!document.body.textContent.includes("Downloading at once")`), "the page to close", 25);
+  check(true, "B leaves the Downloads page");
 
   // ADR-0043 (Phase 11 E6): every text field, not just search. Menu opens Settings, the
   // D-pad walks down to the OpenSubtitles key, and the pad types a key with upper case.

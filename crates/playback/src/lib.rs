@@ -59,6 +59,10 @@ pub struct PlayPlan {
     pub ranked: Vec<(SourceCandidate, Score)>,
     /// Which of `ranked` is the one that opens.
     pub chosen: usize,
+    /// What the chosen one resolved to: for a torrent, the hash a download would fetch.
+    pub stream: Option<source_protocol::PlayableStream>,
+    /// The catalogue's runtime, minutes, when it knows it.
+    pub runtime_minutes: Option<u32>,
 }
 
 impl PlayPlan {
@@ -133,6 +137,17 @@ pub(crate) async fn target_for(
     torrent: Option<(&Arc<Engine>, &StreamServer)>,
     candidate: &SourceCandidate,
 ) -> Result<String, String> {
+    resolved(resolver, torrent, candidate)
+        .await
+        .map(|(open, _)| open)
+}
+
+/// [`target_for`], keeping what the candidate resolved to.
+async fn resolved(
+    resolver: &Resolver,
+    torrent: Option<(&Arc<Engine>, &StreamServer)>,
+    candidate: &SourceCandidate,
+) -> Result<(String, source_protocol::PlayableStream), String> {
     use source_protocol::PlayableStream;
     let stream = resolver
         .resolve(candidate)
@@ -146,10 +161,11 @@ pub(crate) async fn target_for(
         (PlayableStream::Http { url, .. }, None) => Ok(Target::Url(url.clone())),
         (PlayableStream::File { path }, None) => Ok(Target::File(path.into())),
     };
-    match opened.map_err(|e| e.to_string())? {
-        Target::Url(u) => Ok(u),
-        Target::File(p) => Ok(p.to_string_lossy().into_owned()),
-    }
+    let open = match opened.map_err(|e| e.to_string())? {
+        Target::Url(u) => u,
+        Target::File(p) => p.to_string_lossy().into_owned(),
+    };
+    Ok((open, stream))
 }
 
 /// What this machine plays well, from what `tiers.rs` permits and found. AV1 decode and
@@ -221,8 +237,8 @@ pub async fn plan_with(
     let offers = sinephile_selection::offers(&ranked);
     let mut reasons = Vec::new();
     for (chosen, (candidate, score)) in ranked.iter().enumerate() {
-        let open = match target_for(resolver, torrent, candidate).await {
-            Ok(open) => open,
+        let (open, stream) = match resolved(resolver, torrent, candidate).await {
+            Ok(r) => r,
             Err(e) => {
                 reasons.push(format!("{}: {e}", candidate.provenance.backend));
                 continue;
@@ -245,6 +261,8 @@ pub async fn plan_with(
             original_language,
             chosen,
             ranked,
+            stream: Some(stream),
+            runtime_minutes: ctx.runtime_minutes,
         });
     }
     Err(PlayError::NothingPlayable(offered, reasons.join("; ")))

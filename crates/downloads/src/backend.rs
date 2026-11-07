@@ -76,6 +76,20 @@ pub fn source_of(d: &Download) -> Result<Source, BackendError> {
     Err(BackendError::Refused(format!("cannot fetch {}", d.title)))
 }
 
+/// The `source` column for an info hash and the trackers its source named, the form
+/// [`source_of`] reads. A tracker holding `|` is dropped rather than split in two.
+pub fn source_for(hash: &str, trackers: &[String]) -> String {
+    let mut s = format!("infohash:{}", hash.to_ascii_lowercase());
+    for t in trackers
+        .iter()
+        .filter(|t| !t.is_empty() && !t.contains('|'))
+    {
+        s.push('|');
+        s.push_str(t);
+    }
+    s
+}
+
 /// A download's own folder name: its title, with what Windows forbids in a name removed.
 pub fn folder_name(title: &str) -> String {
     let cleaned: String = title
@@ -211,5 +225,60 @@ impl Backend for Rqbit {
             .main_file(id, Wanted::default())
             .map_err(refused)?;
         self.engine.file_path(id, &file).map_err(refused)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn with_source(source: String) -> Download {
+        Download {
+            id: 1,
+            media_item_id: None,
+            title: "T".into(),
+            source,
+            torrent: None,
+            backend: "librqbit".into(),
+            backend_id: None,
+            priority: 0,
+            state: sinephile_persistence::repositories::DownloadState::Queued,
+            total_bytes: None,
+            done_bytes: 0,
+            limit_kib: None,
+            not_before: None,
+            reason: None,
+            error: None,
+            file_path: None,
+            added_at: String::new(),
+            finished_at: None,
+        }
+    }
+
+    #[test]
+    fn an_info_hash_and_its_trackers_survive_the_source_column() {
+        let trackers = vec![
+            "http://example.org/x".to_string(),
+            String::new(),
+            "http://example.org/bad|split".to_string(),
+            "udp://example.net:6969".to_string(),
+        ];
+        let source = source_for("ABC123", &trackers);
+        match source_of(&with_source(source)).unwrap() {
+            Source::InfoHash { hash, trackers } => {
+                assert_eq!(hash, "abc123");
+                assert_eq!(
+                    trackers,
+                    ["http://example.org/x", "udp://example.net:6969"]
+                );
+            }
+            _ => panic!("an info hash"),
+        }
+    }
+
+    #[test]
+    fn a_folder_name_is_one_windows_accepts() {
+        assert_eq!(folder_name("Face/Off: Redux?"), "Face Off  Redux");
+        assert_eq!(folder_name("..."), "Download");
     }
 }

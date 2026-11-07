@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { DESTINATIONS, type Destination, useUi } from "@/lib/store";
+import { inProgress } from "@/features/downloads/format";
+import { useDownloads } from "@/features/downloads/useDownloads";
 
 /**
  * The masthead — SPEC.md §3.1 and §9.4, ADR-0037.
@@ -16,8 +18,8 @@ import { DESTINATIONS, type Destination, useUi } from "@/lib/store";
  * - Oxblood marks the active destination and nothing else here (§9.1: intent only).
  * - Empty space is the drag region, so the bar still moves the window.
  *
- * Downloads and the profile avatar join the right-hand group in Phases 13 and 14. A
- * button that opens nothing would be a placeholder, so they are not here yet.
+ * Downloads (Phase 13) is a word too, with the number in progress beside it, shown only
+ * when there is one. The profile avatar joins the right-hand group in Phase 14.
  */
 
 export const LABELS: Record<Destination, string> = {
@@ -40,8 +42,11 @@ export function Masthead({
   searching: boolean;
   onSearchChange: (open: boolean) => void;
 }) {
-  const { destination, settingsOpen, setDestination, setSettingsOpen } = useUi();
+  const { destination, settingsOpen, setDestination, setSettingsOpen, downloadsOpen, setDownloadsOpen } =
+    useUi();
   const controls = useWindowControls();
+  const downloads = useDownloads();
+  const busy = inProgress(downloads.data ?? []).length;
 
   const go = (d: Destination) => {
     setSettingsOpen(false);
@@ -71,7 +76,7 @@ export function Masthead({
           {DESTINATIONS.map((d) => {
             // Nothing is active while search or settings is showing: a tab claiming
             // "Films" behind a page of search results says you are somewhere you are not.
-            const active = !searching && !settingsOpen && destination === d;
+            const active = !searching && !settingsOpen && !downloadsOpen && destination === d;
             return (
               <li key={d} className="flex">
                 <button
@@ -105,6 +110,7 @@ export function Masthead({
           type="button"
           onClick={() => {
             setSettingsOpen(false);
+            setDownloadsOpen(false);
             onSearchChange(true);
           }}
           aria-pressed={searching}
@@ -122,6 +128,26 @@ export function Masthead({
           <kbd className="rounded-sm border border-line px-1.5 font-mono text-[11px] leading-[18px] text-ink-faint">
             /
           </kbd>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            onSearchChange(false);
+            setDownloadsOpen(true);
+          }}
+          aria-pressed={downloadsOpen}
+          aria-label={busy > 0 ? `Downloads, ${busy} in progress` : "Downloads"}
+          className={`flex h-8 items-center gap-2 px-3 text-[13px] transition-colors duration-[var(--dur-standard)] ${
+            downloadsOpen ? "text-ink" : "text-ink-muted hover:text-ink"
+          }`}
+        >
+          Downloads
+          {busy > 0 && (
+            <span className="min-w-[18px] rounded-sm bg-oxblood px-1 text-center font-mono text-[11px] leading-[18px] text-ink">
+              {busy}
+            </span>
+          )}
         </button>
 
         <button

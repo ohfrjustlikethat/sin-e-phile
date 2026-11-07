@@ -34,6 +34,7 @@ let resolvePlan: (v: unknown) => void = () => {};
 const commands = {
   itemDetail: vi.fn(() => ok(DETAIL)),
   preparePlay: vi.fn(() => new Promise((r) => (resolvePlan = r))),
+  downloadAdvice: vi.fn(() => ok(null)),
   seriesDetail: vi.fn(() =>
     ok({ seasons: [{ number: 0, episodes: 1 }, { number: 1, episodes: 2 }, { number: 2, episodes: 1 }], next_airing: { episode: 7, airs_at: 4102444800 } }),
   ),
