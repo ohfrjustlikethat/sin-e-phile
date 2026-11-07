@@ -33,8 +33,8 @@
       {
         "id": "13.4",
         "text": "The advisor (crates/downloads advise.rs): stall probability from swarm throughput against the file's bitrate, free disk and an existing local copy, time-of-day network history, and the taste model's input (a neutral stand-in until Phase 15), giving one recommendation and one readable sentence (E8); trials recorded for E1.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "92c070d"
       },
       {
         "id": "13.5",
@@ -53,8 +53,8 @@
       {
         "id": "E1",
         "text": "The advisor's recommendation is correct (matches what actually happens) in at least 8 of 10 manual trials across varied swarm conditions.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "92c070d: cargo run --release -p eval -- advise (2026-11-07), ten fresh loopback swarm conditions chosen after the model's last change and run once (bitrates 0.8, 2 and 3 MB/s; one to four capped seeders; 0.6x to 2.5x the bitrate): each measured as the app measures, advised, then played from a fresh engine at its bitrate after a 3-second buffer. 9 of 10 right (target at least 8): the miss was four slow peers at 0.86 MB/s for a 0.8 MB/s film, judged 4% likely to pause, which paused once. The first run on twelve other conditions scored 7/12 and found the engine's speed bug (7e18942); both runs and every change between them are in docs/eval-results.md. Caveat recorded there: a loopback swarm is steadier than the internet."
       },
       {
         "id": "E2",
@@ -95,8 +95,8 @@
       {
         "id": "E8",
         "text": "The recommendation reason is a single readable sentence.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "92c070d: crates/downloads/src/advise.rs tests: every branch (stream, download, tonight, no room, local copy, nobody sharing, a favourite) is checked by one_sentence (a single full stop at the end, no other sentence break, no line break, at most 160 characters); every sentence in the twenty-two trials read as one, e.g. 'It would pause to buffer if streamed (1.8 MB/s against the 2.0 MB/s it needs), so download it first, about a minute.'"
       }
     ]
   },
@@ -1572,8 +1572,8 @@
         {
           "id": "E1",
           "text": "The advisor's recommendation is correct (matches what actually happens) in at least 8 of 10 manual trials across varied swarm conditions.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "92c070d: cargo run --release -p eval -- advise (2026-11-07), ten fresh loopback swarm conditions chosen after the model's last change and run once (bitrates 0.8, 2 and 3 MB/s; one to four capped seeders; 0.6x to 2.5x the bitrate): each measured as the app measures, advised, then played from a fresh engine at its bitrate after a 3-second buffer. 9 of 10 right (target at least 8): the miss was four slow peers at 0.86 MB/s for a 0.8 MB/s film, judged 4% likely to pause, which paused once. The first run on twelve other conditions scored 7/12 and found the engine's speed bug (7e18942); both runs and every change between them are in docs/eval-results.md. Caveat recorded there: a loopback swarm is steadier than the internet."
         },
         {
           "id": "E2",
@@ -1614,8 +1614,8 @@
         {
           "id": "E8",
           "text": "The recommendation reason is a single readable sentence.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "92c070d: crates/downloads/src/advise.rs tests: every branch (stream, download, tonight, no room, local copy, nobody sharing, a favourite) is checked by one_sentence (a single full stop at the end, no other sentence break, no line break, at most 160 characters); every sentence in the twenty-two trials read as one, e.g. 'It would pause to buffer if streamed (1.8 MB/s against the 2.0 MB/s it needs), so download it first, about a minute.'"
         }
       ],
       "subtasks": [
@@ -1640,8 +1640,8 @@
         {
           "id": "13.4",
           "text": "The advisor (crates/downloads advise.rs): stall probability from swarm throughput against the file's bitrate, free disk and an existing local copy, time-of-day network history, and the taste model's input (a neutral stand-in until Phase 15), giving one recommendation and one readable sentence (E8); trials recorded for E1.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "92c070d"
         },
         {
           "id": "13.5",
@@ -2316,7 +2316,7 @@
       ]
     }
   ],
-  "next_action": "Phase 13 subtask 13.4 (docs/phases/phase-13-download-manager.md): crates/downloads/src/advise.rs, a pure advise(Inputs) -> Advice { choice: Stream | Download | DownloadTonight, sentence } from (1) stall probability: measured swarm throughput (mean and spread from peers' rates) against the file's bitrate (size / runtime) with a buffer model; (2) free disk against the file size and an existing local copy; (3) a time-of-day throughput history (migration-free: profile setting JSON of hourly means); (4) taste: a TasteSignal trait with a neutral stand-in until Phase 15. Unit tests for each signal and the one-sentence rule; then ten recorded trials for E1.",
+  "next_action": "Phase 13 subtask 13.5 (docs/phases/phase-13-download-manager.md): the Downloads page (src/features/downloads/DownloadsScreen.tsx) reached from the masthead Downloads button with a live count; commands in src-tauri/src/commands/downloads.rs for add (from the film page: the chosen torrent candidate, the advisor sentence as reason), priority, limit, schedule, global limits and the qBittorrent settings (rebuild_manager on change); the film page shows the advisor (prepare_play measures the swarm it already started); storage: a size budget and a cleanup view of watched downloads by size and age. Pad-complete in tools/uiaudit/controller.mjs.",
   "blockers": [],
   "decisions_pending": [
     {

@@ -15,21 +15,21 @@ A download manager: queue with priorities, pause/resume/cancel, per-download and
 
 ## Exit criteria
 
-- [ ] **E1** The advisor's recommendation is correct (matches what actually happens) in at least 8 of 10 manual trials across varied swarm conditions.
+- [x] **E1** The advisor's recommendation is correct (matches what actually happens) in at least 8 of 10 manual trials across varied swarm conditions.
 - [ ] **E2** A download completed through the qBittorrent backend files into the library identically to one completed through librqbit, verified by comparing the resulting rows.
 - [x] **E3** With qBittorrent configured but not running, a queued download falls back to librqbit rather than failing.
 - [x] **E4** `tools/guard` rejects any code path that reads qBittorrent's search plugins, RSS feeds or tracker configuration.
 - [x] **E5** Downloads survive an app restart and resume.
 - [x] **E6** A completed download is automatically matched and appears in the local library with no user action.
 - [x] **E7** Bandwidth limits are actually respected, verified by measurement.
-- [ ] **E8** The recommendation reason is a single readable sentence.
+- [x] **E8** The recommendation reason is a single readable sentence.
 
 ## Subtasks
 
 - [x] **13.1** The download queue (crates/downloads): items with priority, state (queued, active, paused, done, failed), per-item and global limits, a schedule window (start after a time), surviving restart (migration), a backend trait with librqbit as the default; completion files the item into the library through sinephile_library::scan (E5, E6).
 - [x] **13.2** The qBittorrent backend over its Web API (ADR-0029): configured by the user (address, credentials kept like other secrets), detected, never bundled or required; falls back to librqbit when not running (E3); a transport only, with a guard rule rejecting any read of search plugins, RSS or tracker lists (E4), seen to fail. Tested against a local stand-in Web API; one real-qBittorrent check batched for the author (E2).
 - [x] **13.3** Bandwidth limits measured: a local seeder and a timed transfer under each limit, numbers to docs/eval-results.md (E7).
-- [ ] **13.4** The advisor (crates/downloads advise.rs): stall probability from swarm throughput against the file's bitrate, free disk and an existing local copy, time-of-day network history, and the taste model's input (a neutral stand-in until Phase 15), giving one recommendation and one readable sentence (E8); trials recorded for E1.
+- [x] **13.4** The advisor (crates/downloads advise.rs): stall probability from swarm throughput against the file's bitrate, free disk and an existing local copy, time-of-day network history, and the taste model's input (a neutral stand-in until Phase 15), giving one recommendation and one readable sentence (E8); trials recorded for E1.
 - [ ] **13.5** The Downloads page (masthead Downloads button with a live count, ADR-0037): queue, progress, speed, seeds/peers, ETA, the reason each was queued, pause/resume/cancel, priorities, limits; storage budget and a cleanup view. Pad-complete in tools/uiaudit/controller.mjs.
 - [ ] **13.6** Author checks batched in one message: real controller (Phase 8 E5), VPN adapter pulled mid-download (Phase 7 E7), a real qBittorrent round trip (E2), the review screen's feel, D77's release-build console check. Then docs/specs/downloads.md, learning note, README and HOW_IT_WORKS, regression, close.
 
@@ -45,3 +45,4 @@ Estimating whether a stream will stall; bitrate versus throughput; why the taste
 - **13.1** The download queue (crates/downloads): items with priority, state (queued, active, paused, done, · `163095b`
 - **13.2** The qBittorrent backend over its Web API (ADR-0029): configured by the user (address, credential · `f5345b5`
 - **13.3** Bandwidth limits measured: a local seeder and a timed transfer under each limit, numbers to docs · `35decf3`
+- **13.4** The advisor (crates/downloads advise.rs): stall probability from swarm throughput against the fi · `92c070d`
