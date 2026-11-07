@@ -12,15 +12,15 @@
 
 **Phase 13 — Download Manager and the Stream-vs-Download Advisor** (`in_progress`, branch `phase/13-download-manager`)
 
-4 of 8 exit criteria met with evidence.
+5 of 8 exit criteria met with evidence.
 
 > Opened 2026-11-07 when Phase 12 merged (b5dccda, tag phase-12). qBittorrent is not installed on this machine; installing software on the author's PC is outside the repository, so the backend is built and tested against a local stand-in of its Web API and the one real round trip joins the batched author checks (13.6). The taste model (Phase 15) does not exist yet: the advisor takes its input through an interface with a neutral stand-in, recorded rather than faked. Author checks carried here: Phase 7 E7, Phase 8 E5.
 
-### Subtasks — 2/6 complete
+### Subtasks — 3/6 complete
 
 - [x] **13.1** The download queue (crates/downloads): items with priority, state (queued, active, paused, done, failed), per-item and global limits, a schedule window (start after a time), surviving restart (migration), a backend trait with librqbit as the default; completion files the item into the library through sinephile_library::scan (E5, E6). · `163095b`
 - [x] **13.2** The qBittorrent backend over its Web API (ADR-0029): configured by the user (address, credentials kept like other secrets), detected, never bundled or required; falls back to librqbit when not running (E3); a transport only, with a guard rule rejecting any read of search plugins, RSS or tracker lists (E4), seen to fail. Tested against a local stand-in Web API; one real-qBittorrent check batched for the author (E2). · `f5345b5`
-- [ ] **13.3** Bandwidth limits measured: a local seeder and a timed transfer under each limit, numbers to docs/eval-results.md (E7).
+- [x] **13.3** Bandwidth limits measured: a local seeder and a timed transfer under each limit, numbers to docs/eval-results.md (E7). · `35decf3`
 - [ ] **13.4** The advisor (crates/downloads advise.rs): stall probability from swarm throughput against the file's bitrate, free disk and an existing local copy, time-of-day network history, and the taste model's input (a neutral stand-in until Phase 15), giving one recommendation and one readable sentence (E8); trials recorded for E1.
 - [ ] **13.5** The Downloads page (masthead Downloads button with a live count, ADR-0037): queue, progress, speed, seeds/peers, ETA, the reason each was queued, pause/resume/cancel, priorities, limits; storage budget and a cleanup view. Pad-complete in tools/uiaudit/controller.mjs.
 - [ ] **13.6** Author checks batched in one message: real controller (Phase 8 E5), VPN adapter pulled mid-download (Phase 7 E7), a real qBittorrent round trip (E2), the review screen's feel, D77's release-build console check. Then docs/specs/downloads.md, learning note, README and HOW_IT_WORKS, regression, close.
@@ -37,14 +37,15 @@
       - *Evidence:* 163095b: crates/downloads/tests/queue.rs the_queue_survives_a_restart_and_carries_on: a 16 MiB download from a slow loopback seeder stopped mid-way (engine stopped, manager dropped), a new engine on the same folder and a new manager over the same queue: the row is still active, the download is added back from the queue's own row with the pieces on disk kept (progress >= before), and it completes. Seen to fail with re-adding disabled. Engine-level persistence: crates/torrent/tests/swarm.rs a_download_survives_a_restart (Phase 7).
 - [x] **E6** A completed download is automatically matched and appears in the local library with no user action.
       - *Evidence:* 163095b: crates/downloads/tests/queue.rs a_finished_download_files_itself_into_the_library_already_matched: a download for Heat (1995) completes through the manager, lands in the Downloads folder (registered as a library folder), and has a library row matched to Heat, confirmed, with files_for_item(Heat) offering it; a download with no catalogue item is identified like any library file (identify_file).
-- [ ] **E7** Bandwidth limits are actually respected, verified by measurement.
+- [x] **E7** Bandwidth limits are actually respected, verified by measurement.
+      - *Evidence:* 35decf3: crates/downloads/tests/limits.rs (cargo test -p sinephile-downloads --test limits -- --nocapture --test-threads=1), a loopback seeder with no limit and a 48 MiB file through the queue: a per-download limit of 1.00 MiB/s measured 1.02 MiB/s (twice); the global limit of 2.00 MiB/s (Engine::set_limits) measured 2.01 and 2.00 MiB/s; with no limit the same swarm ran at 157.2 MiB/s (48 MiB in 0.31 s), so the limit is what held it. Each held to within 15%. Numbers in docs/eval-results.md (Phase 13).
 - [ ] **E8** The recommendation reason is a single readable sentence.
 
 ---
 
 ## What's next
 
-Phase 13 subtask 13.3 (docs/phases/phase-13-download-manager.md): measure bandwidth limits. In crates/downloads/tests/limits.rs, a loopback seeder with no upload limit and a 24 MiB file: download once with a per-download limit of 1 MiB/s and once with the engine global limit (Engine::set_limits) of 2 MiB/s; sample done_bytes over 6 s after the first second; assert the mean rate is within 15% of each limit; record the numbers in docs/eval-results.md (E7).
+Phase 13 subtask 13.4 (docs/phases/phase-13-download-manager.md): crates/downloads/src/advise.rs, a pure advise(Inputs) -> Advice { choice: Stream | Download | DownloadTonight, sentence } from (1) stall probability: measured swarm throughput (mean and spread from peers' rates) against the file's bitrate (size / runtime) with a buffer model; (2) free disk against the file size and an existing local copy; (3) a time-of-day throughput history (migration-free: profile setting JSON of hourly means); (4) taste: a TasteSignal trait with a neutral stand-in until Phase 15. Unit tests for each signal and the one-sentence rule; then ten recorded trials for E1.
 
 ---
 
@@ -73,7 +74,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 10 | Subtitle Pipeline | B | 8 | 2 | 6/6 |
 | [x] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 6/6 |
 | [x] | 12 | Local Library Engine | B | 4 | 2–3 | 6/6 |
-| [~] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 4/8 |
+| [~] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 5/8 |
 | [ ] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 0/6 |
 | [ ] | 15 | Taste Model | B | 5, 14 | 2 | 0/5 |
 | [ ] | 16 | Recommendation Engine | B | 15 | 2–3 | 0/6 |

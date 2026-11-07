@@ -2523,3 +2523,20 @@ Then *Heat* searched, its 1995 result clicked, Play: the page said "Your files",
 warm (14.8 at Phase 11: noise); recall@10 **0.9760**; subtitles **80/80**, held out 32/32, false accepts
 **0/10**; identify unchanged at 99.05% / 0.39% (held out 100% / 0%). Unchanged from Phase 11. Rust tests
 687 passed, 0 failed; frontend 116.
+
+## Phase 13 — Download manager
+
+### E7: bandwidth limits, measured
+
+2026-11-07, `cargo test -p sinephile-downloads --test limits -- --nocapture --test-threads=1`: a
+loopback seeder with no limit of its own and a 48 MiB file, downloaded through the queue; the rate is
+the mean of `done_bytes` from one to seven seconds after the start.
+
+| Limit | Measured |
+|---|---|
+| this download's own, 1.00 MiB/s | **1.02 MiB/s** (run 1), **1.02 MiB/s** (run 2) |
+| global (`Engine::set_limits`), 2.00 MiB/s | **2.01 MiB/s**, **2.00 MiB/s** |
+| none (control) | 48 MiB in 0.31 s, **157.2 MiB/s** |
+
+The test holds each limit to within 15%. The control shows the swarm would run 80 times faster, so the
+limit is what held it.

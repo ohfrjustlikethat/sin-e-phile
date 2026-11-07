@@ -27,8 +27,8 @@
       {
         "id": "13.3",
         "text": "Bandwidth limits measured: a local seeder and a timed transfer under each limit, numbers to docs/eval-results.md (E7).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "35decf3"
       },
       {
         "id": "13.4",
@@ -89,8 +89,8 @@
       {
         "id": "E7",
         "text": "Bandwidth limits are actually respected, verified by measurement.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "35decf3: crates/downloads/tests/limits.rs (cargo test -p sinephile-downloads --test limits -- --nocapture --test-threads=1), a loopback seeder with no limit and a 48 MiB file through the queue: a per-download limit of 1.00 MiB/s measured 1.02 MiB/s (twice); the global limit of 2.00 MiB/s (Engine::set_limits) measured 2.01 and 2.00 MiB/s; with no limit the same swarm ran at 157.2 MiB/s (48 MiB in 0.31 s), so the limit is what held it. Each held to within 15%. Numbers in docs/eval-results.md (Phase 13)."
       },
       {
         "id": "E8",
@@ -1608,8 +1608,8 @@
         {
           "id": "E7",
           "text": "Bandwidth limits are actually respected, verified by measurement.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "35decf3: crates/downloads/tests/limits.rs (cargo test -p sinephile-downloads --test limits -- --nocapture --test-threads=1), a loopback seeder with no limit and a 48 MiB file through the queue: a per-download limit of 1.00 MiB/s measured 1.02 MiB/s (twice); the global limit of 2.00 MiB/s (Engine::set_limits) measured 2.01 and 2.00 MiB/s; with no limit the same swarm ran at 157.2 MiB/s (48 MiB in 0.31 s), so the limit is what held it. Each held to within 15%. Numbers in docs/eval-results.md (Phase 13)."
         },
         {
           "id": "E8",
@@ -1634,8 +1634,8 @@
         {
           "id": "13.3",
           "text": "Bandwidth limits measured: a local seeder and a timed transfer under each limit, numbers to docs/eval-results.md (E7).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "35decf3"
         },
         {
           "id": "13.4",
@@ -2316,7 +2316,7 @@
       ]
     }
   ],
-  "next_action": "Phase 13 subtask 13.3 (docs/phases/phase-13-download-manager.md): measure bandwidth limits. In crates/downloads/tests/limits.rs, a loopback seeder with no upload limit and a 24 MiB file: download once with a per-download limit of 1 MiB/s and once with the engine global limit (Engine::set_limits) of 2 MiB/s; sample done_bytes over 6 s after the first second; assert the mean rate is within 15% of each limit; record the numbers in docs/eval-results.md (E7).",
+  "next_action": "Phase 13 subtask 13.4 (docs/phases/phase-13-download-manager.md): crates/downloads/src/advise.rs, a pure advise(Inputs) -> Advice { choice: Stream | Download | DownloadTonight, sentence } from (1) stall probability: measured swarm throughput (mean and spread from peers' rates) against the file's bitrate (size / runtime) with a buffer model; (2) free disk against the file size and an existing local copy; (3) a time-of-day throughput history (migration-free: profile setting JSON of hourly means); (4) taste: a TasteSignal trait with a neutral stand-in until Phase 15. Unit tests for each signal and the one-sentence rule; then ten recorded trials for E1.",
   "blockers": [],
   "decisions_pending": [
     {
