@@ -2515,3 +2515,11 @@ settled its other episodes); the app took **20–290 ms** per answer from key to
 
 Then *Heat* searched, its 1995 result clicked, Play: the page said "Your files", and the player logged
 `first_frame_ms=388 backend=local` (budget 500 ms local). Phase 8's carried criterion, discharged.
+
+### Regression check before merging Phase 12 (rule 13)
+
+2026-11-07, `cargo run --release -p eval -- all` twice (now including `identify`) and `-- vector
+--report`: E2 **43/43**; E3 meaning **0.0472**, filter **1.0000** (carried); p95 **44.1 ms** cold, **15.2 ms**
+warm (14.8 at Phase 11: noise); recall@10 **0.9760**; subtitles **80/80**, held out 32/32, false accepts
+**0/10**; identify unchanged at 99.05% / 0.39% (held out 100% / 0%). Unchanged from Phase 11. Rust tests
+687 passed, 0 failed; frontend 116.

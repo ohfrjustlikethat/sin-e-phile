@@ -2902,6 +2902,31 @@
       "id": "D72",
       "phase_raised": 10,
       "text": "The subtitle corpus is synthetic speech (Windows' synthesiser) over synthetic beds. Add a handful of real public-domain film clips with hand-timed subtitles we write ourselves, to measure the VAD on a real mix (SPEC.md R6)."
+    },
+    {
+      "id": "D73",
+      "text": "A multi-episode file (S01E01E02) is matched to its first episode with covers = 2, but LocalFileBackend only finds files matched to the exact episode asked for, so episode 2 does not offer it. Look up files whose match covers the asked episode (crates/sources/src/backends/local.rs item_for, LibraryRepository::files_for_item).",
+      "phase_raised": 12
+    },
+    {
+      "id": "D74",
+      "text": "A file removed while the app runs is marked missing by the watcher but only purged at the next scan (launch or Rescan). Missing files are already hidden from every view; purge them after a quiet period in library_loop if the rows ever matter.",
+      "phase_raised": 12
+    },
+    {
+      "id": "D75",
+      "text": "The held-out filename corpus (109 names) was written by the same hand that tuned the parser, and its identification labels were seen in --report output while tuning. A truly independent check is a real user's library: count asked, accepted and wrong after a first real scan (Phase 14's onboarding test is the natural moment).",
+      "phase_raised": 12
+    },
+    {
+      "id": "D76",
+      "text": "Two remakes with the same title and year (rare, but real) can only be told apart by duration, which needs FFprobe; a file FFprobe cannot read stays in the review queue. Container title tags (probed) are stored but not yet weighed as a signal.",
+      "phase_raised": 12
+    },
+    {
+      "id": "D77",
+      "text": "CREATE_NO_WINDOW is now set on FFprobe and the subtitle aligner's FFmpeg; confirm in a release build (windows subsystem) that no console window flashes during a scan or an alignment. Batched with the Phase 13 author checks.",
+      "phase_raised": 12
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."
