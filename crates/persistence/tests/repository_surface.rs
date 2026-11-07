@@ -23,8 +23,8 @@ use sinephile_persistence::model::EpisodeNumbering;
 use sinephile_persistence::repositories::profiles::PlaybackPosition;
 use sinephile_persistence::repositories::{
     BackfillRepository, CatalogueRepository, CredentialRepository, DirectLinkRepository,
-    EpisodeRepository, MatchReason, MediaRepository, ProfileRepository, Readiness, Sample,
-    SearchRepository, SourceRepository, TmdbAccess, WikipediaRepository,
+    EpisodeRepository, MatchReason, MediaRepository, NewProfile, ProfileRepository, Readiness,
+    Sample, SearchRepository, SourceRepository, TmdbAccess, WikipediaRepository,
 };
 use sinephile_persistence::repositories::{CachedSubtitle, QuotaDay, SubtitleRepository};
 use sinephile_persistence::{Db, IdSource, MediaKind, NewMediaItem, TitleVariant};
@@ -415,6 +415,72 @@ async fn profile_repository_surface() {
         .await
         .expect("setting miss")
         .is_none());
+
+    // ── Phase 14 ──
+    // create_with — never the default; get — hit and miss
+    let kid = repo
+        .create_with(&NewProfile {
+            name: "  Mina ",
+            avatar_colour: Some("slate"),
+            is_kids: true,
+            kids_limit: Some("PG"),
+        })
+        .await
+        .expect("create_with");
+    let got = repo.get(kid).await.expect("get").expect("there");
+    assert_eq!(
+        (
+            got.name.as_str(),
+            got.is_default,
+            got.is_kids,
+            got.kids_limit.as_deref()
+        ),
+        ("Mina", false, true, Some("PG"))
+    );
+    assert_eq!(got.avatar_colour.as_deref(), Some("slate"));
+    assert!(!got.has_pin && got.last_used_at.is_none());
+    assert!(repo.get(9_999).await.expect("get miss").is_none());
+
+    // update
+    repo.update(
+        kid,
+        &NewProfile {
+            name: "Mina",
+            avatar_colour: Some("ochre"),
+            is_kids: false,
+            kids_limit: None,
+        },
+    )
+    .await
+    .expect("update");
+    let got = repo.get(kid).await.unwrap().unwrap();
+    assert_eq!(
+        (got.avatar_colour.as_deref(), got.is_kids),
+        (Some("ochre"), false)
+    );
+
+    // touch — and all() lists the most recently used first
+    repo.touch(kid).await.expect("touch");
+    assert!(repo.get(kid).await.unwrap().unwrap().last_used_at.is_some());
+    assert_eq!(repo.all().await.unwrap()[0].id, kid, "most recent first");
+
+    // set_default — exactly one default after
+    repo.set_default(kid).await.expect("set_default");
+    let all = repo.all().await.unwrap();
+    assert_eq!(all.iter().filter(|p| p.is_default).count(), 1);
+    assert_eq!(repo.default_profile().await.unwrap().unwrap().id, kid);
+
+    // delete — the default hands over to the most recently used; the last never goes
+    repo.touch(first).await.unwrap();
+    assert!(repo.delete(kid).await.expect("delete"));
+    assert_eq!(repo.default_profile().await.unwrap().unwrap().id, first);
+    assert!(
+        !repo.delete(kid).await.expect("delete again"),
+        "already gone"
+    );
+    assert!(repo.delete(second).await.unwrap());
+    assert!(!repo.delete(first).await.unwrap(), "never the last profile");
+    assert_eq!(repo.all().await.unwrap().len(), 1);
 }
 
 /// Exercise every public method on `Archiver`.
@@ -628,6 +694,32 @@ async fn db_surface() {
         .clear_secret(profile, "qbittorrent.password")
         .await
         .unwrap());
+
+    // set_pin / verify_pin / clear_pin (Phase 14); has_pin reads the same key
+    assert!(creds
+        .verify_pin(profile, "0000")
+        .await
+        .expect("no PIN opens"));
+    assert!(
+        creds.set_pin(profile, "12a4").await.is_err(),
+        "four digits only"
+    );
+    assert!(creds.set_pin(profile, "123").await.is_err());
+    creds.set_pin(profile, "2468").await.expect("set_pin");
+    assert!(
+        ProfileRepository::new(&db)
+            .get(profile)
+            .await
+            .unwrap()
+            .unwrap()
+            .has_pin
+    );
+    assert!(creds.verify_pin(profile, "2468").await.unwrap());
+    assert!(!creds.verify_pin(profile, "2469").await.unwrap());
+    assert!(!creds.verify_pin(profile, "24680").await.unwrap());
+    assert!(creds.clear_pin(profile).await.expect("clear_pin"));
+    assert!(!creds.clear_pin(profile).await.unwrap());
+    assert!(creds.verify_pin(profile, "9999").await.unwrap());
 
     // ── SearchRepository ──────────────────────────────────────────────────────
     let search = SearchRepository::new(&db);

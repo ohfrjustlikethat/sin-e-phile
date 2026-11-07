@@ -216,7 +216,20 @@ pub async fn plan_with(
     resolver: &Resolver,
     torrent: Option<(&Arc<Engine>, &StreamServer)>,
     media_item_id: i64,
+    ctx: Context,
+) -> Result<PlayPlan, PlayError> {
+    plan_as(db, resolver, torrent, media_item_id, ctx, None).await
+}
+
+/// [`plan_with`] for one profile: its resume position is the one used (Phase 14).
+/// `None` is the default profile.
+pub async fn plan_as(
+    db: &Db,
+    resolver: &Resolver,
+    torrent: Option<(&Arc<Engine>, &StreamServer)>,
+    media_item_id: i64,
     mut ctx: Context,
+    profile: Option<i64>,
 ) -> Result<PlayPlan, PlayError> {
     let query = query_for(db, media_item_id)
         .await?
@@ -244,7 +257,10 @@ pub async fn plan_with(
                 continue;
             }
         };
-        let profile = ProfileRepository::new(db).ensure_default().await?;
+        let profile = match profile {
+            Some(p) => p,
+            None => ProfileRepository::new(db).ensure_default().await?,
+        };
         let start = ProfileRepository::new(db)
             .position(profile, media_item_id)
             .await?

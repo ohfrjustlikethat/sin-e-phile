@@ -187,9 +187,17 @@ pub async fn prepare_play(
             .and_then(sinephile_selection::resolution_from_code),
         ..Default::default()
     };
-    let plan = sinephile_playback::plan_with(&db, &resolver, torrent, i64::from(id), choice)
-        .await
-        .map_err(|e| e.to_string())?;
+    let profile = state.profile().await?;
+    let plan = sinephile_playback::plan_as(
+        &db,
+        &resolver,
+        torrent,
+        i64::from(id),
+        choice,
+        Some(profile),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
     let chosen = plan.ranked.get(plan.chosen);
     *PLANNED.lock().expect("planned") = Some(Planned {
         open: plan.open.clone(),
@@ -266,7 +274,7 @@ pub async fn save_position(
 ) -> Result<(), String> {
     let db = state.db().ok_or("the library is still opening")?;
     let profiles = ProfileRepository::new(&db);
-    let profile = profiles.ensure_default().await.map_err(|e| e.to_string())?;
+    let profile = state.profile().await?;
     profiles
         .save_position(
             profile,
@@ -292,7 +300,7 @@ pub async fn rate_title(
 ) -> Result<(), String> {
     let db = state.db().ok_or("the library is still opening")?;
     let profiles = ProfileRepository::new(&db);
-    let profile = profiles.ensure_default().await.map_err(|e| e.to_string())?;
+    let profile = state.profile().await?;
     profiles
         .rate(profile, i64::from(id), stars.map(i64::from))
         .await
@@ -304,7 +312,7 @@ pub async fn rate_title(
 pub async fn title_rating(state: State<'_, AppState>, id: i32) -> Result<Option<i32>, String> {
     let db = state.db().ok_or("the library is still opening")?;
     let profiles = ProfileRepository::new(&db);
-    let profile = profiles.ensure_default().await.map_err(|e| e.to_string())?;
+    let profile = state.profile().await?;
     Ok(profiles
         .rating(profile, i64::from(id))
         .await

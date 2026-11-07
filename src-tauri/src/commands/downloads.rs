@@ -88,10 +88,7 @@ async fn manager(app: &AppHandle) -> Result<Arc<Manager>, String> {
     let mut backends: Vec<Arc<dyn Backend>> = Vec::new();
     // The user's own qBittorrent first, when they configured one (ADR-0029); librqbit
     // always, and the one a download falls back to.
-    let profile = ProfileRepository::new(&db)
-        .ensure_default()
-        .await
-        .map_err(|e| e.to_string())?;
+    let profile = state.profile().await?;
     let creds = CredentialRepository::new(&db);
     if let Some(address) = creds
         .get(profile, QBIT_ADDRESS)
@@ -379,10 +376,7 @@ pub async fn download_advice(
         return Ok(None);
     };
     let free = measure::free_space(&downloads_dir()).unwrap_or(0);
-    let profile = ProfileRepository::new(&db)
-        .ensure_default()
-        .await
-        .map_err(|e| e.to_string())?;
+    let profile = state.profile().await?;
     let kept = storage::stored(&db, profile, unix_now())
         .await
         .map_err(|e| e.to_string())?;
@@ -557,10 +551,7 @@ pub async fn downloads_settings(
     state: State<'_, AppState>,
 ) -> Result<DownloadsSettingsView, String> {
     let db = state.db().ok_or("the library is still opening")?;
-    let profile = ProfileRepository::new(&db)
-        .ensure_default()
-        .await
-        .map_err(|e| e.to_string())?;
+    let profile = state.profile().await?;
     let creds = CredentialRepository::new(&db);
     let plain = |v: Option<String>| v.filter(|s| !s.is_empty());
     Ok(DownloadsSettingsView {
@@ -629,10 +620,7 @@ pub async fn set_qbittorrent(
             return Err("an address like http://localhost:8080".into());
         }
     }
-    let profile = ProfileRepository::new(&db)
-        .ensure_default()
-        .await
-        .map_err(|e| e.to_string())?;
+    let profile = state.profile().await?;
     let creds = CredentialRepository::new(&db);
     let e = |e: sinephile_persistence::DbError| e.to_string();
     creds.set(profile, QBIT_ADDRESS, address).await.map_err(e)?;
@@ -691,10 +679,7 @@ pub struct StorageView {
 #[specta::specta]
 pub async fn downloads_storage(state: State<'_, AppState>) -> Result<StorageView, String> {
     let db = state.db().ok_or("the library is still opening")?;
-    let profile = ProfileRepository::new(&db)
-        .ensure_default()
-        .await
-        .map_err(|e| e.to_string())?;
+    let profile = state.profile().await?;
     let kept = storage::stored(&db, profile, unix_now())
         .await
         .map_err(|e| e.to_string())?;

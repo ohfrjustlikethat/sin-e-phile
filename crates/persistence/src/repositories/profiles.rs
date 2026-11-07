@@ -13,7 +13,28 @@ pub struct Profile {
     pub id: i64,
     pub name: String,
     pub is_default: bool,
+    /// A design-system avatar colour name ("oxblood", "slate"…); `None` for the first.
+    pub avatar_colour: Option<String>,
+    /// Shows only what is positively known to suit children (Phase 14).
+    pub is_kids: bool,
+    /// The highest certification allowed when the profile has a TMDB key.
+    pub kids_limit: Option<String>,
+    pub last_used_at: Option<String>,
+    /// A PIN is set (it lives wrapped in `profile_settings`, never here).
+    pub has_pin: bool,
 }
+
+/// What a new profile is made with.
+#[derive(Debug, Clone, Default)]
+pub struct NewProfile<'a> {
+    pub name: &'a str,
+    pub avatar_colour: Option<&'a str>,
+    pub is_kids: bool,
+    pub kids_limit: Option<&'a str>,
+}
+
+const PROFILE_COLUMNS: &str = "id, name, is_default, avatar_colour, is_kids, kids_limit, last_used_at,
+    EXISTS (SELECT 1 FROM profile_settings s WHERE s.profile_id = profiles.id AND s.key = 'pin') AS has_pin";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PlaybackPosition {
@@ -53,10 +74,115 @@ impl<'a> ProfileRepository<'a> {
     }
 
     pub async fn default_profile(&self) -> Result<Option<Profile>, DbError> {
-        let row = sqlx::query("SELECT id, name, is_default FROM profiles WHERE is_default = 1")
-            .fetch_optional(self.db.pool())
-            .await?;
+        let row = sqlx::query(&format!(
+            "SELECT {PROFILE_COLUMNS} FROM profiles WHERE is_default = 1"
+        ))
+        .fetch_optional(self.db.pool())
+        .await?;
         row.map(map_profile).transpose()
+    }
+
+    /// A profile with its avatar and kids settings; never the default (that stays with
+    /// the first profile until the user says otherwise).
+    pub async fn create_with(&self, p: &NewProfile<'_>) -> Result<i64, DbError> {
+        Ok(sqlx::query_scalar(
+            "INSERT INTO profiles (name, is_default, avatar_colour, is_kids, kids_limit)
+             VALUES (?, 0, ?, ?, ?) RETURNING id",
+        )
+        .bind(p.name.trim())
+        .bind(p.avatar_colour)
+        .bind(i64::from(p.is_kids))
+        .bind(p.kids_limit)
+        .fetch_one(self.db.pool())
+        .await?)
+    }
+
+    pub async fn get(&self, id: i64) -> Result<Option<Profile>, DbError> {
+        let row = sqlx::query(&format!(
+            "SELECT {PROFILE_COLUMNS} FROM profiles WHERE id = ?"
+        ))
+        .bind(id)
+        .fetch_optional(self.db.pool())
+        .await?;
+        row.map(map_profile).transpose()
+    }
+
+    /// Name, avatar and kids settings in one write.
+    pub async fn update(&self, id: i64, p: &NewProfile<'_>) -> Result<(), DbError> {
+        sqlx::query(
+            "UPDATE profiles SET name = ?2, avatar_colour = ?3, is_kids = ?4, kids_limit = ?5
+             WHERE id = ?1",
+        )
+        .bind(id)
+        .bind(p.name.trim())
+        .bind(p.avatar_colour)
+        .bind(i64::from(p.is_kids))
+        .bind(p.kids_limit)
+        .execute(self.db.pool())
+        .await?;
+        Ok(())
+    }
+
+    /// The one opened on launch when nobody is asked.
+    pub async fn set_default(&self, id: i64) -> Result<(), DbError> {
+        let mut tx = self.db.pool().begin().await?;
+        sqlx::query("UPDATE profiles SET is_default = 0 WHERE is_default = 1 AND id <> ?")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("UPDATE profiles SET is_default = 1 WHERE id = ?")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Delete a profile and everything that is only its (the tables cascade). The last
+    /// profile is never deleted; deleting the default hands it to the most recently used.
+    /// Returns whether anything was deleted.
+    pub async fn delete(&self, id: i64) -> Result<bool, DbError> {
+        let mut tx = self.db.pool().begin().await?;
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM profiles")
+            .fetch_one(&mut *tx)
+            .await?;
+        let was_default: Option<i64> =
+            sqlx::query_scalar("SELECT is_default FROM profiles WHERE id = ?")
+                .bind(id)
+                .fetch_optional(&mut *tx)
+                .await?;
+        let Some(was_default) = was_default else {
+            return Ok(false);
+        };
+        if count <= 1 {
+            return Ok(false);
+        }
+        sqlx::query("DELETE FROM profiles WHERE id = ?")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        if was_default == 1 {
+            sqlx::query(
+                "UPDATE profiles SET is_default = 1 WHERE id = (
+                     SELECT id FROM profiles
+                     ORDER BY last_used_at IS NULL, last_used_at DESC, id LIMIT 1)",
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(true)
+    }
+
+    /// Opened just now: the picker lists the most recent first.
+    pub async fn touch(&self, id: i64) -> Result<(), DbError> {
+        sqlx::query(
+            "UPDATE profiles SET last_used_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?",
+        )
+        .bind(id)
+        .execute(self.db.pool())
+        .await?;
+        Ok(())
     }
 
     /// The default profile's id, creating one if there is none. Profiles proper arrive
@@ -70,9 +196,12 @@ impl<'a> ProfileRepository<'a> {
     }
 
     pub async fn all(&self) -> Result<Vec<Profile>, DbError> {
-        let rows = sqlx::query("SELECT id, name, is_default FROM profiles ORDER BY id")
-            .fetch_all(self.db.pool())
-            .await?;
+        let rows = sqlx::query(&format!(
+            "SELECT {PROFILE_COLUMNS} FROM profiles
+             ORDER BY last_used_at IS NULL, last_used_at DESC, id"
+        ))
+        .fetch_all(self.db.pool())
+        .await?;
         rows.into_iter().map(map_profile).collect()
     }
 
@@ -309,5 +438,10 @@ fn map_profile(row: sqlx::sqlite::SqliteRow) -> Result<Profile, DbError> {
         id: row.try_get("id")?,
         name: row.try_get("name")?,
         is_default: row.try_get::<i64, _>("is_default")? != 0,
+        avatar_colour: row.try_get("avatar_colour")?,
+        is_kids: row.try_get::<i64, _>("is_kids")? != 0,
+        kids_limit: row.try_get("kids_limit")?,
+        last_used_at: row.try_get("last_used_at")?,
+        has_pin: row.try_get::<i64, _>("has_pin")? != 0,
     })
 }
