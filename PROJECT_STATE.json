@@ -71,8 +71,8 @@
       {
         "id": "E5",
         "text": "The model updates within 2 s of a watch event, without blocking the UI.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "0bfada4: cargo run --release -p eval -- update (2026-11-08): a 650-film profile (MovieLens user 3) watches five unmet well-known films; from each viewing's write to the rebuilt model through ModelCache: 125.7-133.2 ms (target under 2,000 ms), and every watched film is a member of the model it timed; cached with nothing new 0.3 ms. Not blocking the UI: end_viewing and rate_title return once the signal is written and the rebuild runs in a background task (src-tauri/src/commands/home.rs refresh_model). Seen to fail: ModelCache::get made to ignore the fingerprint gives 'every watch in its model: false', E5 NOT MET. docs/eval-results.md."
       }
     ]
   },
@@ -1760,8 +1760,8 @@
         {
           "id": "E5",
           "text": "The model updates within 2 s of a watch event, without blocking the UI.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "0bfada4: cargo run --release -p eval -- update (2026-11-08): a 650-film profile (MovieLens user 3) watches five unmet well-known films; from each viewing's write to the rebuilt model through ModelCache: 125.7-133.2 ms (target under 2,000 ms), and every watched film is a member of the model it timed; cached with nothing new 0.3 ms. Not blocking the UI: end_viewing and rate_title return once the signal is written and the rebuild runs in a background task (src-tauri/src/commands/home.rs refresh_model). Seen to fail: ModelCache::get made to ignore the fingerprint gives 'every watch in its model: false', E5 NOT MET. docs/eval-results.md."
         }
       ],
       "subtasks": [
@@ -2368,7 +2368,7 @@
       ]
     }
   ],
-  "next_action": "Phase 15 subtask 15.5 (docs/phases/phase-15-taste-model.md). First E5, the one criterion not yet worked: after a watch event the model must update within 2 s without blocking the UI. In src-tauri/src/commands/playback.rs end_viewing (and record_signal), spawn a background rebuild through crate::commands::home::MODELS.get (a tokio task; it takes the engine lock only for the build), and prove it with a test in crates/taste/tests/model.rs that records a viewing, rebuilds through ModelCache::get and asserts the fingerprint moved and the modes changed, plus a measured rebuild time in eval switch (record in docs/eval-results.md). Then the author check batch (Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, Phase 15 E3 on the taste profile screen: Settings -> Profiles -> See <name>'s taste), docs/specs/taste-model.md, docs/learning/phase-15-notes.md, README and HOW_IT_WORKS, regression (eval all, import --from 600, taste, switch, modes), session log with retrospective and the decision that leanings are corrected through the statements, then close.",
+  "next_action": "Phase 15 subtask 15.5 (docs/phases/phase-15-taste-model.md). E5 is met (0bfada4). Remaining: the author check batch (Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, Phase 15 E3 on the taste profile screen: Settings -> Profiles -> See <name>'s taste), docs/specs/taste-model.md, docs/learning/phase-15-notes.md, README and HOW_IT_WORKS, regression (eval all, import --from 600, taste, switch, modes), session log with retrospective and the decision that leanings are corrected through the statements, then close.",
   "blockers": [],
   "decisions_pending": [
     {

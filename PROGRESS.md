@@ -12,7 +12,7 @@
 
 **Phase 15 — Taste Model** (`in_progress`, branch `phase/15-taste-model`)
 
-3 of 5 exit criteria met with evidence.
+4 of 5 exit criteria met with evidence.
 
 > Receives Phase 14 E2's reflection half: the modes must beat popularity on eval taste (the seed: 11.06% against 35.64%). E3 needs the author's agreement, asked in the batch at this phase's end.
 
@@ -33,13 +33,14 @@
 - [ ] **E3** The taste profile screen describes a test profile in a way the author agrees is accurate.
 - [x] **E4** Temporal decay is tested with a synthetic profile whose taste shifts over simulated time.
       - *Evidence:* 9310430: crates/taste/tests/model.rs a_taste_that_moves_is_followed_and_the_old_one_fades (a synthetic profile: twelve horror films completed two years ago, twelve documentaries last month; the strongest mode is the documentaries with over 70% of the weight, and with the dates swapped it is the horror); crates/taste/src/modes.rs signals_fade_with_age_and_strong_ones_fade_slower; seen to fail with decay switched off.
-- [ ] **E5** The model updates within 2 s of a watch event, without blocking the UI.
+- [x] **E5** The model updates within 2 s of a watch event, without blocking the UI.
+      - *Evidence:* 0bfada4: cargo run --release -p eval -- update (2026-11-08): a 650-film profile (MovieLens user 3) watches five unmet well-known films; from each viewing's write to the rebuilt model through ModelCache: 125.7-133.2 ms (target under 2,000 ms), and every watched film is a member of the model it timed; cached with nothing new 0.3 ms. Not blocking the UI: end_viewing and rate_title return once the signal is written and the rebuild runs in a background task (src-tauri/src/commands/home.rs refresh_model). Seen to fail: ModelCache::get made to ignore the fingerprint gives 'every watch in its model: false', E5 NOT MET. docs/eval-results.md.
 
 ---
 
 ## What's next
 
-Phase 15 subtask 15.5 (docs/phases/phase-15-taste-model.md). First E5, the one criterion not yet worked: after a watch event the model must update within 2 s without blocking the UI. In src-tauri/src/commands/playback.rs end_viewing (and record_signal), spawn a background rebuild through crate::commands::home::MODELS.get (a tokio task; it takes the engine lock only for the build), and prove it with a test in crates/taste/tests/model.rs that records a viewing, rebuilds through ModelCache::get and asserts the fingerprint moved and the modes changed, plus a measured rebuild time in eval switch (record in docs/eval-results.md). Then the author check batch (Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, Phase 15 E3 on the taste profile screen: Settings -> Profiles -> See <name>'s taste), docs/specs/taste-model.md, docs/learning/phase-15-notes.md, README and HOW_IT_WORKS, regression (eval all, import --from 600, taste, switch, modes), session log with retrospective and the decision that leanings are corrected through the statements, then close.
+Phase 15 subtask 15.5 (docs/phases/phase-15-taste-model.md). E5 is met (0bfada4). Remaining: the author check batch (Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, Phase 15 E3 on the taste profile screen: Settings -> Profiles -> See <name>'s taste), docs/specs/taste-model.md, docs/learning/phase-15-notes.md, README and HOW_IT_WORKS, regression (eval all, import --from 600, taste, switch, modes), session log with retrospective and the decision that leanings are corrected through the statements, then close.
 
 ---
 
@@ -70,7 +71,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 12 | Local Library Engine | B | 4 | 2–3 | 6/6 |
 | [x] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 8/8 |
 | [x] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 3/6 |
-| [~] | 15 | Taste Model | B | 5, 14 | 2 | 3/5 |
+| [~] | 15 | Taste Model | B | 5, 14 | 2 | 4/5 |
 | [ ] | 16 | Recommendation Engine | B | 15 | 2–3 | 0/6 |
 | [ ] | 17 | Discovery Engine | B | 16 | 2 | 0/6 |
 | [ ] | 18 | Browsing Surfaces 🏁 | B | 17 | 4–5 | 0/13 |
