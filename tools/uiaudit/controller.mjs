@@ -140,6 +140,12 @@ const waitFor = async (probe, what, tries = 90) => {
 
 mkdirSync(OUT, { recursive: true });
 
+// The whole flow takes about a minute. Past five, something is stuck: fail loudly.
+setTimeout(() => {
+  console.error("controller: FAILED — still running after 5 minutes");
+  process.exit(1);
+}, 5 * 60_000).unref();
+
 // The BUILT app (`npm run build` first), served with the fakes inlined as the first
 // script — so they exist before any module runs, with no reload. Reloading or
 // navigating a page that Chrome has already opened left the module scripts unrun.
@@ -186,6 +192,12 @@ const target = await waitFor(
 );
 ws = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise((r) => ws.addEventListener("open", r, { once: true }));
+// If Chrome dies, every question waiting on it fails rather than waiting for ever: a
+// check that hangs is worse than one that fails (it hung for ten minutes once).
+ws.addEventListener("close", () => {
+  for (const p of pending.values()) p.rej(new Error("controller: Chrome went away"));
+  pending.clear();
+});
 ws.addEventListener("message", (e) => {
   const m = JSON.parse(e.data);
   const p = m.id && pending.get(m.id);
