@@ -7,17 +7,26 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager as _, State};
-use tokio::sync::OnceCell;
+use tokio::sync::Mutex;
 
+use sinephile_downloads::qbittorrent::Qbittorrent;
 use sinephile_downloads::{now_iso, Backend, Manager, Rqbit};
 use sinephile_library::probe::ffprobe;
 use sinephile_library::scan::Prober;
-use sinephile_persistence::repositories::{Download, DownloadRepository};
+use sinephile_persistence::repositories::{
+    CredentialRepository, Download, DownloadRepository, ProfileRepository,
+};
 
 use crate::state::AppState;
 
-/// The manager, built once the database and the torrent engine are ready.
-static MANAGER: OnceCell<Arc<Manager>> = OnceCell::const_new();
+/// The manager, built once the database and the torrent engine are ready, and built again
+/// when the qBittorrent settings change.
+static MANAGER: Mutex<Option<Arc<Manager>>> = Mutex::const_new(None);
+
+/// The qBittorrent Web API's address, user name (plain settings) and password (a secret).
+pub const QBIT_ADDRESS: &str = "qbittorrent.address";
+pub const QBIT_USER: &str = "qbittorrent.user";
+pub const QBIT_PASSWORD: &str = "qbittorrent.password";
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct DownloadView {
@@ -58,23 +67,57 @@ impl From<Download> for DownloadView {
 }
 
 async fn manager(app: &AppHandle) -> Result<Arc<Manager>, String> {
-    MANAGER
-        .get_or_try_init(|| async {
-            let state = app.state::<AppState>();
-            let db = state.db().ok_or("the library is still opening")?;
-            let runtime = state.torrent().await?;
-            let dir = crate::logging::data_dir().join("Downloads");
-            let backends: Vec<Arc<dyn Backend>> =
-                vec![Arc::new(Rqbit::new(runtime.engine.clone()))];
-            Ok::<_, String>(Arc::new(Manager::new(
-                (*db).clone(),
-                backends,
-                dir,
-                ffprobe as Prober,
-            )))
-        })
+    let mut held = MANAGER.lock().await;
+    if let Some(m) = held.as_ref() {
+        return Ok(m.clone());
+    }
+    let state = app.state::<AppState>();
+    let db = state.db().ok_or("the library is still opening")?;
+    let runtime = state.torrent().await?;
+    let dir = crate::logging::data_dir().join("Downloads");
+    let mut backends: Vec<Arc<dyn Backend>> = Vec::new();
+    // The user's own qBittorrent first, when they configured one (ADR-0029); librqbit
+    // always, and the one a download falls back to.
+    let profile = ProfileRepository::new(&db)
+        .ensure_default()
         .await
-        .cloned()
+        .map_err(|e| e.to_string())?;
+    let creds = CredentialRepository::new(&db);
+    if let Some(address) = creds
+        .get(profile, QBIT_ADDRESS)
+        .await
+        .ok()
+        .flatten()
+        .filter(|a| !a.is_empty())
+    {
+        let user = creds
+            .get(profile, QBIT_USER)
+            .await
+            .ok()
+            .flatten()
+            .filter(|u| !u.is_empty());
+        let password = creds.secret(profile, QBIT_PASSWORD).await.ok().flatten();
+        backends.push(Arc::new(Qbittorrent::new(
+            state.untrusted_http.clone(),
+            &address,
+            user,
+            password,
+        )));
+    }
+    backends.push(Arc::new(Rqbit::new(runtime.engine.clone())));
+    let m = Arc::new(Manager::new(
+        (*db).clone(),
+        backends,
+        dir,
+        ffprobe as Prober,
+    ));
+    *held = Some(m.clone());
+    Ok(m)
+}
+
+/// Build the manager again on the next tick (the qBittorrent settings changed).
+pub async fn rebuild_manager() {
+    *MANAGER.lock().await = None;
 }
 
 /// Once a second: start what should run, follow what runs, file what finished. The
@@ -86,7 +129,7 @@ pub async fn downloads_loop(app: AppHandle) {
         let Some(db) = app.state::<AppState>().db() else {
             continue;
         };
-        if MANAGER.get().is_none() {
+        if MANAGER.lock().await.is_none() {
             let open = DownloadRepository::new(&db)
                 .open()
                 .await

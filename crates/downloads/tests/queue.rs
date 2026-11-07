@@ -270,3 +270,54 @@ async fn the_queue_survives_a_restart_and_carries_on() {
     );
     until_done(&m, &db, id, Duration::from_secs(60)).await;
 }
+
+/// Phase 13 E3: qBittorrent configured but not running. The download meant for it is
+/// fetched by librqbit instead of failing, and the row says which backend moved it.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_configured_qbittorrent_that_is_not_running_falls_back_to_librqbit() {
+    use sinephile_downloads::qbittorrent::Qbittorrent;
+    use sinephile_downloads::Backend;
+    use sinephile_metadata_api::transport::FakeTransport;
+
+    let s = seed("Thief.1981.Fallback", 2 * MIB, None).await;
+    let db = Db::in_memory().await.unwrap();
+    let work = TempDir::new().unwrap();
+    let engine = Arc::new(
+        Engine::start(offline(&work.path().join("engine")))
+            .await
+            .unwrap(),
+    );
+    let mut rqbit = Rqbit::new(engine);
+    rqbit.initial_peers = vec![s.peer];
+    // Nothing answers at qBittorrent's address: an empty stand-in is an unreachable server.
+    let qbit = Qbittorrent::new(
+        Arc::new(FakeTransport::new()),
+        "http://qbit.test:8080",
+        None,
+        None,
+    );
+    let backends: Vec<Arc<dyn Backend>> = vec![Arc::new(qbit), Arc::new(rqbit)];
+    let m = Manager::new(
+        db.clone(),
+        backends,
+        work.path().join("Downloads"),
+        no_probe as Prober,
+    );
+
+    let source = format!("infohash:{}", "0".repeat(40));
+    let id = DownloadRepository::new(&db)
+        .add(&NewDownload {
+            title: "Thief",
+            source: &source,
+            torrent: Some(&s.torrent),
+            backend: "qbittorrent",
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let first = m.tick(NOW).await.unwrap();
+    assert_eq!(first.started, vec![id], "started, not failed: {first:?}");
+    let d = DownloadRepository::new(&db).get(id).await.unwrap().unwrap();
+    assert_eq!(d.backend, "librqbit", "librqbit moved the bytes");
+    until_done(&m, &db, id, Duration::from_secs(60)).await;
+}

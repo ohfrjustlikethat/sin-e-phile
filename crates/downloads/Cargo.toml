@@ -13,6 +13,10 @@ sinephile-persistence = { path = "../persistence" }
 sinephile-torrent = { path = "../torrent" }
 sinephile-library = { path = "../library" }
 async-trait = "=0.1.92"
+sinephile-metadata-api = { path = "../metadata-api" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+url = "=2.5.8"
 thiserror = "2"
 
 [dev-dependencies]

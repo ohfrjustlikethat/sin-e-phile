@@ -37,6 +37,11 @@ pub trait Backend: Send + Sync {
     fn name(&self) -> &'static str;
     /// Whether it can take work now. librqbit always can; qBittorrent only if running.
     async fn available(&self) -> bool;
+    /// Whether it can fetch this download at all (qBittorrent takes links and hashes,
+    /// not a `.torrent` file's bytes).
+    fn accepts(&self, _d: &Download) -> bool {
+        true
+    }
     /// Whether it already holds this download (after a restart, it may not).
     async fn holds(&self, id: &str) -> bool;
     /// Start fetching into `dir`; returns the backend's id for it.

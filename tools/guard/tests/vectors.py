@@ -103,6 +103,26 @@ SHOULD_FIRE: list[tuple[str, str, str]] = [
         "denylist",
     ),
     (
+        "qBittorrent search plugin endpoint",
+        "self.get(\"/api/v2/search/start\")",
+        "qbittorrent-content",
+    ),
+    (
+        "qBittorrent RSS endpoint",
+        "let url = format!(\"{base}/api/v2/rss/items\");",
+        "qbittorrent-content",
+    ),
+    (
+        "qBittorrent tracker list endpoint",
+        "post(\"/api/v2/torrents/addTrackers\", form)",
+        "qbittorrent-content",
+    ),
+    (
+        "qBittorrent tracker preference",
+        "prefs[\"add_trackers\"] = list",
+        "qbittorrent-content",
+    ),
+    (
         "undeclared source-shaped domain",
         "let api = \"https://some-metadata-site.io/v1/films\";",
         "undeclared-domain",
@@ -129,6 +149,8 @@ SHOULD_PASS: list[tuple[str, str]] = [
     ("release group token is permitted", "Movie.Title.2019.1080p.BluRay.x264-GROUP.mkv"),
     ("redacted site tag is permitted", "[SITE01] Series Title - 07 [1080p][HEVC].mkv"),
     ("prose mentioning torrents", "The torrent engine streams rather than downloads."),
+    ("qBittorrent transport endpoints are permitted", "post(\"/api/v2/torrents/add\"); get(\"/api/v2/torrents/info?hashes=x\")"),
+    ("qBittorrent files endpoint is permitted", "get(\"/api/v2/torrents/files?hash=x\")"),
     # The GPL-3.0 text is not ours to edit, and the FSF is legal/development
     # infrastructure rather than a content source - so it belongs in
     # INFRASTRUCTURE_DOMAINS, not in the allowlist (ADR-0010 scopes the

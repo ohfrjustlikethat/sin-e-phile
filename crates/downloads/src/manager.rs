@@ -94,12 +94,12 @@ impl Manager {
     /// to librqbit rather than failing).
     async fn usable(&self, d: &Download) -> Option<Arc<dyn Backend>> {
         if let Some(own) = self.backend(&d.backend) {
-            if own.available().await {
+            if own.accepts(d) && own.available().await {
                 return Some(own.clone());
             }
         }
         for b in &self.backends {
-            if b.available().await {
+            if b.accepts(d) && b.available().await {
                 return Some(b.clone());
             }
         }

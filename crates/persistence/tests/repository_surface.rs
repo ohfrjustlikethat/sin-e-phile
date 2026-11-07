@@ -549,6 +549,58 @@ async fn db_surface() {
     assert!(!creds.clear_opensubtitles_key(profile).await.unwrap());
     assert_eq!(creds.opensubtitles_key(profile).await.unwrap(), None);
 
+    // set_secret / secret / clear_secret (Phase 13: the qBittorrent password)
+    assert_eq!(
+        creds.secret(profile, "qbittorrent.password").await.unwrap(),
+        None
+    );
+    creds
+        .set_secret(profile, "qbittorrent.password", "a password with spaces")
+        .await
+        .expect("set_secret");
+    assert_eq!(
+        creds
+            .secret(profile, "qbittorrent.password")
+            .await
+            .unwrap()
+            .as_deref(),
+        Some("a password with spaces")
+    );
+    assert!(
+        creds.get(profile, "qbittorrent.password").await.is_err(),
+        "a secret is never read as plain text"
+    );
+    creds
+        .set(profile, "qbittorrent.address", "http://localhost:8080")
+        .await
+        .unwrap();
+    assert_eq!(
+        creds.secret(profile, "qbittorrent.address").await.unwrap(),
+        None,
+        "a plain setting is not a secret"
+    );
+    creds
+        .set_secret(profile, "qbittorrent.password", "")
+        .await
+        .unwrap();
+    assert_eq!(
+        creds.secret(profile, "qbittorrent.password").await.unwrap(),
+        None,
+        "empty clears"
+    );
+    creds
+        .set_secret(profile, "qbittorrent.password", "again")
+        .await
+        .unwrap();
+    assert!(creds
+        .clear_secret(profile, "qbittorrent.password")
+        .await
+        .unwrap());
+    assert!(!creds
+        .clear_secret(profile, "qbittorrent.password")
+        .await
+        .unwrap());
+
     // ── SearchRepository ──────────────────────────────────────────────────────
     let search = SearchRepository::new(&db);
 

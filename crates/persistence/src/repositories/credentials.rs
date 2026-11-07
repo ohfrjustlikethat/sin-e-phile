@@ -242,6 +242,57 @@ impl<'a> CredentialRepository<'a> {
         Ok(removed > 0)
     }
 
+    /// Store any other secret a profile supplies (the qBittorrent Web API password, Phase
+    /// 13), wrapped with Windows' DPAPI like the API keys. Empty clears it.
+    pub async fn set_secret(&self, profile_id: i64, key: &str, value: &str) -> Result<(), DbError> {
+        if value.is_empty() {
+            self.clear_secret(profile_id, key).await?;
+            return Ok(());
+        }
+        let Some(wrapped) = secrets::wrap(value) else {
+            return Err(DbError::Invalid(KeyError::NotProtectable.to_string()));
+        };
+        sqlx::query(
+            "INSERT INTO profile_settings (profile_id, key, value, is_secret, updated_at)
+             VALUES (?, ?, ?, 1, datetime('now'))
+             ON CONFLICT (profile_id, key)
+             DO UPDATE SET value = excluded.value, is_secret = 1, updated_at = datetime('now')",
+        )
+        .bind(profile_id)
+        .bind(key)
+        .bind(wrapped)
+        .execute(self.db.pool())
+        .await?;
+        Ok(())
+    }
+
+    /// A secret stored with `set_secret`, if it unwraps on this machine.
+    pub async fn secret(&self, profile_id: i64, key: &str) -> Result<Option<String>, DbError> {
+        let stored: Option<Vec<u8>> = sqlx::query_scalar(
+            "SELECT value FROM profile_settings WHERE profile_id = ? AND key = ? AND is_secret = 1",
+        )
+        .bind(profile_id)
+        .bind(key)
+        .fetch_optional(self.db.pool())
+        .await?;
+        Ok(stored
+            .as_deref()
+            .and_then(secrets::unwrap)
+            .filter(|v| !v.is_empty()))
+    }
+
+    pub async fn clear_secret(&self, profile_id: i64, key: &str) -> Result<bool, DbError> {
+        let removed = sqlx::query(
+            "DELETE FROM profile_settings WHERE profile_id = ? AND key = ? AND is_secret = 1",
+        )
+        .bind(profile_id)
+        .bind(key)
+        .execute(self.db.pool())
+        .await?
+        .rows_affected();
+        Ok(removed > 0)
+    }
+
     /// How many profiles have supplied a key. For the settings screen, and for making
     /// sure the answer is never "one, by default".
     pub async fn profiles_with_a_key(&self) -> Result<i64, DbError> {

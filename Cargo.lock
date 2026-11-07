@@ -5414,12 +5414,16 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "librqbit",
+ "serde",
+ "serde_json",
  "sinephile-library",
+ "sinephile-metadata-api",
  "sinephile-persistence",
  "sinephile-torrent",
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "url",
 ]
 
 [[package]]
