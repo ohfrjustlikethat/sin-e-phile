@@ -308,3 +308,11 @@ nothing more; its search plugins, feeds and tracker lists are never read.
 **Fail closed** *(Phase 14)* — A kids profile shows only what is positively known to suit children; anything unknown is left out.
 
 **Seed taste vector** *(Phase 14)* — The direction in the catalogue's embedding space that a profile's liked films point, on average.
+
+**Taste mode** *(Phase 15)* — One of a profile's separate tastes: a cluster of the films it liked, with a direction, a share and its members.
+
+**Popularity prior** *(Phase 15)* — A small pull towards films many people loved, added to similarity so a personal model does not lose to "the most popular".
+
+**Decay / half-life** *(Phase 15)* — An old signal counts half as much after 180 days (720 for strongly held ones).
+
+**Correction** *(Phase 15)* — More of this, less, or not me, on one taste mode; it changes that mode's weight on Home.

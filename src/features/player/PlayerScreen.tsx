@@ -201,6 +201,20 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
     if (state?.position != null) last.current = { position: state.position, duration: state.duration };
   }, [state]);
 
+  // Seconds actually played, for the taste model (Phase 15): paused time does not count.
+  const played = useRef(0);
+  const running = useRef(false);
+  useEffect(() => {
+    running.current = !!state?.started && !state.paused && !state.ended;
+  }, [state]);
+  useEffect(() => {
+    played.current = 0;
+    const tick = window.setInterval(() => {
+      if (running.current) played.current += 1;
+    }, 1000);
+    return () => window.clearInterval(tick);
+  }, [playing]);
+
   // Open on mount; save the position and close on unmount.
   useEffect(() => {
     if (!playing) return;
@@ -217,6 +231,10 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
     return () => {
       window.clearInterval(timer);
       save();
+      // Completed, abandoned at its point, or a skim (the backend decides; Phase 15).
+      if (playing.mediaItemId !== null) {
+        void commands.endViewing(playing.mediaItemId, played.current, last.current.position, last.current.duration);
+      }
       void commands.playerClose();
       void setFullscreen(false);
     };

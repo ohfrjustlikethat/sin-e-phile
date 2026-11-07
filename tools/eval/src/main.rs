@@ -15,12 +15,14 @@ mod embed;
 mod error;
 mod identify;
 mod imports;
+mod modes;
 mod relevance;
 mod scan;
 mod search;
 mod subs;
 mod switching;
 mod taste;
+mod update;
 mod vector;
 
 #[tokio::main]
@@ -95,8 +97,10 @@ async fn main() {
             scan::run(Path::new(&data_dir), files).await
         }
         "identify" => identify::run(Path::new(&data_dir), report).await,
-        "taste" => taste::run(Path::new(&data_dir)).await,
+        "taste" => taste::run(Path::new(&data_dir), args.iter().any(|a| a == "--tune")).await,
         "switch" => switching::run(Path::new(&data_dir)).await,
+        "update" => update::run(Path::new(&data_dir)).await,
+        "modes" => modes::run(Path::new(&data_dir), args.iter().any(|a| a == "--prove")).await,
         "import" => {
             let from = args
                 .iter()

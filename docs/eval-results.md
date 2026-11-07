@@ -2728,3 +2728,74 @@ is not in these numbers.
 recall@10 **0.9760**; subtitles **80/80**, held out 32/32, false accepts **0/10**; identify **99.05% /
 0.39%** (held out 100% / 0%). Unchanged from Phase 13. Phase 14's own, rerun after migration 0025: import
 (fresh set) 98.83% / 0 wrong; taste seed 11.06% against popularity 35.64% (carried); switch 2.1 / 11.5 ms.
+
+## Phase 15 — Taste model
+
+### Taste modes with a popularity prior: Phase 14 E2's carried half, met
+
+2026-11-08, `cargo run --release -p eval -- taste` (the same three MovieLens users, folds and 500 slots
+as Phase 14's measurement; nothing about them changed). Steps, each measured on the same harness:
+
+| Model | Held-out favourites in the 500 |
+|---|---|
+| Phase 14 seed (one weighted mean) | 11.06% |
+| taste modes (k-means, k 3-8 by silhouette, weighted and decayed signals) | 12.75% |
+| **modes with a popularity prior of 0.5** | **40.32%** |
+| the 500 most popular (the bar) | 35.64% |
+| chance | 0.417% |
+
+**The prior was chosen on other users**: `eval taste --tune` runs the next three users in the same band
+(120, 166, 171), never the three that judge. There: popularity 19.79%; modes alone 9.63%; with the prior
+0.0 10.16%, 0.1 23.88%, 0.2 25.07%, 0.3 25.07%, **0.5 25.66%**, 0.75 25.40%, 1.0 24.74%, 1.5 23.61%, 2.0
+23.28%. A broad plateau from 0.2 to 0.75; 0.5 was taken and the judging users run once.
+
+What the numbers say: the embeddings know what a film is about, not how widely it is seen, and these
+users' favourites are mostly widely seen; closeness to a taste mode plus being widely seen beats either
+alone (97 times chance, 1.13 times popularity). The margin over popularity is 4.7 points on these users.
+
+Second run on the judging users after an engineering change (the silhouette sampled at 160 points for
+speed, nothing tuned): **40.63%** against popularity 35.64%; 97x chance, 1.14x popularity. Unchanged.
+
+### E1: two unrelated tastes, two sets of modes
+
+2026-11-08, `cargo run --release -p eval -- modes`: a profile that loves the 30 most-voted horror films
+and the 30 most-voted documentaries (none in both), five stars each, clustered on the real vectors:
+
+| Mode | Weight | Horror | Documentary | Purity |
+|---|---|---|---|---|
+| 1 | 47% | 28 | 0 | 100% |
+| 2 | 42% | 0 | 25 | 100% |
+| 3 | 10% | 2 | 4 | 67% |
+
+(three identical runs; weighted purity **96.6%**, target at least 90%; each taste in modes of its own; the
+small third mode holds the two tastes' edge cases, which is where a mixed mode belongs).
+**Seen to fail**: `-- modes --prove` shuffles the vectors between titles, and purity falls to 59.3%
+(chance is 50%), E1 NOT MET. The first version iterated a hash map, so k-means' seeding changed run to
+run (94.9% then 98.3%); the titles are now taken in a fixed order, as the app's model takes them.
+
+### Switching, with the taste model
+
+`-- switch` again: building a profile's model is 25 ms (nothing yet) and 160 ms (650 films), done in the
+background at launch for every profile (`warm_models`, D82); a switch after that is **20.8 / 29.8 ms
+p95** (the prior ranks a 3,000-title pool). E5 holds.
+
+### The model after a watch (Phase 15 E5)
+
+`cargo run --release -p eval -- update`, 2026-11-08, on 59a1d6d plus the uncommitted harness: a
+650-film profile (MovieLens user 3) watches five well-known films it had not met, and each is timed
+from the viewing's write to the rebuilt model through the app's `ModelCache`. **125.7 to 133.2 ms**
+(target under 2,000 ms); every watched film is a member of the model it timed; with nothing new, the
+cached model costs 0.3 ms. The model at launch: 162.3 ms. In the app the rebuild runs in a background
+task after `end_viewing` and `rate_title` return (`commands::home::refresh_model`), so the UI
+does not wait. **Seen to fail**: with `ModelCache::get` made to ignore the fingerprint, the update
+"takes" 0.5 ms and no watched film is in its model: E5 NOT MET.
+
+The same run of `-- modes` now says the modes in words (15.4), on the real catalogue:
+"You gravitate toward horror and drama, mostly from the 2000s and 2010s (The Silence of the Lambs,
+The Shining, Alien)" (47%); "You also love documentary and biography … (Bowling for Columbine,
+Fahrenheit 9/11, The Social Dilemma)" (42%); and the 10% edge-case mode, "documentary and action …,
+Jeff Tremaine above all (Get Out, Saw, Super Size Me)", which says honestly that it is a mixture.
+
+### Regression check before merging Phase 15 (rule 13)
+
+2026-11-08, `cargo run --release -p eval -- all` (twice), `-- vector --report`, `-- import --from 600`, `-- taste`, `-- switch`, `-- modes`, `-- update`: E2 **43/43**; E3 meaning **0.0472**, filter **1.0000** (carried); p95 **15.6 ms** warm (16.4 at Phase 14: noise); recall@10 **0.9760**; subtitles **48/48** tuned, **32/32** held out, false accepts **0/10**; identify **99.05% / 0.39%** (held out 100% / 0%); import (fresh 600) **98.83% / 0 wrong**; taste **40.63%** against popularity 35.64%; switch **22.9 / 30.5 ms** p95; modes purity **96.6%**; update **125.5–133.2 ms**. Unchanged from Phase 14 and from this phase's own first runs.

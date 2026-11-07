@@ -154,6 +154,13 @@ async fn media_repository_surface() {
     assert_eq!(ok, [toy, paddington].into_iter().collect());
     assert!(repo.suitable_for_children(&[]).await.unwrap().is_empty());
 
+    // genres — by name, in order; none is empty, not an error
+    assert_eq!(
+        repo.genres(toy).await.expect("genres"),
+        vec!["Animation", "Children", "Comedy"]
+    );
+    assert!(repo.genres(film).await.unwrap().is_empty());
+
     // titles_released_between — films and series only, every name, in the years given
     let near = repo
         .titles_released_between(2014, 2016)
@@ -184,6 +191,13 @@ async fn media_repository_surface() {
         repo.most_voted_films(2).await.expect("most_voted_films"),
         vec![famous, known]
     );
+    // most_voted_with_votes — ids with their votes, most first
+    let pool = repo
+        .most_voted_with_votes(2)
+        .await
+        .expect("most_voted_with_votes");
+    assert_eq!(pool, vec![(famous, 900_000), (known, 1_000)]);
+
     // most_voted_films_between — only the years asked for
     assert_eq!(
         repo.most_voted_films_between(1980, 1989, 5)
@@ -459,6 +473,63 @@ async fn profile_repository_surface() {
         repo.finished(second, film).await.unwrap(),
         "a completed watch"
     );
+
+    // record_viewing / viewings — the stopping point kept (Phase 15)
+    repo.record_viewing(first, film, 300, false, 310)
+        .await
+        .expect("record_viewing");
+    let seen = repo.viewings(first).await.expect("viewings");
+    assert_eq!(seen.len(), 1);
+    assert_eq!(
+        (
+            seen[0].watched_seconds,
+            seen[0].completed,
+            seen[0].stopped_at_seconds
+        ),
+        (300, false, Some(310))
+    );
+    assert!(repo.viewings(9_999).await.unwrap().is_empty());
+
+    // signal_fingerprint — moves with a viewing, a rating and the watchlist
+    let f0 = repo
+        .signal_fingerprint(first)
+        .await
+        .expect("signal_fingerprint");
+    repo.rate(first, film, Some(4)).await.unwrap();
+    let f1 = repo.signal_fingerprint(first).await.unwrap();
+    assert_ne!(f0, f1, "a rating moves it");
+    repo.rate(first, film, Some(2)).await.unwrap();
+    assert_ne!(
+        repo.signal_fingerprint(first).await.unwrap(),
+        f1,
+        "so does changing one"
+    );
+    repo.rate(first, film, None).await.unwrap();
+    assert_eq!(
+        repo.signal_fingerprint(first).await.unwrap(),
+        f0,
+        "and clearing it puts it back"
+    );
+
+    // ratings — every rating with its date
+    repo.rate(first, film, Some(3)).await.unwrap();
+    let rated = repo.ratings(first).await.expect("ratings");
+    assert_eq!((rated.len(), rated[0].0, rated[0].1), (1, film, 3));
+    assert!(rated[0].2.len() >= 10, "dated");
+    repo.rate(first, film, None).await.unwrap();
+
+    // record_signal / signals — one per title and kind within a minute; the kind is checked
+    repo.record_signal(first, film, "detail")
+        .await
+        .expect("record_signal");
+    repo.record_signal(first, film, "detail").await.unwrap();
+    repo.record_signal(first, film, "search").await.unwrap();
+    assert_eq!(
+        repo.signals(first, "detail").await.expect("signals").len(),
+        1
+    );
+    assert_eq!(repo.signals(first, "search").await.unwrap().len(), 1);
+    assert!(repo.record_signal(first, film, "nonsense").await.is_err());
 
     // liked — five and four stars, then completed unrated watches; a low rating is not liking
     let third = media

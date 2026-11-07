@@ -128,7 +128,11 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::taste::set_taste_input,
             commands::taste::taste_preview,
             commands::taste::taste_round,
+            commands::taste::taste_profile,
+            commands::taste::correct_taste,
             commands::home::home,
+            commands::playback::end_viewing,
+            commands::playback::record_signal,
             commands::home::onboarding_done,
             commands::home::finish_onboarding,
         ])
@@ -174,6 +178,7 @@ pub fn run() {
             tauri::async_runtime::spawn(commands::player::state_loop(app.handle().clone()));
             tauri::async_runtime::spawn(commands::library::library_loop(app.handle().clone()));
             tauri::async_runtime::spawn(commands::downloads::downloads_loop(app.handle().clone()));
+            tauri::async_runtime::spawn(commands::home::warm_models(app.handle().clone()));
 
             // THE DATABASE OPENS OFF THE STARTUP PATH, and the catalogue refreshes
             // itself behind it (D37, ADR-0030). Both on a background task, because

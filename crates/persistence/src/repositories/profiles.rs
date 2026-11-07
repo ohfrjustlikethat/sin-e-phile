@@ -24,6 +24,18 @@ pub struct Profile {
     pub has_pin: bool,
 }
 
+/// One viewing from the log, for the taste model (Phase 15).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Viewing {
+    pub media_item_id: i64,
+    /// "YYYY-MM-DD HH:MM:SS" (UTC) or ISO, as recorded.
+    pub started_at: String,
+    pub watched_seconds: i64,
+    pub completed: bool,
+    /// Where it stopped, when known: the abandon point.
+    pub stopped_at_seconds: Option<i64>,
+}
+
 /// What a new profile is made with.
 #[derive(Debug, Clone, Default)]
 pub struct NewProfile<'a> {
@@ -268,6 +280,120 @@ impl<'a> ProfileRepository<'a> {
         .bind(watched_seconds)
         .bind(i64::from(completed))
         .fetch_one(self.db.pool())
+        .await?)
+    }
+
+    /// A viewing as the player saw it end (Phase 15): seconds actually played, whether it
+    /// was completed, and where it stopped.
+    pub async fn record_viewing(
+        &self,
+        profile_id: i64,
+        media_item_id: i64,
+        watched_seconds: i64,
+        completed: bool,
+        stopped_at_seconds: i64,
+    ) -> Result<i64, DbError> {
+        Ok(sqlx::query_scalar(
+            "INSERT INTO watch_events
+                 (profile_id, media_item_id, watched_seconds, completed, stopped_at_seconds, ended_at)
+             VALUES (?, ?, ?, ?, ?, datetime('now')) RETURNING id",
+        )
+        .bind(profile_id)
+        .bind(media_item_id)
+        .bind(watched_seconds)
+        .bind(i64::from(completed))
+        .bind(stopped_at_seconds)
+        .fetch_one(self.db.pool())
+        .await?)
+    }
+
+    /// A cheap fingerprint of everything the taste model reads for a profile: it changes
+    /// whenever a viewing, a rating or the watchlist changes, so a cached model can be
+    /// trusted while it does not (Phase 15).
+    pub async fn signal_fingerprint(&self, profile_id: i64) -> Result<String, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT
+                 (SELECT COUNT(*) || '/' || COALESCE(MAX(id), 0) FROM watch_events WHERE profile_id = ?1)
+                 || ':' ||
+                 (SELECT COUNT(*) || '/' || COALESCE(MAX(rated_at), '') || '/' || COALESCE(SUM(stars * media_item_id), 0)
+                    FROM ratings WHERE profile_id = ?1)
+                 || ':' ||
+                 (SELECT COUNT(*) || '/' || COALESCE(SUM(media_item_id), 0) FROM watchlist_items WHERE profile_id = ?1)",
+        )
+        .bind(profile_id)
+        .fetch_one(self.db.pool())
+        .await?)
+    }
+
+    /// Every rating with when it was given: (title, stars, rated_at), oldest first.
+    pub async fn ratings(&self, profile_id: i64) -> Result<Vec<(i64, i64, String)>, DbError> {
+        Ok(sqlx::query_as(
+            "SELECT media_item_id, stars, rated_at FROM ratings WHERE profile_id = ? ORDER BY rated_at, media_item_id",
+        )
+        .bind(profile_id)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
+    /// Every viewing in the log, oldest first.
+    pub async fn viewings(&self, profile_id: i64) -> Result<Vec<Viewing>, DbError> {
+        let rows: Vec<(i64, String, i64, i64, Option<i64>)> = sqlx::query_as(
+            "SELECT media_item_id, started_at, watched_seconds, completed, stopped_at_seconds
+             FROM watch_events WHERE profile_id = ? ORDER BY started_at, id",
+        )
+        .bind(profile_id)
+        .fetch_all(self.db.pool())
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(
+                |(media_item_id, started_at, watched_seconds, completed, stopped_at_seconds)| {
+                    Viewing {
+                        media_item_id,
+                        started_at,
+                        watched_seconds,
+                        completed: completed != 0,
+                        stopped_at_seconds,
+                    }
+                },
+            )
+            .collect())
+    }
+
+    /// A light signal (Phase 15): "search" (opened from a search) or "detail" (a detail page
+    /// opened). The same signal for the same title within a minute is one.
+    pub async fn record_signal(
+        &self,
+        profile_id: i64,
+        media_item_id: i64,
+        kind: &str,
+    ) -> Result<(), DbError> {
+        sqlx::query(
+            "INSERT INTO signals (profile_id, media_item_id, kind)
+             SELECT ?1, ?2, ?3
+             WHERE NOT EXISTS (SELECT 1 FROM signals WHERE profile_id = ?1 AND media_item_id = ?2
+                               AND kind = ?3 AND at >= strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-1 minute'))",
+        )
+        .bind(profile_id)
+        .bind(media_item_id)
+        .bind(kind)
+        .execute(self.db.pool())
+        .await?;
+        Ok(())
+    }
+
+    /// Signals of one kind, oldest first: (title, when).
+    pub async fn signals(
+        &self,
+        profile_id: i64,
+        kind: &str,
+    ) -> Result<Vec<(i64, String)>, DbError> {
+        Ok(sqlx::query_as(
+            "SELECT media_item_id, at FROM signals WHERE profile_id = ? AND kind = ? ORDER BY at, id",
+        )
+        .bind(profile_id)
+        .bind(kind)
+        .fetch_all(self.db.pool())
         .await?)
     }
 

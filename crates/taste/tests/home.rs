@@ -36,7 +36,9 @@ async fn a_new_profile_with_nothing_still_has_a_home() {
     let db = Db::in_memory().await.unwrap();
     let heat = film(&db, "Heat", 1995, 900_000, &["Crime"]).await;
     let me = ProfileRepository::new(&db).ensure_default().await.unwrap();
-    let r = rails(&db, None, me, false, None).await.unwrap();
+    let r = rails(&db, None, me, false, None, &Default::default())
+        .await
+        .unwrap();
     assert_eq!(r.len(), 1, "{r:?}");
     assert_eq!((r[0].key, r[0].items.clone()), ("loved", vec![heat]));
 }
@@ -69,7 +71,9 @@ async fn started_saved_and_loved_each_in_their_place_and_kids_see_only_what_suit
         .await
         .unwrap();
 
-    let r = rails(&db, None, me, false, None).await.unwrap();
+    let r = rails(&db, None, me, false, None, &Default::default())
+        .await
+        .unwrap();
     let keys: Vec<&str> = r.iter().map(|x| x.key).collect();
     assert_eq!(
         keys,
@@ -83,7 +87,9 @@ async fn started_saved_and_loved_each_in_their_place_and_kids_see_only_what_suit
         "what is started or saved is not offered again as new"
     );
 
-    let kids = rails(&db, None, me, true, None).await.unwrap();
+    let kids = rails(&db, None, me, true, None, &Default::default())
+        .await
+        .unwrap();
     let all: Vec<i64> = kids.iter().flat_map(|x| x.items.clone()).collect();
     assert!(all.contains(&paddington) && all.contains(&toy), "{kids:?}");
     assert!(

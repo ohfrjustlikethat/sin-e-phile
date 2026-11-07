@@ -22,6 +22,8 @@ pub async fn run(data_dir: &Path) -> Result<bool, EvalError> {
     let (mut engine, _) = crate::search::engine(data_dir)?;
     let db = Db::open_in(data_dir).await?;
     let profiles = ProfileRepository::new(&db);
+    // One cache across the switches, as the app keeps one.
+    let cache = sinephile_taste::model::ModelCache::default();
     println!("switch — a profile switch: one write and the new profile's Home\n");
 
     let empty = profiles
@@ -45,15 +47,17 @@ pub async fn run(data_dir: &Path) -> Result<bool, EvalError> {
                 let t0 = Instant::now();
                 profiles.touch(id).await?;
                 let rails =
-                    sinephile_taste::home::rails(&db, engine.semantic_mut(), id, false, None)
+                    sinephile_taste::home::rails(&db, engine.semantic_mut(), id, false, None, &cache)
                         .await?;
                 times.push(t0.elapsed().as_secs_f64() * 1000.0);
                 assert!(!rails.is_empty());
             }
-            let (first, p) = (times[0], p95(times.clone()));
+            // The first switch builds the profile's taste model (the app builds every
+            // profile's in the background at launch); the rest are what a switch costs.
+            let (first, p) = (times[0], p95(times[1..].to_vec()));
             worst = worst.max(p);
             println!(
-                "  {name:<20} first {first:>6.1} ms   p95 {p:>6.1} ms   (target under 100 ms)"
+                "  {name:<20} building the model {first:>6.1} ms   switching after {p:>6.1} ms p95   (target under 100 ms)"
             );
         }
         // Where the time goes, for the full profile.
@@ -69,7 +73,7 @@ pub async fn run(data_dir: &Path) -> Result<bool, EvalError> {
         let _ = sinephile_taste::nearest(semantic, &seed, 20, &seen);
         let t_near = t.elapsed().as_secs_f64() * 1000.0;
         let t = Instant::now();
-        let _ = sinephile_taste::home::rails(&db, None, full, false, None).await?;
+        let _ = sinephile_taste::home::rails(&db, None, full, false, None, &cache).await?;
         let t_plain = t.elapsed().as_secs_f64() * 1000.0;
         println!(
             "    (650 films: liked() {t_liked:.1} ms, seed of {} {t_seed:.1} ms, nearest {t_near:.1} ms, rails without taste {t_plain:.1} ms)",

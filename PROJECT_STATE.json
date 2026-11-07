@@ -1,98 +1,80 @@
 {
   "spec_version": "3.3.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-11-06",
+  "last_updated": "2026-11-08",
   "sessions_completed": 21,
   "current_phase": {
-    "number": 14,
-    "slug": "profiles",
-    "title": "Profiles and First-Run Onboarding",
+    "number": 15,
+    "slug": "taste-model",
+    "title": "Taste Model",
     "status": "in_progress",
-    "branch": "phase/14-profiles",
-    "started_at": "2026-11-07T12:50:33Z",
-    "note": "E1 and E6 need a person and the author; built and tested as far as code allows, asked for in the batch after Phase 15 (ADR-0040).",
+    "branch": "phase/15-taste-model",
+    "started_at": "2026-11-07T18:08:40Z",
+    "note": "Receives Phase 14 E2's reflection half: the modes must beat popularity on eval taste (the seed: 11.06% against 35.64%). E3 needs the author's agreement, asked in the batch at this phase's end.",
     "subtasks": [
       {
-        "id": "14.1",
-        "text": "Profiles in the backend: migration 0024 (avatar colour, PIN salt and hash, kids flag and limit, last used); ProfileRepository create/rename/delete (never the last)/set_pin/verify_pin/set_kids/touch, each with a line in repository_surface.rs; an active profile in AppState replacing every ensure_default() call in src-tauri; a crate test that watchlist, positions, ratings, watch events, settings and keys never cross profiles (E5).",
+        "id": "15.1",
+        "text": "Signals (migration 0026 and the player): a watch recorded when the player leaves (completed past 90%, otherwise abandoned with its point), rewatches, searches that led to a title, detail pages opened and not played (a weak negative), with the time of day and the session's length; repository methods with surface lines; the player and the detail page write them.",
         "status": "complete",
-        "commit": "f671bc2"
+        "commit": "db5dfb3"
       },
       {
-        "id": "14.2",
-        "text": "Profiles in the app: the picker on launch only with two or more (ADR-0043), the avatar in the masthead with a switcher, create and edit with an optional PIN, the kids profile failing closed (TMDB certification within the limit when the profile has a key, otherwise Family or Animation titles that are not adult nor tagged with an adult genre); switching timed to a re-rendered Home (E5); pad-complete in tools/uiaudit/controller.mjs. The frontend's personal browser storage (playback choice, recent searches) is scoped by profile and reloaded on a switch; machine settings (controller, last destination) stay shared.",
+        "id": "15.2",
+        "text": "Taste modes (crates/taste): the positive signals weighted (completed, rewatched, rated, watchlisted, imported) and decayed by age, with a longer half-life for strongly held ones; clustered into 3 to 8 modes (k-means over the catalogue vectors, k by silhouette), each with a vector, weight and recency; recommendations interleaved across modes in proportion to weight. Judged on eval taste against popularity (Phase 14 E2's carried half) and on a synthetic two-taste profile (E1).",
         "status": "complete",
-        "commit": "272b54f"
+        "commit": "85f5cc2"
       },
       {
-        "id": "14.3",
-        "text": "Imports (crates/imports): Letterboxd CSV (watched, ratings, diary, watchlist), Trakt JSON, IMDb ratings CSV, MAL and AniList XML, each matched to the catalogue (an IMDb id where the file gives one, else title and year through the library's identifier), recorded per profile as ratings, completed watches and watchlist, unmatched rows listed in words; a 500+ entry Letterboxd fixture built from catalogue titles, match rate recorded (E2).",
+        "id": "15.3",
+        "text": "Axes and negatives: preferred eras, runtimes, countries, languages, subtitle tolerance and directors from the signals, the taste statements as priors; negative preferences from abandons (5 minutes in means less than 80, E2); a temporal-decay test on a profile whose taste shifts over simulated time (E4).",
         "status": "complete",
-        "commit": "cace2eb"
+        "commit": "9310430"
       },
       {
-        "id": "14.4",
-        "text": "Taste input: the six taste statements (pace, ambiguity, era, subtitles, runtime, formal experimentation) stored per profile; the free-text 'what you love' embedded with the query embedder and stored; a seed taste vector from imports and statements, so E2's 'reflected in the taste model' is measurable now (nearest titles to the vector against the imported favourites) and Phase 15 builds on it.",
+        "id": "15.4",
+        "text": "The taste profile screen (src/features/taste/TasteProfile.tsx): the model described in plain language (modes named by what they hold, axes in words), each mode and axis correctable (more, less, not me), pad-complete; Home's taste rail follows the modes.",
         "status": "complete",
-        "commit": "8174b82"
+        "commit": "86eec57"
       },
       {
-        "id": "14.5",
-        "text": "The onboarding wizard: profile, taste (imports, statements, free text, and the adaptive typographic title-card grid as an extra round: 3-4 rounds, picks spread for information gain), sources (paste a URL, the Internet Archive, add a folder inline), each skippable and never a dead end; shown on first run only; E3 and E4 tested with no key and no sources; pad-complete.",
+        "id": "15.5",
+        "text": "The author check batch after this phase (ADR-0040): Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, and E3 here (the screen describes a profile accurately); then docs/specs/taste-model.md, learning note, README and HOW_IT_WORKS, regression, close.",
         "status": "complete",
-        "commit": "3848f41"
-      },
-      {
-        "id": "14.6",
-        "text": "Author checks batched after Phase 15 (E1 a first-time user timed to a populated Home; E6 sign-off on the onboarding screens) with the earlier ones; docs/specs/profiles.md, learning note, README and HOW_IT_WORKS, regression, close.",
-        "status": "complete",
-        "commit": "89e50d6"
+        "commit": "7563446"
       }
     ],
     "exit_criteria": [
       {
         "id": "E1",
-        "text": "A first-time user with no technical knowledge reaches a populated Home screen in under two minutes. Test this on an actual person.",
-        "met": false,
-        "evidence": "MEASURED: the whole first run is pad-complete in tools/uiaudit/controller.mjs and ends on a Home that is never empty (crates/taste/tests/home.rs); a first-time person timing it is the author's to arrange.",
-        "carried_to_phase": 16,
-        "carried_reason": "It needs an actual first-time person (SPEC says so); batched with the author checks after Phase 15, so Phase 16 receives it."
+        "text": "The model produces distinct, recognisable clusters for a synthetic profile with two deliberately unrelated tastes.",
+        "met": true,
+        "evidence": "eval modes (2026-11-08): a synthetic profile loving the 30 most-voted horror films and the 30 most-voted documentaries, clustered by sinephile_taste::modes on the real catalogue vectors: 3 modes, weighted purity 96.6% (target 90%), horror in one mode and documentaries in two of their own, three identical runs; seen to fail with --prove (vectors shuffled between titles: 59.3%, NOT MET). Unit test crates/taste/src/modes.rs two_unrelated_tastes_become_two_separate_modes (seen to fail with one mode forced). docs/eval-results.md 'E1: two unrelated tastes'."
       },
       {
         "id": "E2",
-        "text": "A Letterboxd export of 500+ films imports correctly and is reflected in the taste model.",
-        "met": false,
-        "evidence": "MEASURED: the import half is met: eval import on a fresh set of 600 films (ranks 601-1200), 98.83% right, 0 wrong, a second import adds nothing. The reflection half is not: eval taste on three real MovieLens histories, the seed finds 11.06% of held-out favourites among its 500 nearest against 35.64% for popularity (27x chance, 0.31x popularity). docs/eval-results.md.",
-        "carried_to_phase": 15,
-        "carried_reason": "'Reflected in the taste model' needs the taste model, which is Phase 15's deliverable (taste modes, not one mean); Phase 15 must beat popularity on eval taste."
+        "text": "Abandonment is weighted correctly — abandoning at 5 minutes and at 80 minutes mean different things.",
+        "met": true,
+        "evidence": "9310430: crates/taste/tests/model.rs abandoning_at_five_minutes_and_at_eighty_mean_different_things (record_viewing at 300 s and 4,800 s of a 100-minute film, read back through model::signals and weigh: -0.575 against -0.2, and the early abandon's genre first among the axes' avoids); crates/taste/src/modes.rs abandoning_at_five_minutes_means_more_than_at_eighty; seen to fail with the abandon weight made flat."
       },
       {
         "id": "E3",
-        "text": "Skipping the sources step leaves a functional, non-empty app.",
-        "met": true,
-        "evidence": "3848f41: src/features/onboarding/Onboarding.test.tsx 'skipping every step still finishes, and nothing is a dead end' (Skip, Skip, Back, Skip, 'Skip, and start' reaches the app); crates/taste/tests/home.rs a_new_profile_with_nothing_still_has_a_home (no history, no sources, no vector half: the 'Widely loved' rail from the offline catalogue alone, seen to fail with the kids filter broken); the whole first run by pad in tools/uiaudit/controller.mjs ('the whole first run by pad, and it ends in the app'); docs/evidence/phase-14/onboarding-*.png (the real window on the full catalogue, no TMDB key)."
+        "text": "The taste profile screen describes a test profile in a way the author agrees is accurate.",
+        "met": false,
+        "evidence": "MEASURED: the screen exists and describes real modes in sentences (86eec57; crates/taste/tests/describe.rs each_mode_is_named_by_what_it_holds; on the real catalogue, eval modes prints 'You gravitate toward horror and drama, mostly from the 2000s and 2010s (The Silence of the Lambs, The Shining, Alien)'; pad-complete in tools/uiaudit/controller.mjs). Whether it is accurate is the author's judgement.",
+        "carried_to_phase": 16,
+        "carried_reason": "It needs the author to agree the description is accurate; batched with the author checks after Phase 15, so Phase 16 receives it."
       },
       {
         "id": "E4",
-        "text": "Completing onboarding with no TMDB key produces a working, populated, good-looking app (ADR-0013). Every artwork-bearing surface has a designed artwork-free state — a typographic fallback, never a grey rectangle.",
-        "met": false,
-        "evidence": "MEASURED: no TMDB key anywhere in Phase 14; Home's cards are PosterCard's designed typographic state (no 'Uncatalogued', no grey rectangles); the onboarding screens on the full catalogue in docs/evidence/phase-14/; 'good-looking' is the author's judgement.",
-        "carried_to_phase": 16,
-        "carried_reason": "'Good-looking' is the author's sign-off, asked with E6 after Phase 15; Phase 16 receives it."
+        "text": "Temporal decay is tested with a synthetic profile whose taste shifts over simulated time.",
+        "met": true,
+        "evidence": "9310430: crates/taste/tests/model.rs a_taste_that_moves_is_followed_and_the_old_one_fades (a synthetic profile: twelve horror films completed two years ago, twelve documentaries last month; the strongest mode is the documentaries with over 70% of the weight, and with the dates swapped it is the horror); crates/taste/src/modes.rs signals_fade_with_age_and_strong_ones_fade_slower; seen to fail with decay switched off."
       },
       {
         "id": "E5",
-        "text": "Profile switching is instant and leaks no state between profiles.",
+        "text": "The model updates within 2 s of a watch event, without blocking the UI.",
         "met": true,
-        "evidence": "eval switch (2026-11-07/08): a switch (touch, then the new profile's Home rails with the taste seed) takes 2.1-2.5 ms for an empty profile and 10.9-11.5 ms for one with 650 imported films, warm; 112.1 ms the first time after an import, from disk (D82). No state leaks: crates/persistence/tests/profiles.rs nothing_one_profile_does_is_visible_to_another and deleting_a_profile_takes_all_of_its_own_and_nothing_else (seen to fail with a profile filter removed); browser storage per profile in src/lib/profileStorage.test.ts (seen to fail with reset-then-read). docs/eval-results.md 'E5: switching profiles'."
-      },
-      {
-        "id": "E6",
-        "text": "Every onboarding screen is beautiful — this is the first impression.",
-        "met": false,
-        "evidence": "MEASURED: the three onboarding steps captured in the real window (docs/evidence/phase-14/onboarding-*.png) and by the pad flow (tools/uiaudit/out/controller/00a, 00b).",
-        "carried_to_phase": 16,
-        "carried_reason": "'Beautiful' is the author's sign-off on these screens, batched after Phase 15; Phase 16 receives it."
+        "evidence": "0bfada4: cargo run --release -p eval -- update (2026-11-08): a 650-film profile (MovieLens user 3) watches five unmet well-known films; from each viewing's write to the rebuilt model through ModelCache: 125.7-133.2 ms (target under 2,000 ms), and every watched film is a member of the model it timed; cached with nothing new 0.3 ms. Not blocking the UI: end_viewing and rate_title return once the signal is written and the rebuild runs in a background task (src-tauri/src/commands/home.rs refresh_model). Seen to fail: ModelCache::get made to ignore the fingerprint gives 'every watch in its model: false', E5 NOT MET. docs/eval-results.md."
       }
     ]
   },
@@ -1659,8 +1641,8 @@
       "title": "Profiles and First-Run Onboarding",
       "depends_on": "3, 5",
       "sessions": "2",
-      "status": "in_progress",
-      "completion_commit": null,
+      "status": "complete",
+      "completion_commit": "06b9e4d",
       "exit_criteria": [
         {
           "id": "E1",
@@ -1673,10 +1655,8 @@
         {
           "id": "E2",
           "text": "A Letterboxd export of 500+ films imports correctly and is reflected in the taste model.",
-          "met": false,
-          "evidence": "MEASURED: the import half is met: eval import on a fresh set of 600 films (ranks 601-1200), 98.83% right, 0 wrong, a second import adds nothing. The reflection half is not: eval taste on three real MovieLens histories, the seed finds 11.06% of held-out favourites among its 500 nearest against 35.64% for popularity (27x chance, 0.31x popularity). docs/eval-results.md.",
-          "carried_to_phase": 15,
-          "carried_reason": "'Reflected in the taste model' needs the taste model, which is Phase 15's deliverable (taste modes, not one mean); Phase 15 must beat popularity on eval taste."
+          "met": true,
+          "evidence": "Met in Phase 15: eval taste on the same three MovieLens users, folds and 500 slots: the taste modes with a popularity prior of 0.5 (chosen on three other users with eval taste --tune) find 40.63% of held-out favourites against 35.64% for popularity (97x chance). The import half: eval import on a fresh 600-film set, 98.83% right, 0 wrong, idempotent. docs/eval-results.md 'Taste modes with a popularity prior'."
         },
         {
           "id": "E3",
@@ -1752,38 +1732,72 @@
       "title": "Taste Model",
       "depends_on": "5, 14",
       "sessions": "2",
-      "status": "not_started",
+      "status": "in_progress",
       "completion_commit": null,
       "exit_criteria": [
         {
           "id": "E1",
           "text": "The model produces distinct, recognisable clusters for a synthetic profile with two deliberately unrelated tastes.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "eval modes (2026-11-08): a synthetic profile loving the 30 most-voted horror films and the 30 most-voted documentaries, clustered by sinephile_taste::modes on the real catalogue vectors: 3 modes, weighted purity 96.6% (target 90%), horror in one mode and documentaries in two of their own, three identical runs; seen to fail with --prove (vectors shuffled between titles: 59.3%, NOT MET). Unit test crates/taste/src/modes.rs two_unrelated_tastes_become_two_separate_modes (seen to fail with one mode forced). docs/eval-results.md 'E1: two unrelated tastes'."
         },
         {
           "id": "E2",
           "text": "Abandonment is weighted correctly — abandoning at 5 minutes and at 80 minutes mean different things.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "9310430: crates/taste/tests/model.rs abandoning_at_five_minutes_and_at_eighty_mean_different_things (record_viewing at 300 s and 4,800 s of a 100-minute film, read back through model::signals and weigh: -0.575 against -0.2, and the early abandon's genre first among the axes' avoids); crates/taste/src/modes.rs abandoning_at_five_minutes_means_more_than_at_eighty; seen to fail with the abandon weight made flat."
         },
         {
           "id": "E3",
           "text": "The taste profile screen describes a test profile in a way the author agrees is accurate.",
           "met": false,
-          "evidence": null
+          "evidence": "MEASURED: the screen exists and describes real modes in sentences (86eec57; crates/taste/tests/describe.rs each_mode_is_named_by_what_it_holds; on the real catalogue, eval modes prints 'You gravitate toward horror and drama, mostly from the 2000s and 2010s (The Silence of the Lambs, The Shining, Alien)'; pad-complete in tools/uiaudit/controller.mjs). Whether it is accurate is the author's judgement.",
+          "carried_to_phase": 16,
+          "carried_reason": "It needs the author to agree the description is accurate; batched with the author checks after Phase 15, so Phase 16 receives it."
         },
         {
           "id": "E4",
           "text": "Temporal decay is tested with a synthetic profile whose taste shifts over simulated time.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "9310430: crates/taste/tests/model.rs a_taste_that_moves_is_followed_and_the_old_one_fades (a synthetic profile: twelve horror films completed two years ago, twelve documentaries last month; the strongest mode is the documentaries with over 70% of the weight, and with the dates swapped it is the horror); crates/taste/src/modes.rs signals_fade_with_age_and_strong_ones_fade_slower; seen to fail with decay switched off."
         },
         {
           "id": "E5",
           "text": "The model updates within 2 s of a watch event, without blocking the UI.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "0bfada4: cargo run --release -p eval -- update (2026-11-08): a 650-film profile (MovieLens user 3) watches five unmet well-known films; from each viewing's write to the rebuilt model through ModelCache: 125.7-133.2 ms (target under 2,000 ms), and every watched film is a member of the model it timed; cached with nothing new 0.3 ms. Not blocking the UI: end_viewing and rate_title return once the signal is written and the rebuild runs in a background task (src-tauri/src/commands/home.rs refresh_model). Seen to fail: ModelCache::get made to ignore the fingerprint gives 'every watch in its model: false', E5 NOT MET. docs/eval-results.md."
+        }
+      ],
+      "subtasks": [
+        {
+          "id": "15.1",
+          "text": "Signals (migration 0026 and the player): a watch recorded when the player leaves (completed past 90%, otherwise abandoned with its point), rewatches, searches that led to a title, detail pages opened and not played (a weak negative), with the time of day and the session's length; repository methods with surface lines; the player and the detail page write them.",
+          "status": "complete",
+          "commit": "db5dfb3"
+        },
+        {
+          "id": "15.2",
+          "text": "Taste modes (crates/taste): the positive signals weighted (completed, rewatched, rated, watchlisted, imported) and decayed by age, with a longer half-life for strongly held ones; clustered into 3 to 8 modes (k-means over the catalogue vectors, k by silhouette), each with a vector, weight and recency; recommendations interleaved across modes in proportion to weight. Judged on eval taste against popularity (Phase 14 E2's carried half) and on a synthetic two-taste profile (E1).",
+          "status": "complete",
+          "commit": "85f5cc2"
+        },
+        {
+          "id": "15.3",
+          "text": "Axes and negatives: preferred eras, runtimes, countries, languages, subtitle tolerance and directors from the signals, the taste statements as priors; negative preferences from abandons (5 minutes in means less than 80, E2); a temporal-decay test on a profile whose taste shifts over simulated time (E4).",
+          "status": "complete",
+          "commit": "9310430"
+        },
+        {
+          "id": "15.4",
+          "text": "The taste profile screen (src/features/taste/TasteProfile.tsx): the model described in plain language (modes named by what they hold, axes in words), each mode and axis correctable (more, less, not me), pad-complete; Home's taste rail follows the modes.",
+          "status": "complete",
+          "commit": "86eec57"
+        },
+        {
+          "id": "15.5",
+          "text": "The author check batch after this phase (ADR-0040): Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, and E3 here (the screen describes a profile accurately); then docs/specs/taste-model.md, learning note, README and HOW_IT_WORKS, regression, close.",
+          "status": "complete",
+          "commit": "7563446"
         }
       ]
     },
@@ -2358,7 +2372,7 @@
       ]
     }
   ],
-  "next_action": "Phase 14 close (docs/phases/phase-14-profiles.md): push, wait for CI green on phase/14-profiles, merge --no-ff into main, CI green on main, tag phase-14, write the phase record (complete, completion_commit = the merge), python tools/phasedoc/generate.py --close 14 and --open 15, and author Phase 15 subtasks from SPEC.md §15 (taste modes that beat popularity on eval taste).",
+  "next_action": "Close Phase 15 (/closephase 15): CI green on phase/15-taste-model, merge --no-ff into main, CI green on main, tag phase-15, write completion_commit (the merge) into phases[15], python tools/phasedoc/generate.py --close 15 and --open 16, then report to the author with the batched checks (Phase 8 E5, Phase 7 E7, review feel, D77, Phase 14 E1/E4/E6, Phase 15 E3).",
   "blockers": [],
   "decisions_pending": [
     {
@@ -3044,6 +3058,16 @@
       "id": "D82",
       "text": "The first profile switch after launch costs about 112 ms (index and catalogue pages read from disk) against 11 ms warm. Touch the vector index and the votes index in the background after launch so the first switch, and the first Home, are warm.",
       "phase_raised": 14
+    },
+    {
+      "id": "D83",
+      "text": "crates/torrent/tests/swarm.rs a_download_survives_a_restart failed once in CI (run 42396646470, 2026-11-07, at ec78b82): 10,223,616 bytes before the stop, 0 after wait_ready on the restarted engine. Passes 5/5 locally and in every earlier CI run; code unchanged since Phase 13. Rerun. If it recurs: check that Engine::stop lets librqbit flush its writes and persistence before the session ends (a slow runner may lose the race).",
+      "phase_raised": 14
+    },
+    {
+      "id": "D84",
+      "text": "The offline catalogue has no countries or original languages (IMDb's free datasets do not carry them; the columns are empty), so the taste model cannot learn country or language preferences, or subtitle tolerance, from behaviour; the statements stand in. Fill them from TMDB for profiles with a key (and Wikidata, which is keyless) and add the axes in crates/taste/src/axes.rs.",
+      "phase_raised": 15
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

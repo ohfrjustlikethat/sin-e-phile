@@ -15,6 +15,7 @@ const commands = {
   playerPauseStill: vi.fn(() => ok("data:image/jpeg;base64,AAAA")),
   playerResumeVideo: vi.fn(() => ok(null)),
   savePosition: vi.fn(() => ok(null)),
+  endViewing: vi.fn(() => ok(null)),
   subtitleNudge: vi.fn((ms: number) => ok(ms * 3)),
   pauseDetails: vi.fn(() =>
     ok({
@@ -122,7 +123,7 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
     expect(commands.playerAction).toHaveBeenCalledWith({ kind: "seek_by", seconds: -30 });
   });
 
-  it("saves the position it reached on the way out (Phase 8 E4)", async () => {
+  it("saves the position it reached on the way out (Phase 8 E4), and the viewing (Phase 15)", async () => {
     events.on = {};
     const w = window as unknown as Record<string, unknown>;
     w.__TAURI_INTERNALS__ = {};
@@ -137,12 +138,29 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
           },
         }),
       );
+      // Three seconds of playing, then two paused: only the playing counts (Phase 15).
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 3_100));
+      });
+      act(() =>
+        events.on["player-state"]?.({
+          payload: {
+            position: 2715.4, duration: 5700, paused: true, buffered_until: null, volume: 100,
+            muted: false, speed: 1, hwdec: null, ended: false, started: true, tracks: [],
+          },
+        }),
+      );
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 2_100));
+      });
       unmount();
-      expect(commands.savePosition).toHaveBeenCalledWith(1, 2712.4, 5700);
+      expect(commands.savePosition).toHaveBeenCalledWith(1, 2715.4, 5700);
+      expect(commands.endViewing).toHaveBeenCalledWith(1, 3, 2715.4, 5700);
     } finally {
       delete w.__TAURI_INTERNALS__;
     }
-  });
+    // Real seconds pass: the count is of seconds played, so the test waits for them.
+  }, 10_000);
 
   it("leaves on Escape and closes the player", async () => {
     const { unmount } = render(<PlayerScreen />);

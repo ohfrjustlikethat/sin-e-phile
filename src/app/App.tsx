@@ -10,6 +10,7 @@ import { PadKeyboard, closePadKeyboard } from "@/app/PadKeyboard";
 import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { ReviewScreen } from "@/features/library/ReviewScreen";
 import { DownloadsScreen } from "@/features/downloads/DownloadsScreen";
+import { TasteProfile } from "@/features/taste/TasteProfile";
 import { DownloadNotices } from "@/features/downloads/DownloadNotices";
 import { ProfilePicker } from "@/features/profiles/ProfilePicker";
 import { Onboarding } from "@/features/onboarding/Onboarding";
@@ -62,6 +63,7 @@ export function App() {
     useUi();
   const playing = useUi((s) => s.playing);
   const reviewOpen = useUi((s) => s.reviewOpen);
+  const tasteOpen = useUi((s) => s.tasteOpen);
   const downloadsOpen = useUi((s) => s.downloadsOpen);
   const pickerOpen = useUi((s) => s.pickerOpen);
   const setPickerOpen = useUi((s) => s.setPickerOpen);
@@ -221,6 +223,15 @@ export function App() {
       },
     },
     {
+      id: "taste",
+      label: "Your taste",
+      group: "Navigate",
+      run: () => {
+        setSearching(false);
+        useUi.getState().setTasteOpen(true);
+      },
+    },
+    {
       id: "settings",
       label: "Open settings",
       group: "Settings",
@@ -259,6 +270,8 @@ export function App() {
           <main className="min-h-0 min-w-0 flex-1 overflow-auto">
             {settingsOpen && reviewOpen ? (
               <ReviewScreen />
+            ) : settingsOpen && tasteOpen ? (
+              <TasteProfile />
             ) : settingsOpen ? (
               <SettingsScreen />
             ) : downloadsOpen ? (

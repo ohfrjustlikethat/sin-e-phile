@@ -104,6 +104,17 @@ const FAKE = `(() => {
       year: 1930 + i * 8, made_by: "A Director" })),
     taste_input: () => ({ statements: { pace: null, ambiguity: null, era: null, subtitles: null, runtime: null, form: null }, love: null }),
     taste_preview: () => [],
+    // Phase 15: the taste profile, and a correction to it.
+    taste_profile: () => ({
+      modes: [
+        { anchor: 31, share: 0.6, examples: [], correction: window.__corrections[31] ?? null,
+          sentence: "You gravitate toward horror, mostly from the 1970s and 80s (Night Fog, Cold Hands, The Pale House)." },
+        { anchor: 32, share: 0.4, examples: [], correction: window.__corrections[32] ?? null,
+          sentence: "You also love documentary, mostly from the 2010s." },
+      ],
+      axes: ["You tend to walk out of war."],
+    }),
+    correct_taste: (a) => { window.__corrections[a.anchor] = a.correction; return null; },
     home: () => [{ key: "loved", title: "Widely loved", items: [{ id: 7, title: "Sunrise", year: 1927,
       made_by: "F. W. Murnau", runtime_minutes: 94 }] }],
     // Phase 14: two profiles, so Who's watching? opens on launch; Jon's has a PIN.
@@ -120,6 +131,7 @@ const FAKE = `(() => {
   window.__calls = [];
   window.__downloads = [];
   window.__onboarded = false;
+  window.__corrections = {};
   window.__profiles = [
     { id: 1, name: "Jon", is_default: true, avatar_colour: "slate", is_kids: false, has_pin: true, active: true },
     { id: 2, name: "Mina", is_default: false, avatar_colour: "ochre", is_kids: false, has_pin: false, active: false },
@@ -622,6 +634,38 @@ try {
   await press(B.B);
   await waitFor(() => evalJs(`document.body.textContent.includes("OpenSubtitles")`), "Settings again", 25);
   check(true, "B returns from the queue to Settings");
+
+  // Phase 15: the taste profile by pad. The D-pad finds "See Jon's taste" in Settings,
+  // A opens it, and a mode is corrected with A alone.
+  let onTaste = false;
+  for (let i = 0; i < 80 && !onTaste; i++) {
+    await press(B.DOWN);
+    onTaste = (await active())?.text === "See Jon's taste";
+  }
+  for (let i = 0; i < 120 && !onTaste; i++) {
+    await press(B.UP);
+    onTaste = (await active())?.text === "See Jon's taste";
+  }
+  check(onTaste, "the D-pad reaches 'See Jon's taste' in Settings");
+  await press(B.A);
+  await waitFor(() => evalJs(`document.body.textContent.includes("You gravitate toward horror")`), "the taste profile", 25);
+  check(await evalJs(`document.body.textContent.includes("60% of your taste")`), "A opens the taste profile: each mode said, with its share");
+  await shoot("07d-taste");
+  const inFirst = () =>
+    evalJs(`document.activeElement?.closest('[role="radiogroup"]')?.getAttribute("aria-label") === "Taste 1"`);
+  for (let i = 0; i < 8 && !(await inFirst()); i++) await press(B.DOWN);
+  let onLess = false;
+  for (let i = 0; i < 4 && !onLess; i++) {
+    onLess = (await inFirst()) && (await active())?.text === "Less";
+    if (!onLess) await press(B.RIGHT);
+  }
+  check(onLess, "the D-pad reaches the first mode's 'Less'");
+  await press(B.A);
+  const fixed = await waitFor(async () => (await calls("correct_taste"))[0], "the correction", 25);
+  check(fixed.anchor === 31 && fixed.correction === "less", "A on Less corrects the first mode");
+  await press(B.B);
+  await waitFor(() => evalJs(`document.body.textContent.includes("OpenSubtitles")`), "Settings after the taste", 25);
+  check(true, "B returns from the taste profile to Settings");
   await press(B.B); // leave Settings
 
   // Reduced motion: every transform goes, the ring stops gliding.

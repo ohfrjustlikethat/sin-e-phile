@@ -206,3 +206,112 @@ pub async fn taste_round(
     }
     Ok(out)
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct TasteModeView {
+    /// What a correction is keyed by.
+    pub anchor: i32,
+    /// Share of the taste, 0 to 1, before corrections.
+    pub share: f64,
+    pub sentence: String,
+    pub examples: Vec<TastePick>,
+    /// "more" | "less" | "not_me"
+    pub correction: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct TasteProfileView {
+    pub modes: Vec<TasteModeView>,
+    /// The axes and avoids, in sentences.
+    pub axes: Vec<String>,
+}
+
+/// The profile's taste, described (Phase 15): its modes from the model, its axes from its
+/// signals and statements. Without the vector half there are no modes, only the axes.
+#[tauri::command]
+#[specta::specta]
+pub async fn taste_profile(state: State<'_, AppState>) -> Result<TasteProfileView, String> {
+    use sinephile_taste::{axes, describe, model, modes};
+    let db = state.db().ok_or("the library is still opening")?;
+    let me = state.profile().await?;
+    let today = model::day_of(&sinephile_downloads::now_iso()).unwrap_or(0.0);
+    let found = match state.engine() {
+        Some(engine) => {
+            let mut engine = engine.lock().await;
+            match engine.semantic_mut() {
+                Some(s) => {
+                    crate::commands::home::MODELS
+                        .get(&db, s, me, today)
+                        .await
+                        .map_err(|e| e.to_string())?
+                        .0
+                }
+                None => Vec::new(),
+            }
+        }
+        None => Vec::new(),
+    };
+    let weighed = modes::weigh(
+        &model::signals(&db, me, today)
+            .await
+            .map_err(|e| e.to_string())?,
+    );
+    let raw = CredentialRepository::new(&db)
+        .get(me, STATEMENTS)
+        .await
+        .map_err(|e| e.to_string())?;
+    let a = axes::axes(&db, &weighed, &Statements::parse(raw.as_deref()))
+        .await
+        .map_err(|e| e.to_string())?;
+    let fixes = describe::corrections(&db, me)
+        .await
+        .map_err(|e| e.to_string())?;
+    let d = describe::describe(&db, &found, &a, &fixes)
+        .await
+        .map_err(|e| e.to_string())?;
+    let ids: Vec<i64> = d.modes.iter().flat_map(|m| m.examples.clone()).collect();
+    let mut cards = sinephile_search_engine::card::cards(&db, &ids)
+        .await
+        .map_err(|e| e.to_string())?;
+    let media = sinephile_persistence::repositories::MediaRepository::new(&db);
+    let mut out = Vec::new();
+    for m in d.modes {
+        let mut examples = Vec::new();
+        for id in m.examples {
+            if let Some(t) = media.by_id(id).await.map_err(|e| e.to_string())? {
+                examples.push(TastePick {
+                    id: id as i32,
+                    title: t.primary_title,
+                    year: t.release_year.map(|y| y as i32),
+                    made_by: cards.remove(&id).and_then(|c| c.made_by),
+                });
+            }
+        }
+        out.push(TasteModeView {
+            anchor: m.anchor as i32,
+            share: m.share,
+            sentence: m.sentence,
+            examples,
+            correction: m.correction,
+        });
+    }
+    Ok(TasteProfileView {
+        modes: out,
+        axes: d.axes,
+    })
+}
+
+/// Correct one mode of the profile's taste: "more", "less", "not_me", or `None` to undo.
+#[tauri::command]
+#[specta::specta]
+pub async fn correct_taste(
+    state: State<'_, AppState>,
+    anchor: i32,
+    correction: Option<String>,
+) -> Result<(), String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let me = state.profile().await?;
+    sinephile_taste::describe::correct(&db, me, i64::from(anchor), correction.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}

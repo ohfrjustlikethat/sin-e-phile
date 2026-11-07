@@ -7,8 +7,13 @@
 //!   words embedded and counted alongside. Phase 15 splits this into several modes; one
 //!   seed is enough to show that an import is reflected and to start a Home screen.
 
+pub mod axes;
+pub mod describe;
 pub mod home;
+pub mod model;
+pub mod modes;
 pub mod rounds;
+pub mod signals;
 
 use std::collections::HashSet;
 
