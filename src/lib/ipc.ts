@@ -292,6 +292,15 @@ export const commands = {
 	 *  loves), leaving out what it has seen. Empty without the vector half.
 	 */
 	tastePreview: (limit: number | null) => typedError<TastePick[], string>(__TAURI_INVOKE("taste_preview", { limit })),
+	/**
+	 *  One round of onboarding's title cards: `size` films not in `shown`, spread across the
+	 *  decades and, once something is liked, half near the taste so far.
+	 */
+	tasteRound: (shown: number[], size: number | null) => typedError<TastePick[], string>(__TAURI_INVOKE("taste_round", { shown, size })),
+	home: () => typedError<RailView[], string>(__TAURI_INVOKE("home")),
+	/**  Whether the first-run wizard has been finished or skipped. */
+	onboardingDone: () => typedError<boolean, string>(__TAURI_INVOKE("onboarding_done")),
+	finishOnboarding: () => typedError<null, string>(__TAURI_INVOKE("finish_onboarding")),
 };
 
 /* Types */
@@ -515,6 +524,14 @@ export type HardwareProfile = {
 	overridden: boolean,
 };
 
+export type HomeCard = {
+	id: number,
+	title: string,
+	year: number | null,
+	made_by: string | null,
+	runtime_minutes: number | null,
+};
+
 export type ImportView = {
 	/**  "Letterboxd" | "Trakt" | "IMDb" | "MyAnimeList" */
 	from: string,
@@ -660,6 +677,12 @@ export type ProfileView = {
 	has_pin: boolean,
 	/**  The one watching now. */
 	active: boolean,
+};
+
+export type RailView = {
+	key: string,
+	title: string,
+	items: HomeCard[],
 };
 
 export type RatingView = {

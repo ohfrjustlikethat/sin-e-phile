@@ -11,5 +11,10 @@ description = "What a person likes: taste statements, and the seed taste vector 
 [dependencies]
 sinephile-search-engine = { path = "../search-engine" }
 sinephile-embedding = { path = "../embedding" }
+sinephile-persistence = { path = "../persistence" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread"] }
+sqlx = { version = "=0.8.6", default-features = false, features = ["sqlite", "runtime-tokio"] }

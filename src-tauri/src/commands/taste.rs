@@ -166,3 +166,43 @@ pub async fn taste_preview(
     }
     Ok(out)
 }
+
+/// One round of onboarding's title cards: `size` films not in `shown`, spread across the
+/// decades and, once something is liked, half near the taste so far.
+#[tauri::command]
+#[specta::specta]
+pub async fn taste_round(
+    state: State<'_, AppState>,
+    shown: Vec<i32>,
+    size: Option<i32>,
+) -> Result<Vec<TastePick>, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let me = state.profile().await?;
+    let kids = crate::commands::profiles::kids(&state).await;
+    let shown: HashSet<i64> = shown.into_iter().map(i64::from).collect();
+    let size = size.unwrap_or(12).clamp(4, 24) as usize;
+    let ids = match state.engine() {
+        Some(engine) => {
+            let mut engine = engine.lock().await;
+            sinephile_taste::rounds::round(&db, engine.semantic_mut(), me, kids, &shown, size).await
+        }
+        None => sinephile_taste::rounds::round(&db, None, me, kids, &shown, size).await,
+    }
+    .map_err(|e| e.to_string())?;
+    let media = sinephile_persistence::repositories::MediaRepository::new(&db);
+    let mut cards = sinephile_search_engine::card::cards(&db, &ids)
+        .await
+        .map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for id in ids {
+        if let Some(m) = media.by_id(id).await.map_err(|e| e.to_string())? {
+            out.push(TastePick {
+                id: id as i32,
+                title: m.primary_title,
+                year: m.release_year.map(|y| y as i32),
+                made_by: cards.remove(&id).and_then(|c| c.made_by),
+            });
+        }
+    }
+    Ok(out)
+}

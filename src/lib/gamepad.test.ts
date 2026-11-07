@@ -176,3 +176,16 @@ describe("nearestInRegion (Phase 14)", () => {
     expect(nearestInRegion(top, [masthead, below], [false, true], "down")).toBe(1);
   });
 });
+
+describe("nearest, the beam (Phase 14)", () => {
+  it("moves along the row to a far target rather than to a nearer one off it", () => {
+    // Back, Skip and Continue on one row; a wide button above-right of Back, closer.
+    const back = { x: 449, y: 932, width: 104, height: 48 };
+    const more = { x: 449, y: 790, width: 328, height: 50 };
+    const skip = { x: 1210, y: 932, width: 72, height: 48 };
+    const next = { x: 1307, y: 932, width: 142, height: 48 };
+    expect(nearest(back, [more, skip, next], "right")).toBe(1);
+    // With nothing on the row, the general rule still finds the button off it.
+    expect(nearest(back, [more], "right")).toBe(0);
+  });
+});

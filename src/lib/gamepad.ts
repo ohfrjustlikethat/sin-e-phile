@@ -162,6 +162,12 @@ export function nearest(from: Box, candidates: Box[], direction: Direction): num
   const gapY = (c: Box) => Math.max(0, c.y - (from.y + from.height), from.y - (c.y + c.height));
   let best = -1;
   let bestScore = Infinity;
+  // The beam: a target that overlaps the focused one across the direction of travel (on
+  // its row, moving left or right; in its column, moving up or down) always beats one that
+  // does not, however close. Without it, Right from Back went to the button above-right
+  // instead of along the row to Continue (found by the Phase 14 pad flow).
+  let beam = -1;
+  let beamScore = Infinity;
   candidates.forEach((c, i) => {
     // Centre distance only breaks ties between boxes that overlap equally.
     const tie = 0.01 * Math.hypot(c.x + c.width / 2 - cx, c.y + c.height / 2 - cy);
@@ -194,8 +200,12 @@ export function nearest(from: Box, candidates: Box[], direction: Direction): num
       bestScore = score;
       best = i;
     }
+    if (across === 0 && score < beamScore) {
+      beamScore = score;
+      beam = i;
+    }
   });
-  return best;
+  return beam >= 0 ? beam : best;
 }
 
 /**

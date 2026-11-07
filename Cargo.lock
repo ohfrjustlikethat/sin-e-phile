@@ -5621,7 +5621,10 @@ dependencies = [
  "serde",
  "serde_json",
  "sinephile-embedding",
+ "sinephile-persistence",
  "sinephile-search-engine",
+ "sqlx",
+ "tokio",
 ]
 
 [[package]]

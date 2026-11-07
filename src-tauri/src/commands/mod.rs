@@ -6,6 +6,7 @@
 
 pub mod assets;
 pub mod downloads;
+pub mod home;
 pub mod imports;
 pub mod library;
 pub mod overlay;

@@ -164,6 +164,33 @@ async fn media_repository_surface() {
         .any(|(id, t, y, _)| *id == paddington && t == "Paddington" && *y == 2014));
     assert!(near.iter().all(|(_, _, y, _)| (2014..=2016).contains(y)));
     assert!(!near.iter().any(|(id, ..)| *id == toy), "1995 is outside");
+
+    // most_voted_films — films only, by votes; nothing without votes
+    let famous = repo
+        .insert(&NewMediaItem {
+            rating_votes: Some(900_000),
+            ..NewMediaItem::film("Heat", 1995)
+        })
+        .await
+        .unwrap();
+    let known = repo
+        .insert(&NewMediaItem {
+            rating_votes: Some(1_000),
+            ..NewMediaItem::film("Thief", 1981)
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        repo.most_voted_films(2).await.expect("most_voted_films"),
+        vec![famous, known]
+    );
+    // most_voted_films_between — only the years asked for
+    assert_eq!(
+        repo.most_voted_films_between(1980, 1989, 5)
+            .await
+            .expect("most_voted_films_between"),
+        vec![known]
+    );
 }
 
 /// Exercise every public method on `EpisodeRepository`.

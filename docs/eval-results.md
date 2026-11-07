@@ -2687,3 +2687,18 @@ times popularity. One mean over about 400 liked titles is a centroid of everythi
 what SPEC.md Phase 15 warns against ("not one average vector"); MovieLens favourites are also mostly
 popular films, which flatters the popularity baseline. The import half of E2 is met (above); this half is
 carried to Phase 15, whose taste modes must beat popularity on this harness.
+
+### The films most people know: an index, measured
+
+2026-11-07, found in the real window: onboarding's first round of title cards took several seconds to
+appear (the log showed each decade's query over a second). On the full catalogue (Python `sqlite3`
+against `data/sinephile.db`, the queries exactly as `MediaRepository` runs them):
+
+| Query | Before | After 0025 |
+|---|---|---|
+| most-voted films (Home's "Widely loved") | 2.13 s | **0.001 s** |
+| a round of eleven decades (title cards) | 2.27 s | **0.067 s** |
+
+Migration 0025: a partial index on votes. The decade query walks it in vote order with year and kind
+kept out of the index choice (`+`), the same answers in every decade (checked). A second index on
+(year, votes) was tried and not used by the planner, so it is not in the migration.

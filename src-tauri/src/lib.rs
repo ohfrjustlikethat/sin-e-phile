@@ -127,6 +127,10 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::taste::taste_input,
             commands::taste::set_taste_input,
             commands::taste::taste_preview,
+            commands::taste::taste_round,
+            commands::home::home,
+            commands::home::onboarding_done,
+            commands::home::finish_onboarding,
         ])
         // `AssetProgress` travels as an EVENT payload, so no command signature mentions it
         // and specta would not export it. Registered explicitly rather than hand-written in

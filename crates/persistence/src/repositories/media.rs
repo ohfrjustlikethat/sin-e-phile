@@ -338,6 +338,43 @@ impl<'a> MediaRepository<'a> {
         .await?)
     }
 
+    /// The most-voted films, most first, not adult: the Home rail every install has, key or
+    /// none, sources or none (Phase 14).
+    pub async fn most_voted_films(&self, limit: i64) -> Result<Vec<i64>, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT id FROM media_items
+             WHERE kind IN ('film', 'anime_film') AND is_adult = 0 AND rating_votes IS NOT NULL
+             ORDER BY rating_votes DESC, id LIMIT ?",
+        )
+        .bind(limit)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
+    /// The most-voted films released from `from` to `to`: onboarding's title cards are
+    /// drawn decade by decade, so the first round spreads across eras (Phase 14).
+    pub async fn most_voted_films_between(
+        &self,
+        from: i64,
+        to: i64,
+        limit: i64,
+    ) -> Result<Vec<i64>, DbError> {
+        Ok(sqlx::query_scalar(
+            // The `+` keeps kind and year out of the index choice, so SQLite walks the
+            // votes index (0025) in order and stops at `limit`: 0.067 s for eleven decades
+            // instead of 2.3 s sorting each one, the same answers.
+            "SELECT id FROM media_items
+             WHERE +kind IN ('film', 'anime_film') AND is_adult = 0 AND rating_votes IS NOT NULL
+               AND +release_year BETWEEN ? AND ?
+             ORDER BY rating_votes DESC, id LIMIT ?",
+        )
+        .bind(from)
+        .bind(to)
+        .bind(limit)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
     pub async fn count(&self) -> Result<i64, DbError> {
         Ok(sqlx::query_scalar("SELECT COUNT(*) FROM media_items")
             .fetch_one(self.db.pool())

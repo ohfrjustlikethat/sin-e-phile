@@ -95,6 +95,17 @@ const FAKE = `(() => {
     downloads_storage: () => ({ used_bytes: 0, free_bytes: 200 * 1024 ** 3, budget_bytes: null, items: [] }),
     downloads_settings: () => ({ max_active: 3, budget_gib: null, qbittorrent_address: null,
       qbittorrent_user: null, qbittorrent_has_password: false }),
+    // Phase 14: first run (the wizard), then Home's rails.
+    onboarding_done: () => window.__onboarded,
+    finish_onboarding: () => { window.__onboarded = true; return null; },
+    update_profile: () => null,
+    rate_title: () => null,
+    taste_round: () => Array.from({ length: 12 }, (_, i) => ({ id: 100 + i, title: "Film " + (i + 1),
+      year: 1930 + i * 8, made_by: "A Director" })),
+    taste_input: () => ({ statements: { pace: null, ambiguity: null, era: null, subtitles: null, runtime: null, form: null }, love: null }),
+    taste_preview: () => [],
+    home: () => [{ key: "loved", title: "Widely loved", items: [{ id: 7, title: "Sunrise", year: 1927,
+      made_by: "F. W. Murnau", runtime_minutes: 94 }] }],
     // Phase 14: two profiles, so Who's watching? opens on launch; Jon's has a PIN.
     profiles: () => window.__profiles,
     switch_profile: (a) => {
@@ -108,6 +119,7 @@ const FAKE = `(() => {
   let nextId = 1;
   window.__calls = [];
   window.__downloads = [];
+  window.__onboarded = false;
   window.__profiles = [
     { id: 1, name: "Jon", is_default: true, avatar_colour: "slate", is_kids: false, has_pin: true, active: true },
     { id: 2, name: "Mina", is_default: false, avatar_colour: "ochre", is_kids: false, has_pin: false, active: false },
@@ -355,6 +367,27 @@ const steerToButton = async (label) => {
 
 // ── the flow ────────────────────────────────────────────────────────────────
 try {
+  // Phase 14: first run is the wizard, by pad: a name field first, Continue, a title card
+  // picked with A, Continue, then Start watching.
+  await waitFor(() => evalJs(`document.body.textContent.includes("Who's this for?")`), "the first-run wizard", 40);
+  check(await evalJs(`document.activeElement?.tagName === "INPUT"`), "first run opens on the wizard, focus on the name field");
+  await shoot("00a-onboarding");
+  await steerToButton("Continue");
+  await press(B.A);
+  await waitFor(() => evalJs(`document.body.textContent.includes("What do you like?")`), "step 2", 25);
+  await waitFor(() => evalJs(`document.body.textContent.includes("Film 1")`), "the title cards", 25);
+  await steerToButton("Film 1A Director · 1930");
+  await press(B.A);
+  check((await calls("rate_title")).some((a) => a.id === 100 && a.stars === 4), "A on a title card picks it (liked, four stars)");
+  await shoot("00b-title-cards");
+  await steerToButton("Continue");
+  await press(B.A);
+  await waitFor(() => evalJs(`document.body.textContent.includes("Where to watch")`), "step 3", 25);
+  await steerToButton("Start watching");
+  await press(B.A);
+  await waitFor(async () => (await calls("finish_onboarding")).length === 1, "the wizard to finish", 25);
+  check(true, "the whole first run by pad, and it ends in the app");
+
   // Phase 14: two profiles, so launch asks who is watching (ADR-0043), focus on the first.
   await waitFor(() => evalJs(`document.body.textContent.includes("Who's watching?")`), "the profile picker", 40);
   await waitFor(async () => (await active())?.text === "Jon, PIN", "focus on the first profile", 25);
