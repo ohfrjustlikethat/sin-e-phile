@@ -2623,3 +2623,45 @@ meaning **0.0472**, filter **1.0000** (carried); p95 **43.8 ms** cold, **15.8 ms
 false accepts **0/10**; identify **99.05% / 0.39%** (held out 100% / 0%), 44.7 ms per name. Unchanged
 from Phase 12. Rust tests 739 passed, 0 failed, 6 ignored (E2's real round trip among them, run on
 demand); frontend 136. `npm run audit:ui`: rail p95 16.8 ms, 0 dropped, 45 focus stops all ringed.
+
+## Phase 14 — Profiles and onboarding
+
+### E2: a Letterboxd export of 600 films, first run
+
+2026-11-07, `cargo run --release -p eval -- import` (the export made at run time from the local
+`ml-25m.zip`: the 600 most-rated films, titles as MovieLens writes them turned into Letterboxd's form,
+each film's IMDb id as ground truth; never committed, as MovieLens and IMDb data may not be
+redistributed). 550 watched, 50 on the watchlist:
+
+| | Films | Share |
+|---|---|---|
+| right | 592 | **98.67%** (target at least 95%) |
+| wrong | 1 | **0.17%** (target under 1%) |
+| asked | 7 | 1.17% |
+
+Recorded 347 ratings, 543 dated watches, 50 watchlist entries in 0.2 s; imported again, 0 new watches.
+The wrong one: "300" (2007 in MovieLens) placed on an obscure 2007 "300" (15 votes) rather than the 2006
+film (924,388 votes). The asked: five punctuation differences ("&"/"and", a trailing "?", "X-Files"/"X
+Files", a possessive prefix) and two harness bugs (titles with two parentheticals not fully stripped).
+The matcher is being changed in the light of this set, so a fresh set judges it next.
+
+### E2: a fresh set after the changes, met
+
+Changes made after the first run: a title a year either side with 100 times the votes beats an obscure
+exact-year one (`choose`); when the exact name finds nothing, names are compared normalised ("&"/"and",
+punctuation, a leading "the") a year either side (`normalised`, `MediaRepository::titles_released_between`);
+the harness strips every parenthetical. Then the next 600 films by ratings (ranks 601-1200, disjoint),
+chosen before running and run once: `cargo run --release -p eval -- import --from 600`, 2026-11-07.
+
+| | Fresh set (601-1200) | Tuned set (1-600), for comparison |
+|---|---|---|
+| right | **592 = 98.83%** | 598 = 99.67% |
+| wrong | **0 = 0.00%** | 0 = 0.00% |
+| asked | 7 = 1.17% | 2 = 0.33% |
+| import time | 7.5 s | 2.5 s |
+
+E2 met on the fresh set: at least 500 films, at least 95% right, under 1% wrong, and imported again
+adds nothing. Of the seven asked, two are genuinely ambiguous (two "Daredevil" of 2003, two "Emma" of
+1996, close in votes), four are names written very differently ("Men in Black III" / "Men in Black 3"),
+and one is the harness cutting "Birdman: Or (The Unexpected Virtue of Ignorance)" short. The fallback's
+cost is the time: each miss scans three years of names (about a second for the worst).

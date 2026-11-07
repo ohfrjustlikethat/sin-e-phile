@@ -311,16 +311,46 @@ pub async fn library_loop(app: AppHandle) {
 }
 
 #[cfg(windows)]
-mod picker {
+pub(crate) mod picker {
     use windows::core::w;
+    use windows::core::HSTRING;
     use windows::Win32::Foundation::HWND;
     use windows::Win32::System::Com::{
         CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, CLSCTX_INPROC_SERVER,
         COINIT_APARTMENTTHREADED,
     };
     use windows::Win32::UI::Shell::{
-        FileOpenDialog, IFileOpenDialog, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, SIGDN_FILESYSPATH,
+        FileOpenDialog, IFileOpenDialog, FOS_FILEMUSTEXIST, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS,
+        SIGDN_FILESYSPATH,
     };
+
+    /// Windows' file picker, titled `title`, owned by the app's window (Phase 14 imports).
+    pub fn file(owner: Option<isize>, title: &str) -> Option<String> {
+        // SAFETY: as `folder`: COM for exactly the dialog's lifetime, the one COM string
+        // freed with CoTaskMemFree.
+        unsafe {
+            if CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_err() {
+                return None;
+            }
+            let picked = (|| {
+                let dialog: IFileOpenDialog =
+                    CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER).ok()?;
+                let options = dialog.GetOptions().ok()?;
+                dialog
+                    .SetOptions(options | FOS_FILEMUSTEXIST | FOS_FORCEFILESYSTEM)
+                    .ok()?;
+                dialog.SetTitle(&HSTRING::from(title)).ok()?;
+                dialog.Show(owner.map(|h| HWND(h as *mut _))).ok()?;
+                let item = dialog.GetResult().ok()?;
+                let name = item.GetDisplayName(SIGDN_FILESYSPATH).ok()?;
+                let path = name.to_string().ok();
+                CoTaskMemFree(Some(name.0 as *const _));
+                path
+            })();
+            CoUninitialize();
+            picked
+        }
+    }
 
     /// Windows' folder picker, owned by the app's window so it sits above it.
     pub fn folder(owner: Option<isize>) -> Option<String> {
@@ -353,8 +383,11 @@ mod picker {
 }
 
 #[cfg(not(windows))]
-mod picker {
+pub(crate) mod picker {
     pub fn folder(_: Option<isize>) -> Option<String> {
+        None
+    }
+    pub fn file(_: Option<isize>, _: &str) -> Option<String> {
         None
     }
 }

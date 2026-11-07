@@ -318,6 +318,26 @@ impl<'a> MediaRepository<'a> {
         Ok(out)
     }
 
+    /// Every name of every film and series released from `from` to `to`, with its year and
+    /// votes: (id, name, year, votes). For matching a name written differently from the
+    /// catalogue's ("&" for "and"), where an exact lookup found nothing (Phase 14 imports).
+    pub async fn titles_released_between(
+        &self,
+        from: i64,
+        to: i64,
+    ) -> Result<Vec<(i64, String, i64, i64)>, DbError> {
+        Ok(sqlx::query_as(
+            "SELECT m.id, t.title, m.release_year, COALESCE(m.rating_votes, 0)
+             FROM media_items m JOIN titles t ON t.media_item_id = m.id
+             WHERE m.release_year BETWEEN ? AND ?
+               AND m.kind IN ('film', 'series', 'anime_film', 'anime_series')",
+        )
+        .bind(from)
+        .bind(to)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
     pub async fn count(&self) -> Result<i64, DbError> {
         Ok(sqlx::query_scalar("SELECT COUNT(*) FROM media_items")
             .fetch_one(self.db.pool())

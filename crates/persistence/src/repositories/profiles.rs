@@ -271,6 +271,35 @@ impl<'a> ProfileRepository<'a> {
         .await?)
     }
 
+    /// A watch that happened at `at` (an import, Phase 14): the date is kept, because the
+    /// taste model weighs recent watching more. Importing the same file twice adds
+    /// nothing: a watch of this title at this moment is recorded once. Returns whether it
+    /// was new.
+    pub async fn record_watch_at(
+        &self,
+        profile_id: i64,
+        media_item_id: i64,
+        watched_seconds: i64,
+        completed: bool,
+        at: &str,
+    ) -> Result<bool, DbError> {
+        let inserted = sqlx::query(
+            "INSERT INTO watch_events (profile_id, media_item_id, watched_seconds, completed, started_at)
+             SELECT ?1, ?2, ?3, ?4, ?5
+             WHERE NOT EXISTS (SELECT 1 FROM watch_events
+                               WHERE profile_id = ?1 AND media_item_id = ?2 AND started_at = ?5)",
+        )
+        .bind(profile_id)
+        .bind(media_item_id)
+        .bind(watched_seconds)
+        .bind(i64::from(completed))
+        .bind(at)
+        .execute(self.db.pool())
+        .await?
+        .rows_affected();
+        Ok(inserted == 1)
+    }
+
     pub async fn save_position(
         &self,
         profile_id: i64,

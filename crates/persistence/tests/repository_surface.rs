@@ -153,6 +153,17 @@ async fn media_repository_surface() {
         .expect("suitable_for_children");
     assert_eq!(ok, [toy, paddington].into_iter().collect());
     assert!(repo.suitable_for_children(&[]).await.unwrap().is_empty());
+
+    // titles_released_between — films and series only, every name, in the years given
+    let near = repo
+        .titles_released_between(2014, 2016)
+        .await
+        .expect("titles_released_between");
+    assert!(near
+        .iter()
+        .any(|(id, t, y, _)| *id == paddington && t == "Paddington" && *y == 2014));
+    assert!(near.iter().all(|(_, _, y, _)| (2014..=2016).contains(y)));
+    assert!(!near.iter().any(|(id, ..)| *id == toy), "1995 is outside");
 }
 
 /// Exercise every public method on `EpisodeRepository`.
@@ -392,6 +403,25 @@ async fn profile_repository_surface() {
     assert!(
         !repo.finished(first, other).await.unwrap(),
         "another profile's"
+    );
+
+    // record_watch_at — dated, and once per moment
+    assert!(repo
+        .record_watch_at(second, other, 5_400, true, "2019-04-02 00:00:00")
+        .await
+        .expect("record_watch_at"));
+    assert!(
+        !repo
+            .record_watch_at(second, other, 5_400, true, "2019-04-02 00:00:00")
+            .await
+            .unwrap(),
+        "the same watch imported again is not new"
+    );
+    assert!(
+        repo.record_watch_at(second, other, 5_400, true, "2021-01-09 00:00:00")
+            .await
+            .unwrap(),
+        "a rewatch on another day is"
     );
 
     // record_watch

@@ -4,6 +4,7 @@ import { Button, Input, Toggle } from "@/design-system";
 import { commands, type ProfileView } from "@/lib/ipc";
 import { AVATAR_COLOURS, Avatar, colourOf, type AvatarColour } from "@/features/profiles/Avatar";
 import { PROFILES, useProfiles } from "@/features/profiles/useProfiles";
+import { ImportHistory } from "@/features/profiles/ImportHistory";
 
 /**
  * Settings → Profiles — SPEC.md Phase 14. Add a profile (a name, a colour, kids or not,
@@ -42,6 +43,12 @@ export function ProfilesSection() {
           </div>
         ))}
       {active && <OwnPin profile={active} />}
+      {active && (
+        <div className="mt-8">
+          <h3 className="mb-2 text-[13px] text-ink">Import {active.name}'s history</h3>
+          <ImportHistory />
+        </div>
+      )}
     </section>
   );
 }

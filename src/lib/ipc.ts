@@ -281,6 +281,10 @@ export const commands = {
 	switchProfile: (id: number, pin: string | null) => typedError<ProfileView, string>(__TAURI_INVOKE("switch_profile", { id, pin })),
 	/**  Set or clear the watching profile's own PIN (`None` clears it). */
 	setProfilePin: (pin: string | null) => typedError<null, string>(__TAURI_INVOKE("set_profile_pin", { pin })),
+	/**  Windows' file picker for an export. `None` when cancelled. */
+	pickImportFile: () => typedError<string | null, string>(__TAURI_INVOKE("pick_import_file")),
+	/**  Read an export and record it for the profile watching. */
+	importHistory: (path: string) => typedError<ImportView, string>(__TAURI_INVOKE("import_history", { path })),
 };
 
 /* Types */
@@ -502,6 +506,19 @@ export type HardwareProfile = {
 	/**  The tier actually in force. Differs only when the user has overridden. */
 	effective_tier: Tier,
 	overridden: boolean,
+};
+
+export type ImportView = {
+	/**  "Letterboxd" | "Trakt" | "IMDb" | "MyAnimeList" */
+	from: string,
+	entries: number,
+	matched: number,
+	ratings: number,
+	watches: number,
+	watchlist: number,
+	/**  What could not be placed, in words (the first hundred). */
+	unmatched: UnmatchedView[],
+	unmatched_total: number,
 };
 
 export type ItemDetail = {
@@ -885,6 +902,12 @@ export type TrackView = {
 	lang: string | null,
 	title: string | null,
 	selected: boolean,
+};
+
+export type UnmatchedView = {
+	title: string,
+	year: number | null,
+	why: string,
 };
 
 /**

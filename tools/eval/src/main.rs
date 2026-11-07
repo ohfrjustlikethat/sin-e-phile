@@ -14,6 +14,7 @@ mod advise;
 mod embed;
 mod error;
 mod identify;
+mod imports;
 mod relevance;
 mod scan;
 mod search;
@@ -92,6 +93,15 @@ async fn main() {
             scan::run(Path::new(&data_dir), files).await
         }
         "identify" => identify::run(Path::new(&data_dir), report).await,
+        "import" => {
+            let from = args
+                .iter()
+                .position(|a| a == "--from")
+                .and_then(|i| args.get(i + 1))
+                .and_then(|n| n.parse().ok())
+                .unwrap_or(0);
+            imports::run(Path::new(&data_dir), from).await
+        }
         "all" => match search::run(Path::new(&data_dir), report).await {
             // Every harness runs even when an earlier one misses its target — stopping
             // at the first failure hides the rest, and §10.12 compares ALL the numbers

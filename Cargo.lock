@@ -1438,6 +1438,7 @@ dependencies = [
  "sinephile-downloads",
  "sinephile-embedder",
  "sinephile-embedding",
+ "sinephile-imports",
  "sinephile-library",
  "sinephile-persistence",
  "sinephile-search-engine",
@@ -1448,6 +1449,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "zip",
 ]
 
 [[package]]
@@ -5349,6 +5351,7 @@ dependencies = [
  "sinephile-downloads",
  "sinephile-embedder",
  "sinephile-embedding",
+ "sinephile-imports",
  "sinephile-library",
  "sinephile-metadata-api",
  "sinephile-persistence",
@@ -5448,6 +5451,22 @@ dependencies = [
  "sha2",
  "tempfile",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "sinephile-imports"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "quick-xml",
+ "serde",
+ "serde_json",
+ "sinephile-persistence",
+ "sqlx",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "zip",
 ]
 
 [[package]]
