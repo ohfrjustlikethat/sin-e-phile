@@ -127,11 +127,22 @@ pub async fn search(
     };
 
     let limit = i64::from(limit.unwrap_or(20).clamp(1, 100));
+    let kids = crate::commands::profiles::kids(&state).await;
     let mut engine = engine.lock().await;
-    let hits = engine
-        .search(&db, &query, limit)
+    // A kids profile sees only what suits children, so it asks for more and keeps those.
+    let mut hits = engine
+        .search(&db, &query, if kids { limit * 5 } else { limit })
         .await
         .map_err(|e| e.to_string())?;
+    if kids {
+        let ids: Vec<i64> = hits.iter().map(|h| h.media_item_id).collect();
+        let ok = sinephile_persistence::repositories::MediaRepository::new(&db)
+            .suitable_for_children(&ids)
+            .await
+            .map_err(|e| e.to_string())?;
+        hits.retain(|h| ok.contains(&h.media_item_id));
+        hits.truncate(limit as usize);
+    }
 
     let readiness = CatalogueRepository::new(&db)
         .readiness()

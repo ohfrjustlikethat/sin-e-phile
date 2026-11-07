@@ -11,6 +11,8 @@ import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { ReviewScreen } from "@/features/library/ReviewScreen";
 import { DownloadsScreen } from "@/features/downloads/DownloadsScreen";
 import { DownloadNotices } from "@/features/downloads/DownloadNotices";
+import { ProfilePicker } from "@/features/profiles/ProfilePicker";
+import { useProfileSync, useProfiles } from "@/features/profiles/useProfiles";
 import { SearchScreen } from "@/features/search/SearchScreen";
 import { DesignGallery } from "@/features/design/DesignGallery";
 import { CommandPalette, type Command } from "@/design-system";
@@ -58,6 +60,14 @@ export function App() {
   const playing = useUi((s) => s.playing);
   const reviewOpen = useUi((s) => s.reviewOpen);
   const downloadsOpen = useUi((s) => s.downloadsOpen);
+  const pickerOpen = useUi((s) => s.pickerOpen);
+  const setPickerOpen = useUi((s) => s.setPickerOpen);
+  const { profiles, loading: profilesLoading } = useProfiles();
+  useProfileSync();
+  // ADR-0043: ask who is watching on launch only when there is more than one profile.
+  useEffect(() => {
+    if (pickerOpen === null && !profilesLoading) setPickerOpen(profiles.length >= 2);
+  }, [pickerOpen, profilesLoading, profiles.length, setPickerOpen]);
   const mini = useUi((s) => s.mini);
   const detail = useUi((s) => s.detail);
   useDropToPlay();
@@ -258,6 +268,7 @@ export function App() {
         </div>
       )}
       <DownloadNotices />
+      {pickerOpen && !full && <ProfilePicker onDone={() => setPickerOpen(false)} />}
       {playing && (
         <div
           className={

@@ -100,6 +100,59 @@ async fn media_repository_surface() {
 
     // count
     assert_eq!(repo.count().await.expect("count"), 3);
+
+    // suitable_for_children — filed for children or family, and nothing excluded
+    let genre = |name: &'static str, item: i64| {
+        let db = db.clone();
+        async move {
+            sqlx::query("INSERT INTO genres (name) VALUES (?) ON CONFLICT DO NOTHING")
+                .bind(name)
+                .execute(db.pool())
+                .await
+                .unwrap();
+            sqlx::query(
+                "INSERT INTO media_genres (media_item_id, genre_id)
+                 SELECT ?, id FROM genres WHERE name = ?",
+            )
+            .bind(item)
+            .bind(name)
+            .execute(db.pool())
+            .await
+            .unwrap();
+        }
+    };
+    let toy = repo
+        .insert(&NewMediaItem::film("Toy Story", 1995))
+        .await
+        .unwrap();
+    let paddington = repo
+        .insert(&NewMediaItem::film("Paddington", 2014))
+        .await
+        .unwrap();
+    let party = repo
+        .insert(&NewMediaItem::film("Sausage Party", 2016))
+        .await
+        .unwrap();
+    let scary = repo
+        .insert(&NewMediaItem::film("Goosebumps", 2015))
+        .await
+        .unwrap();
+    for g in ["Animation", "Comedy", "Children"] {
+        genre(g, toy).await;
+    }
+    genre("Family", paddington).await;
+    for g in ["Animation", "Comedy"] {
+        genre(g, party).await;
+    }
+    for g in ["Family", "Horror"] {
+        genre(g, scary).await;
+    }
+    let ok = repo
+        .suitable_for_children(&[toy, paddington, party, scary, film])
+        .await
+        .expect("suitable_for_children");
+    assert_eq!(ok, [toy, paddington].into_iter().collect());
+    assert!(repo.suitable_for_children(&[]).await.unwrap().is_empty());
 }
 
 /// Exercise every public method on `EpisodeRepository`.

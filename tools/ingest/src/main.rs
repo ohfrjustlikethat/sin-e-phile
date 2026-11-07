@@ -718,6 +718,9 @@ async fn movielens(
         tracing::info!("resuming a previous run");
     }
     ml::load(&mut job, Arc::new(pairs)).await?;
+    let children = ml::children(&path)?;
+    tracing::info!("{} films filed under Children", children.len());
+    ml::load_children(&mut job, Arc::new(children)).await?;
     job.finish().await?;
 
     // The number ADR-0019 requires Phase 4 to produce: streaming every rating is the

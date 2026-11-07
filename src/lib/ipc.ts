@@ -264,6 +264,23 @@ export const commands = {
 	downloadsStorage: () => typedError<StorageView, string>(__TAURI_INVOKE("downloads_storage")),
 	/**  Delete a finished download from disk and from the library. */
 	downloadClear: (id: number) => typedError<null, string>(__TAURI_INVOKE("download_clear", { id })),
+	/**  Every profile, the most recently used first. */
+	profiles: () => typedError<ProfileView[], string>(__TAURI_INVOKE("profiles")),
+	createProfile: (name: string, avatarColour: string | null, isKids: boolean, pin: string | null) => typedError<ProfileView, string>(__TAURI_INVOKE("create_profile", { name, avatarColour, isKids, pin })),
+	/**
+	 *  Name, avatar and kids setting. Only the profile watching may change itself, or any
+	 *  profile when the one watching is not a kids profile.
+	 */
+	updateProfile: (id: number, name: string, avatarColour: string | null, isKids: boolean) => typedError<null, string>(__TAURI_INVOKE("update_profile", { id, name, avatarColour, isKids })),
+	/**
+	 *  Delete a profile and its history, ratings, watchlist and settings. Never the last;
+	 *  never from a kids profile. Deleting the one watching switches to the default.
+	 */
+	deleteProfile: (id: number) => typedError<boolean, string>(__TAURI_INVOKE("delete_profile", { id })),
+	/**  Switch who is watching. A PIN is checked first; a wrong one changes nothing. */
+	switchProfile: (id: number, pin: string | null) => typedError<ProfileView, string>(__TAURI_INVOKE("switch_profile", { id, pin })),
+	/**  Set or clear the watching profile's own PIN (`None` clears it). */
+	setProfilePin: (pin: string | null) => typedError<null, string>(__TAURI_INVOKE("set_profile_pin", { pin })),
 };
 
 /* Types */
@@ -608,6 +625,17 @@ export type PlayerStateView = {
 	/**  Frames the video output has dropped (the stats overlay; Phase 11 E2). */
 	dropped_frames: number | null,
 	tracks: TrackView[],
+};
+
+export type ProfileView = {
+	id: number,
+	name: string,
+	is_default: boolean,
+	avatar_colour: string | null,
+	is_kids: boolean,
+	has_pin: boolean,
+	/**  The one watching now. */
+	active: boolean,
 };
 
 export type RatingView = {

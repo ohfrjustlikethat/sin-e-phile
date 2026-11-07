@@ -29,6 +29,9 @@ interface UiState {
   /** The Downloads page (Phase 13), opened from the masthead. */
   downloadsOpen: boolean;
   setDownloadsOpen: (open: boolean) => void;
+  /** Who's watching? (Phase 14): `null` until launch has decided whether to ask. */
+  pickerOpen: boolean | null;
+  setPickerOpen: (open: boolean) => void;
   playing: Playing | null;
   /** The in-app mini player (ADR-0043): watching in a corner while browsing. */
   mini: boolean;
@@ -51,6 +54,8 @@ export const useUi = create<UiState>()(
       reviewOpen: false,
       setReviewOpen: (reviewOpen) => set({ reviewOpen }),
       downloadsOpen: false,
+      pickerOpen: null,
+      setPickerOpen: (pickerOpen) => set({ pickerOpen }),
       setDownloadsOpen: (downloadsOpen) =>
         set(downloadsOpen ? { downloadsOpen, settingsOpen: false, reviewOpen: false, detail: null } : { downloadsOpen }),
       playing: null,

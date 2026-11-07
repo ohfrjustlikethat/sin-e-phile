@@ -6,6 +6,9 @@
 use sqlx::Row;
 
 use crate::db::{Db, DbError};
+
+/// Genres a kids profile never shows, whatever else a title is filed under.
+const KIDS_EXCLUDED: &str = "'Adult', 'Horror', 'Thriller', 'Crime', 'War', 'Film-Noir'";
 use crate::model::{IdSource, MediaItem, MediaKind, NewMediaItem, Title, TitleVariant};
 
 /// One credit as the detail page lists it.
@@ -284,6 +287,35 @@ impl<'a> MediaRepository<'a> {
                 },
             )
             .collect())
+    }
+
+    /// Which of `ids` a kids profile may see (Phase 14). Fails closed: only titles
+    /// positively filed as for children (MovieLens "Children", from `ingest movielens`)
+    /// or family (IMDb "Family"), not adult, and in none of the genres no children's film
+    /// carries. Nothing else is guessed at: an unfiled title is not shown.
+    pub async fn suitable_for_children(
+        &self,
+        ids: &[i64],
+    ) -> Result<std::collections::HashSet<i64>, DbError> {
+        let mut out = std::collections::HashSet::new();
+        for chunk in ids.chunks(500) {
+            let sql = format!(
+                "SELECT m.id FROM media_items m
+                 WHERE m.id IN ({}) AND m.is_adult = 0
+                   AND EXISTS (SELECT 1 FROM media_genres mg JOIN genres g ON g.id = mg.genre_id
+                               WHERE mg.media_item_id = m.id AND g.name IN ('Children', 'Family'))
+                   AND NOT EXISTS (SELECT 1 FROM media_genres mg JOIN genres g ON g.id = mg.genre_id
+                               WHERE mg.media_item_id = m.id
+                                 AND g.name IN ({KIDS_EXCLUDED}))",
+                vec!["?"; chunk.len()].join(", ")
+            );
+            let mut q = sqlx::query_scalar::<_, i64>(&sql);
+            for id in chunk {
+                q = q.bind(id);
+            }
+            out.extend(q.fetch_all(self.db.pool()).await?);
+        }
+        Ok(out)
     }
 
     pub async fn count(&self) -> Result<i64, DbError> {

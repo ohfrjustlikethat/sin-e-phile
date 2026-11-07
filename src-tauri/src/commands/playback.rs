@@ -42,6 +42,9 @@ pub async fn item_detail(
 ) -> Result<Option<ItemDetail>, String> {
     let db = state.db().ok_or("the library is still opening")?;
     let media = MediaRepository::new(&db);
+    if !allowed(&state, &db, i64::from(id)).await? {
+        return Ok(None);
+    }
     let Some(item) = media
         .by_id(i64::from(id))
         .await
@@ -69,6 +72,22 @@ pub async fn item_detail(
             })
             .collect(),
     }))
+}
+
+/// Whether the profile watching may open `id`: anything, unless it is a kids profile.
+async fn allowed(
+    state: &AppState,
+    db: &sinephile_persistence::Db,
+    id: i64,
+) -> Result<bool, String> {
+    if !crate::commands::profiles::kids(state).await {
+        return Ok(true);
+    }
+    Ok(MediaRepository::new(db)
+        .suitable_for_children(&[id])
+        .await
+        .map_err(|e| e.to_string())?
+        .contains(&id))
 }
 
 /// What Play will open, decided now (see `sinephile_playback::plan`).
@@ -170,6 +189,9 @@ pub async fn prepare_play(
     quality: Option<String>,
 ) -> Result<PlayPlanView, String> {
     let db = state.db().ok_or("the library is still opening")?;
+    if !allowed(&state, &db, i64::from(id)).await? {
+        return Err("This isn't available on a kids profile.".into());
+    }
     let (resolver, ctx) = resolver(&state).await?;
     // The engine starts here if a swarm might be needed; a failure to start it only
     // means swarms are skipped, not that nothing can play.
