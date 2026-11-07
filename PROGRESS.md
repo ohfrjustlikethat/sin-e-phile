@@ -16,13 +16,13 @@
 
 > Receives Phase 14 E2's reflection half: the modes must beat popularity on eval taste (the seed: 11.06% against 35.64%). E3 needs the author's agreement, asked in the batch at this phase's end.
 
-### Subtasks — 4/5 complete
+### Subtasks — 5/5 complete
 
 - [x] **15.1** Signals (migration 0026 and the player): a watch recorded when the player leaves (completed past 90%, otherwise abandoned with its point), rewatches, searches that led to a title, detail pages opened and not played (a weak negative), with the time of day and the session's length; repository methods with surface lines; the player and the detail page write them. · `db5dfb3`
 - [x] **15.2** Taste modes (crates/taste): the positive signals weighted (completed, rewatched, rated, watchlisted, imported) and decayed by age, with a longer half-life for strongly held ones; clustered into 3 to 8 modes (k-means over the catalogue vectors, k by silhouette), each with a vector, weight and recency; recommendations interleaved across modes in proportion to weight. Judged on eval taste against popularity (Phase 14 E2's carried half) and on a synthetic two-taste profile (E1). · `85f5cc2`
 - [x] **15.3** Axes and negatives: preferred eras, runtimes, countries, languages, subtitle tolerance and directors from the signals, the taste statements as priors; negative preferences from abandons (5 minutes in means less than 80, E2); a temporal-decay test on a profile whose taste shifts over simulated time (E4). · `9310430`
 - [x] **15.4** The taste profile screen (src/features/taste/TasteProfile.tsx): the model described in plain language (modes named by what they hold, axes in words), each mode and axis correctable (more, less, not me), pad-complete; Home's taste rail follows the modes. · `86eec57`
-- [~] **15.5** The author check batch after this phase (ADR-0040): Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, and E3 here (the screen describes a profile accurately); then docs/specs/taste-model.md, learning note, README and HOW_IT_WORKS, regression, close.
+- [x] **15.5** The author check batch after this phase (ADR-0040): Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, and E3 here (the screen describes a profile accurately); then docs/specs/taste-model.md, learning note, README and HOW_IT_WORKS, regression, close. · `7563446`
 
 ### Exit criteria
 
@@ -41,7 +41,7 @@
 
 ## What's next
 
-Phase 15 subtask 15.5 (docs/phases/phase-15-taste-model.md). E5 is met (0bfada4). Remaining: the author check batch (Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, Phase 15 E3 on the taste profile screen: Settings -> Profiles -> See <name>'s taste), docs/specs/taste-model.md, docs/learning/phase-15-notes.md, README and HOW_IT_WORKS, regression (eval all, import --from 600, taste, switch, modes), session log with retrospective and the decision that leanings are corrected through the statements, then close.
+Close Phase 15 (/closephase 15): CI green on phase/15-taste-model, merge --no-ff into main, CI green on main, tag phase-15, write completion_commit (the merge) into phases[15], python tools/phasedoc/generate.py --close 15 and --open 16, then report to the author with the batched checks (Phase 8 E5, Phase 7 E7, review feel, D77, Phase 14 E1/E4/E6, Phase 15 E3).
 
 ---
 

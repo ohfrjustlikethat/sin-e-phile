@@ -39,8 +39,8 @@
       {
         "id": "15.5",
         "text": "The author check batch after this phase (ADR-0040): Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, and E3 here (the screen describes a profile accurately); then docs/specs/taste-model.md, learning note, README and HOW_IT_WORKS, regression, close.",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "7563446"
       }
     ],
     "exit_criteria": [
@@ -1796,8 +1796,8 @@
         {
           "id": "15.5",
           "text": "The author check batch after this phase (ADR-0040): Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, and E3 here (the screen describes a profile accurately); then docs/specs/taste-model.md, learning note, README and HOW_IT_WORKS, regression, close.",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "7563446"
         }
       ]
     },
@@ -2372,7 +2372,7 @@
       ]
     }
   ],
-  "next_action": "Phase 15 subtask 15.5 (docs/phases/phase-15-taste-model.md). E5 is met (0bfada4). Remaining: the author check batch (Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, Phase 15 E3 on the taste profile screen: Settings -> Profiles -> See <name>'s taste), docs/specs/taste-model.md, docs/learning/phase-15-notes.md, README and HOW_IT_WORKS, regression (eval all, import --from 600, taste, switch, modes), session log with retrospective and the decision that leanings are corrected through the statements, then close.",
+  "next_action": "Close Phase 15 (/closephase 15): CI green on phase/15-taste-model, merge --no-ff into main, CI green on main, tag phase-15, write completion_commit (the merge) into phases[15], python tools/phasedoc/generate.py --close 15 and --open 16, then report to the author with the batched checks (Phase 8 E5, Phase 7 E7, review feel, D77, Phase 14 E1/E4/E6, Phase 15 E3).",
   "blockers": [],
   "decisions_pending": [
     {
