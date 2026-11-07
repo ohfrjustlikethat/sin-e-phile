@@ -297,6 +297,13 @@ export const commands = {
 	 *  decades and, once something is liked, half near the taste so far.
 	 */
 	tasteRound: (shown: number[], size: number | null) => typedError<TastePick[], string>(__TAURI_INVOKE("taste_round", { shown, size })),
+	/**
+	 *  The profile's taste, described (Phase 15): its modes from the model, its axes from its
+	 *  signals and statements. Without the vector half there are no modes, only the axes.
+	 */
+	tasteProfile: () => typedError<TasteProfileView, string>(__TAURI_INVOKE("taste_profile")),
+	/**  Correct one mode of the profile's taste: "more", "less", "not_me", or `None` to undo. */
+	correctTaste: (anchor: number, correction: string | null) => typedError<null, string>(__TAURI_INVOKE("correct_taste", { anchor, correction })),
 	home: () => typedError<RailView[], string>(__TAURI_INVOKE("home")),
 	/**
 	 *  The player left a title (Phase 15): seconds actually played, where it stopped, its
@@ -887,11 +894,28 @@ export type TasteInputView = {
 	love: string | null,
 };
 
+export type TasteModeView = {
+	/**  What a correction is keyed by. */
+	anchor: number,
+	/**  Share of the taste, 0 to 1, before corrections. */
+	share: number | null,
+	sentence: string,
+	examples: TastePick[],
+	/**  "more" | "less" | "not_me" */
+	correction: string | null,
+};
+
 export type TastePick = {
 	id: number,
 	title: string,
 	year: number | null,
 	made_by: string | null,
+};
+
+export type TasteProfileView = {
+	modes: TasteModeView[],
+	/**  The axes and avoids, in sentences. */
+	axes: string[],
 };
 
 /**  A score term exactly as `sinephile_selection::Term` holds it. */

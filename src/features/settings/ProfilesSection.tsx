@@ -6,6 +6,7 @@ import { AVATAR_COLOURS, Avatar, colourOf, type AvatarColour } from "@/features/
 import { PROFILES, useProfiles } from "@/features/profiles/useProfiles";
 import { ImportHistory } from "@/features/profiles/ImportHistory";
 import { TasteInput } from "@/features/profiles/TasteInput";
+import { useUi } from "@/lib/store";
 
 /**
  * Settings → Profiles — SPEC.md Phase 14. Add a profile (a name, a colour, kids or not,
@@ -22,6 +23,7 @@ async function ok<T>(p: Promise<{ status: "ok"; data: T } | { status: "error"; e
 
 export function ProfilesSection() {
   const { profiles, active } = useProfiles();
+  const setTasteOpen = useUi((s) => s.setTasteOpen);
   const [adding, setAdding] = useState(false);
   const locked = active?.is_kids ?? false;
 
@@ -54,6 +56,11 @@ export function ProfilesSection() {
         <div className="mt-8">
           <h3 className="mb-3 text-[13px] text-ink">What {active.name} likes</h3>
           <TasteInput />
+          <div className="mt-6">
+            <Button variant="secondary" size="sm" onClick={() => setTasteOpen(true)}>
+              See {active.name}'s taste
+            </Button>
+          </div>
         </div>
       )}
     </section>

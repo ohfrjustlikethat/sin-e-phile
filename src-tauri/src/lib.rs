@@ -128,6 +128,8 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::taste::set_taste_input,
             commands::taste::taste_preview,
             commands::taste::taste_round,
+            commands::taste::taste_profile,
+            commands::taste::correct_taste,
             commands::home::home,
             commands::playback::end_viewing,
             commands::playback::record_signal,

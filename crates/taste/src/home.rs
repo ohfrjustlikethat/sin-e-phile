@@ -81,6 +81,11 @@ pub async fn rails(
             let today = crate::model::day_of(&now_iso()).unwrap_or(0.0);
             let (mut modes, mut met) = cache.get(db, s, profile, today).await?;
             met.extend(seen.iter().copied());
+            // The profile's own corrections from its taste profile: more, less, not me.
+            crate::describe::apply(
+                &mut modes,
+                &crate::describe::corrections(db, profile).await?,
+            );
             if let Some(text) = love.map(str::trim).filter(|t| !t.is_empty()) {
                 if let Ok(v) = s.embedder.embed_query(text) {
                     crate::model::add_words(&mut modes, v);

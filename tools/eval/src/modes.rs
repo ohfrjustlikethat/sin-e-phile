@@ -97,6 +97,14 @@ pub async fn run(data_dir: &Path, prove: bool) -> Result<bool, EvalError> {
         100.0 * weighted_purity,
         homes.contains_key("horror") && homes.contains_key("documentary")
     );
+    // 15.4: the same modes said in words, on the real catalogue, for reading by eye.
+    let said =
+        sinephile_taste::describe::describe(&db, &modes, &Default::default(), &Default::default())
+            .await?;
+    println!("\n  described:");
+    for m in &said.modes {
+        println!("    {:>3.0}%  {}", 100.0 * m.share, m.sentence);
+    }
     println!("\n  E1 {}", if ok { "MET" } else { "NOT MET" });
     Ok(ok)
 }

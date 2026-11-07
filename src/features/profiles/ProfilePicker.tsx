@@ -16,6 +16,7 @@ import { useProfiles } from "./useProfiles";
 export function ProfilePicker({ onDone }: { onDone: () => void }) {
   const { profiles, switchTo } = useProfiles();
   const openSettings = useUi((s) => s.setSettingsOpen);
+  const setTasteOpen = useUi((s) => s.setTasteOpen);
   const [asking, setAsking] = useState<ProfileView | null>(null);
   const first = useRef<HTMLButtonElement>(null);
 
@@ -78,7 +79,7 @@ export function ProfilePicker({ onDone }: { onDone: () => void }) {
               </li>
             ))}
           </ul>
-          <div className="mt-14">
+          <div className="mt-14 flex gap-4">
             <Button
               variant="ghost"
               onClick={() => {
@@ -87,6 +88,15 @@ export function ProfilePicker({ onDone }: { onDone: () => void }) {
               }}
             >
               Manage profiles
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                onDone();
+                setTasteOpen(true);
+              }}
+            >
+              Your taste
             </Button>
           </div>
         </>

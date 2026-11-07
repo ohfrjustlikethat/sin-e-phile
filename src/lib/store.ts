@@ -26,6 +26,9 @@ interface UiState {
   /** The library's review queue (Phase 12), opened from Settings → Library. */
   reviewOpen: boolean;
   setReviewOpen: (open: boolean) => void;
+  /** The taste profile (Phase 15), a settings sub-screen like the review queue. */
+  tasteOpen: boolean;
+  setTasteOpen: (open: boolean) => void;
   /** The Downloads page (Phase 13), opened from the masthead. */
   downloadsOpen: boolean;
   setDownloadsOpen: (open: boolean) => void;
@@ -53,18 +56,29 @@ export const useUi = create<UiState>()(
       settingsOpen: false,
       reviewOpen: false,
       setReviewOpen: (reviewOpen) => set({ reviewOpen }),
+      tasteOpen: false,
+      setTasteOpen: (tasteOpen) =>
+        set(tasteOpen ? { tasteOpen, settingsOpen: true, reviewOpen: false, downloadsOpen: false, detail: null } : { tasteOpen }),
       downloadsOpen: false,
       pickerOpen: null,
       setPickerOpen: (pickerOpen) => set({ pickerOpen }),
       setDownloadsOpen: (downloadsOpen) =>
-        set(downloadsOpen ? { downloadsOpen, settingsOpen: false, reviewOpen: false, detail: null } : { downloadsOpen }),
+        set(
+          downloadsOpen
+            ? { downloadsOpen, settingsOpen: false, reviewOpen: false, tasteOpen: false, detail: null }
+            : { downloadsOpen },
+        ),
       playing: null,
       mini: false,
       setMini: (mini) => set({ mini }),
       detail: null,
       setDestination: (destination) => set({ destination, detail: null, downloadsOpen: false }),
       setSettingsOpen: (settingsOpen) =>
-        set(settingsOpen ? { settingsOpen, reviewOpen: false, downloadsOpen: false } : { settingsOpen, reviewOpen: false }),
+        set(
+          settingsOpen
+            ? { settingsOpen, reviewOpen: false, tasteOpen: false, downloadsOpen: false }
+            : { settingsOpen, reviewOpen: false, tasteOpen: false },
+        ),
       play: (playing) => set({ playing }),
       openDetail: (detail) => set({ detail, settingsOpen: false, downloadsOpen: false }),
       closeDetail: () => set({ detail: null }),
