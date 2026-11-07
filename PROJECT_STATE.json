@@ -15,8 +15,8 @@
       {
         "id": "15.1",
         "text": "Signals (migration 0026 and the player): a watch recorded when the player leaves (completed past 90%, otherwise abandoned with its point), rewatches, searches that led to a title, detail pages opened and not played (a weak negative), with the time of day and the session's length; repository methods with surface lines; the player and the detail page write them.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "db5dfb3"
       },
       {
         "id": "15.2",
@@ -1770,8 +1770,8 @@
         {
           "id": "15.1",
           "text": "Signals (migration 0026 and the player): a watch recorded when the player leaves (completed past 90%, otherwise abandoned with its point), rewatches, searches that led to a title, detail pages opened and not played (a weak negative), with the time of day and the session's length; repository methods with surface lines; the player and the detail page write them.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "db5dfb3"
         },
         {
           "id": "15.2",
@@ -2370,7 +2370,7 @@
       ]
     }
   ],
-  "next_action": "Phase 15 subtask 15.1 (docs/phases/phase-15-taste-model.md): write migration 0026_signals in crates/persistence/migrations (a signals table: profile_id, media_item_id, kind (search, detail_view, rewatch), at, hour, context JSON) with repository methods and repository_surface lines; record a watch event from src-tauri/src/commands/playback.rs save_position when the player leaves (completed past 90% of the duration, otherwise abandoned with watched_seconds as its point), once per viewing.",
+  "next_action": "Phase 15 subtask 15.2 (docs/phases/phase-15-taste-model.md): taste modes in crates/taste/src/modes.rs: weight each positive signal (completed 1.0, rewatched 1.5, rated by stars, watchlisted 0.4, imported as recorded) and decay it by age (half-life 180 days, 720 for five stars and rewatches); k-means over the liked titles' stored vectors for k in 3..=8 chosen by silhouette; recommend by interleaving each mode's nearest in proportion to its weight; judge on eval taste against popularity (11.06% seed vs 35.64%) and on a synthetic two-taste profile (E1).",
   "blockers": [],
   "decisions_pending": [
     {

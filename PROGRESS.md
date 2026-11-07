@@ -16,9 +16,9 @@
 
 > Receives Phase 14 E2's reflection half: the modes must beat popularity on eval taste (the seed: 11.06% against 35.64%). E3 needs the author's agreement, asked in the batch at this phase's end.
 
-### Subtasks — 0/5 complete
+### Subtasks — 1/5 complete
 
-- [ ] **15.1** Signals (migration 0026 and the player): a watch recorded when the player leaves (completed past 90%, otherwise abandoned with its point), rewatches, searches that led to a title, detail pages opened and not played (a weak negative), with the time of day and the session's length; repository methods with surface lines; the player and the detail page write them.
+- [x] **15.1** Signals (migration 0026 and the player): a watch recorded when the player leaves (completed past 90%, otherwise abandoned with its point), rewatches, searches that led to a title, detail pages opened and not played (a weak negative), with the time of day and the session's length; repository methods with surface lines; the player and the detail page write them. · `db5dfb3`
 - [ ] **15.2** Taste modes (crates/taste): the positive signals weighted (completed, rewatched, rated, watchlisted, imported) and decayed by age, with a longer half-life for strongly held ones; clustered into 3 to 8 modes (k-means over the catalogue vectors, k by silhouette), each with a vector, weight and recency; recommendations interleaved across modes in proportion to weight. Judged on eval taste against popularity (Phase 14 E2's carried half) and on a synthetic two-taste profile (E1).
 - [ ] **15.3** Axes and negatives: preferred eras, runtimes, countries, languages, subtitle tolerance and directors from the signals, the taste statements as priors; negative preferences from abandons (5 minutes in means less than 80, E2); a temporal-decay test on a profile whose taste shifts over simulated time (E4).
 - [ ] **15.4** The taste profile screen (src/features/taste/TasteProfile.tsx): the model described in plain language (modes named by what they hold, axes in words), each mode and axis correctable (more, less, not me), pad-complete; Home's taste rail follows the modes.
@@ -36,7 +36,7 @@
 
 ## What's next
 
-Phase 15 subtask 15.1 (docs/phases/phase-15-taste-model.md): write migration 0026_signals in crates/persistence/migrations (a signals table: profile_id, media_item_id, kind (search, detail_view, rewatch), at, hour, context JSON) with repository methods and repository_surface lines; record a watch event from src-tauri/src/commands/playback.rs save_position when the player leaves (completed past 90% of the duration, otherwise abandoned with watched_seconds as its point), once per viewing.
+Phase 15 subtask 15.2 (docs/phases/phase-15-taste-model.md): taste modes in crates/taste/src/modes.rs: weight each positive signal (completed 1.0, rewatched 1.5, rated by stars, watchlisted 0.4, imported as recorded) and decay it by age (half-life 180 days, 720 for five stars and rewatches); k-means over the liked titles' stored vectors for k in 3..=8 chosen by silhouette; recommend by interleaving each mode's nearest in proportion to its weight; judge on eval taste against popularity (11.06% seed vs 35.64%) and on a synthetic two-taste profile (E1).
 
 ---
 
