@@ -91,6 +91,15 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::player::player_stats,
             commands::thumbs::scrub_thumbs,
             commands::thumbs::scrub_sheet,
+            commands::library::library_folders,
+            commands::library::add_library_folder,
+            commands::library::remove_library_folder,
+            commands::library::rescan_library_folder,
+            commands::library::library_review_count,
+            commands::library::pick_library_folder,
+            commands::library::library_review,
+            commands::library::resolve_review,
+            commands::library::not_a_title,
         ])
         // `AssetProgress` travels as an EVENT payload, so no command signature mentions it
         // and specta would not export it. Registered explicitly rather than hand-written in
@@ -99,6 +108,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
         .typ::<commands::assets::AssetProgress>()
         .typ::<commands::torrent::TorrentProgress>()
         .typ::<commands::player::PlayerStateView>()
+        .typ::<commands::library::LibraryScanEvent>()
 }
 
 pub fn run() {
@@ -131,6 +141,7 @@ pub fn run() {
             app.manage(AppState::new());
             tauri::async_runtime::spawn(commands::torrent::progress_loop(app.handle().clone()));
             tauri::async_runtime::spawn(commands::player::state_loop(app.handle().clone()));
+            tauri::async_runtime::spawn(commands::library::library_loop(app.handle().clone()));
 
             // THE DATABASE OPENS OFF THE STARTUP PATH, and the catalogue refreshes
             // itself behind it (D37, ADR-0030). Both on a background task, because

@@ -2420,3 +2420,106 @@ why `all` exits 1, as before); E1 p50 / p95 **14.1 / 44.1 ms** on the first run,
 release build with cold caches, and **6.4 / 14.8 ms** warm; HNSW recall@10 **0.9760**; subtitles
 **80/80** (held out 32/32), false accepts **0/10**. Unchanged from Phase 10. Rust tests 654 passed,
 0 failed; frontend 104.
+
+## Phase 12 — Local library engine
+
+### The filename parser, first run on the corpus
+
+2026-11-07, `cargo test -p filename-parser --test corpus -- --nocapture`, 549 hand-labelled names
+(`fixtures/filenames/names.psv`), before any tuning: title **98.54%**, year **100%**, season **99.45%**,
+episodes **99.45%**, absolute **99.82%**, resolution **100%**, source **100%**, codec **100%**, group
+**99.82%**; every field right on **98.36%** of names. The misses: S02E01E02 (the boundary was checked
+before the continuation was read), a site prefix followed by `_`, a spaced ` - GROUP`, a film called
+*Episode 50*, and three bare-number names whose labels broke the corpus's own convention
+(`Episode 3.mkv` is labelled episode 3; `05.mkv` was not). Those three labels were corrected.
+
+### The filename parser after tuning, and on names it never saw
+
+2026-11-07, same command. After the fixes above (continuation read before the boundary check,
+separators trimmed from a title's ends, ` - GROUP` after a technical tag, an opening "Episode N"
+followed by a year is a title, a bare number is an episode): **549/549** names right on every field.
+Then `heldout.psv`, 109 names written after the tuning and run once: **109/109** on every field. The
+caveat: the held-out names were written by the same hand that tuned the parser, so they test what it
+was not tuned on but not what its writer did not think of. Real libraries are the check that remains;
+the identification harness and the review queue are where a miss would show.
+
+### Identification, first run (E1, E2)
+
+2026-11-07, `cargo run --release -p eval -- identify` against the full catalogue (2.7M titles), before
+tuning. Tuning set 547 names (2 labels not in the catalogue, left out): **top-1 513/519 = 98.84%**;
+held out **108/108 = 100%**. The lowest threshold with fewer than 1% wrong among accepted names is
+**0.895**: 0/361 accepted wrong, but **34.0%** of names would be asked (37.6% held out). Below it the
+wrong share is 1.8–4.7%. And **452.6 ms per name**: 10,000 files would take over an hour. Two problems
+to fix: confidence that separates right from wrong earlier, and speed.
+
+### Identification after tuning: E1 and E2 met
+
+2026-11-07, `cargo run --release -p eval -- identify` (`--timing` for the per-query costs, `--report` for
+every miss). Steps, each measured:
+
+1. **Speed.** The trigram search cost 437.9 ms of the 452.6 ms per name (`--timing`: exact title 0.3 ms,
+   words 9.3 ms, candidate facts 0.8 ms). Run only when the exact and word searches find nothing close:
+   **43.4 ms per name**, accuracy unchanged.
+2. **Kind over runtime.** *Westworld* S01E10 (a 90-minute finale) went to the 1973 film. Weights now
+   title .40, year .22, kind .18, runtime .12, popularity .08; a series that has the claimed episode
+   gains .08; a series runtime is judged loosely. A trailing country ("The Office (UK)") is also searched
+   without it. Top-1 99.04%, asked 16.6%.
+3. **Confidence.** It was the best score times the lead, which capped a runaway winner with no year in
+   its name near 0.85. Now the lead times a plausibility that is full from a score of 0.80. Fansub
+   naming makes a live-action namesake less likely (*One Piece* 1999 over 2023). Asked 8.6%.
+4. **Labels corrected (9 of 549).** Every wrong acceptance in steps 2–3 was a row I had labelled `?`
+   (cannot be identified) that the catalogue does identify. Four were seasons or episodes of single IMDb
+   series whose episode was found (*Shingeki no Kyojin* S2E05, *Re Zero* S2E25, *Futurama* 2x01, *Spy x
+   Family* 25), one film exists that I assumed did not (*Web of Lies*, 2009), and four rows carry a
+   duration that names the film (*Arrival* x3 at 116 minutes, *Tokyo Story* at 136). They were relabelled.
+   *Ookami to Koushinryou* 13 stays `?`: the 2008 series and its 2024 remake share the title and both
+   have an episode 13. Accepting it is a real false-confident miss and is counted as one.
+5. **The threshold.** The lowest with under 1% wrong among accepted was 0.615, at 0.97%: too close to
+   the line. The library accepts at **0.75** (`sinephile_library::ACCEPT_AT`).
+
+At 0.75, tuning set 549 names (2 labels not in the catalogue): **E1 top-1 523/528 = 99.05%**; **E2 2/510
+accepted wrong = 0.39%** (0.37% of all names); **6.8%** asked. Held out, 109 names: **108/108 = 100%**,
+**0/103** accepted wrong, **5.5%** asked. **43.7 ms per name.** Caveat: the held-out names were seen in
+`--report` output during this tuning, though no parameter was set from them and none was relabelled.
+
+### E3: scanning 10,000 files
+
+2026-11-07, `cargo run --release -p eval -- scan` (default 10,000), full catalogue, real FFprobe. A
+worst case for the scanner's shared searches: 10,000 **distinct** films sampled at random from the
+catalogue (at least 500 votes), each a small file with a scene-style name in its own "Title (Year)"
+folder. The scan walks, records, identifies in parallel (7 at a time) and runs FFprobe on the files it
+is unsure of (here FFprobe cannot read the stand-in files, so it is tried and fails: its cost is
+counted, its help is not).
+
+| Run | Files | Time | Per file | Accepted / asked | Page queries p95, idle → during scan | Best right | Accepted wrong |
+|---|---|---|---|---|---|---|---|
+| 1 | 9,994 of 9,996 | **37.1 s** | 3.7 ms | 9,255 / 739 | 24.7 → **33.5 ms** (542 runs) | 99.45% | 1 / 9,255 |
+| 2 (walker fixed) | 9,998 of 9,999 | **35.3 s** | 3.5 ms | 9,279 / 719 | 24.6 → **34.9 ms** (515 runs) | 99.54% | 1 / 9,279 |
+| 3 | 9,995 of 9,995 | **35.0 s** | 3.5 ms | 9,278 / 717 | — | — | — |
+
+Target: under 180 s and the UI not blocked. Run 1 lost two films whose titles start with "$" or ".",
+which the walker skipped as system folders; it now skips by Windows' hidden and system attributes and
+two system names (`crates/library/tests/scan.rs` `titles_that_look_like_system_names_are_still_found`,
+seen to fail on the old rule). The one file run 2 did not list is most likely a film with "sample" in
+its title: a file under 300 MB with that word is a release's sample clip, which a real film never is.
+
+### E5: the review queue, and a local film played
+
+2026-11-07. **Pad only** (`node tools/uiaudit/controller.mjs`): from Settings the D-pad reaches "Check
+them" and twenty waiting files are answered by A alone in **5.3 s**. **Real window**, full catalogue:
+22 files (21 ambiguous on purpose: twelve remakes with no year, five *Monster* episodes, four *The
+Office* episodes with no country, and one 2.2 GB file named as *Heat* 1995) scanned in **1.3 s**, *Heat*
+accepted and **21 asked**. Answered by keyboard: **14 answers settled all 21** (a series' first answer
+settled its other episodes); the app took **20–290 ms** per answer from key to the next file on screen,
+0.8 s in all. So twenty answers in under a minute is a person reading, not the app waiting.
+
+Then *Heat* searched, its 1995 result clicked, Play: the page said "Your files", and the player logged
+`first_frame_ms=388 backend=local` (budget 500 ms local). Phase 8's carried criterion, discharged.
+
+### Regression check before merging Phase 12 (rule 13)
+
+2026-11-07, `cargo run --release -p eval -- all` twice (now including `identify`) and `-- vector
+--report`: E2 **43/43**; E3 meaning **0.0472**, filter **1.0000** (carried); p95 **44.1 ms** cold, **15.2 ms**
+warm (14.8 at Phase 11: noise); recall@10 **0.9760**; subtitles **80/80**, held out 32/32, false accepts
+**0/10**; identify unchanged at 99.05% / 0.39% (held out 100% / 0%). Unchanged from Phase 11. Rust tests
+687 passed, 0 failed; frontend 116.

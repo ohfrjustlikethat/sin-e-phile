@@ -1,96 +1,90 @@
 {
-  "spec_version": "3.2.0",
+  "spec_version": "3.3.0",
   "project": "sin-e-phile",
   "last_updated": "2026-11-06",
   "sessions_completed": 21,
   "current_phase": {
-    "number": 11,
-    "slug": "player-experience-layer",
-    "title": "Player Experience Layer",
+    "number": 12,
+    "slug": "local-library-engine",
+    "title": "Local Library Engine",
     "status": "in_progress",
-    "branch": "phase/11-player-experience-layer",
-    "started_at": "2026-11-06T10:00:00Z",
-    "note": "Opened 2026-11-06 when Phase 10 merged (c48c546, tag phase-10); part of the author's five-phase request (9-13). No series page existed, so 11.1 builds a minimal one (airing awareness needs somewhere to show). Trivia, goofs and soundtrack have no free, legal source (IMDb's datasets omit them; scraping is out, 2.1): the overlay says so rather than inventing a source. Author checks still outstanding: real controller (Phase 8 E5), VPN drop (Phase 7 E7), both carried to 13.",
+    "branch": "phase/12-local-library-engine",
+    "started_at": "2026-11-07T01:30:00Z",
+    "note": "Opened 2026-11-07 when Phase 11 merged (cc3ca3c, tag phase-11). Inherits: absolute_number is NULL by design (ADR-0031), so an anime-style absolute number goes to the review queue rather than a lookup; Phase 8's carried criterion (search, click and watch a local file) is discharged by 12.5; the confidence threshold is measured, not chosen (DECISIONS_PENDING). Release-group names in fixtures are invented: real ones would be naming content sources by the back door (2.1). Author checks still outstanding: real controller (Phase 8 E5), VPN drop (Phase 7 E7), both carried to 13.",
     "subtasks": [
       {
-        "id": "11.1",
-        "text": "Series and airing awareness (ADR-0030): migration 0019 airing_schedule filled from AniList nextAiringEpisode during anime ingest/refresh; EpisodeRepository lists a series' seasons and episodes and its next airing; the detail page of a series shows seasons, episodes (playable) and 'Episode 7 airs Thursday' even with no episode row (a pure, tested wording function).",
+        "id": "12.1",
+        "text": "crates/filename-parser (MIT/Apache, pure, no I/O): title, year, season, episode (S01E02, 1x02, multi-episode ranges), absolute episode for anime-style 'Title - 059', resolution, source, codec, audio, language, release group (bracket prefix or dash suffix, recognised by position, never by a list of names). fixtures/filenames/: 500+ hand-labelled names covering scene, anime fansub, multi-episode, messy and adversarial cases; every group name invented (2.1); a per-field accuracy test. Documented with a runnable README example (E6).",
         "status": "complete",
-        "commit": "2794a42"
+        "commit": "8c3a377"
       },
       {
-        "id": "11.2",
-        "text": "The pause overlay: on pause, over the dimmed still, a panel with the cast (character names; headshots only with the user's TMDB key, else typographic), director and key crew, ratings that exist (IMDb from the catalogue; AniList for anime) and never Rotten Tomatoes, time remaining, the current chapter, 'more like this' from the vector index; a cast member opens their filmography. Data fetched when playback starts so the overlay paints in < 200 ms (measured in the real window). Trivia, goofs and soundtrack have no free legal source and are said to be absent, not scraped.",
+        "id": "12.2",
+        "text": "Migration 0021 library: library_folders (the user's own roots, machine-specific like local_files.path; the portability test's allow-list grows by that column with the reason), local_files gains folder_id and a missing_since for moves; match_memory (a normalised name pattern -> media item, from the user's decisions). LibraryRepository with a repository_surface line per method.",
         "status": "complete",
-        "commit": "5b55e4c"
+        "commit": "9de8483"
       },
       {
-        "id": "11.3",
-        "text": "Episodes in the player: previous/next episode (N/P keys, pad), a next-episode card with a countdown in the last 30 s or at a credits chapter, autoplay on by default and switchable in Settings -> Playback; a pure, tested function decides the next episode across season boundaries.",
+        "id": "12.3",
+        "text": "crates/library identification: candidates from the catalogue by title (FTS) and year, scored on independent weak signals (title similarity, year, duration vs runtime from FFprobe, episode exists, folder and sibling context, remembered decisions), a confidence in [0,1], auto-accepted above a threshold set from measurement (DECISIONS_PENDING), else the review queue. tools/eval 'identify' harness over fixtures/filenames labelled with catalogue ids: top-1 (E1 > 95%) and false-confident (E2 < 1%); numbers to docs/eval-results.md.",
         "status": "complete",
-        "commit": "1369b57"
+        "commit": "c0eda95"
       },
       {
-        "id": "11.4",
-        "text": "The scrub bar: chapter marks from mpv's chapter list; hover thumbnails from FFmpeg sprites generated in a low-priority background process (one frame per 10 s, cached under data/cache/thumbs by file hash), proven not to stutter playback (mpv frame-drop-count unchanged while generating).",
+        "id": "12.4",
+        "text": "Scanner and watcher: register a folder, walk it recursively, probe only what identification needs, in parallel, off the UI thread with progress events; the notify crate (ReadDirectoryChangesW) applies creates, deletes, renames and moves without a rescan; a rename or move keeps the row (no duplicate, E4). Measured: 10,000 files under 3 minutes with the UI responsive (E3).",
         "status": "complete",
-        "commit": "f2bf342"
+        "commit": "96a73fa"
       },
       {
-        "id": "11.5",
-        "text": "Player controls: picture-in-picture (small always-on-top window, Ctrl+P), audio delay (Ctrl+[ / Ctrl+]), brightness/contrast/saturation in a Picture menu, a stats-for-nerds overlay (I: decode path, dropped frames, bitrate, cache, swarm peers/speed), and a shortcuts overlay (?) generated from the same key map the player uses.",
+        "id": "12.5",
+        "text": "The review queue (Settings or Library): side-by-side candidates, typographic when there is no artwork, one click or one A press resolves, manual search for the rest, one decision settles a whole series' files; remembered for similar names. The library feeds LocalFileBackend so a local film is found by search and plays from its page (discharges Phase 8's carried criterion). Pad-only flow in tools/uiaudit/controller.mjs; resolving 20 items timed (E5).",
         "status": "complete",
-        "commit": "656441e"
+        "commit": "b96f9fd"
       },
       {
-        "id": "11.7",
-        "text": "The TV keyboard (ADR-0043): the Netflix-TV grid (a-z/0-9 left, results live beside it, space and backspace below) on every text field, Xbox-standard buttons (A type, B close, X backspace, Y space, LT/RT cursor, LB/RB letters/symbols incl. case, Menu submit), title suggestions and word completion from the catalogue, recent searches; a voice key placeholder for Phase 20; the controller flow proves an API key and a search can be typed with the pad alone.",
+        "id": "12.6",
+        "text": "docs/specs/library.md, learning note, README and HOW_IT_WORKS, regression check, close.",
         "status": "complete",
-        "commit": "6fed80f"
-      },
-      {
-        "id": "11.6",
-        "text": "docs/MANUAL_TESTS.md playback plan run on all three tiers via the tier override (screenshots per tier), docs/specs/player-experience.md, learning note, evidence for E1-E5, regression check, close.",
-        "status": "complete",
-        "commit": "acf5a85"
+        "commit": "c0a782e"
       }
     ],
     "exit_criteria": [
       {
         "id": "E1",
-        "text": "The pause overlay is visually excellent and appears in < 200 ms.",
+        "text": "> 95% top-1 accuracy on the fixture corpus.",
         "met": true,
-        "evidence": "5b55e4c: real window 2026-11-06, Nosferatu (1922) streaming from the Internet Archive, Space pressed four times: pause to the overlay's first painted frame (window.__pauseMs, measured from the intent to requestAnimationFrame after layout) = 22, 4, 4, 5 ms (target < 200 ms). Before the change the overlay waited for mpv's still capture (up to 500 ms); the video window is now hidden first. Visually: screenshot shows the right-side panel (ADR-0043) between the player's bars with cast and parts, crew by role, IMDb 7.8 / 125,211 votes, and more like this (Nosferatu the Vampyre, Shadow of the Vampire, The Last Laugh). Tests: PlayerScreen.test.tsx 'the pause panel shows who is in it and who made it, before the still arrives' and 'a cast member opens their films, and a film leaves the player for its page'."
+        "evidence": "c0eda95: cargo run --release -p eval -- identify (2026-11-07, full catalogue): tuning set fixtures/filenames/names.psv 549 names, 2 labels not in the catalogue left out, top-1 523/528 = 99.05%; held out heldout.psv 108/108 = 100%. Method and every tuning step with its measured number in docs/eval-results.md (Phase 12, Identification). crates/library/tests/identify.rs: 7 tests (year, duration, episode over film namesake, folders, remembered decision, no guess); seen to fail when the kind signal was neutralised."
       },
       {
         "id": "E2",
-        "text": "Scrub thumbnails generate without stuttering playback.",
+        "text": "< 1% false-confident rate — being wrong while confident is the worst failure mode here.",
         "met": true,
-        "evidence": "f2bf342: real window 2026-11-07, a 20-minute 1080p H.264 file on d3d11va: player_state.dropped_frames over 30 s of playback was 0 -> 0 with thumbnail generation running and 0 -> 0 with the sheets cached; generation (crates/player/src/thumbs.rs: FFmpeg below-normal priority, -threads 1, -skip_frame nokey) made both sheets in 970 ms. docs/eval-results.md Phase 11 E2. Tests: crates/player/tests/playback.rs thumbnail_sheets_are_made_from_a_file; thumbs::tests a_time_finds_its_tile; src/features/player/scrubPreview.test.ts. Screenshot: the 7:25 tile shown above the bar in its own cut-out."
+        "evidence": "c0eda95: same run, at the library's own threshold sinephile_library::ACCEPT_AT = 0.75: tuning set 2/510 accepted were wrong = 0.39% (0.37% of all names; strict reading: of accepted names, and a '?'-labelled name accepted counts as wrong); held out 0/103. Asked (review queue) 6.8% and 5.5%. The lowest threshold under 1% was 0.615 at 0.97%; 0.75 keeps a margin. 9 of 549 labels were corrected, each reason recorded in docs/eval-results.md."
       },
       {
         "id": "E3",
-        "text": "Next-episode autoplay works and is disableable.",
+        "text": "Scanning 10,000 files completes in under 3 minutes and does not block the UI.",
         "met": true,
-        "evidence": "1369b57: src/features/player/PlayerScreen.test.tsx 'autoplay plays the next episode when the countdown ends' (the card shows 'Play in 10' at 30 s left; after ten seconds prepare_play is asked for the next episode) and 'offers the next episode in the last 30 s; B says not now, A plays it' (with autoplay switched off the card offers 'Play' with no countdown, and nothing plays by itself); the switch is Settings -> Playback 'Play the next episode automatically' (src/features/settings/PlaybackSection.tsx). When to offer it: src/features/player/endCard.test.ts (last 30 s, a credits chapter, the end). Next/previous across seasons: crates/persistence/tests/repository_surface.rs episode_repository_surface next_after/previous_before."
+        "evidence": "96a73fa: cargo run --release -p eval -- scan (2026-11-07, full catalogue, real FFprobe): 10,000 distinct films sampled from the catalogue, one scene-named file each in its own folder, scanned in 37.1 s, 35.3 s and 35.0 s (target 180 s), 3.5-3.7 ms a file, identification 7 at a time. Not blocking the UI: the queries a page issues ran alongside, p95 24.6-24.7 ms idle and 33.5-34.9 ms during the scan (515-542 runs). Scans run on background tasks (src-tauri/src/commands/library.rs start_scan) with progress events. Accuracy on the sample: best right 99.45-99.54%, accepted wrong 1/9,279. Table in docs/eval-results.md."
       },
       {
         "id": "E4",
-        "text": "All player features are keyboard-accessible and documented in a shortcuts overlay (`?`).",
+        "text": "Renaming a file outside the app is detected and does not create a duplicate.",
         "met": true,
-        "evidence": "656441e: every player feature has a key: src/features/player/intents.ts SHORTCUTS (19 rows: play/pause, seeks, volume, mute, full screen, frame step, speed, subtitles, subtitle timing, sound timing, episodes, statistics, mini player, picture-in-picture, shortcuts, back, and the pad's player menu); intents.test.ts 'says what each key really does' turns each row's real key event through keyIntent and must get the row's intent; the '?' overlay renders that same table (PlayerScreen.test.tsx '? lists the shortcuts, I shows statistics, Ctrl+[ moves the sound'). The pad reaches the rest through Menu (PlayerScreen.test.tsx 'Menu opens the player menu; inside it the D-pad moves focus instead of seeking'). Real window 2026-11-07: Ctrl+M mini player and Ctrl+P picture-in-picture (480x270, restored to 1455x909) screenshotted."
+        "evidence": "96a73fa: crates/library/tests/scan.rs a_scan_finds_identifies_and_keeps_a_renamed_file (renamed while closed: same row, same match, no duplicate) and the_watcher_sees_a_rename_and_keeps_one_row (the real notify watcher on a temp folder); both seen to fail with move detection disabled. Real window 2026-11-07: a 2.2 GB file in a library folder renamed in place while the app ran (the watcher reported a removal then an arrival: Missing(1) then Moved), one row, the same id, matched to Heat (1995) at 1.0; relaunched, the startup scan reported unchanged 1 moved 0; moved to another folder and renamed Heat.mkv while closed, the next launch reported moved 1, the same row and match."
       },
       {
         "id": "E5",
-        "text": "Manual test plan for playback passes on all three tiers.",
+        "text": "The review queue is genuinely pleasant to use — resolving 20 ambiguous items takes under a minute.",
         "met": true,
-        "evidence": "450cca6: docs/MANUAL_TESTS.md 'Playback, on every tier (Phase 11, E5)' run in the real window 2026-11-07 under each tier (debug SINEPHILE_TIER override; get_hardware_profile reported effective_tier modest/standard/capable, overridden true), with Garden.mkv (8:00, H.264 720p) and a sidecar .srt offset by 82 s, aligned cache cleared before each run. Local file, every tier: first frame, d3d11va; pause overlay painted in 2.2 / 2.3 / 2.4 ms (window.__pauseMs); scrub_thumbs returned sheets; statistics, shortcuts (?), mini player (Ctrl+M out and back), picture-in-picture (742x418 always on top, Ctrl+P restored the exact 2204x1376 inner size at 200,125); 0 ERROR lines. Subtitles: standard and capable logged 'aligned: scale 1.00000, offset -82180 ms, confidence 1.91'; modest logged 'fits the film's length; loaded as it is' (no speech alignment on Tier 0, by design). Stream (the same file over local HTTP, 3 GETs served): first frame 359 / 275 / 272 ms, pause overlay 2.3 / 2.5 / 3.7 ms, statistics shown, 0 ERROR lines. The run found four defects, fixed and tested in 450cca6 before this evidence was taken: Ctrl+M could not leave the mini player, PiP restore used the outer size, a bare file paused into an empty panel, a 5 kbit/s stream read '0.0 Mbit/s'. Screenshots: docs/evidence/phase-11/{modest-paused,standard-stats,capable-mini,capable-pip}.png."
+        "evidence": "b96f9fd: tools/uiaudit/controller.mjs (CI step, pad only): from Settings the D-pad reaches 'Check them', and 20 waiting files are answered by A alone in 5.3 s (each A answers the focused first card). Real window 2026-11-07 against the full catalogue: a library of 22 files (21 genuinely ambiguous: 12 remakes with no year, 5 Monster episodes, 4 The Office episodes with no country) scanned in 1.3 s with 21 asked; answered by keyboard, 14 answers settled all 21 (one answer per series settled its other episodes), the app taking 20-290 ms per answer from key to the next file on screen (0.8 s in all), so the minute is the person's reading time. src/features/library/ReviewScreen.test.tsx (5 tests) and crates/library/tests/review.rs one_answer_settles_the_whole_series_and_is_remembered (seen to fail without remembering). The author's own impression of the screen joins the Phase 13 batch of author checks with the screenshot."
       },
       {
         "id": "E6",
-        "text": "With only a controller, every text field in the app can be filled from the on-screen keyboard, and its suggestions, recent searches and word completion work (ADR-0043).",
+        "text": "`crates/filename-parser` is documented and independently useful.",
         "met": true,
-        "evidence": "6fed80f: tools/uiaudit/controller.mjs (CI step 'Controller flow (simulated Xbox pad)'), pad only: Y opens search and the keyboard, 'sunrise' typed with D-pad and A; Menu opens Settings, the D-pad walks to the OpenSubtitles API key field 'without a keyboard popping up on the way', A opens the keyboard, RB/LB switch case and 'Ab9' is typed, X deletes, Menu closes with focus kept on the field. Typing aids: src/app/PadKeyboard.test.tsx 'on search: recent searches first, then suggestions and word completion' and 'types upper case and symbols, for API keys and addresses'; src/app/keyboardText.test.ts (cursor editing, completion, recents)."
+        "evidence": "8c3a377: crates/filename-parser (MIT OR Apache-2.0, one dependency: regex =1.13.1, no I/O) documented by README.md included as the crate doc, whose example runs as a doctest (cargo test -p filename-parser: 1 doctest passed), plus examples/parse.rs for the command line. Measured: tests/corpus.rs the_corpus_reads_as_a_human_reads_it, 549 hand-labelled names in fixtures/filenames/names.psv, 100% on every field after tuning (98.36% before); names_it_was_never_tuned_on_read_as_well, 109 names in heldout.psv written after tuning, 109/109 on the first run; tests/fields.rs (7 tests: languages, edition, flags, audio, dates, episode titles, extension, comparable). Seen to fail: dropping the year made both corpus tests fail (year 32.24% < 97%). Release groups in the fixtures are invented (2.1)."
       }
     ]
   },
@@ -1096,7 +1090,9 @@
           "met": false,
           "evidence": "MEASURED 2026-11-06, carried (ADR-0036): the Internet Archive and P2P paths are tested from catalogue row to first frame - crates/playback/tests/end_to_end.rs::search_to_first_frame_over_a_swarm (offline swarm) and ::live_archive_search_to_first_frame (live), and in the real window search -> detail -> Play -> picture in 5.5-7.9 s from the Internet Archive (docs/eval-results.md, docs/media/phase-08-demo.gif). A local file plays by drag-and-drop (src/features/player/useDropToPlay.ts) but cannot be searched for: LocalFileBackend::find is a stub until the library scanner.",
           "carried_to_phase": 12,
-          "carried_reason": "Searching for and clicking a local file needs the scanned library index that Phase 12 builds; until then LocalFileBackend has nothing to find. The IA and P2P halves are met."
+          "carried_reason": "Searching for and clicking a local file needs the scanned library index that Phase 12 builds; until then LocalFileBackend has nothing to find. The IA and P2P halves are met.",
+          "discharged_in_phase": 12,
+          "discharged_evidence": "b96f9fd: Phase 12 real window 2026-11-07: a 2.2 GB file in a library folder, identified as Heat (1995) by the scan; searched 'Heat', clicked the 1995 result, Play: the film page's source line read 'Your files', and the log recorded first frame ready_ms=35 first_frame_ms=388 backend=local. LocalFileBackend answers from the library (crates/sources/tests/local.rs, 2 tests, seen to fail on the old stub)."
         },
         {
           "id": "E2",
@@ -1382,8 +1378,8 @@
       "title": "Player Experience Layer",
       "depends_on": "8, 9, 10",
       "sessions": "2",
-      "status": "in_progress",
-      "completion_commit": null,
+      "status": "complete",
+      "completion_commit": "cc3ca3c",
       "exit_criteria": [
         {
           "id": "E1",
@@ -1473,44 +1469,82 @@
       "title": "Local Library Engine",
       "depends_on": "4",
       "sessions": "2–3",
-      "status": "not_started",
+      "status": "in_progress",
       "completion_commit": null,
       "exit_criteria": [
         {
           "id": "E1",
           "text": "> 95% top-1 accuracy on the fixture corpus.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "c0eda95: cargo run --release -p eval -- identify (2026-11-07, full catalogue): tuning set fixtures/filenames/names.psv 549 names, 2 labels not in the catalogue left out, top-1 523/528 = 99.05%; held out heldout.psv 108/108 = 100%. Method and every tuning step with its measured number in docs/eval-results.md (Phase 12, Identification). crates/library/tests/identify.rs: 7 tests (year, duration, episode over film namesake, folders, remembered decision, no guess); seen to fail when the kind signal was neutralised."
         },
         {
           "id": "E2",
           "text": "< 1% false-confident rate — being wrong while confident is the worst failure mode here.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "c0eda95: same run, at the library's own threshold sinephile_library::ACCEPT_AT = 0.75: tuning set 2/510 accepted were wrong = 0.39% (0.37% of all names; strict reading: of accepted names, and a '?'-labelled name accepted counts as wrong); held out 0/103. Asked (review queue) 6.8% and 5.5%. The lowest threshold under 1% was 0.615 at 0.97%; 0.75 keeps a margin. 9 of 549 labels were corrected, each reason recorded in docs/eval-results.md."
         },
         {
           "id": "E3",
           "text": "Scanning 10,000 files completes in under 3 minutes and does not block the UI.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "96a73fa: cargo run --release -p eval -- scan (2026-11-07, full catalogue, real FFprobe): 10,000 distinct films sampled from the catalogue, one scene-named file each in its own folder, scanned in 37.1 s, 35.3 s and 35.0 s (target 180 s), 3.5-3.7 ms a file, identification 7 at a time. Not blocking the UI: the queries a page issues ran alongside, p95 24.6-24.7 ms idle and 33.5-34.9 ms during the scan (515-542 runs). Scans run on background tasks (src-tauri/src/commands/library.rs start_scan) with progress events. Accuracy on the sample: best right 99.45-99.54%, accepted wrong 1/9,279. Table in docs/eval-results.md."
         },
         {
           "id": "E4",
           "text": "Renaming a file outside the app is detected and does not create a duplicate.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "96a73fa: crates/library/tests/scan.rs a_scan_finds_identifies_and_keeps_a_renamed_file (renamed while closed: same row, same match, no duplicate) and the_watcher_sees_a_rename_and_keeps_one_row (the real notify watcher on a temp folder); both seen to fail with move detection disabled. Real window 2026-11-07: a 2.2 GB file in a library folder renamed in place while the app ran (the watcher reported a removal then an arrival: Missing(1) then Moved), one row, the same id, matched to Heat (1995) at 1.0; relaunched, the startup scan reported unchanged 1 moved 0; moved to another folder and renamed Heat.mkv while closed, the next launch reported moved 1, the same row and match."
         },
         {
           "id": "E5",
           "text": "The review queue is genuinely pleasant to use — resolving 20 ambiguous items takes under a minute.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "b96f9fd: tools/uiaudit/controller.mjs (CI step, pad only): from Settings the D-pad reaches 'Check them', and 20 waiting files are answered by A alone in 5.3 s (each A answers the focused first card). Real window 2026-11-07 against the full catalogue: a library of 22 files (21 genuinely ambiguous: 12 remakes with no year, 5 Monster episodes, 4 The Office episodes with no country) scanned in 1.3 s with 21 asked; answered by keyboard, 14 answers settled all 21 (one answer per series settled its other episodes), the app taking 20-290 ms per answer from key to the next file on screen (0.8 s in all), so the minute is the person's reading time. src/features/library/ReviewScreen.test.tsx (5 tests) and crates/library/tests/review.rs one_answer_settles_the_whole_series_and_is_remembered (seen to fail without remembering). The author's own impression of the screen joins the Phase 13 batch of author checks with the screenshot."
         },
         {
           "id": "E6",
           "text": "`crates/filename-parser` is documented and independently useful.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "8c3a377: crates/filename-parser (MIT OR Apache-2.0, one dependency: regex =1.13.1, no I/O) documented by README.md included as the crate doc, whose example runs as a doctest (cargo test -p filename-parser: 1 doctest passed), plus examples/parse.rs for the command line. Measured: tests/corpus.rs the_corpus_reads_as_a_human_reads_it, 549 hand-labelled names in fixtures/filenames/names.psv, 100% on every field after tuning (98.36% before); names_it_was_never_tuned_on_read_as_well, 109 names in heldout.psv written after tuning, 109/109 on the first run; tests/fields.rs (7 tests: languages, edition, flags, audio, dates, episode titles, extension, comparable). Seen to fail: dropping the year made both corpus tests fail (year 32.24% < 97%). Release groups in the fixtures are invented (2.1)."
+        }
+      ],
+      "subtasks": [
+        {
+          "id": "12.1",
+          "text": "crates/filename-parser (MIT/Apache, pure, no I/O): title, year, season, episode (S01E02, 1x02, multi-episode ranges), absolute episode for anime-style 'Title - 059', resolution, source, codec, audio, language, release group (bracket prefix or dash suffix, recognised by position, never by a list of names). fixtures/filenames/: 500+ hand-labelled names covering scene, anime fansub, multi-episode, messy and adversarial cases; every group name invented (2.1); a per-field accuracy test. Documented with a runnable README example (E6).",
+          "status": "complete",
+          "commit": "8c3a377"
+        },
+        {
+          "id": "12.2",
+          "text": "Migration 0021 library: library_folders (the user's own roots, machine-specific like local_files.path; the portability test's allow-list grows by that column with the reason), local_files gains folder_id and a missing_since for moves; match_memory (a normalised name pattern -> media item, from the user's decisions). LibraryRepository with a repository_surface line per method.",
+          "status": "complete",
+          "commit": "9de8483"
+        },
+        {
+          "id": "12.3",
+          "text": "crates/library identification: candidates from the catalogue by title (FTS) and year, scored on independent weak signals (title similarity, year, duration vs runtime from FFprobe, episode exists, folder and sibling context, remembered decisions), a confidence in [0,1], auto-accepted above a threshold set from measurement (DECISIONS_PENDING), else the review queue. tools/eval 'identify' harness over fixtures/filenames labelled with catalogue ids: top-1 (E1 > 95%) and false-confident (E2 < 1%); numbers to docs/eval-results.md.",
+          "status": "complete",
+          "commit": "c0eda95"
+        },
+        {
+          "id": "12.4",
+          "text": "Scanner and watcher: register a folder, walk it recursively, probe only what identification needs, in parallel, off the UI thread with progress events; the notify crate (ReadDirectoryChangesW) applies creates, deletes, renames and moves without a rescan; a rename or move keeps the row (no duplicate, E4). Measured: 10,000 files under 3 minutes with the UI responsive (E3).",
+          "status": "complete",
+          "commit": "96a73fa"
+        },
+        {
+          "id": "12.5",
+          "text": "The review queue (Settings or Library): side-by-side candidates, typographic when there is no artwork, one click or one A press resolves, manual search for the rest, one decision settles a whole series' files; remembered for similar names. The library feeds LocalFileBackend so a local film is found by search and plays from its page (discharges Phase 8's carried criterion). Pad-only flow in tools/uiaudit/controller.mjs; resolving 20 items timed (E5).",
+          "status": "complete",
+          "commit": "b96f9fd"
+        },
+        {
+          "id": "12.6",
+          "text": "docs/specs/library.md, learning note, README and HOW_IT_WORKS, regression check, close.",
+          "status": "complete",
+          "commit": "c0a782e"
         }
       ]
     },
@@ -1826,6 +1860,18 @@
         },
         {
           "id": "E11",
+          "text": "Leaving the player shrinks the picture into its tile at 60 fps, measured in the real window, and reduced motion replaces it with a dissolve (ADR-0044).",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E12",
+          "text": "Relaunching, including after a forced crash, returns to the same page, scroll, focus and film position (ADR-0044).",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E13",
           "text": "The author signs off the screenshot review set (every surface, both sizes, with and without artwork) against §9.0's test: `manual: <what they reviewed and said>`. This set supplies the README's screenshots.",
           "met": false,
           "evidence": null
@@ -1937,12 +1983,18 @@
         },
         {
           "id": "E3",
-          "text": "CI fails on a > 10% regression in any tracked benchmark.",
+          "text": "Idle memory is measured over the whole process tree, WebView2's processes included, in the release build, and meets §2.3 (ADR-0044).",
           "met": false,
           "evidence": null
         },
         {
           "id": "E4",
+          "text": "CI fails on a > 10% regression in any tracked benchmark.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
           "text": "The Tier 0 experience is genuinely good, not merely functional — verified by the manual test plan.",
           "met": false,
           "evidence": null
@@ -2104,6 +2156,24 @@
           "text": "Reading progress syncs to AniList.",
           "met": false,
           "evidence": null
+        },
+        {
+          "id": "E6",
+          "text": "EPUB (fixed and reflowable), MOBI and AZW3 open correctly; a DRM-protected file is refused with a plain message, never decrypted.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E7",
+          "text": "Guided View steps through panels on a fixture set with its detection accuracy measured and recorded, and falls back to page view where unsure.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E8",
+          "text": "Every reading surface and mode is usable with an Xbox controller alone.",
+          "met": false,
+          "evidence": null
         }
       ]
     },
@@ -2186,11 +2256,17 @@
           "text": "Section 2.1 verified once more: no source URLs, indexer names, or catalogues anywhere in the repository or its history.",
           "met": false,
           "evidence": null
+        },
+        {
+          "id": "E6",
+          "text": "The release artefact contains no catalogue database or dataset file, verified by listing it (ADR-0044).",
+          "met": false,
+          "evidence": null
         }
       ]
     }
   ],
-  "next_action": "Close Phase 11: CI green on phase/11-player-experience-layer, merge --no-ff into main, CI green on main, tag phase-11, write the close record (completion_commit = merge), python tools/phasedoc/generate.py --close 11 and --open 12.",
+  "next_action": "Close Phase 12: CI green on phase/12-local-library-engine, merge --no-ff into main, CI green on main, tag phase-12, python /c/Users/hashi/AppData/Local/Temp/claude/C--Users-hashi-Documents-sin-e-phile/02bfad50-f550-4fd9-bb12-04c75dab39ba/scratchpad/open13.py-style close record (completion_commit = merge), generate.py --close 12 and --open 13.",
   "blockers": [],
   "decisions_pending": [
     {
@@ -2445,6 +2521,11 @@
       "id": "0043",
       "title": "The TV keyboard, and the interface decisions that lock the app",
       "date": "2026-11-06"
+    },
+    {
+      "id": "0044",
+      "title": "Release polish, reading formats, and an unsigned release",
+      "date": "2026-11-07"
     }
   ],
   "environment": {
@@ -2821,6 +2902,31 @@
       "id": "D72",
       "phase_raised": 10,
       "text": "The subtitle corpus is synthetic speech (Windows' synthesiser) over synthetic beds. Add a handful of real public-domain film clips with hand-timed subtitles we write ourselves, to measure the VAD on a real mix (SPEC.md R6)."
+    },
+    {
+      "id": "D73",
+      "text": "A multi-episode file (S01E01E02) is matched to its first episode with covers = 2, but LocalFileBackend only finds files matched to the exact episode asked for, so episode 2 does not offer it. Look up files whose match covers the asked episode (crates/sources/src/backends/local.rs item_for, LibraryRepository::files_for_item).",
+      "phase_raised": 12
+    },
+    {
+      "id": "D74",
+      "text": "A file removed while the app runs is marked missing by the watcher but only purged at the next scan (launch or Rescan). Missing files are already hidden from every view; purge them after a quiet period in library_loop if the rows ever matter.",
+      "phase_raised": 12
+    },
+    {
+      "id": "D75",
+      "text": "The held-out filename corpus (109 names) was written by the same hand that tuned the parser, and its identification labels were seen in --report output while tuning. A truly independent check is a real user's library: count asked, accepted and wrong after a first real scan (Phase 14's onboarding test is the natural moment).",
+      "phase_raised": 12
+    },
+    {
+      "id": "D76",
+      "text": "Two remakes with the same title and year (rare, but real) can only be told apart by duration, which needs FFprobe; a file FFprobe cannot read stays in the review queue. Container title tags (probed) are stored but not yet weighed as a signal.",
+      "phase_raised": 12
+    },
+    {
+      "id": "D77",
+      "text": "CREATE_NO_WINDOW is now set on FFprobe and the subtitle aligner's FFmpeg; confirm in a release build (windows subsystem) that no console window flashes during a scan or an alignment. Batched with the Phase 13 author checks.",
+      "phase_raised": 12
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

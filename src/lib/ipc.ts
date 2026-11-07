@@ -197,6 +197,23 @@ export const commands = {
 } | null, string>(__TAURI_INVOKE("scrub_thumbs")),
 	/**  One sheet, as a `data:` URI. */
 	scrubSheet: (index: number) => typedError<string, string>(__TAURI_INVOKE("scrub_sheet", { index })),
+	libraryFolders: () => typedError<LibraryFolderView[], string>(__TAURI_INVOKE("library_folders")),
+	/**  Add a folder, scan it, and watch it. */
+	addLibraryFolder: (path: string) => typedError<number, string>(__TAURI_INVOKE("add_library_folder", { path })),
+	removeLibraryFolder: (id: number) => typedError<null, string>(__TAURI_INVOKE("remove_library_folder", { id })),
+	rescanLibraryFolder: (id: number) => typedError<null, string>(__TAURI_INVOKE("rescan_library_folder", { id })),
+	/**  How many files are waiting for a human decision. */
+	libraryReviewCount: () => typedError<number, string>(__TAURI_INVOKE("library_review_count")),
+	/**  Windows' own folder picker. `None` when cancelled. */
+	pickLibraryFolder: () => typedError<string | null, string>(__TAURI_INVOKE("pick_library_folder")),
+	libraryReview: (limit: number) => typedError<ReviewItemView[], string>(__TAURI_INVOKE("library_review", { limit })),
+	/**
+	 *  The answer: this file is that film or series. Returns how many other waiting files
+	 *  the same answer settled.
+	 */
+	resolveReview: (fileId: number, mediaItemId: number) => typedError<number, string>(__TAURI_INVOKE("resolve_review", { fileId, mediaItemId })),
+	/**  "Not a film or episode": never asked about again. */
+	notATitle: (fileId: number) => typedError<null, string>(__TAURI_INVOKE("not_a_title", { fileId })),
 };
 
 /* Types */
@@ -385,6 +402,27 @@ export type ItemDetail = {
 	credits: CreditView[],
 };
 
+export type LibraryFolderView = {
+	id: number,
+	path: string,
+	files: number,
+	scanned_at: string | null,
+	scanning: boolean,
+};
+
+/**  Sent as `library-scan` while a folder is scanned. */
+export type LibraryScanEvent = {
+	folder_id: number,
+	/**  "walking" | "identifying" | "done" | "failed" */
+	phase: string,
+	done: number,
+	total: number,
+	/**  When done: files, accepted, asked. */
+	files: number,
+	accepted: number,
+	asked: number,
+};
+
 /**  One of the user's own links. Ids are rowids, far below 2^53 (see `SearchHit`). */
 export type LinkInfo = {
 	id: number,
@@ -482,6 +520,35 @@ export type RatingView = {
 	/**  Out of ten. */
 	score: number | null,
 	votes: number | null,
+};
+
+export type ReviewItemView = {
+	file_id: number,
+	/**  The file's own name. */
+	name: string,
+	/**  The folders it sits in, below the library folder. */
+	folders: string,
+	minutes: number | null,
+	height: number | null,
+	/**  What the name was read as: the title, the year, and the episode in words. */
+	read_title: string,
+	read_year: number | null,
+	read_episode: string,
+	/**  Other waiting files named the same way, which one answer also settles. */
+	same_name: number,
+	options: ReviewOptionView[],
+};
+
+export type ReviewOptionView = {
+	media_item_id: number,
+	/**  "film" | "series" | "anime_film" | "anime_series" */
+	kind: string,
+	title: string,
+	year: number | null,
+	runtime_minutes: number | null,
+	made_by: string | null,
+	/**  The first sentence, for a card. */
+	synopsis: string | null,
 };
 
 /**

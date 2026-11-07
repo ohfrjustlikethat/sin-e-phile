@@ -8,6 +8,7 @@ pub mod backfill;
 pub mod catalogue;
 pub mod credentials;
 pub mod episodes;
+pub mod library;
 pub mod media;
 pub mod profiles;
 pub mod search;
@@ -21,6 +22,10 @@ pub use catalogue::{
 };
 pub use credentials::{CredentialRepository, TmdbAccess};
 pub use episodes::{EpisodeRepository, EpisodeRow};
+pub use library::{
+    Candidate, CandidateFacts, FileMatch, LibraryFolder, LibraryRepository, LocalFile, MatchMethod,
+    NewLocalFile, Probe, Upserted,
+};
 pub use media::{Appearance, Credit, MediaRepository};
 pub use profiles::ProfileRepository;
 pub use search::{Hit, HitDetail, MatchReason, SearchRepository};

@@ -27,6 +27,8 @@ pub struct Context {
     pub direct_links: Vec<direct::DirectLink>,
     /// Installed addons, already re-checked (`crate::addons::installed`).
     pub addons: Vec<(Url, Manifest)>,
+    /// The library, for `LocalFileBackend` (Phase 12). `None` finds no local files.
+    pub library: Option<sinephile_persistence::Db>,
 }
 
 impl Default for Context {
@@ -37,6 +39,7 @@ impl Default for Context {
             untrusted_http: Arc::new(Unconnected),
             direct_links: Vec::new(),
             addons: Vec::new(),
+            library: None,
         }
     }
 }
@@ -54,7 +57,7 @@ impl Transport for Unconnected {
 /// asked, and in what order, is the registry's decision (`crate::registry`).
 pub fn all(ctx: &Context) -> Vec<Arc<dyn SourceBackend>> {
     let mut backends: Vec<Arc<dyn SourceBackend>> = vec![
-        Arc::new(local::LocalFileBackend),
+        Arc::new(local::LocalFileBackend::new(ctx.library.clone())),
         Arc::new(archive::InternetArchiveBackend::new(ctx.http.clone())),
         Arc::new(direct::DirectHttpBackend::new(ctx.direct_links.clone())),
     ];

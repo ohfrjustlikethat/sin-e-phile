@@ -4,48 +4,47 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 3.2.0** · 21 session(s) completed · last updated 2026-11-06
+**Spec version 3.3.0** · 21 session(s) completed · last updated 2026-11-06
 
 ---
 
 ## Where we are right now
 
-**Phase 11 — Player Experience Layer** (`in_progress`, branch `phase/11-player-experience-layer`)
+**Phase 12 — Local Library Engine** (`in_progress`, branch `phase/12-local-library-engine`)
 
 6 of 6 exit criteria met with evidence.
 
-> Opened 2026-11-06 when Phase 10 merged (c48c546, tag phase-10); part of the author's five-phase request (9-13). No series page existed, so 11.1 builds a minimal one (airing awareness needs somewhere to show). Trivia, goofs and soundtrack have no free, legal source (IMDb's datasets omit them; scraping is out, 2.1): the overlay says so rather than inventing a source. Author checks still outstanding: real controller (Phase 8 E5), VPN drop (Phase 7 E7), both carried to 13.
+> Opened 2026-11-07 when Phase 11 merged (cc3ca3c, tag phase-11). Inherits: absolute_number is NULL by design (ADR-0031), so an anime-style absolute number goes to the review queue rather than a lookup; Phase 8's carried criterion (search, click and watch a local file) is discharged by 12.5; the confidence threshold is measured, not chosen (DECISIONS_PENDING). Release-group names in fixtures are invented: real ones would be naming content sources by the back door (2.1). Author checks still outstanding: real controller (Phase 8 E5), VPN drop (Phase 7 E7), both carried to 13.
 
-### Subtasks — 7/7 complete
+### Subtasks — 6/6 complete
 
-- [x] **11.1** Series and airing awareness (ADR-0030): migration 0019 airing_schedule filled from AniList nextAiringEpisode during anime ingest/refresh; EpisodeRepository lists a series' seasons and episodes and its next airing; the detail page of a series shows seasons, episodes (playable) and 'Episode 7 airs Thursday' even with no episode row (a pure, tested wording function). · `2794a42`
-- [x] **11.2** The pause overlay: on pause, over the dimmed still, a panel with the cast (character names; headshots only with the user's TMDB key, else typographic), director and key crew, ratings that exist (IMDb from the catalogue; AniList for anime) and never Rotten Tomatoes, time remaining, the current chapter, 'more like this' from the vector index; a cast member opens their filmography. Data fetched when playback starts so the overlay paints in < 200 ms (measured in the real window). Trivia, goofs and soundtrack have no free legal source and are said to be absent, not scraped. · `5b55e4c`
-- [x] **11.3** Episodes in the player: previous/next episode (N/P keys, pad), a next-episode card with a countdown in the last 30 s or at a credits chapter, autoplay on by default and switchable in Settings -> Playback; a pure, tested function decides the next episode across season boundaries. · `1369b57`
-- [x] **11.4** The scrub bar: chapter marks from mpv's chapter list; hover thumbnails from FFmpeg sprites generated in a low-priority background process (one frame per 10 s, cached under data/cache/thumbs by file hash), proven not to stutter playback (mpv frame-drop-count unchanged while generating). · `f2bf342`
-- [x] **11.5** Player controls: picture-in-picture (small always-on-top window, Ctrl+P), audio delay (Ctrl+[ / Ctrl+]), brightness/contrast/saturation in a Picture menu, a stats-for-nerds overlay (I: decode path, dropped frames, bitrate, cache, swarm peers/speed), and a shortcuts overlay (?) generated from the same key map the player uses. · `656441e`
-- [x] **11.7** The TV keyboard (ADR-0043): the Netflix-TV grid (a-z/0-9 left, results live beside it, space and backspace below) on every text field, Xbox-standard buttons (A type, B close, X backspace, Y space, LT/RT cursor, LB/RB letters/symbols incl. case, Menu submit), title suggestions and word completion from the catalogue, recent searches; a voice key placeholder for Phase 20; the controller flow proves an API key and a search can be typed with the pad alone. · `6fed80f`
-- [x] **11.6** docs/MANUAL_TESTS.md playback plan run on all three tiers via the tier override (screenshots per tier), docs/specs/player-experience.md, learning note, evidence for E1-E5, regression check, close. · `acf5a85`
+- [x] **12.1** crates/filename-parser (MIT/Apache, pure, no I/O): title, year, season, episode (S01E02, 1x02, multi-episode ranges), absolute episode for anime-style 'Title - 059', resolution, source, codec, audio, language, release group (bracket prefix or dash suffix, recognised by position, never by a list of names). fixtures/filenames/: 500+ hand-labelled names covering scene, anime fansub, multi-episode, messy and adversarial cases; every group name invented (2.1); a per-field accuracy test. Documented with a runnable README example (E6). · `8c3a377`
+- [x] **12.2** Migration 0021 library: library_folders (the user's own roots, machine-specific like local_files.path; the portability test's allow-list grows by that column with the reason), local_files gains folder_id and a missing_since for moves; match_memory (a normalised name pattern -> media item, from the user's decisions). LibraryRepository with a repository_surface line per method. · `9de8483`
+- [x] **12.3** crates/library identification: candidates from the catalogue by title (FTS) and year, scored on independent weak signals (title similarity, year, duration vs runtime from FFprobe, episode exists, folder and sibling context, remembered decisions), a confidence in [0,1], auto-accepted above a threshold set from measurement (DECISIONS_PENDING), else the review queue. tools/eval 'identify' harness over fixtures/filenames labelled with catalogue ids: top-1 (E1 > 95%) and false-confident (E2 < 1%); numbers to docs/eval-results.md. · `c0eda95`
+- [x] **12.4** Scanner and watcher: register a folder, walk it recursively, probe only what identification needs, in parallel, off the UI thread with progress events; the notify crate (ReadDirectoryChangesW) applies creates, deletes, renames and moves without a rescan; a rename or move keeps the row (no duplicate, E4). Measured: 10,000 files under 3 minutes with the UI responsive (E3). · `96a73fa`
+- [x] **12.5** The review queue (Settings or Library): side-by-side candidates, typographic when there is no artwork, one click or one A press resolves, manual search for the rest, one decision settles a whole series' files; remembered for similar names. The library feeds LocalFileBackend so a local film is found by search and plays from its page (discharges Phase 8's carried criterion). Pad-only flow in tools/uiaudit/controller.mjs; resolving 20 items timed (E5). · `b96f9fd`
+- [x] **12.6** docs/specs/library.md, learning note, README and HOW_IT_WORKS, regression check, close. · `c0a782e`
 
 ### Exit criteria
 
-- [x] **E1** The pause overlay is visually excellent and appears in < 200 ms.
-      - *Evidence:* 5b55e4c: real window 2026-11-06, Nosferatu (1922) streaming from the Internet Archive, Space pressed four times: pause to the overlay's first painted frame (window.__pauseMs, measured from the intent to requestAnimationFrame after layout) = 22, 4, 4, 5 ms (target < 200 ms). Before the change the overlay waited for mpv's still capture (up to 500 ms); the video window is now hidden first. Visually: screenshot shows the right-side panel (ADR-0043) between the player's bars with cast and parts, crew by role, IMDb 7.8 / 125,211 votes, and more like this (Nosferatu the Vampyre, Shadow of the Vampire, The Last Laugh). Tests: PlayerScreen.test.tsx 'the pause panel shows who is in it and who made it, before the still arrives' and 'a cast member opens their films, and a film leaves the player for its page'.
-- [x] **E2** Scrub thumbnails generate without stuttering playback.
-      - *Evidence:* f2bf342: real window 2026-11-07, a 20-minute 1080p H.264 file on d3d11va: player_state.dropped_frames over 30 s of playback was 0 -> 0 with thumbnail generation running and 0 -> 0 with the sheets cached; generation (crates/player/src/thumbs.rs: FFmpeg below-normal priority, -threads 1, -skip_frame nokey) made both sheets in 970 ms. docs/eval-results.md Phase 11 E2. Tests: crates/player/tests/playback.rs thumbnail_sheets_are_made_from_a_file; thumbs::tests a_time_finds_its_tile; src/features/player/scrubPreview.test.ts. Screenshot: the 7:25 tile shown above the bar in its own cut-out.
-- [x] **E3** Next-episode autoplay works and is disableable.
-      - *Evidence:* 1369b57: src/features/player/PlayerScreen.test.tsx 'autoplay plays the next episode when the countdown ends' (the card shows 'Play in 10' at 30 s left; after ten seconds prepare_play is asked for the next episode) and 'offers the next episode in the last 30 s; B says not now, A plays it' (with autoplay switched off the card offers 'Play' with no countdown, and nothing plays by itself); the switch is Settings -> Playback 'Play the next episode automatically' (src/features/settings/PlaybackSection.tsx). When to offer it: src/features/player/endCard.test.ts (last 30 s, a credits chapter, the end). Next/previous across seasons: crates/persistence/tests/repository_surface.rs episode_repository_surface next_after/previous_before.
-- [x] **E4** All player features are keyboard-accessible and documented in a shortcuts overlay (`?`).
-      - *Evidence:* 656441e: every player feature has a key: src/features/player/intents.ts SHORTCUTS (19 rows: play/pause, seeks, volume, mute, full screen, frame step, speed, subtitles, subtitle timing, sound timing, episodes, statistics, mini player, picture-in-picture, shortcuts, back, and the pad's player menu); intents.test.ts 'says what each key really does' turns each row's real key event through keyIntent and must get the row's intent; the '?' overlay renders that same table (PlayerScreen.test.tsx '? lists the shortcuts, I shows statistics, Ctrl+[ moves the sound'). The pad reaches the rest through Menu (PlayerScreen.test.tsx 'Menu opens the player menu; inside it the D-pad moves focus instead of seeking'). Real window 2026-11-07: Ctrl+M mini player and Ctrl+P picture-in-picture (480x270, restored to 1455x909) screenshotted.
-- [x] **E5** Manual test plan for playback passes on all three tiers.
-      - *Evidence:* 450cca6: docs/MANUAL_TESTS.md 'Playback, on every tier (Phase 11, E5)' run in the real window 2026-11-07 under each tier (debug SINEPHILE_TIER override; get_hardware_profile reported effective_tier modest/standard/capable, overridden true), with Garden.mkv (8:00, H.264 720p) and a sidecar .srt offset by 82 s, aligned cache cleared before each run. Local file, every tier: first frame, d3d11va; pause overlay painted in 2.2 / 2.3 / 2.4 ms (window.__pauseMs); scrub_thumbs returned sheets; statistics, shortcuts (?), mini player (Ctrl+M out and back), picture-in-picture (742x418 always on top, Ctrl+P restored the exact 2204x1376 inner size at 200,125); 0 ERROR lines. Subtitles: standard and capable logged 'aligned: scale 1.00000, offset -82180 ms, confidence 1.91'; modest logged 'fits the film's length; loaded as it is' (no speech alignment on Tier 0, by design). Stream (the same file over local HTTP, 3 GETs served): first frame 359 / 275 / 272 ms, pause overlay 2.3 / 2.5 / 3.7 ms, statistics shown, 0 ERROR lines. The run found four defects, fixed and tested in 450cca6 before this evidence was taken: Ctrl+M could not leave the mini player, PiP restore used the outer size, a bare file paused into an empty panel, a 5 kbit/s stream read '0.0 Mbit/s'. Screenshots: docs/evidence/phase-11/{modest-paused,standard-stats,capable-mini,capable-pip}.png.
-- [x] **E6** With only a controller, every text field in the app can be filled from the on-screen keyboard, and its suggestions, recent searches and word completion work (ADR-0043).
-      - *Evidence:* 6fed80f: tools/uiaudit/controller.mjs (CI step 'Controller flow (simulated Xbox pad)'), pad only: Y opens search and the keyboard, 'sunrise' typed with D-pad and A; Menu opens Settings, the D-pad walks to the OpenSubtitles API key field 'without a keyboard popping up on the way', A opens the keyboard, RB/LB switch case and 'Ab9' is typed, X deletes, Menu closes with focus kept on the field. Typing aids: src/app/PadKeyboard.test.tsx 'on search: recent searches first, then suggestions and word completion' and 'types upper case and symbols, for API keys and addresses'; src/app/keyboardText.test.ts (cursor editing, completion, recents).
+- [x] **E1** > 95% top-1 accuracy on the fixture corpus.
+      - *Evidence:* c0eda95: cargo run --release -p eval -- identify (2026-11-07, full catalogue): tuning set fixtures/filenames/names.psv 549 names, 2 labels not in the catalogue left out, top-1 523/528 = 99.05%; held out heldout.psv 108/108 = 100%. Method and every tuning step with its measured number in docs/eval-results.md (Phase 12, Identification). crates/library/tests/identify.rs: 7 tests (year, duration, episode over film namesake, folders, remembered decision, no guess); seen to fail when the kind signal was neutralised.
+- [x] **E2** < 1% false-confident rate — being wrong while confident is the worst failure mode here.
+      - *Evidence:* c0eda95: same run, at the library's own threshold sinephile_library::ACCEPT_AT = 0.75: tuning set 2/510 accepted were wrong = 0.39% (0.37% of all names; strict reading: of accepted names, and a '?'-labelled name accepted counts as wrong); held out 0/103. Asked (review queue) 6.8% and 5.5%. The lowest threshold under 1% was 0.615 at 0.97%; 0.75 keeps a margin. 9 of 549 labels were corrected, each reason recorded in docs/eval-results.md.
+- [x] **E3** Scanning 10,000 files completes in under 3 minutes and does not block the UI.
+      - *Evidence:* 96a73fa: cargo run --release -p eval -- scan (2026-11-07, full catalogue, real FFprobe): 10,000 distinct films sampled from the catalogue, one scene-named file each in its own folder, scanned in 37.1 s, 35.3 s and 35.0 s (target 180 s), 3.5-3.7 ms a file, identification 7 at a time. Not blocking the UI: the queries a page issues ran alongside, p95 24.6-24.7 ms idle and 33.5-34.9 ms during the scan (515-542 runs). Scans run on background tasks (src-tauri/src/commands/library.rs start_scan) with progress events. Accuracy on the sample: best right 99.45-99.54%, accepted wrong 1/9,279. Table in docs/eval-results.md.
+- [x] **E4** Renaming a file outside the app is detected and does not create a duplicate.
+      - *Evidence:* 96a73fa: crates/library/tests/scan.rs a_scan_finds_identifies_and_keeps_a_renamed_file (renamed while closed: same row, same match, no duplicate) and the_watcher_sees_a_rename_and_keeps_one_row (the real notify watcher on a temp folder); both seen to fail with move detection disabled. Real window 2026-11-07: a 2.2 GB file in a library folder renamed in place while the app ran (the watcher reported a removal then an arrival: Missing(1) then Moved), one row, the same id, matched to Heat (1995) at 1.0; relaunched, the startup scan reported unchanged 1 moved 0; moved to another folder and renamed Heat.mkv while closed, the next launch reported moved 1, the same row and match.
+- [x] **E5** The review queue is genuinely pleasant to use — resolving 20 ambiguous items takes under a minute.
+      - *Evidence:* b96f9fd: tools/uiaudit/controller.mjs (CI step, pad only): from Settings the D-pad reaches 'Check them', and 20 waiting files are answered by A alone in 5.3 s (each A answers the focused first card). Real window 2026-11-07 against the full catalogue: a library of 22 files (21 genuinely ambiguous: 12 remakes with no year, 5 Monster episodes, 4 The Office episodes with no country) scanned in 1.3 s with 21 asked; answered by keyboard, 14 answers settled all 21 (one answer per series settled its other episodes), the app taking 20-290 ms per answer from key to the next file on screen (0.8 s in all), so the minute is the person's reading time. src/features/library/ReviewScreen.test.tsx (5 tests) and crates/library/tests/review.rs one_answer_settles_the_whole_series_and_is_remembered (seen to fail without remembering). The author's own impression of the screen joins the Phase 13 batch of author checks with the screenshot.
+- [x] **E6** `crates/filename-parser` is documented and independently useful.
+      - *Evidence:* 8c3a377: crates/filename-parser (MIT OR Apache-2.0, one dependency: regex =1.13.1, no I/O) documented by README.md included as the crate doc, whose example runs as a doctest (cargo test -p filename-parser: 1 doctest passed), plus examples/parse.rs for the command line. Measured: tests/corpus.rs the_corpus_reads_as_a_human_reads_it, 549 hand-labelled names in fixtures/filenames/names.psv, 100% on every field after tuning (98.36% before); names_it_was_never_tuned_on_read_as_well, 109 names in heldout.psv written after tuning, 109/109 on the first run; tests/fields.rs (7 tests: languages, edition, flags, audio, dates, episode titles, extension, comparable). Seen to fail: dropping the year made both corpus tests fail (year 32.24% < 97%). Release groups in the fixtures are invented (2.1).
 
 ---
 
 ## What's next
 
-Close Phase 11: CI green on phase/11-player-experience-layer, merge --no-ff into main, CI green on main, tag phase-11, write the close record (completion_commit = merge), python tools/phasedoc/generate.py --close 11 and --open 12.
+Close Phase 12: CI green on phase/12-local-library-engine, merge --no-ff into main, CI green on main, tag phase-12, python /c/Users/hashi/AppData/Local/Temp/claude/C--Users-hashi-Documents-sin-e-phile/02bfad50-f550-4fd9-bb12-04c75dab39ba/scratchpad/open13.py-style close record (completion_commit = merge), generate.py --close 12 and --open 13.
 
 ---
 
@@ -72,23 +71,23 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 8 | Player Core — MILESTONE: FIRST DEMOABLE BUILD 🏁 | A | 5, 7 | 2–3 | 5/7 |
 | [x] | 9 | Intelligent Source Selection | B | 8 | 1–2 | 7/7 |
 | [x] | 10 | Subtitle Pipeline | B | 8 | 2 | 6/6 |
-| [~] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 6/6 |
-| [ ] | 12 | Local Library Engine | B | 4 | 2–3 | 0/6 |
+| [x] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 6/6 |
+| [~] | 12 | Local Library Engine | B | 4 | 2–3 | 6/6 |
 | [ ] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 0/8 |
 | [ ] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 0/6 |
 | [ ] | 15 | Taste Model | B | 5, 14 | 2 | 0/5 |
 | [ ] | 16 | Recommendation Engine | B | 15 | 2–3 | 0/6 |
 | [ ] | 17 | Discovery Engine | B | 16 | 2 | 0/6 |
-| [ ] | 18 | Browsing Surfaces 🏁 | B | 17 | 4–5 | 0/11 |
+| [ ] | 18 | Browsing Surfaces 🏁 | B | 17 | 4–5 | 0/13 |
 | [ ] | 19 | Watchlist and External Sync | C | 18 | 1–2 | 0/5 |
 | [ ] | 20 | Windows Platform Integration | C | 12, 18 | 2–3 | 0/5 |
-| [ ] | 21 | Performance Engineering and the Low-End Path | B | 18 (20 optional) | 2 | 0/4 |
+| [ ] | 21 | Performance Engineering and the Low-End Path | B | 18 (20 optional) | 2 | 0/5 |
 | [ ] | 22 | Vision Layer (Tier 2) | D | 11 | 1–2 | 0/5 |
 | [ ] | 23 | Binge Intelligence | C | 11, 12 | 1–2 | 0/4 |
 | [ ] | 24 | Live Channels | D | 18 | 2 | 0/5 |
-| [ ] | 25 | Manga and Comics | D | 3, 5, 16 | 2–3 | 0/5 |
+| [ ] | 25 | Manga and Comics | D | 3, 5, 16 | 2–3 | 0/8 |
 | [ ] | 26 | Connected Playback | D | 11 | 2 | 0/5 |
-| [ ] | 27 | Hardening, Packaging, and Portfolio Finalisation | B | everything | 2–3 | 0/5 |
+| [ ] | 27 | Hardening, Packaging, and Portfolio Finalisation | B | everything | 2–3 | 0/6 |
 
 Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting review · `[ ]` not started. 🏁 marks Phase 8 (first demoable build) and Phase 18 (complete product).
 
@@ -168,6 +167,11 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D70** (raised in Phase 10) Subtitle files inside a torrent are found (crates/subtitles/src/files.rs in_torrent) but not fetched: plan() returns Off for Origin::Torrent. Fetch the file through the engine (select the file index) and treat it as a sidecar.
 - **D71** (raised in Phase 10) The OpenSubtitles hash, and so downloads and hash-keyed nudges, need a local file; a stream (Internet Archive, torrent) is keyed by its address and gets no download. Hash a stream from HTTP range requests for the first and last 64 KiB (the streaming server supports ranges).
 - **D72** (raised in Phase 10) The subtitle corpus is synthetic speech (Windows' synthesiser) over synthetic beds. Add a handful of real public-domain film clips with hand-timed subtitles we write ourselves, to measure the VAD on a real mix (SPEC.md R6).
+- **D73** (raised in Phase 12) A multi-episode file (S01E01E02) is matched to its first episode with covers = 2, but LocalFileBackend only finds files matched to the exact episode asked for, so episode 2 does not offer it. Look up files whose match covers the asked episode (crates/sources/src/backends/local.rs item_for, LibraryRepository::files_for_item).
+- **D74** (raised in Phase 12) A file removed while the app runs is marked missing by the watcher but only purged at the next scan (launch or Rescan). Missing files are already hidden from every view; purge them after a quiet period in library_loop if the rows ever matter.
+- **D75** (raised in Phase 12) The held-out filename corpus (109 names) was written by the same hand that tuned the parser, and its identification labels were seen in --report output while tuning. A truly independent check is a real user's library: count asked, accepted and wrong after a first real scan (Phase 14's onboarding test is the natural moment).
+- **D76** (raised in Phase 12) Two remakes with the same title and year (rare, but real) can only be told apart by duration, which needs FFprobe; a file FFprobe cannot read stays in the review queue. Container title tags (probed) are stored but not yet weighed as a signal.
+- **D77** (raised in Phase 12) CREATE_NO_WINDOW is now set on FFprobe and the subtitle aligner's FFmpeg; confirm in a release build (windows subsystem) that no console window flashes during a scan or an alignment. Batched with the Phase 13 author checks.
 
 ---
 

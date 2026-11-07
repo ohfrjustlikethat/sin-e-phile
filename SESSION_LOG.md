@@ -1968,3 +1968,83 @@ worth it: four defects, all invisible to unit tests.
 stale frontend.
 
 **Carry forward.** Phase 7 E7 and Phase 8 E5 (author checks) to Phase 13. D67–D72.
+
+### Session 22, continued (2026-11-07) — spec 3.3.0, between 12.3 and 12.4
+
+**Asked and answered.** The author asked whether every title stays updated whenever a torrent
+exists (no: the catalogue refreshes in ADR-0030's layers, but the app ships no sources and never
+looks for torrents itself, §2.1), how to make a public release instantly good, and how efficient the
+app is. Decided by the author: the player exits by shrinking into its tile; shared-element motion;
+seamless resume and crash restore; Windows media controls and history import confirmed; reading adds
+EPUB, DRM-free MOBI/AZW3 and Guided View with a full controller scheme; the release is unsigned.
+
+**Spec amendment.** 3.3.0 (A34, ADR-0044): Phases 18, 21, 25 and 27 gain deliverables and seven
+exit criteria between them. Two facts recorded with it: the IMDb datasets are personal,
+non-commercial, so no pre-built catalogue is ever distributed; and the 42.2 MB idle figure counted the
+main process only, so Phase 21 measures the whole process tree.
+
+**Also.** The full pre-push list was killed by the system's memory pressure; re-run step by step, all
+green (Rust 673, frontend 104). The pad flow had hung for ten minutes when its Chrome died: it now
+fails on a closed connection or after five minutes (`a684e55`).
+
+### Session 22, continued (2026-11-07) — Phase 12: the local library engine
+
+**Built.** `crates/filename-parser` (MIT/Apache): tags found by pattern with explicit boundaries,
+strong and weak tags, year choice, groups by position; 549 hand-labelled names plus 109 held out,
+groups invented. `crates/library`: identification by weighted weak signals with a confidence from the
+lead over the runner-up, accepted at 0.75; a scanner (walk, reconcile, identify 7 at a time, FFprobe
+only when unsure); a watcher (notify, quietened, removals first); the review queue (one answer
+remembered by the name's pattern settles every file named the same way; "not a film" survives
+rescans). Migrations 0021 (library) and 0022 (ignore). Settings → Library with Windows' own folder
+picker (IFileOpenDialog through the `windows` crate already pinned, no new dependency) or a typed path;
+the review screen, pad-complete. LocalFileBackend answers from the library. `eval identify` and
+`eval scan` harnesses.
+
+**Numbers.** Parser 98.36% of names right on every field before tuning, 549/549 after, 109/109 held
+out. Identification (full catalogue): top-1 99.05% (held out 100%), wrong among accepted 0.39% (held
+out 0/103), asked 6.8%, 43.7 ms a name (from 452.6 before the trigram search became a fallback). Scan:
+10,000 distinct catalogue films in 35.0–37.1 s, page queries p95 24.7 → 34.9 ms during it, 99.5% right.
+Review: 20 by pad alone in 5.3 s; in the real window 14 answers settled 21 files, 20–290 ms each. A
+local film played in 388 ms. Rust tests 654 → 687; frontend 104 → 116.
+
+**Regression (rule 13).** E2 43/43, E3 0.0472 / 1.0000 (carried), warm p95 15.2 ms, recall@10 0.9760,
+subtitles 80/80 and 0/10 false accepts: unchanged from Phase 11.
+
+**Bugs, and what each teaches.**
+- S02E01E02 lost both episodes: the boundary was checked before the continuation was read. *Read
+  the whole token, then judge its edges.*
+- The walker skipped "$9.99" and ".45" as system folders (`eval scan` lost two of 10,000). *Decide by
+  the attribute that means "system", not by a character that usually goes with it.*
+- File rows were stored as `\\?\C:\…` while the folder row was `C:\…`: the next launch would have
+  seen every file as moved. Found only in the real window. *One spelling of a path, everywhere.*
+- Adding Tauri's dialog plugin silently upgraded Tauri and dozens of crates; reverted, and the picker
+  built on `IFileOpenDialog` instead. *Read the lock diff of every dependency change.*
+- CI failed on the 3.3.0 amendment: the state file's new criteria were in a different order from
+  SPEC.md. `build_state --check` was not on my pre-push list; it is now (B12, cleared).
+- Nine of my own corpus labels said "cannot be identified" where the catalogue or the file's own
+  duration does identify the name. Relabelled with the reason recorded; one genuinely ambiguous name
+  kept and counted as a miss. *A label is a claim too; check it against the evidence in the row.*
+- My first screen capture method copied whatever was on top of the screen, which was another
+  window. Deleted unviewed beyond the glance; window-only capture used since.
+- The pad flow hung for ten minutes when its Chrome died under memory pressure: it now fails on a
+  closed connection or after five minutes.
+
+**Decisions.** Release groups in fixtures invented, streaming-service tags removed (§2.1). Accept at
+0.75, not the legal minimum 0.615. Folder cascade by trigger so 0021 stays reversible. Moves detected
+by size and modification time, no hashing. A file whose name says nothing takes its folder's title.
+`SINEPHILE_TIER` debug override. Folder picker without a new dependency. D73–D77.
+
+**Spec amendment.** 3.3.0 (A34, ADR-0044) earlier the same day.
+
+#### Phase 12 retrospective
+
+**Went well.** Building the corpus and the harness before tuning made every change a number, and the
+10,000-film scan doubled as an accuracy test on real titles. The real window caught two bugs no unit
+test could.
+
+**Went badly.** Two shortcuts cost time: a lock-file upgrade I nearly committed, and a check (state
+order) missing from my own pre-push list. And I wrote labels from memory rather than from the row's
+evidence.
+
+**Carry forward.** Phase 7 E7 and Phase 8 E5 (author checks), the review screen's feel, and D77's
+release-build check, all batched at Phase 13. D73–D77.

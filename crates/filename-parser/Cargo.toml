@@ -1,0 +1,15 @@
+[package]
+name = "filename-parser"
+version = "0.1.0"
+edition = "2021"
+publish = false
+# NOT the workspace's GPL-3.0: this crate links neither libmpv nor FFmpeg, so it carries
+# the permissive licence that makes it usable elsewhere (ADR-0017). See README.md.
+license = "MIT OR Apache-2.0"
+description = "Read title, year, season, episode and release tags out of real-world media filenames (SPEC.md Phase 12)."
+
+# Pure string handling: no I/O, no catalogue, no network. It reads what a name SAYS;
+# deciding what the file IS belongs to the library, which has the evidence.
+
+[dependencies]
+regex = "=1.13.1"

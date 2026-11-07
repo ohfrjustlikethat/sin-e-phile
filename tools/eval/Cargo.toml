@@ -33,3 +33,5 @@ thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 subtitle-align = { path = "../../crates/subtitle-align" }
+sinephile-library = { path = "../../crates/library" }
+filename-parser = { path = "../../crates/filename-parser" }

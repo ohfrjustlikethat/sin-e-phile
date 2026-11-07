@@ -212,20 +212,26 @@ fast, by sliding the recordings against each other until the claps line up.
 including the films held back from tuning, and subtitles for the wrong film are refused
 every time. `docs/specs/subtitle-alignment.md` has the method and its numbers.
 
-### The local library — identifying your files by looking at them `⬜ Phase 12`
+### The local library — identifying your files by looking at them `✅ Phase 12`
 
 Point it at a folder and it works out what everything is. Filenames alone are not
-enough — they are inconsistent, and ambiguous cases exist (`The.Batman` could be 1989
-or 2022).
+enough — they are inconsistent, and ambiguous cases exist (`The.Batman` could be the 2022 film or
+the 2004 animated series).
 
-So it combines several weak signals: what the filename parser extracted, the actual
-duration from the file, its resolution, which audio languages are present, embedded
-container metadata, and the folder's context. Several weak signals agreeing beats one
-strong signal guessing.
+So it combines several weak signals: the title, year and episode the filename parser read,
+the folders around the file, the file's duration from FFprobe, how popular each candidate
+is, and whether a series actually has the episode the name claims. Several weak signals
+agreeing beats one strong signal guessing. How sure it is depends on how far the best
+reading is ahead of the next: two equally good readings are a question, not a coin toss.
 
-Only genuinely ambiguous cases reach a **review queue**, resolved with one click on a
-side-by-side poster comparison. Being **wrong while confident** is the worst failure
-here, so it is measured separately and held under 1%.
+Only genuinely uncertain files reach a **review queue**, resolved with one key or one
+button on typographic cards; an answer is remembered for every file named the same way, so
+a series is settled by its first episode. Being **wrong while confident** is the worst
+failure here, so it is measured separately: 0.39% of what it accepts, against a 1% limit.
+
+**The analogy:** sorting a box of unlabelled tapes by reading the spines, the shelf they
+came from and how long each runs, and putting aside only the ones where two films share a
+name and a year.
 
 ### Taste and discovery — the reason to use this at all `⬜ Phases 15–17`
 
@@ -358,6 +364,15 @@ player in the corner while you browse, sound timing, picture adjustments, statis
 shortcuts list generated from the same table the keys use. With a controller, every text
 field gets the TV keyboard. Checked on all three tiers in the real window. How the pieces
 fit: `docs/specs/player-experience.md`.
+
+### The local library ✅ `Phase 12`
+
+`crates/filename-parser` reads what a name says. `crates/library` identifies (weighted
+signals, a confidence from the lead, accepted at 0.75), scans (walk, reconcile, identify in
+parallel, probe only the uncertain), watches (ReadDirectoryChangesW through `notify`, a
+rename kept a rename) and runs the review queue. The local source answers from the library,
+so a film on this PC sits beside every other copy on its page. How it all fits:
+`docs/specs/library.md`.
 
 ### The posture guard ✅ `Phase 0`
 

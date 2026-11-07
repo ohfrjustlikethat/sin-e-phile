@@ -1,0 +1,26 @@
+[package]
+name = "sinephile-library"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "Point it at a folder: it finds the films and episodes, says what each one is, and asks only when it is not sure (SPEC.md Phase 12)."
+
+# Identification, scanning and watching are logic, so they live here and are tested here
+# (ADR-0022). src-tauri only starts them and relays their progress.
+
+[dependencies]
+sinephile-persistence = { path = "../persistence" }
+filename-parser = { path = "../filename-parser" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+walkdir = "=2.5.0"
+futures = "=0.3.31"
+# ReadDirectoryChangesW on Windows, named by SPEC.md Phase 12.
+notify = { version = "=8.2.0", default-features = false }
+tokio = { version = "1", features = ["rt"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "time"] }
+sqlx = { version = "=0.8.6", default-features = false, features = ["runtime-tokio", "sqlite"] }
+tempfile = "3"

@@ -1,6 +1,6 @@
 # Phase 11 — Player Experience Layer
 
-**Status:** in_progress · **Depends on:** 8, 9, 10 · **Sessions:** 2
+**Status:** complete · **Depends on:** 8, 9, 10 · **Sessions:** 2
 
 > The single file a session reads to know what it is doing. Generated from
 > `SPEC.md` §15 by `tools/phasedoc/generate.py`. Working file, not a document.
@@ -48,3 +48,41 @@ Why the overlay data is available but scene-level data isn't; background work wi
 - **11.5** Player controls: picture-in-picture (small always-on-top window, Ctrl+P), audio delay (Ctrl+[ /  · `656441e`
 - **11.7** The TV keyboard (ADR-0043): the Netflix-TV grid (a-z/0-9 left, results live beside it, space and · `6fed80f`
 - **11.6** docs/MANUAL_TESTS.md playback plan run on all three tiers via the tier override (screenshots per · `acf5a85`
+
+<!-- closed: written at phase end -->
+
+---
+
+## Outcome
+
+**Complete.** Merged as `cc3ca3c`.
+
+### Evidence per criterion
+
+**E1** — The pause overlay is visually excellent and appears in < 200 ms.
+
+> 5b55e4c: real window 2026-11-06, Nosferatu (1922) streaming from the Internet Archive, Space pressed four times: pause to the overlay's first painted frame (window.__pauseMs, measured from the intent to requestAnimationFrame after layout) = 22, 4, 4, 5 ms (target < 200 ms). Before the change the overlay waited for mpv's still capture (up to 500 ms); the video window is now hidden first. Visually: screenshot shows the right-side panel (ADR-0043) between the player's bars with cast and parts, crew by role, IMDb 7.8 / 125,211 votes, and more like this (Nosferatu the Vampyre, Shadow of the Vampire, The Last Laugh). Tests: PlayerScreen.test.tsx 'the pause panel shows who is in it and who made it, before the still arrives' and 'a cast member opens their films, and a film leaves the player for its page'.
+
+**E2** — Scrub thumbnails generate without stuttering playback.
+
+> f2bf342: real window 2026-11-07, a 20-minute 1080p H.264 file on d3d11va: player_state.dropped_frames over 30 s of playback was 0 -> 0 with thumbnail generation running and 0 -> 0 with the sheets cached; generation (crates/player/src/thumbs.rs: FFmpeg below-normal priority, -threads 1, -skip_frame nokey) made both sheets in 970 ms. docs/eval-results.md Phase 11 E2. Tests: crates/player/tests/playback.rs thumbnail_sheets_are_made_from_a_file; thumbs::tests a_time_finds_its_tile; src/features/player/scrubPreview.test.ts. Screenshot: the 7:25 tile shown above the bar in its own cut-out.
+
+**E3** — Next-episode autoplay works and is disableable.
+
+> 1369b57: src/features/player/PlayerScreen.test.tsx 'autoplay plays the next episode when the countdown ends' (the card shows 'Play in 10' at 30 s left; after ten seconds prepare_play is asked for the next episode) and 'offers the next episode in the last 30 s; B says not now, A plays it' (with autoplay switched off the card offers 'Play' with no countdown, and nothing plays by itself); the switch is Settings -> Playback 'Play the next episode automatically' (src/features/settings/PlaybackSection.tsx). When to offer it: src/features/player/endCard.test.ts (last 30 s, a credits chapter, the end). Next/previous across seasons: crates/persistence/tests/repository_surface.rs episode_repository_surface next_after/previous_before.
+
+**E4** — All player features are keyboard-accessible and documented in a shortcuts overlay (`?`).
+
+> 656441e: every player feature has a key: src/features/player/intents.ts SHORTCUTS (19 rows: play/pause, seeks, volume, mute, full screen, frame step, speed, subtitles, subtitle timing, sound timing, episodes, statistics, mini player, picture-in-picture, shortcuts, back, and the pad's player menu); intents.test.ts 'says what each key really does' turns each row's real key event through keyIntent and must get the row's intent; the '?' overlay renders that same table (PlayerScreen.test.tsx '? lists the shortcuts, I shows statistics, Ctrl+[ moves the sound'). The pad reaches the rest through Menu (PlayerScreen.test.tsx 'Menu opens the player menu; inside it the D-pad moves focus instead of seeking'). Real window 2026-11-07: Ctrl+M mini player and Ctrl+P picture-in-picture (480x270, restored to 1455x909) screenshotted.
+
+**E5** — Manual test plan for playback passes on all three tiers.
+
+> 450cca6: docs/MANUAL_TESTS.md 'Playback, on every tier (Phase 11, E5)' run in the real window 2026-11-07 under each tier (debug SINEPHILE_TIER override; get_hardware_profile reported effective_tier modest/standard/capable, overridden true), with Garden.mkv (8:00, H.264 720p) and a sidecar .srt offset by 82 s, aligned cache cleared before each run. Local file, every tier: first frame, d3d11va; pause overlay painted in 2.2 / 2.3 / 2.4 ms (window.__pauseMs); scrub_thumbs returned sheets; statistics, shortcuts (?), mini player (Ctrl+M out and back), picture-in-picture (742x418 always on top, Ctrl+P restored the exact 2204x1376 inner size at 200,125); 0 ERROR lines. Subtitles: standard and capable logged 'aligned: scale 1.00000, offset -82180 ms, confidence 1.91'; modest logged 'fits the film's length; loaded as it is' (no speech alignment on Tier 0, by design). Stream (the same file over local HTTP, 3 GETs served): first frame 359 / 275 / 272 ms, pause overlay 2.3 / 2.5 / 3.7 ms, statistics shown, 0 ERROR lines. The run found four defects, fixed and tested in 450cca6 before this evidence was taken: Ctrl+M could not leave the mini player, PiP restore used the outer size, a bare file paused into an empty panel, a 5 kbit/s stream read '0.0 Mbit/s'. Screenshots: docs/evidence/phase-11/{modest-paused,standard-stats,capable-mini,capable-pip}.png.
+
+**E6** — With only a controller, every text field in the app can be filled from the on-screen keyboard, and its suggestions, recent searches and word completion work (ADR-0043).
+
+> 6fed80f: tools/uiaudit/controller.mjs (CI step 'Controller flow (simulated Xbox pad)'), pad only: Y opens search and the keyboard, 'sunrise' typed with D-pad and A; Menu opens Settings, the D-pad walks to the OpenSubtitles API key field 'without a keyboard popping up on the way', A opens the keyboard, RB/LB switch case and 'Ab9' is typed, X deletes, Menu closes with focus kept on the field. Typing aids: src/app/PadKeyboard.test.tsx 'on search: recent searches first, then suggestions and word completion' and 'types upper case and symbols, for API keys and addresses'; src/app/keyboardText.test.ts (cursor editing, completion, recents).
+
+### Next phase starts by
+
+Phase 12 subtask 12.1 (docs/phases/phase-12-local-library-engine.md): crates/filename-parser/src/lib.rs parse(name) -> Parsed; tokenise on separators, take bracketed group and tags first, then SxxEyy / 1x02 / ranges / " - NNN" absolute, year as the last plausible 19xx/20xx before the tags, title as the text before the first tag; fixtures/filenames/names.tsv hand-labelled, tests/corpus.rs per-field accuracy.

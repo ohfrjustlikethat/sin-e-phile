@@ -1,0 +1,12 @@
+DROP TABLE IF EXISTS match_memory;
+DROP TABLE IF EXISTS review_candidates;
+ALTER TABLE local_file_matches DROP COLUMN covers;
+DROP INDEX IF EXISTS idx_local_files_size;
+DROP INDEX IF EXISTS idx_local_files_folder;
+ALTER TABLE local_files DROP COLUMN probed_at;
+ALTER TABLE local_files DROP COLUMN container_title;
+ALTER TABLE local_files DROP COLUMN audio_languages;
+ALTER TABLE local_files DROP COLUMN missing_since;
+DROP TRIGGER IF EXISTS library_folder_removed;
+ALTER TABLE local_files DROP COLUMN folder_id;
+DROP TABLE IF EXISTS library_folders;
