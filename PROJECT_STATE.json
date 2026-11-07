@@ -27,8 +27,8 @@
       {
         "id": "14.3",
         "text": "Imports (crates/imports): Letterboxd CSV (watched, ratings, diary, watchlist), Trakt JSON, IMDb ratings CSV, MAL and AniList XML, each matched to the catalogue (an IMDb id where the file gives one, else title and year through the library's identifier), recorded per profile as ratings, completed watches and watchlist, unmatched rows listed in words; a 500+ entry Letterboxd fixture built from catalogue titles, match rate recorded (E2).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "cace2eb"
       },
       {
         "id": "14.4",
@@ -1707,8 +1707,8 @@
         {
           "id": "14.3",
           "text": "Imports (crates/imports): Letterboxd CSV (watched, ratings, diary, watchlist), Trakt JSON, IMDb ratings CSV, MAL and AniList XML, each matched to the catalogue (an IMDb id where the file gives one, else title and year through the library's identifier), recorded per profile as ratings, completed watches and watchlist, unmatched rows listed in words; a 500+ entry Letterboxd fixture built from catalogue titles, match rate recorded (E2).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "cace2eb"
         },
         {
           "id": "14.4",
@@ -2342,7 +2342,7 @@
       ]
     }
   ],
-  "next_action": "Phase 14 subtask 14.3 (docs/phases/phase-14-profiles.md): create crates/imports with parsers for a Letterboxd export (watched.csv, ratings.csv, diary.csv, watchlist.csv: Name, Year, Letterboxd URI, Rating), a Trakt JSON export, an IMDb ratings CSV (Const, Your Rating, Title, Year) and MAL/AniList XML, matched to the catalogue by IMDb id where given else exact title plus year, recorded per profile (ratings, completed watches, watchlist); a 500+ row Letterboxd fixture in fixtures/imports built from catalogue titles; tests and the match rate for E2.",
+  "next_action": "Phase 14 subtask 14.4 (docs/phases/phase-14-profiles.md): taste input. Store the six taste statements (pace, ambiguity, era, subtitles, runtime, formal experimentation) and the free-text \"what you love\" per profile (profile_settings via CredentialRepository::set), embed the free text with the query embedder, and build a seed taste vector (crates/taste: the mean of the catalogue vectors of titles rated 4-5 or completed, plus the free-text vector); measure E2's second half with eval import: the nearest titles to the seed vector against the imported favourites.",
   "blockers": [],
   "decisions_pending": [
     {
