@@ -7,6 +7,7 @@
 //!   words embedded and counted alongside. Phase 15 splits this into several modes; one
 //!   seed is enough to show that an import is reflected and to start a Home screen.
 
+pub mod axes;
 pub mod home;
 pub mod model;
 pub mod modes;

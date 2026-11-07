@@ -289,6 +289,17 @@ impl<'a> MediaRepository<'a> {
             .collect())
     }
 
+    /// A title's genres, by name (Phase 15's taste axes).
+    pub async fn genres(&self, media_item_id: i64) -> Result<Vec<String>, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT g.name FROM media_genres mg JOIN genres g ON g.id = mg.genre_id
+             WHERE mg.media_item_id = ? ORDER BY g.name",
+        )
+        .bind(media_item_id)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
     /// Which of `ids` a kids profile may see (Phase 14). Fails closed: only titles
     /// positively filed as for children (MovieLens "Children", from `ingest movielens`)
     /// or family (IMDb "Family"), not adult, and in none of the genres no children's film

@@ -154,6 +154,13 @@ async fn media_repository_surface() {
     assert_eq!(ok, [toy, paddington].into_iter().collect());
     assert!(repo.suitable_for_children(&[]).await.unwrap().is_empty());
 
+    // genres — by name, in order; none is empty, not an error
+    assert_eq!(
+        repo.genres(toy).await.expect("genres"),
+        vec!["Animation", "Children", "Comedy"]
+    );
+    assert!(repo.genres(film).await.unwrap().is_empty());
+
     // titles_released_between — films and series only, every name, in the years given
     let near = repo
         .titles_released_between(2014, 2016)
