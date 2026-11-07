@@ -5,8 +5,9 @@
 //! restart picks up where it left off: a download the backend no longer holds is added
 //! again into the same folder, and the pieces already on disk are kept.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use sinephile_library::identify::Cache;
@@ -16,7 +17,7 @@ use sinephile_persistence::repositories::{
 };
 use sinephile_persistence::{Db, DbError};
 
-use crate::backend::{Backend, BackendError};
+use crate::backend::{Backend, BackendError, Progress};
 use crate::queue::{plan, Step};
 
 #[derive(Debug, thiserror::Error)]
@@ -72,6 +73,8 @@ pub struct Manager {
     /// How many run at once.
     pub max_active: usize,
     probe: Prober,
+    /// The last progress each running download reported: speed and peers for the page.
+    live: Mutex<HashMap<i64, Progress>>,
 }
 
 impl Manager {
@@ -82,7 +85,18 @@ impl Manager {
             dir,
             max_active: 3,
             probe,
+            live: Mutex::new(HashMap::new()),
         }
+    }
+
+    /// Speed and peers of what is running, as of the last tick.
+    pub fn live(&self) -> HashMap<i64, Progress> {
+        self.live.lock().map(|l| l.clone()).unwrap_or_default()
+    }
+
+    /// The combined download rate of everything running, bytes per second.
+    pub fn speed(&self) -> f64 {
+        self.live().values().map(|p| p.speed).sum()
     }
 
     fn backend(&self, name: &str) -> Option<&Arc<dyn Backend>> {
@@ -159,6 +173,13 @@ impl Manager {
             };
             repo.set_progress(d.id, p.done as i64, (p.total > 0).then_some(p.total as i64))
                 .await?;
+            if let Ok(mut live) = self.live.lock() {
+                if p.finished || p.error.is_some() {
+                    live.remove(&d.id);
+                } else {
+                    live.insert(d.id, p.clone());
+                }
+            }
             if let Some(error) = p.error {
                 repo.fail(d.id, &error).await?;
                 out.failed.push(d.id);

@@ -321,3 +321,62 @@ async fn a_configured_qbittorrent_that_is_not_running_falls_back_to_librqbit() {
     assert_eq!(d.backend, "librqbit", "librqbit moved the bytes");
     until_done(&m, &db, id, Duration::from_secs(60)).await;
 }
+
+/// The film page starts a torrent to stream before anyone asks to download it (D61). A
+/// download of the same torrent moves it into the downloads folder with what it has.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_torrent_already_streaming_becomes_the_download_and_keeps_its_pieces() {
+    let s = seed("Heat.1995.Stream", 16 * MIB, Some(4 * MIB as u32)).await;
+    let db = Db::in_memory().await.unwrap();
+    let work = TempDir::new().unwrap();
+    let engine = Arc::new(
+        Engine::start(offline(&work.path().join("engine")))
+            .await
+            .unwrap(),
+    );
+    // Streaming: added the way prepare_play adds it, into the engine's own folder.
+    let streaming = engine
+        .add(
+            Source::File(s.torrent.clone()),
+            AddOptions {
+                initial_peers: vec![s.peer],
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    let had = engine.status(&streaming).unwrap().progress_bytes;
+    assert!(had > 0 && had < 16 * MIB as u64, "mid-stream: {had}");
+
+    let downloads = work.path().join("Downloads");
+    let m = manager(&db, engine.clone(), vec![s.peer], downloads.clone());
+    let id = DownloadRepository::new(&db)
+        .add(&film("Heat", &s.torrent))
+        .await
+        .unwrap();
+    m.tick(NOW).await.unwrap();
+    let d = DownloadRepository::new(&db).get(id).await.unwrap().unwrap();
+    assert_eq!(
+        d.backend_id.as_deref(),
+        Some(streaming.as_str()),
+        "the same torrent"
+    );
+    let kept = engine.status(&streaming).unwrap().progress_bytes;
+    assert!(
+        kept >= had,
+        "the pieces came along: {kept} now, {had} before"
+    );
+    until_done(&m, &db, id, Duration::from_secs(60)).await;
+    let file = DownloadRepository::new(&db)
+        .get(id)
+        .await
+        .unwrap()
+        .unwrap()
+        .file_path
+        .unwrap();
+    assert!(
+        Path::new(&file).starts_with(downloads.join("Heat")),
+        "{file}"
+    );
+}

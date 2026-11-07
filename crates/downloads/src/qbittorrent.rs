@@ -68,7 +68,7 @@ fn form(pairs: &[(&str, &str)]) -> String {
 /// magnet's `btih` (hex, or base32 as some clients write it).
 pub fn info_hash(d: &Download) -> Option<String> {
     if let Some(h) = d.source.strip_prefix("infohash:") {
-        return valid_hex(h);
+        return valid_hex(h.split('|').next().unwrap_or_default());
     }
     let rest = d.source.split("btih:").nth(1)?;
     let token: String = rest
