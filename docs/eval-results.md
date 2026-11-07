@@ -2481,3 +2481,24 @@ At 0.75, tuning set 549 names (2 labels not in the catalogue): **E1 top-1 523/52
 accepted wrong = 0.39%** (0.37% of all names); **6.8%** asked. Held out, 109 names: **108/108 = 100%**,
 **0/103** accepted wrong, **5.5%** asked. **43.7 ms per name.** Caveat: the held-out names were seen in
 `--report` output during this tuning, though no parameter was set from them and none was relabelled.
+
+### E3: scanning 10,000 files
+
+2026-11-07, `cargo run --release -p eval -- scan` (default 10,000), full catalogue, real FFprobe. A
+worst case for the scanner's shared searches: 10,000 **distinct** films sampled at random from the
+catalogue (at least 500 votes), each a small file with a scene-style name in its own "Title (Year)"
+folder. The scan walks, records, identifies in parallel (7 at a time) and runs FFprobe on the files it
+is unsure of (here FFprobe cannot read the stand-in files, so it is tried and fails: its cost is
+counted, its help is not).
+
+| Run | Files | Time | Per file | Accepted / asked | Page queries p95, idle → during scan | Best right | Accepted wrong |
+|---|---|---|---|---|---|---|---|
+| 1 | 9,994 of 9,996 | **37.1 s** | 3.7 ms | 9,255 / 739 | 24.7 → **33.5 ms** (542 runs) | 99.45% | 1 / 9,255 |
+| 2 (walker fixed) | 9,998 of 9,999 | **35.3 s** | 3.5 ms | 9,279 / 719 | 24.6 → **34.9 ms** (515 runs) | 99.54% | 1 / 9,279 |
+| 3 | 9,995 of 9,995 | **35.0 s** | 3.5 ms | 9,278 / 717 | — | — | — |
+
+Target: under 180 s and the UI not blocked. Run 1 lost two films whose titles start with "$" or ".",
+which the walker skipped as system folders; it now skips by Windows' hidden and system attributes and
+two system names (`crates/library/tests/scan.rs` `titles_that_look_like_system_names_are_still_found`,
+seen to fail on the old rule). The one file run 2 did not list is most likely a film with "sample" in
+its title: a file under 300 MB with that word is a release's sample clip, which a real film never is.

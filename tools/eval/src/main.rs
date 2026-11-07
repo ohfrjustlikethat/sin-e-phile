@@ -14,6 +14,7 @@ mod embed;
 mod error;
 mod identify;
 mod relevance;
+mod scan;
 mod search;
 mod subs;
 mod vector;
@@ -72,6 +73,15 @@ async fn main() {
         "identify" if args.iter().any(|a| a == "--timing") => {
             identify::timing(Path::new(&data_dir)).await
         }
+        "scan" => {
+            let files = args
+                .iter()
+                .position(|a| a == "--files")
+                .and_then(|i| args.get(i + 1))
+                .and_then(|n| n.parse().ok())
+                .unwrap_or(10_000);
+            scan::run(Path::new(&data_dir), files).await
+        }
         "identify" => identify::run(Path::new(&data_dir), report).await,
         "all" => match search::run(Path::new(&data_dir), report).await {
             // Every harness runs even when an earlier one misses its target — stopping
@@ -101,6 +111,7 @@ async fn main() {
                  \n  eval subs [--report]     subtitle alignment over fixtures/subtitles\
                  \n       --trace <wav> <out> the speech trace of a 16-bit mono WAV\
                  \n  eval identify [--report] what each name in fixtures/filenames is (Phase 12)\
+                 \n  eval scan [--files N]    scan N distinct catalogue films (Phase 12 E3)\
                  \n  eval all [--report]      every harness that exists\
                  \n\
                  \nReads the catalogue from $SINEPHILE_DATA_DIR, default ./data.\n"

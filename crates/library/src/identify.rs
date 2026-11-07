@@ -231,8 +231,21 @@ pub fn confidence(best: f64, next: f64) -> f64 {
     lead * plausible
 }
 
+/// Candidate ids already searched for, by comparable title: a scan of a series' episodes
+/// searches the catalogue once, not once per episode.
+pub type Cache = std::sync::Mutex<std::collections::HashMap<String, Vec<i64>>>;
+
 /// Identify one file.
 pub async fn identify(db: &Db, e: &Evidence) -> Result<Identification, DbError> {
+    identify_with(db, e, None).await
+}
+
+/// Identify one file, reusing and filling `cache`.
+pub async fn identify_with(
+    db: &Db,
+    e: &Evidence,
+    cache: Option<&Cache>,
+) -> Result<Identification, DbError> {
     let parsed = parse(&e.name);
     let folder = hint(&e.folders);
     let bare = says_nothing(&parsed.title);
@@ -289,38 +302,20 @@ pub async fn identify(db: &Db, e: &Evidence) -> Result<Identification, DbError> 
     }
 
     let library = LibraryRepository::new(db);
-    let search = SearchRepository::new(db);
-
-    // Candidates: the exact title in any variant, then word and trigram matches.
-    let mut ids: Vec<i64> = Vec::new();
-    let mut add = |hits: Vec<sinephile_persistence::repositories::Hit>| {
-        for h in hits {
-            let wanted =
-                FILM_KINDS.contains(&h.kind.as_str()) || SERIES_KINDS.contains(&h.kind.as_str());
-            if wanted && !ids.contains(&h.media_item_id) {
-                ids.push(h.media_item_id);
+    let cache_key = comparable(&title);
+    let cached = cache.and_then(|c| c.lock().ok()?.get(&cache_key).cloned());
+    let mut ids = match cached {
+        Some(ids) => ids,
+        None => {
+            let ids = candidates_for(db, &title).await?;
+            if let Some(c) = cache {
+                if let Ok(mut c) = c.lock() {
+                    c.insert(cache_key, ids.clone());
+                }
             }
+            ids
         }
     };
-    // "The Office (US)", "The Office UK": the catalogue's title has no country.
-    let bare_title = without_country(&title);
-    let mut exact = search.exact_title(&title, 20).await?;
-    let mut words = search.keyword(&title, 15).await?;
-    if let Some(bare) = &bare_title {
-        exact.extend(search.exact_title(bare, 20).await?);
-        words.extend(search.keyword(bare, 15).await?);
-    }
-    // The trigram search finds misspellings, and costs ~100x the others on the full
-    // catalogue (`eval identify --timing`): only when nothing close was found.
-    let close = exact
-        .iter()
-        .chain(&words)
-        .any(|h| title_similarity(&title, &h.title) >= 0.8);
-    add(exact);
-    add(words);
-    if !close {
-        add(search.fuzzy(&title, 8).await?);
-    }
 
     let remembered = library.recall(&key).await?;
     if let Some(id) = remembered {
@@ -406,6 +401,43 @@ pub async fn identify(db: &Db, e: &Evidence) -> Result<Identification, DbError> 
     }
     out.candidates = scored;
     Ok(out)
+}
+
+/// The catalogue items a title could be: the exact title in any variant, then word
+/// matches, then (only when nothing close was found) trigram matches.
+async fn candidates_for(db: &Db, title: &str) -> Result<Vec<i64>, DbError> {
+    let search = SearchRepository::new(db);
+    let mut ids: Vec<i64> = Vec::new();
+    let mut add = |hits: Vec<sinephile_persistence::repositories::Hit>| {
+        for h in hits {
+            let wanted =
+                FILM_KINDS.contains(&h.kind.as_str()) || SERIES_KINDS.contains(&h.kind.as_str());
+            if wanted && !ids.contains(&h.media_item_id) {
+                ids.push(h.media_item_id);
+            }
+        }
+    };
+    // "The Office (US)", "The Office UK": the catalogue's title has no country.
+    let bare_title = without_country(title);
+    let mut exact = search.exact_title(title, 20).await?;
+    let mut words = search.keyword(title, 15).await?;
+    if let Some(bare) = &bare_title {
+        exact.extend(search.exact_title(bare, 20).await?);
+        words.extend(search.keyword(bare, 15).await?);
+    }
+    // The trigram search finds misspellings, and costs ~100x the others on the full
+    // catalogue (`eval identify --timing`): only when nothing close was found.
+    let close = exact
+        .iter()
+        .chain(&words)
+        .any(|h| title_similarity(title, &h.title) >= 0.8);
+    add(exact);
+    add(words);
+    if !close {
+        add(search.fuzzy(title, 8).await?);
+    }
+
+    Ok(ids)
 }
 
 fn score(

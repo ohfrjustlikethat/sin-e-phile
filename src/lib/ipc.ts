@@ -197,6 +197,15 @@ export const commands = {
 } | null, string>(__TAURI_INVOKE("scrub_thumbs")),
 	/**  One sheet, as a `data:` URI. */
 	scrubSheet: (index: number) => typedError<string, string>(__TAURI_INVOKE("scrub_sheet", { index })),
+	libraryFolders: () => typedError<LibraryFolderView[], string>(__TAURI_INVOKE("library_folders")),
+	/**  Add a folder, scan it, and watch it. */
+	addLibraryFolder: (path: string) => typedError<number, string>(__TAURI_INVOKE("add_library_folder", { path })),
+	removeLibraryFolder: (id: number) => typedError<null, string>(__TAURI_INVOKE("remove_library_folder", { id })),
+	rescanLibraryFolder: (id: number) => typedError<null, string>(__TAURI_INVOKE("rescan_library_folder", { id })),
+	/**  How many files are waiting for a human decision. */
+	libraryReviewCount: () => typedError<number, string>(__TAURI_INVOKE("library_review_count")),
+	/**  Windows' own folder picker. `None` when cancelled. */
+	pickLibraryFolder: () => typedError<string | null, string>(__TAURI_INVOKE("pick_library_folder")),
 };
 
 /* Types */
@@ -383,6 +392,27 @@ export type ItemDetail = {
 	runtime_minutes: number | null,
 	synopsis: string | null,
 	credits: CreditView[],
+};
+
+export type LibraryFolderView = {
+	id: number,
+	path: string,
+	files: number,
+	scanned_at: string | null,
+	scanning: boolean,
+};
+
+/**  Sent as `library-scan` while a folder is scanned. */
+export type LibraryScanEvent = {
+	folder_id: number,
+	/**  "walking" | "identifying" | "done" | "failed" */
+	phase: string,
+	done: number,
+	total: number,
+	/**  When done: files, accepted, asked. */
+	files: number,
+	accepted: number,
+	asked: number,
 };
 
 /**  One of the user's own links. Ids are rowids, far below 2^53 (see `SearchHit`). */

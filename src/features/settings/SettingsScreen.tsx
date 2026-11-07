@@ -6,6 +6,7 @@ import { ControllerSection } from "./ControllerSection";
 import { SourcesSection } from "./SourcesSection";
 import { PlaybackSection } from "./PlaybackSection";
 import { SubtitlesSection } from "./SubtitlesSection";
+import { LibrarySection } from "./LibrarySection";
 
 /**
  * Settings — SPEC.md Phase 1, subtask 1.9.
@@ -53,6 +54,7 @@ export function SettingsScreen() {
         </button>
       </header>
 
+      <LibrarySection />
       <SourcesSection />
       <PlaybackSection />
       <SubtitlesSection />

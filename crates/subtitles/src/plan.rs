@@ -312,19 +312,26 @@ fn same(a: &str, b: &str) -> bool {
 /// The film's speech from FFmpeg: the first `seconds` of the default audio track, 16 kHz
 /// mono, through the speech detector. `None` if FFmpeg cannot read it.
 pub fn ffmpeg_speech(target: &str, seconds: u32) -> Option<Vec<bool>> {
-    let out = std::process::Command::new("ffmpeg")
-        .args([
-            "-nostdin",
-            "-v",
-            "error",
-            "-i",
-            target,
-            "-t",
-            &seconds.to_string(),
-        ])
-        .args(["-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", "-"])
-        .output()
-        .ok()?;
+    let mut cmd = std::process::Command::new("ffmpeg");
+    cmd.args([
+        "-nostdin",
+        "-v",
+        "error",
+        "-i",
+        target,
+        "-t",
+        &seconds.to_string(),
+    ])
+    .args(["-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", "-"]);
+    // A console program started from the windowed release build opens a console window
+    // of its own unless told not to (found in Phase 12; thumbs.rs already did this).
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let out = cmd.output().ok()?;
     if !out.status.success() || out.stdout.is_empty() {
         return None;
     }

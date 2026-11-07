@@ -68,6 +68,8 @@ const FAKE = `(() => {
       qualities: ["full_hd", "hd"], unmet: null, why: "1080p · served directly", candidates: [] }),
     player_pause_still: () => "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
     dev_autoplay: () => null,
+    library_folders: () => [],
+    library_review_count: () => 0,
     subtitle_settings: () => ({ settings: { languages: ["en"], always: false, font: "Segoe UI", size: 46,
       position: 95, background: false }, has_key: false, used_today: 0, budget: 5, server_remaining: null }),
   };
