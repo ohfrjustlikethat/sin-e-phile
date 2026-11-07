@@ -29,7 +29,7 @@ Folder registration with recursive scanning and live filesystem monitoring (`Rea
 - [x] **12.3** crates/library identification: candidates from the catalogue by title (FTS) and year, scored on independent weak signals (title similarity, year, duration vs runtime from FFprobe, episode exists, folder and sibling context, remembered decisions), a confidence in [0,1], auto-accepted above a threshold set from measurement (DECISIONS_PENDING), else the review queue. tools/eval 'identify' harness over fixtures/filenames labelled with catalogue ids: top-1 (E1 > 95%) and false-confident (E2 < 1%); numbers to docs/eval-results.md.
 - [x] **12.4** Scanner and watcher: register a folder, walk it recursively, probe only what identification needs, in parallel, off the UI thread with progress events; the notify crate (ReadDirectoryChangesW) applies creates, deletes, renames and moves without a rescan; a rename or move keeps the row (no duplicate, E4). Measured: 10,000 files under 3 minutes with the UI responsive (E3).
 - [x] **12.5** The review queue (Settings or Library): side-by-side candidates, typographic when there is no artwork, one click or one A press resolves, manual search for the rest, one decision settles a whole series' files; remembered for similar names. The library feeds LocalFileBackend so a local film is found by search and plays from its page (discharges Phase 8's carried criterion). Pad-only flow in tools/uiaudit/controller.mjs; resolving 20 items timed (E5).
-- [ ] **12.6** docs/specs/library.md, learning note, README and HOW_IT_WORKS, regression check, close.
+- [x] **12.6** docs/specs/library.md, learning note, README and HOW_IT_WORKS, regression check, close.
 
 ## Learning note
 
@@ -45,3 +45,4 @@ Parsing messy real-world input; why multiple weak signals beat one strong one; c
 - **12.3** crates/library identification: candidates from the catalogue by title (FTS) and year, scored on  · `c0eda95`
 - **12.4** Scanner and watcher: register a folder, walk it recursively, probe only what identification need · `96a73fa`
 - **12.5** The review queue (Settings or Library): side-by-side candidates, typographic when there is no ar · `b96f9fd`
+- **12.6** docs/specs/library.md, learning note, README and HOW_IT_WORKS, regression check, close. · `c0a782e`

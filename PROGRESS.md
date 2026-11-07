@@ -16,14 +16,14 @@
 
 > Opened 2026-11-07 when Phase 11 merged (cc3ca3c, tag phase-11). Inherits: absolute_number is NULL by design (ADR-0031), so an anime-style absolute number goes to the review queue rather than a lookup; Phase 8's carried criterion (search, click and watch a local file) is discharged by 12.5; the confidence threshold is measured, not chosen (DECISIONS_PENDING). Release-group names in fixtures are invented: real ones would be naming content sources by the back door (2.1). Author checks still outstanding: real controller (Phase 8 E5), VPN drop (Phase 7 E7), both carried to 13.
 
-### Subtasks — 5/6 complete
+### Subtasks — 6/6 complete
 
 - [x] **12.1** crates/filename-parser (MIT/Apache, pure, no I/O): title, year, season, episode (S01E02, 1x02, multi-episode ranges), absolute episode for anime-style 'Title - 059', resolution, source, codec, audio, language, release group (bracket prefix or dash suffix, recognised by position, never by a list of names). fixtures/filenames/: 500+ hand-labelled names covering scene, anime fansub, multi-episode, messy and adversarial cases; every group name invented (2.1); a per-field accuracy test. Documented with a runnable README example (E6). · `8c3a377`
 - [x] **12.2** Migration 0021 library: library_folders (the user's own roots, machine-specific like local_files.path; the portability test's allow-list grows by that column with the reason), local_files gains folder_id and a missing_since for moves; match_memory (a normalised name pattern -> media item, from the user's decisions). LibraryRepository with a repository_surface line per method. · `9de8483`
 - [x] **12.3** crates/library identification: candidates from the catalogue by title (FTS) and year, scored on independent weak signals (title similarity, year, duration vs runtime from FFprobe, episode exists, folder and sibling context, remembered decisions), a confidence in [0,1], auto-accepted above a threshold set from measurement (DECISIONS_PENDING), else the review queue. tools/eval 'identify' harness over fixtures/filenames labelled with catalogue ids: top-1 (E1 > 95%) and false-confident (E2 < 1%); numbers to docs/eval-results.md. · `c0eda95`
 - [x] **12.4** Scanner and watcher: register a folder, walk it recursively, probe only what identification needs, in parallel, off the UI thread with progress events; the notify crate (ReadDirectoryChangesW) applies creates, deletes, renames and moves without a rescan; a rename or move keeps the row (no duplicate, E4). Measured: 10,000 files under 3 minutes with the UI responsive (E3). · `96a73fa`
 - [x] **12.5** The review queue (Settings or Library): side-by-side candidates, typographic when there is no artwork, one click or one A press resolves, manual search for the rest, one decision settles a whole series' files; remembered for similar names. The library feeds LocalFileBackend so a local film is found by search and plays from its page (discharges Phase 8's carried criterion). Pad-only flow in tools/uiaudit/controller.mjs; resolving 20 items timed (E5). · `b96f9fd`
-- [ ] **12.6** docs/specs/library.md, learning note, README and HOW_IT_WORKS, regression check, close.
+- [x] **12.6** docs/specs/library.md, learning note, README and HOW_IT_WORKS, regression check, close. · `c0a782e`
 
 ### Exit criteria
 
@@ -44,7 +44,7 @@
 
 ## What's next
 
-Phase 12 subtask 12.6 then close (docs/phases/phase-12-local-library-engine.md): docs/specs/library.md (parser, signals and weights, confidence and ACCEPT_AT, scan, watcher, review, LocalFileBackend); docs/learning/phase-12-notes.md (four sections, concept + file:line, five questions); README and HOW_IT_WORKS; SESSION_LOG with the retrospective; rule-13 regression (eval all twice and vector --report against Phase 11); full pre-push list including build_state --check; merge --no-ff, CI on main, tag phase-12, close record, open Phase 13.
+Close Phase 12: CI green on phase/12-local-library-engine, merge --no-ff into main, CI green on main, tag phase-12, python /c/Users/hashi/AppData/Local/Temp/claude/C--Users-hashi-Documents-sin-e-phile/02bfad50-f550-4fd9-bb12-04c75dab39ba/scratchpad/open13.py-style close record (completion_commit = merge), generate.py --close 12 and --open 13.
 
 ---
 
@@ -167,6 +167,11 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D70** (raised in Phase 10) Subtitle files inside a torrent are found (crates/subtitles/src/files.rs in_torrent) but not fetched: plan() returns Off for Origin::Torrent. Fetch the file through the engine (select the file index) and treat it as a sidecar.
 - **D71** (raised in Phase 10) The OpenSubtitles hash, and so downloads and hash-keyed nudges, need a local file; a stream (Internet Archive, torrent) is keyed by its address and gets no download. Hash a stream from HTTP range requests for the first and last 64 KiB (the streaming server supports ranges).
 - **D72** (raised in Phase 10) The subtitle corpus is synthetic speech (Windows' synthesiser) over synthetic beds. Add a handful of real public-domain film clips with hand-timed subtitles we write ourselves, to measure the VAD on a real mix (SPEC.md R6).
+- **D73** (raised in Phase 12) A multi-episode file (S01E01E02) is matched to its first episode with covers = 2, but LocalFileBackend only finds files matched to the exact episode asked for, so episode 2 does not offer it. Look up files whose match covers the asked episode (crates/sources/src/backends/local.rs item_for, LibraryRepository::files_for_item).
+- **D74** (raised in Phase 12) A file removed while the app runs is marked missing by the watcher but only purged at the next scan (launch or Rescan). Missing files are already hidden from every view; purge them after a quiet period in library_loop if the rows ever matter.
+- **D75** (raised in Phase 12) The held-out filename corpus (109 names) was written by the same hand that tuned the parser, and its identification labels were seen in --report output while tuning. A truly independent check is a real user's library: count asked, accepted and wrong after a first real scan (Phase 14's onboarding test is the natural moment).
+- **D76** (raised in Phase 12) Two remakes with the same title and year (rare, but real) can only be told apart by duration, which needs FFprobe; a file FFprobe cannot read stays in the review queue. Container title tags (probed) are stored but not yet weighed as a signal.
+- **D77** (raised in Phase 12) CREATE_NO_WINDOW is now set on FFprobe and the subtitle aligner's FFmpeg; confirm in a release build (windows subsystem) that no console window flashes during a scan or an alignment. Batched with the Phase 13 author checks.
 
 ---
 

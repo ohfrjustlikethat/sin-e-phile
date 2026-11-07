@@ -45,8 +45,8 @@
       {
         "id": "12.6",
         "text": "docs/specs/library.md, learning note, README and HOW_IT_WORKS, regression check, close.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "c0a782e"
       }
     ],
     "exit_criteria": [
@@ -1543,8 +1543,8 @@
         {
           "id": "12.6",
           "text": "docs/specs/library.md, learning note, README and HOW_IT_WORKS, regression check, close.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "c0a782e"
         }
       ]
     },
@@ -2266,7 +2266,7 @@
       ]
     }
   ],
-  "next_action": "Phase 12 subtask 12.6 then close (docs/phases/phase-12-local-library-engine.md): docs/specs/library.md (parser, signals and weights, confidence and ACCEPT_AT, scan, watcher, review, LocalFileBackend); docs/learning/phase-12-notes.md (four sections, concept + file:line, five questions); README and HOW_IT_WORKS; SESSION_LOG with the retrospective; rule-13 regression (eval all twice and vector --report against Phase 11); full pre-push list including build_state --check; merge --no-ff, CI on main, tag phase-12, close record, open Phase 13.",
+  "next_action": "Close Phase 12: CI green on phase/12-local-library-engine, merge --no-ff into main, CI green on main, tag phase-12, python /c/Users/hashi/AppData/Local/Temp/claude/C--Users-hashi-Documents-sin-e-phile/02bfad50-f550-4fd9-bb12-04c75dab39ba/scratchpad/open13.py-style close record (completion_commit = merge), generate.py --close 12 and --open 13.",
   "blockers": [],
   "decisions_pending": [
     {
