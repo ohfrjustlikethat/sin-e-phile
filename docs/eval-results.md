@@ -2502,3 +2502,16 @@ which the walker skipped as system folders; it now skips by Windows' hidden and 
 two system names (`crates/library/tests/scan.rs` `titles_that_look_like_system_names_are_still_found`,
 seen to fail on the old rule). The one file run 2 did not list is most likely a film with "sample" in
 its title: a file under 300 MB with that word is a release's sample clip, which a real film never is.
+
+### E5: the review queue, and a local film played
+
+2026-11-07. **Pad only** (`node tools/uiaudit/controller.mjs`): from Settings the D-pad reaches "Check
+them" and twenty waiting files are answered by A alone in **5.3 s**. **Real window**, full catalogue:
+22 files (21 ambiguous on purpose: twelve remakes with no year, five *Monster* episodes, four *The
+Office* episodes with no country, and one 2.2 GB file named as *Heat* 1995) scanned in **1.3 s**, *Heat*
+accepted and **21 asked**. Answered by keyboard: **14 answers settled all 21** (a series' first answer
+settled its other episodes); the app took **20–290 ms** per answer from key to the next file on screen,
+0.8 s in all. So twenty answers in under a minute is a person reading, not the app waiting.
+
+Then *Heat* searched, its 1995 result clicked, Play: the page said "Your files", and the player logged
+`first_frame_ms=388 backend=local` (budget 500 ms local). Phase 8's carried criterion, discharged.

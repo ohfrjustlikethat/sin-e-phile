@@ -97,6 +97,9 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::library::rescan_library_folder,
             commands::library::library_review_count,
             commands::library::pick_library_folder,
+            commands::library::library_review,
+            commands::library::resolve_review,
+            commands::library::not_a_title,
         ])
         // `AssetProgress` travels as an EVENT payload, so no command signature mentions it
         // and specta would not export it. Registered explicitly rather than hand-written in

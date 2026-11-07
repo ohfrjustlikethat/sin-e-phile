@@ -1396,6 +1396,32 @@ async fn library_repository_surface() {
         "not for a higher bar"
     );
 
+    // set_ignored: out of the queue for good, and back
+    repo.clear_match(id).await.unwrap();
+    assert_eq!(repo.review_count(0.9).await.unwrap(), 1);
+    repo.set_ignored(id, true).await.expect("ignore");
+    assert!(repo.file(id).await.unwrap().unwrap().ignored);
+    assert_eq!(repo.review_count(0.9).await.unwrap(), 0, "not asked again");
+    assert!(repo.review_queue(0.9, 10).await.unwrap().is_empty());
+    repo.set_ignored(id, false).await.expect("unignore");
+    assert_eq!(
+        repo.review_count(0.9).await.unwrap(),
+        1,
+        "back in the queue"
+    );
+    repo.set_match(
+        id,
+        &FileMatch {
+            media_item_id: heat,
+            confidence: 0.85,
+            method: MatchMethod::Filename,
+            covers: 1,
+            confirmed: false,
+        },
+    )
+    .await
+    .unwrap();
+
     // mark_missing / missing_with_size / move_file: a rename keeps the row and its match
     repo.mark_missing(id).await.expect("missing");
     assert_eq!(repo.missing_with_size(2000).await.unwrap()[0].id, id);

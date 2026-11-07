@@ -235,17 +235,24 @@ pub fn confidence(best: f64, next: f64) -> f64 {
 /// searches the catalogue once, not once per episode.
 pub type Cache = std::sync::Mutex<std::collections::HashMap<String, Vec<i64>>>;
 
-/// Identify one file.
-pub async fn identify(db: &Db, e: &Evidence) -> Result<Identification, DbError> {
-    identify_with(db, e, None).await
+/// What a file's name and folders say, before the catalogue is asked: what to search
+/// for, and the key a decision about it is remembered under.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Reading {
+    pub parsed: Parsed,
+    pub title: String,
+    pub year: Option<u16>,
+    pub season: Option<u32>,
+    pub episodes: Vec<u32>,
+    /// How much the name says episode, 0 to 1.
+    pub likelihood: f64,
+    pub anime_style: bool,
+    pub is_episode: bool,
+    pub pattern: String,
 }
 
-/// Identify one file, reusing and filling `cache`.
-pub async fn identify_with(
-    db: &Db,
-    e: &Evidence,
-    cache: Option<&Cache>,
-) -> Result<Identification, DbError> {
+/// Read a file's evidence (no catalogue, no I/O).
+pub fn read(e: &Evidence) -> Reading {
     let parsed = parse(&e.name);
     let folder = hint(&e.folders);
     let bare = says_nothing(&parsed.title);
@@ -284,7 +291,41 @@ pub async fn identify_with(
     let anime_style = e.name.trim_start().starts_with('[');
     let is_episode = likelihood >= 0.5 && !bare_number || season.is_some();
 
-    let key = pattern(&title, year, is_episode);
+    Reading {
+        pattern: pattern(&title, year, is_episode),
+        parsed,
+        title,
+        year,
+        season,
+        episodes,
+        likelihood,
+        anime_style,
+        is_episode,
+    }
+}
+
+/// Identify one file.
+pub async fn identify(db: &Db, e: &Evidence) -> Result<Identification, DbError> {
+    identify_with(db, e, None).await
+}
+
+/// Identify one file, reusing and filling `cache`.
+pub async fn identify_with(
+    db: &Db,
+    e: &Evidence,
+    cache: Option<&Cache>,
+) -> Result<Identification, DbError> {
+    let Reading {
+        parsed,
+        title,
+        year,
+        season,
+        episodes,
+        likelihood,
+        anime_style,
+        pattern: key,
+        ..
+    } = read(e);
     let mut out = Identification {
         parsed: parsed.clone(),
         title: title.clone(),

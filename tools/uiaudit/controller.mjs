@@ -69,12 +69,24 @@ const FAKE = `(() => {
     player_pause_still: () => "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
     dev_autoplay: () => null,
     library_folders: () => [],
-    library_review_count: () => 0,
+    // Phase 12 E5: twenty files waiting, answered by pad alone further down.
+    library_review_count: () => window.__review.length,
+    library_review: () => window.__review,
+    resolve_review: (a) => {
+      window.__review = window.__review.filter((i) => i.file_id !== a.fileId);
+      return 0;
+    },
     subtitle_settings: () => ({ settings: { languages: ["en"], always: false, font: "Segoe UI", size: 46,
       position: 95, background: false }, has_key: false, used_today: 0, budget: 5, server_remaining: null }),
   };
   let nextId = 1;
   window.__calls = [];
+  const monster = (id, kind, runtime) => ({ media_item_id: id, kind, title: "Monster", year: 2004,
+    runtime_minutes: runtime, made_by: null, synopsis: null });
+  window.__review = Array.from({ length: 20 }, (_, i) => ({ file_id: i + 1,
+    name: "Monster - " + String(i + 1).padStart(2, "0") + " [DVD].mkv", folders: "Anime", minutes: 24, height: 480,
+    read_title: "Monster", read_year: null, read_episode: "Episode " + (i + 1), same_name: 0,
+    options: [monster(10, "anime_series", 24), monster(11, "series", 45)] }));
   window.__TAURI_INTERNALS__ = {
     invoke: async (cmd, args) => {
       window.__calls.push([cmd, args ?? {}]);
@@ -445,6 +457,34 @@ try {
   await press(B.MENU); // Menu is Done
   await waitFor(() => evalJs(`!document.querySelector('[aria-label="On-screen keyboard"]')`), "the keyboard to close", 20);
   check(await onKeyField(), "Menu closes the keyboard (Done), and focus stays on the field");
+
+  // Phase 12 E5: the review queue by pad alone. From the key field the D-pad climbs to
+  // "Check them"; then each A answers the focused (first) card, twenty times.
+  let onCheck = false;
+  for (let i = 0; i < 60 && !onCheck; i++) {
+    await press(B.UP);
+    onCheck = (await active())?.text === "Check them";
+  }
+  check(onCheck, "the D-pad reaches the review queue's 'Check them' in Settings");
+  await press(B.A);
+  await waitFor(() => evalJs(`document.body.textContent.includes("Check your library")`), "the review queue", 25);
+  await shoot("07c-review");
+  const t0 = Date.now();
+  for (let left = 20; left > 0; left--) {
+    await waitFor(
+      () => evalJs(`document.activeElement?.textContent?.includes("Monster") && window.__review.length === ${left}`),
+      `a card focused with ${left} waiting`,
+      40,
+    );
+    await press(B.A);
+  }
+  await waitFor(() => evalJs(`document.body.textContent.includes("Every file in your library is identified")`), "an empty queue", 40);
+  const seconds = (Date.now() - t0) / 1000;
+  const answered = (await calls("resolve_review")).length;
+  check(answered === 20 && seconds < 60, `20 answers by A alone in ${seconds.toFixed(1)} s (E5: under a minute)`);
+  await press(B.B);
+  await waitFor(() => evalJs(`document.body.textContent.includes("OpenSubtitles")`), "Settings again", 25);
+  check(true, "B returns from the queue to Settings");
   await press(B.B); // leave Settings
 
   // Reduced motion: every transform goes, the ring stops gliding.

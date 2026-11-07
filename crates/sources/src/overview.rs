@@ -33,7 +33,7 @@ fn built_in(id: &str) -> Option<(&'static str, &'static str)> {
     Some(match id {
         backends::local::ID => (
             "Your files",
-            "Films already on this computer. Folders are added in a later version.",
+            "Films and episodes in your library folders (Settings, Library).",
         ),
         backends::archive::ID => (
             "Internet Archive",
@@ -168,6 +168,7 @@ pub async fn context_from(
             untrusted_http,
             direct_links,
             addons,
+            library: Some(db.clone()),
         },
         refused,
     ))

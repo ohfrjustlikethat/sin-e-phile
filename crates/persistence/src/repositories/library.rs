@@ -36,6 +36,8 @@ pub struct LocalFile {
     pub container_title: Option<String>,
     pub probed: bool,
     pub missing_since: Option<String>,
+    /// Answered "not a film or episode": never asked about again.
+    pub ignored: bool,
 }
 
 /// A file as the scanner finds it on disk.
@@ -143,7 +145,7 @@ pub struct CandidateFacts {
 
 const FILE_COLUMNS: &str = "id, folder_id, path, size_bytes, modified_at, content_hash,
     duration_seconds, video_codec, audio_codec, width, height, audio_languages,
-    container_title, probed_at, missing_since";
+    container_title, probed_at, missing_since, ignored_at";
 
 fn file(row: &SqliteRow) -> Result<LocalFile, sqlx::Error> {
     let langs: Option<String> = row.try_get("audio_languages")?;
@@ -166,6 +168,7 @@ fn file(row: &SqliteRow) -> Result<LocalFile, sqlx::Error> {
         container_title: row.try_get("container_title")?,
         probed: row.try_get::<Option<String>, _>("probed_at")?.is_some(),
         missing_since: row.try_get("missing_since")?,
+        ignored: row.try_get::<Option<String>, _>("ignored_at")?.is_some(),
     })
 }
 
@@ -546,7 +549,7 @@ impl<'a> LibraryRepository<'a> {
     ) -> Result<Vec<LocalFile>, DbError> {
         let rows = sqlx::query(&format!(
             "SELECT {FILE_COLUMNS} FROM local_files l
-             WHERE l.missing_since IS NULL AND NOT EXISTS (
+             WHERE l.missing_since IS NULL AND l.ignored_at IS NULL AND NOT EXISTS (
                  SELECT 1 FROM local_file_matches m
                  WHERE m.local_file_id = l.id AND (m.is_confirmed = 1 OR m.confidence >= ?1))
              ORDER BY l.path LIMIT ?2"
@@ -561,13 +564,33 @@ impl<'a> LibraryRepository<'a> {
     pub async fn review_count(&self, threshold: f64) -> Result<i64, DbError> {
         Ok(sqlx::query_scalar(
             "SELECT COUNT(*) FROM local_files l
-             WHERE l.missing_since IS NULL AND NOT EXISTS (
+             WHERE l.missing_since IS NULL AND l.ignored_at IS NULL AND NOT EXISTS (
                  SELECT 1 FROM local_file_matches m
                  WHERE m.local_file_id = l.id AND (m.is_confirmed = 1 OR m.confidence >= ?1))",
         )
         .bind(threshold)
         .fetch_one(self.db.pool())
         .await?)
+    }
+
+    /// "Not a film or episode": out of the review queue for good. `false` puts it back.
+    pub async fn set_ignored(&self, id: i64, ignored: bool) -> Result<(), DbError> {
+        sqlx::query(
+            "UPDATE local_files
+             SET ignored_at = CASE WHEN ?2 THEN strftime('%Y-%m-%dT%H:%M:%SZ', 'now') END
+             WHERE id = ?1",
+        )
+        .bind(id)
+        .bind(ignored)
+        .execute(self.db.pool())
+        .await?;
+        if ignored {
+            sqlx::query("DELETE FROM review_candidates WHERE local_file_id = ?1")
+                .bind(id)
+                .execute(self.db.pool())
+                .await?;
+        }
+        Ok(())
     }
 
     /// Present files matched to this item: the copies a film's page can play.

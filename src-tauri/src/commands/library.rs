@@ -358,3 +358,111 @@ mod picker {
         None
     }
 }
+
+// ---- the review queue -------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct ReviewOptionView {
+    pub media_item_id: i32,
+    /// "film" | "series" | "anime_film" | "anime_series"
+    pub kind: String,
+    pub title: String,
+    pub year: Option<i32>,
+    pub runtime_minutes: Option<i32>,
+    pub made_by: Option<String>,
+    /// The first sentence, for a card.
+    pub synopsis: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct ReviewItemView {
+    pub file_id: i32,
+    /// The file's own name.
+    pub name: String,
+    /// The folders it sits in, below the library folder.
+    pub folders: String,
+    pub minutes: Option<i32>,
+    pub height: Option<i32>,
+    /// What the name was read as: the title, the year, and the episode in words.
+    pub read_title: String,
+    pub read_year: Option<i32>,
+    pub read_episode: String,
+    /// Other waiting files named the same way, which one answer also settles.
+    pub same_name: i32,
+    pub options: Vec<ReviewOptionView>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn library_review(
+    state: State<'_, AppState>,
+    limit: i32,
+) -> Result<Vec<ReviewItemView>, String> {
+    use sinephile_library::review::{episode_words, first_sentence, queue};
+    let db = db(&state)?;
+    let items = queue(&db, i64::from(limit))
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(items
+        .into_iter()
+        .map(|i| ReviewItemView {
+            file_id: i.file.id as i32,
+            name: Path::new(&i.file.path)
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+            folders: i.folders.join(" / "),
+            minutes: i.file.duration_seconds.map(|s| (s / 60) as i32),
+            height: i.file.height.map(|h| h as i32),
+            read_episode: episode_words(&i.reading),
+            read_title: i.reading.title.clone(),
+            read_year: i.reading.year.map(i32::from),
+            same_name: i.same_name as i32,
+            options: i
+                .options
+                .into_iter()
+                .map(|o| ReviewOptionView {
+                    media_item_id: o.candidate.media_item_id as i32,
+                    kind: o.candidate.kind,
+                    title: o.candidate.primary_title,
+                    year: o.candidate.release_year.map(|y| y as i32),
+                    runtime_minutes: o.candidate.runtime_minutes.map(|m| m as i32),
+                    made_by: o.made_by,
+                    synopsis: o
+                        .synopsis
+                        .map(|s| first_sentence(&s, 140))
+                        .filter(|s| !s.is_empty()),
+                })
+                .collect(),
+        })
+        .collect())
+}
+
+/// The answer: this file is that film or series. Returns how many other waiting files
+/// the same answer settled.
+#[tauri::command]
+#[specta::specta]
+pub async fn resolve_review(
+    app: AppHandle,
+    file_id: i32,
+    media_item_id: i32,
+) -> Result<i32, String> {
+    let state = app.state::<AppState>();
+    let db = db(&state)?;
+    let done =
+        sinephile_library::review::resolve(&db, i64::from(file_id), i64::from(media_item_id))
+            .await
+            .map_err(|e| e.to_string())?;
+    let _ = app.emit("library-changed", 0);
+    Ok(done.settled as i32)
+}
+
+/// "Not a film or episode": never asked about again.
+#[tauri::command]
+#[specta::specta]
+pub async fn not_a_title(state: State<'_, AppState>, file_id: i32) -> Result<(), String> {
+    let db = db(&state)?;
+    sinephile_library::review::not_a_title(&db, i64::from(file_id))
+        .await
+        .map_err(|e| e.to_string())
+}

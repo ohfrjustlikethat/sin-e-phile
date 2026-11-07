@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Input } from "@/design-system";
 import { commands, type LibraryFolderView, type LibraryScanEvent } from "@/lib/ipc";
+import { useUi } from "@/lib/store";
 
 /**
  * Settings → Library — SPEC.md Phase 12.
@@ -50,6 +51,7 @@ export function LibrarySection() {
   const [progress, setProgress] = useState<Record<number, LibraryScanEvent>>({});
   const [typed, setTyped] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const setReviewOpen = useUi((s) => s.setReviewOpen);
 
   useEffect(() => {
     const refresh = () => {
@@ -115,9 +117,14 @@ export function LibrarySection() {
       </ul>
 
       {(review.data ?? 0) > 0 && (
-        <p className="mb-4 text-sm text-ink">
-          {review.data} {review.data === 1 ? "file needs" : "files need"} a quick check.
-        </p>
+        <div className="mb-5 flex items-center justify-between gap-4 rounded-md border border-line px-4 py-3">
+          <p className="text-sm text-ink">
+            {review.data} {review.data === 1 ? "file needs" : "files need"} a quick check.
+          </p>
+          <Button variant="secondary" size="sm" onClick={() => setReviewOpen(true)}>
+            Check them
+          </Button>
+        </div>
       )}
 
       <div className="flex flex-wrap items-end gap-2">

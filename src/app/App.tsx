@@ -8,6 +8,7 @@ import { moveFocus, startGamepad } from "@/lib/gamepad";
 import { Placeholder } from "@/app/Placeholder";
 import { PadKeyboard, closePadKeyboard } from "@/app/PadKeyboard";
 import { SettingsScreen } from "@/features/settings/SettingsScreen";
+import { ReviewScreen } from "@/features/library/ReviewScreen";
 import { SearchScreen } from "@/features/search/SearchScreen";
 import { DesignGallery } from "@/features/design/DesignGallery";
 import { CommandPalette, type Command } from "@/design-system";
@@ -53,6 +54,7 @@ export function App() {
   const { destination, settingsOpen, setDestination, setSettingsOpen } =
     useUi();
   const playing = useUi((s) => s.playing);
+  const reviewOpen = useUi((s) => s.reviewOpen);
   const mini = useUi((s) => s.mini);
   const detail = useUi((s) => s.detail);
   useDropToPlay();
@@ -219,7 +221,9 @@ export function App() {
         <div className="flex h-full flex-col bg-base text-ink">
           <Masthead searching={searching} onSearchChange={setSearching} />
           <main className="min-h-0 min-w-0 flex-1 overflow-auto">
-            {settingsOpen ? (
+            {settingsOpen && reviewOpen ? (
+              <ReviewScreen />
+            ) : settingsOpen ? (
               <SettingsScreen />
             ) : detail !== null ? (
               <DetailScreen />

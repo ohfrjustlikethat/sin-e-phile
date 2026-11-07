@@ -23,6 +23,9 @@ export interface Playing {
 interface UiState {
   destination: Destination;
   settingsOpen: boolean;
+  /** The library's review queue (Phase 12), opened from Settings → Library. */
+  reviewOpen: boolean;
+  setReviewOpen: (open: boolean) => void;
   playing: Playing | null;
   /** The in-app mini player (ADR-0043): watching in a corner while browsing. */
   mini: boolean;
@@ -42,12 +45,14 @@ export const useUi = create<UiState>()(
     (set) => ({
       destination: "home",
       settingsOpen: false,
+      reviewOpen: false,
+      setReviewOpen: (reviewOpen) => set({ reviewOpen }),
       playing: null,
       mini: false,
       setMini: (mini) => set({ mini }),
       detail: null,
       setDestination: (destination) => set({ destination, detail: null }),
-      setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+      setSettingsOpen: (settingsOpen) => set({ settingsOpen, reviewOpen: false }),
       play: (playing) => set({ playing }),
       openDetail: (detail) => set({ detail, settingsOpen: false }),
       closeDetail: () => set({ detail: null }),
