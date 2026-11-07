@@ -39,7 +39,7 @@
       {
         "id": "15.5",
         "text": "The author check batch after this phase (ADR-0040): Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, and E3 here (the screen describes a profile accurately); then docs/specs/taste-model.md, learning note, README and HOW_IT_WORKS, regression, close.",
-        "status": "not_started",
+        "status": "in_progress",
         "commit": null
       }
     ],
@@ -60,7 +60,9 @@
         "id": "E3",
         "text": "The taste profile screen describes a test profile in a way the author agrees is accurate.",
         "met": false,
-        "evidence": null
+        "evidence": "MEASURED: the screen exists and describes real modes in sentences (86eec57; crates/taste/tests/describe.rs each_mode_is_named_by_what_it_holds; on the real catalogue, eval modes prints 'You gravitate toward horror and drama, mostly from the 2000s and 2010s (The Silence of the Lambs, The Shining, Alien)'; pad-complete in tools/uiaudit/controller.mjs). Whether it is accurate is the author's judgement.",
+        "carried_to_phase": 16,
+        "carried_reason": "It needs the author to agree the description is accurate; batched with the author checks after Phase 15, so Phase 16 receives it."
       },
       {
         "id": "E4",
@@ -1749,7 +1751,9 @@
           "id": "E3",
           "text": "The taste profile screen describes a test profile in a way the author agrees is accurate.",
           "met": false,
-          "evidence": null
+          "evidence": "MEASURED: the screen exists and describes real modes in sentences (86eec57; crates/taste/tests/describe.rs each_mode_is_named_by_what_it_holds; on the real catalogue, eval modes prints 'You gravitate toward horror and drama, mostly from the 2000s and 2010s (The Silence of the Lambs, The Shining, Alien)'; pad-complete in tools/uiaudit/controller.mjs). Whether it is accurate is the author's judgement.",
+          "carried_to_phase": 16,
+          "carried_reason": "It needs the author to agree the description is accurate; batched with the author checks after Phase 15, so Phase 16 receives it."
         },
         {
           "id": "E4",
@@ -1792,7 +1796,7 @@
         {
           "id": "15.5",
           "text": "The author check batch after this phase (ADR-0040): Phase 8 E5 controller, Phase 7 E7 VPN, Phase 13 review feel and D77, Phase 14 E1/E4/E6, and E3 here (the screen describes a profile accurately); then docs/specs/taste-model.md, learning note, README and HOW_IT_WORKS, regression, close.",
-          "status": "not_started",
+          "status": "in_progress",
           "commit": null
         }
       ]

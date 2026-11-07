@@ -2795,3 +2795,7 @@ The same run of `-- modes` now says the modes in words (15.4), on the real catal
 The Shining, Alien)" (47%); "You also love documentary and biography … (Bowling for Columbine,
 Fahrenheit 9/11, The Social Dilemma)" (42%); and the 10% edge-case mode, "documentary and action …,
 Jeff Tremaine above all (Get Out, Saw, Super Size Me)", which says honestly that it is a mixture.
+
+### Regression check before merging Phase 15 (rule 13)
+
+2026-11-08, `cargo run --release -p eval -- all` (twice), `-- vector --report`, `-- import --from 600`, `-- taste`, `-- switch`, `-- modes`, `-- update`: E2 **43/43**; E3 meaning **0.0472**, filter **1.0000** (carried); p95 **15.6 ms** warm (16.4 at Phase 14: noise); recall@10 **0.9760**; subtitles **48/48** tuned, **32/32** held out, false accepts **0/10**; identify **99.05% / 0.39%** (held out 100% / 0%); import (fresh 600) **98.83% / 0 wrong**; taste **40.63%** against popularity 35.64%; switch **22.9 / 30.5 ms** p95; modes purity **96.6%**; update **125.5–133.2 ms**. Unchanged from Phase 14 and from this phase's own first runs.

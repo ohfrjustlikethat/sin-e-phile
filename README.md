@@ -346,6 +346,12 @@ Honestly:
   for and what they like: films to pick by name across a century, six statements that are not
   genres, their own words, or an import from Letterboxd, Trakt, IMDb or MyAnimeList, which placed
   98.8% of 600 films correctly and none wrongly. Home's first version is never empty, key or no key.
+- ✅ **A taste model.** What you finish, walk out of (five minutes in counts more than eighty), rate
+  and save, faded with time, is grouped into several separate tastes rather than one average, and
+  Home recommends from each in proportion. It recovers 40.6% of held-out favourites against 35.6% for
+  "the most popular" on MovieLens users. A taste screen says it back in sentences ("You gravitate
+  toward horror, mostly from the 1970s and 80s …") and takes corrections: more of this, less, not
+  me. It updates about 130 ms after a watch, in the background.
 - ⬜ Everything else described above this section
 
 ---

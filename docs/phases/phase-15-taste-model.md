@@ -17,7 +17,7 @@ Signal collection with weights: completed (strong positive), abandoned early (st
 
 - [x] **E1** The model produces distinct, recognisable clusters for a synthetic profile with two deliberately unrelated tastes.
 - [x] **E2** Abandonment is weighted correctly — abandoning at 5 minutes and at 80 minutes mean different things.
-- [ ] **E3** The taste profile screen describes a test profile in a way the author agrees is accurate.
+- [ ] **E3** The taste profile screen describes a test profile in a way the author agrees is accurate. — *carried to Phase 16*
 - [x] **E4** Temporal decay is tested with a synthetic profile whose taste shifts over simulated time.
 - [x] **E5** The model updates within 2 s of a watch event, without blocking the UI.
 

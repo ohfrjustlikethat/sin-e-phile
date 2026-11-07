@@ -2155,3 +2155,56 @@ on rereading. The taste half of E2 is not met.
 **Carry forward.** The author batch after Phase 15: a real controller, a VPN cut, the review screen's feel,
 D77, a first-time person through onboarding (E1), and sign-off on the onboarding screens and Home (E4, E6).
 Phase 15 must beat popularity on `eval taste`.
+
+### Session 22, continued (2026-11-08) — Phase 15: the taste model
+
+**Built.** Signals (migration 0026): the player records each viewing as completed or abandoned at its
+point; a skim is not recorded; search-opened and detail-not-played signals are stored. `crates/taste`
+gained the model: signals weighed and decayed (half-lives 180 and 720 days, abandon weight by share
+watched), weighted k-means modes with k 3–8 by silhouette, recommendations across modes with a popularity
+prior, a `ModelCache` keyed by a signal fingerprint, axes (decades, lengths, genres, directors, avoids)
+with the statements as priors, and `describe` (each mode in a sentence, the axes when clear, corrections
+per profile). The taste profile screen (Settings → Profiles, Who's watching?, the palette), pad-complete.
+The model rebuilds in a background task after a watch or a rating. Harnesses `eval modes [--prove]`,
+`eval taste [--tune]`, `eval update`; `eval switch` with the model.
+
+**Numbers.** `eval taste`: modes + prior 40.63% of held-out favourites against popularity 35.64% (97x
+chance): Phase 14 E2's carried half met. `eval modes`: purity 96.6%, shuffled control 59.3%. `eval update`:
+126–133 ms from a watch to a model that holds it (target 2 s). Switch with the model 20.8 / 29.8 ms p95.
+Rust tests 761 → 777; frontend 157 → 159.
+
+**Regression (rule 13).** E2 **43/43**; E3 meaning **0.0472**, filter **1.0000** (carried); p95 **15.6 ms** warm (16.4 at Phase 14: noise); recall@10 **0.9760**; subtitles **48/48** tuned, **32/32** held out, false accepts **0/10**; identify **99.05% / 0.39%** (held out 100% / 0%); import (fresh 600) **98.83% / 0 wrong**; taste **40.63%** against popularity 35.64%; switch **22.9 / 30.5 ms** p95; modes purity **96.6%**; update **125.5–133.2 ms**. Unchanged from Phase 14 and from this phase's own first runs.
+
+**Bugs, and what each teaches.**
+- The taste model made a profile switch 272 ms: k-means six times on every Home. Cached by a fingerprint
+  of the signals and built at launch. *Expensive and rarely changing: compute once, key by the data.*
+- `eval modes` gave a different purity each run: k-means seeded from a hash map's order. *Sort before
+  anything order-sensitive.*
+- A table of mode results in eval-results was written from expectation, not from the run; corrected to
+  the measured run. *Copy numbers from output, never from memory.*
+- The description's share-scaling was untested: a mutation survived because every fixture title had one
+  genre. *A mutation that survives names the missing test.*
+- "the 2000s and 10s" read oddly on real data; fixed after reading the real output. *Read the real thing.*
+- A commit subject over 72 characters was refused and swept the next commit's files; fixed forward.
+
+**Decisions.** The popularity prior 0.5, tuned on users 120, 166, 171 and judged once on the three that
+judge. Axes describe and do not weigh recommendations, so they are corrected through the statements (their
+prior), not by a toggle that would change nothing. Corrections keyed by a mode's strongest member.
+Rebuild after a watch in a background task rather than on the command's path. Countries, languages and
+subtitle tolerance wait for data the offline catalogue lacks (D84). E3 (the author agrees the screen
+describes a profile accurately) carried to Phase 16 with the batch. D82–D84.
+
+**Spec amendments.** None.
+
+#### Phase 15 retrospective
+
+**Went well.** Every claim has a harness that was seen to fail: the negative control for modes, the cache
+mutation for freshness, the tuning set kept apart from the judging set. The model beats popularity
+honestly, which Phase 14 could not.
+
+**Went badly.** One fabricated table (caught and corrected) and a weak fixture that let a mutation live.
+Both were caught by rereading, which is not a process.
+
+**Carry forward.** The author batch now: a real controller (8 E5), a VPN cut (7 E7), the review screen's
+feel, D77, a first-time person through onboarding (14 E1), sign-off on onboarding and Home (14 E4, E6), and
+the taste screen on a real profile (15 E3).

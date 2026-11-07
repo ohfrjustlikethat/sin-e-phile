@@ -265,15 +265,16 @@ wrong film through is worse than a smaller shelf.
 **The analogy:** a good video shop's regulars each have a card; the clerk who knows your card does not
 recommend from someone else's.
 
-### Taste and discovery — the reason to use this at all `⬜ Phases 15–17`
+### Taste and discovery — the reason to use this at all `✅ Phase 15 · ⬜ Phases 16–17`
 
 The taste model does not average you into one vector, because someone who loves both
 Tarkovsky and slasher films is not described by their midpoint. Positive signals are
-clustered into 3–8 taste **modes**, each with its own vector, weight and recency. It
-also learns *negative* preferences from what you abandon, and where you abandoned it:
-bailing at 5 minutes and at 80 minutes mean different things.
+clustered into 3–8 taste **modes**, each with its own vector and weight, and old signals
+fade. It also learns *negative* preferences from what you abandon, and where you abandoned
+it: bailing at 5 minutes and at 80 minutes mean different things. A taste screen says the
+modes back in sentences and lets you correct each one. That much exists (Phase 15).
 
-Recommendations combine content similarity against each mode with **collaborative
+Still to come (Phases 16–17): recommendations combine content similarity against each mode with **collaborative
 filtering** — "people who loved this also loved" — precomputed offline, so there is
 no server and no other users involved.
 
@@ -405,6 +406,14 @@ parallel, probe only the uncertain), watches (ReadDirectoryChangesW through `not
 rename kept a rename) and runs the review queue. The local source answers from the library,
 so a film on this PC sits beside every other copy on its page. How it all fits:
 `docs/specs/library.md`.
+
+### The taste model ✅ `Phase 15`
+
+`crates/taste`: signals weighed and decayed, modes by weighted k-means with k by silhouette,
+recommendations across modes with a popularity prior, axes with the statements as priors, the
+modes described in sentences, corrections per profile, and a model cache rebuilt in the
+background after a watch. The taste screen is reached from Settings → Profiles and from Who's
+watching?. How it all fits: `docs/specs/taste-model.md`.
 
 ### Profiles ✅ `Phase 14`
 
