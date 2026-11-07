@@ -12,34 +12,39 @@
 
 **Phase 14 — Profiles and First-Run Onboarding** (`in_progress`, branch `phase/14-profiles`)
 
-1 of 6 exit criteria met with evidence.
+2 of 6 exit criteria met with evidence.
 
 > E1 and E6 need a person and the author; built and tested as far as code allows, asked for in the batch after Phase 15 (ADR-0040).
 
-### Subtasks — 5/6 complete
+### Subtasks — 6/6 complete
 
 - [x] **14.1** Profiles in the backend: migration 0024 (avatar colour, PIN salt and hash, kids flag and limit, last used); ProfileRepository create/rename/delete (never the last)/set_pin/verify_pin/set_kids/touch, each with a line in repository_surface.rs; an active profile in AppState replacing every ensure_default() call in src-tauri; a crate test that watchlist, positions, ratings, watch events, settings and keys never cross profiles (E5). · `f671bc2`
 - [x] **14.2** Profiles in the app: the picker on launch only with two or more (ADR-0043), the avatar in the masthead with a switcher, create and edit with an optional PIN, the kids profile failing closed (TMDB certification within the limit when the profile has a key, otherwise Family or Animation titles that are not adult nor tagged with an adult genre); switching timed to a re-rendered Home (E5); pad-complete in tools/uiaudit/controller.mjs. The frontend's personal browser storage (playback choice, recent searches) is scoped by profile and reloaded on a switch; machine settings (controller, last destination) stay shared. · `272b54f`
 - [x] **14.3** Imports (crates/imports): Letterboxd CSV (watched, ratings, diary, watchlist), Trakt JSON, IMDb ratings CSV, MAL and AniList XML, each matched to the catalogue (an IMDb id where the file gives one, else title and year through the library's identifier), recorded per profile as ratings, completed watches and watchlist, unmatched rows listed in words; a 500+ entry Letterboxd fixture built from catalogue titles, match rate recorded (E2). · `cace2eb`
 - [x] **14.4** Taste input: the six taste statements (pace, ambiguity, era, subtitles, runtime, formal experimentation) stored per profile; the free-text 'what you love' embedded with the query embedder and stored; a seed taste vector from imports and statements, so E2's 'reflected in the taste model' is measurable now (nearest titles to the vector against the imported favourites) and Phase 15 builds on it. · `8174b82`
 - [x] **14.5** The onboarding wizard: profile, taste (imports, statements, free text, and the adaptive typographic title-card grid as an extra round: 3-4 rounds, picks spread for information gain), sources (paste a URL, the Internet Archive, add a folder inline), each skippable and never a dead end; shown on first run only; E3 and E4 tested with no key and no sources; pad-complete. · `3848f41`
-- [ ] **14.6** Author checks batched after Phase 15 (E1 a first-time user timed to a populated Home; E6 sign-off on the onboarding screens) with the earlier ones; docs/specs/profiles.md, learning note, README and HOW_IT_WORKS, regression, close.
+- [x] **14.6** Author checks batched after Phase 15 (E1 a first-time user timed to a populated Home; E6 sign-off on the onboarding screens) with the earlier ones; docs/specs/profiles.md, learning note, README and HOW_IT_WORKS, regression, close. · `89e50d6`
 
 ### Exit criteria
 
 - [ ] **E1** A first-time user with no technical knowledge reaches a populated Home screen in under two minutes. Test this on an actual person.
+      - *Evidence:* MEASURED: the whole first run is pad-complete in tools/uiaudit/controller.mjs and ends on a Home that is never empty (crates/taste/tests/home.rs); a first-time person timing it is the author's to arrange.
 - [ ] **E2** A Letterboxd export of 500+ films imports correctly and is reflected in the taste model.
+      - *Evidence:* MEASURED: the import half is met: eval import on a fresh set of 600 films (ranks 601-1200), 98.83% right, 0 wrong, a second import adds nothing. The reflection half is not: eval taste on three real MovieLens histories, the seed finds 11.06% of held-out favourites among its 500 nearest against 35.64% for popularity (27x chance, 0.31x popularity). docs/eval-results.md.
 - [x] **E3** Skipping the sources step leaves a functional, non-empty app.
       - *Evidence:* 3848f41: src/features/onboarding/Onboarding.test.tsx 'skipping every step still finishes, and nothing is a dead end' (Skip, Skip, Back, Skip, 'Skip, and start' reaches the app); crates/taste/tests/home.rs a_new_profile_with_nothing_still_has_a_home (no history, no sources, no vector half: the 'Widely loved' rail from the offline catalogue alone, seen to fail with the kids filter broken); the whole first run by pad in tools/uiaudit/controller.mjs ('the whole first run by pad, and it ends in the app'); docs/evidence/phase-14/onboarding-*.png (the real window on the full catalogue, no TMDB key).
 - [ ] **E4** Completing onboarding with no TMDB key produces a working, populated, good-looking app (ADR-0013). Every artwork-bearing surface has a designed artwork-free state — a typographic fallback, never a grey rectangle.
-- [ ] **E5** Profile switching is instant and leaks no state between profiles.
+      - *Evidence:* MEASURED: no TMDB key anywhere in Phase 14; Home's cards are PosterCard's designed typographic state (no 'Uncatalogued', no grey rectangles); the onboarding screens on the full catalogue in docs/evidence/phase-14/; 'good-looking' is the author's judgement.
+- [x] **E5** Profile switching is instant and leaks no state between profiles.
+      - *Evidence:* eval switch (2026-11-07/08): a switch (touch, then the new profile's Home rails with the taste seed) takes 2.1-2.5 ms for an empty profile and 10.9-11.5 ms for one with 650 imported films, warm; 112.1 ms the first time after an import, from disk (D82). No state leaks: crates/persistence/tests/profiles.rs nothing_one_profile_does_is_visible_to_another and deleting_a_profile_takes_all_of_its_own_and_nothing_else (seen to fail with a profile filter removed); browser storage per profile in src/lib/profileStorage.test.ts (seen to fail with reset-then-read). docs/eval-results.md 'E5: switching profiles'.
 - [ ] **E6** Every onboarding screen is beautiful — this is the first impression.
+      - *Evidence:* MEASURED: the three onboarding steps captured in the real window (docs/evidence/phase-14/onboarding-*.png) and by the pad flow (tools/uiaudit/out/controller/00a, 00b).
 
 ---
 
 ## What's next
 
-Phase 14 subtask 14.6 (docs/phases/phase-14-profiles.md): measure profile switching (E5: switch_profile to a re-rendered Home in the real window, timed from the log) and record E5 with the isolation tests; write docs/specs/profiles.md, docs/learning/phase-14-notes.md, README and HOW_IT_WORKS; run the regression (eval all, import --from 600, taste); then close Phase 14 with E1, E4 and E6 carried to Phase 16 (they need a first-time person and the author's sign-off, batched after Phase 15) and E2's reflection half carried to Phase 15.
+Phase 14 close (docs/phases/phase-14-profiles.md): push, wait for CI green on phase/14-profiles, merge --no-ff into main, CI green on main, tag phase-14, write the phase record (complete, completion_commit = the merge), python tools/phasedoc/generate.py --close 14 and --open 15, and author Phase 15 subtasks from SPEC.md §15 (taste modes that beat popularity on eval taste).
 
 ---
 
@@ -69,7 +74,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 11 | Player Experience Layer | B | 8, 9, 10 | 2 | 6/6 |
 | [x] | 12 | Local Library Engine | B | 4 | 2–3 | 6/6 |
 | [x] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 8/8 |
-| [~] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 1/6 |
+| [~] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 2/6 |
 | [ ] | 15 | Taste Model | B | 5, 14 | 2 | 0/5 |
 | [ ] | 16 | Recommendation Engine | B | 15 | 2–3 | 0/6 |
 | [ ] | 17 | Discovery Engine | B | 16 | 2 | 0/6 |
@@ -171,6 +176,7 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D79** (raised in Phase 13) The advisor runs only for a torrent copy the film page already started (the plan's chosen candidate). A web stream is not downloadable, so nothing is offered; a title whose best copy is a web stream but which also has a torrent copy is not offered the torrent to download. Revisit with the Phase 15 taste input.
 - **D80** (raised in Phase 13) Upstream (librqbit 9.0.1): create_torrent writes one piece hash too many when the content is a whole number of pieces (500 bytes of hashes for 24 pieces of 256 KiB); libtorrent refuses such a torrent as invalid (stays fetching metadata, then errors; a .torrent of it is never added). The app never creates torrents, so only test fixtures are affected; crates/downloads/tests/qbittorrent_real.rs uses a size that is not a whole number. Worth reporting upstream (the author's call: an outward-facing issue).
 - **D81** (raised in Phase 14) Kids profiles filter by genre (MovieLens 'Children' or IMDb 'Family', not adult, none of Adult/Horror/Thriller/Crime/War/Film-Noir) because the free catalogue has no certifications. The kids_limit column waits for TMDB release-date certifications, which are not fetched yet; until then a profile's limit is not a certification. Home rails (Phases 16-18) must ask MediaRepository::suitable_for_children like search does.
+- **D82** (raised in Phase 14) The first profile switch after launch costs about 112 ms (index and catalogue pages read from disk) against 11 ms warm. Touch the vector index and the votes index in the background after launch so the first switch, and the first Home, are warm.
 
 ---
 
