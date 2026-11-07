@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **3.2.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **3.3.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -328,6 +328,12 @@ typographic treatment rather than breaking.
   credits then an end card for films; an in-app mini player; profile picker only with 2+
   profiles; Surprise me; mood shelves; ambient screen after 5 idle minutes in TV mode; no
   launch intro; watch stats. ADR-0043's table says which phase builds each.
+- **Release polish and reading** (ADR-0044): leaving the player shrinks the picture into its
+  tile; shared-element motion; seamless resume and crash restore (Phase 18). Reading adds
+  EPUB, DRM-free MOBI/AZW3, Guided View and a full controller scheme (Phase 25). The release
+  is **unsigned**, and **no pre-built catalogue is ever distributed**: the IMDb datasets are
+  personal, non-commercial (Phase 27). Idle RAM is measured over the whole process tree,
+  WebView2 included (Phase 21).
 - **Every phase is finished** (ADR-0043): all 28, at full depth, within about two weeks of
   2026-11-06. No tier is cut; tier boundaries are understanding-gate checkpoints, not stops.
 - **Windows only.** Use Windows APIs directly where they give a better result.

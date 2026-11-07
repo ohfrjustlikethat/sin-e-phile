@@ -1,5 +1,5 @@
 {
-  "spec_version": "3.2.0",
+  "spec_version": "3.3.0",
   "project": "sin-e-phile",
   "last_updated": "2026-11-06",
   "sessions_completed": 21,
@@ -1861,6 +1861,18 @@
           "text": "The author signs off the screenshot review set (every surface, both sizes, with and without artwork) against §9.0's test: `manual: <what they reviewed and said>`. This set supplies the README's screenshots.",
           "met": false,
           "evidence": null
+        },
+        {
+          "id": "E12",
+          "text": "Leaving the player shrinks the picture into its tile at 60 fps, measured in the real window, and reduced motion replaces it with a dissolve (ADR-0044).",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E13",
+          "text": "Relaunching, including after a forced crash, returns to the same page, scroll, focus and film position (ADR-0044).",
+          "met": false,
+          "evidence": null
         }
       ]
     },
@@ -1976,6 +1988,12 @@
         {
           "id": "E4",
           "text": "The Tier 0 experience is genuinely good, not merely functional — verified by the manual test plan.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E5",
+          "text": "Idle memory is measured over the whole process tree, WebView2's processes included, in the release build, and meets §2.3 (ADR-0044).",
           "met": false,
           "evidence": null
         }
@@ -2136,6 +2154,24 @@
           "text": "Reading progress syncs to AniList.",
           "met": false,
           "evidence": null
+        },
+        {
+          "id": "E6",
+          "text": "EPUB (fixed and reflowable), MOBI and AZW3 open correctly; a DRM-protected file is refused with a plain message, never decrypted.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E7",
+          "text": "Guided View steps through panels on a fixture set with its detection accuracy measured and recorded, and falls back to page view where unsure.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E8",
+          "text": "Every reading surface and mode is usable with an Xbox controller alone.",
+          "met": false,
+          "evidence": null
         }
       ]
     },
@@ -2216,6 +2252,12 @@
         {
           "id": "E5",
           "text": "Section 2.1 verified once more: no source URLs, indexer names, or catalogues anywhere in the repository or its history.",
+          "met": false,
+          "evidence": null
+        },
+        {
+          "id": "E6",
+          "text": "The release artefact contains no catalogue database or dataset file, verified by listing it (ADR-0044).",
           "met": false,
           "evidence": null
         }
@@ -2477,6 +2519,11 @@
       "id": "0043",
       "title": "The TV keyboard, and the interface decisions that lock the app",
       "date": "2026-11-06"
+    },
+    {
+      "id": "0044",
+      "title": "Release polish, reading formats, and an unsigned release",
+      "date": "2026-11-07"
     }
   ],
   "environment": {

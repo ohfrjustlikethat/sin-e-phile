@@ -1968,3 +1968,21 @@ worth it: four defects, all invisible to unit tests.
 stale frontend.
 
 **Carry forward.** Phase 7 E7 and Phase 8 E5 (author checks) to Phase 13. D67–D72.
+
+### Session 22, continued (2026-11-07) — spec 3.3.0, between 12.3 and 12.4
+
+**Asked and answered.** The author asked whether every title stays updated whenever a torrent
+exists (no: the catalogue refreshes in ADR-0030's layers, but the app ships no sources and never
+looks for torrents itself, §2.1), how to make a public release instantly good, and how efficient the
+app is. Decided by the author: the player exits by shrinking into its tile; shared-element motion;
+seamless resume and crash restore; Windows media controls and history import confirmed; reading adds
+EPUB, DRM-free MOBI/AZW3 and Guided View with a full controller scheme; the release is unsigned.
+
+**Spec amendment.** 3.3.0 (A34, ADR-0044): Phases 18, 21, 25 and 27 gain deliverables and seven
+exit criteria between them. Two facts recorded with it: the IMDb datasets are personal,
+non-commercial, so no pre-built catalogue is ever distributed; and the 42.2 MB idle figure counted the
+main process only, so Phase 21 measures the whole process tree.
+
+**Also.** The full pre-push list was killed by the system's memory pressure; re-run step by step, all
+green (Rust 673, frontend 104). The pad flow had hung for ten minutes when its Chrome died: it now
+fails on a closed connection or after five minutes (`a684e55`).

@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 3.2.0** · 21 session(s) completed · last updated 2026-11-06
+**Spec version 3.3.0** · 21 session(s) completed · last updated 2026-11-06
 
 ---
 
@@ -75,16 +75,16 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [ ] | 15 | Taste Model | B | 5, 14 | 2 | 0/5 |
 | [ ] | 16 | Recommendation Engine | B | 15 | 2–3 | 0/6 |
 | [ ] | 17 | Discovery Engine | B | 16 | 2 | 0/6 |
-| [ ] | 18 | Browsing Surfaces 🏁 | B | 17 | 4–5 | 0/11 |
+| [ ] | 18 | Browsing Surfaces 🏁 | B | 17 | 4–5 | 0/13 |
 | [ ] | 19 | Watchlist and External Sync | C | 18 | 1–2 | 0/5 |
 | [ ] | 20 | Windows Platform Integration | C | 12, 18 | 2–3 | 0/5 |
-| [ ] | 21 | Performance Engineering and the Low-End Path | B | 18 (20 optional) | 2 | 0/4 |
+| [ ] | 21 | Performance Engineering and the Low-End Path | B | 18 (20 optional) | 2 | 0/5 |
 | [ ] | 22 | Vision Layer (Tier 2) | D | 11 | 1–2 | 0/5 |
 | [ ] | 23 | Binge Intelligence | C | 11, 12 | 1–2 | 0/4 |
 | [ ] | 24 | Live Channels | D | 18 | 2 | 0/5 |
-| [ ] | 25 | Manga and Comics | D | 3, 5, 16 | 2–3 | 0/5 |
+| [ ] | 25 | Manga and Comics | D | 3, 5, 16 | 2–3 | 0/8 |
 | [ ] | 26 | Connected Playback | D | 11 | 2 | 0/5 |
-| [ ] | 27 | Hardening, Packaging, and Portfolio Finalisation | B | everything | 2–3 | 0/5 |
+| [ ] | 27 | Hardening, Packaging, and Portfolio Finalisation | B | everything | 2–3 | 0/6 |
 
 Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting review · `[ ]` not started. 🏁 marks Phase 8 (first demoable build) and Phase 18 (complete product).
 
