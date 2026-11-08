@@ -241,3 +241,34 @@ async fn home_is_in_the_authors_order_with_new_episodes_the_library_and_new_rele
     assert!(!r[2].items.contains(&quiet));
     assert!(r[3].items.contains(&classic));
 }
+
+#[tokio::test]
+async fn with_a_tmdb_key_what_is_showing_now_leads_new_releases() {
+    // Phase 16: the catalogue knows years; TMDB knows what is in cinemas this week.
+    use sinephile_persistence::repositories::CredentialRepository;
+    let db = Db::in_memory().await.unwrap();
+    let year = this_year();
+    let big = film(&db, "Most Watched This Year", year, 90_000, &["Drama"]).await;
+    let showing = film(&db, "Just Opened", year, 2_000, &["Drama"]).await;
+    let me = ProfileRepository::new(&db).ensure_default().await.unwrap();
+
+    let r = rails(&db, None, me, false, None, &Default::default())
+        .await
+        .unwrap();
+    let new = r.iter().find(|x| x.key == "new").unwrap();
+    assert_eq!(new.items, vec![big, showing], "without a list: by votes");
+
+    CredentialRepository::new(&db)
+        .set(
+            me,
+            "tmdb.now",
+            &format!(r#"{{"day":"2026-11-08","ids":[{showing}]}}"#),
+        )
+        .await
+        .unwrap();
+    let r = rails(&db, None, me, false, None, &Default::default())
+        .await
+        .unwrap();
+    let new = r.iter().find(|x| x.key == "new").unwrap();
+    assert_eq!(new.items, vec![showing, big], "showing now leads");
+}

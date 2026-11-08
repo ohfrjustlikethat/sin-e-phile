@@ -134,6 +134,7 @@ const FAKE = `(() => {
     ],
     subtitle_choose: () => "aligned: offset +1200 ms",
     set_subtitle_settings: () => null,
+    tmdb_status: () => ({ has_key: false, fetched_on: null }),
     // Phase 16: the catalogue keeps itself current.
     catalogue_status: () => ({ refreshed_at: "2026-11-08T06:21:10Z", titles_added: 885, episodes_added: 7951,
       running: false }),
@@ -414,6 +415,7 @@ try {
     ["Your films on this PC", "Add a folder"],
     ["Where films come from", "comes with no sources of its own"],
     ["Subtitles", "Get a free key"],
+    ["What's showing now", "your own TMDB key"],
     ["Downloads", "choose its network adapter"],
   ]) {
     await waitFor(() => evalJs(`[...document.querySelectorAll("h1")].some((h) => h.textContent === ${JSON.stringify(title)})`), title, 25);

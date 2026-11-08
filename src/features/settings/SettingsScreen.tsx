@@ -8,6 +8,7 @@ import { PlaybackSection } from "./PlaybackSection";
 import { SubtitlesSection } from "./SubtitlesSection";
 import { LibrarySection } from "./LibrarySection";
 import { CatalogueSection } from "./CatalogueSection";
+import { TmdbSection } from "./TmdbSection";
 import { ProfilesSection } from "./ProfilesSection";
 
 /**
@@ -59,6 +60,7 @@ export function SettingsScreen() {
       <ProfilesSection />
       <LibrarySection />
       <CatalogueSection />
+      <TmdbSection />
       <SourcesSection />
       <PlaybackSection />
       <SubtitlesSection />

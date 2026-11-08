@@ -323,6 +323,14 @@ export const commands = {
 	catalogueStatus: () => typedError<CatalogueStatus, string>(__TAURI_INVOKE("catalogue_status")),
 	/**  "Refresh now": a refresh whatever the publisher says, in the background. */
 	refreshCatalogue: () => typedError<boolean, string>(__TAURI_INVOKE("refresh_catalogue")),
+	tmdbStatus: () => typedError<TmdbStatus, string>(__TAURI_INVOKE("tmdb_status")),
+	/**
+	 *  Save this profile's own TMDB key, checked first: a refused key is not saved. Then what
+	 *  is showing now is fetched with it, in the background.
+	 */
+	setTmdbKey: (key: string) => typedError<null, string>(__TAURI_INVOKE("set_tmdb_key", { key })),
+	/**  Remove this profile's key and what was fetched with it (ADR-0027). */
+	clearTmdbKey: () => typedError<boolean, string>(__TAURI_INVOKE("clear_tmdb_key")),
 	/**
 	 *  The profile's taste, described (Phase 15): its modes from the model, its axes from its
 	 *  signals and statements. Without the vector half there are no modes, only the axes.
@@ -990,6 +998,13 @@ export type TitleView = {
 	kind: string,
 	/**  Their part in it, in a filmography. */
 	part: string | null,
+};
+
+export type TmdbStatus = {
+	/**  This profile has its own key saved. */
+	has_key: boolean,
+	/**  When "showing now" was last fetched with it. */
+	fetched_on: string | null,
 };
 
 /**  Every torrent's progress, once a second while the engine runs. */

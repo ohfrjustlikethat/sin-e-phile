@@ -392,3 +392,59 @@ async fn a_resumed_refresh_reads_past_the_watermark_it_started_from() {
         "500 is new, and below the 900 the interrupted run had already stored"
     );
 }
+
+#[tokio::test]
+async fn what_is_showing_now_is_matched_to_the_catalogue_and_kept_for_the_profile() {
+    // Phase 16: with the profile's own TMDB key, the films in cinemas and the series on the
+    // air, matched by IMDb id, kept for Home's "New releases".
+    use sinephile_catalogue::now::{fetched_on, refresh as now, NOW_KEY};
+    use sinephile_metadata_api::tmdb::Tmdb;
+    use sinephile_metadata_api::transport::{FakeTransport, Response};
+    use sinephile_persistence::repositories::CredentialRepository;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let db = Db::open_in(dir.path()).await.expect("open");
+    let path = write_gz(dir.path(), "a.tsv.gz", &basics(&[100, 200]));
+    ingest(&db, &path, &[100, 200], "imdb").await;
+    let profile: i64 = sqlx::query_scalar("INSERT INTO profiles (name) VALUES ('Me') RETURNING id")
+        .fetch_one(db.pool())
+        .await
+        .expect("profile");
+
+    let fake = Arc::new(FakeTransport::default());
+    // Asked in this order: films pages 1 and 2, then each film's IMDb id, then the series
+    // page. The fake answers the last pushed first, so they are pushed in reverse.
+    fake.push(Response::new(200, r#"{"results":[]}"#)); // series on the air: none
+    fake.push(Response::new(200, r#"{"imdb_id":"tt9999999"}"#)); // film 3: not in the catalogue
+    fake.push(Response::new(200, r#"{"imdb_id":"tt0000100"}"#)); // film 2
+    fake.push(Response::new(200, r#"{"imdb_id":"tt0000200"}"#)); // film 1
+    fake.push(Response::new(200, r#"{"results":[]}"#)); // films, page 2
+    fake.push(Response::new(
+        200,
+        r#"{"results":[{"id":1},{"id":2},{"id":3}]}"#,
+    )); // page 1
+    let tmdb = Tmdb::new(fake.clone(), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    let matched = now(&db, &tmdb, profile, "2026-11-08").await.expect("now");
+    assert_eq!(matched, 2);
+    let kept = CredentialRepository::new(&db)
+        .get(profile, NOW_KEY)
+        .await
+        .unwrap()
+        .unwrap();
+    let ids: Vec<i64> = sqlx::query_scalar(
+        "SELECT media_item_id FROM external_ids WHERE external_id IN ('tt0000200', 'tt0000100')
+          ORDER BY external_id DESC",
+    )
+    .fetch_all(db.pool())
+    .await
+    .unwrap();
+    assert_eq!(
+        kept,
+        format!(r#"{{"day":"2026-11-08","ids":[{},{}]}}"#, ids[0], ids[1]),
+        "in TMDB's order"
+    );
+    assert_eq!(
+        fetched_on(&db, profile).await.unwrap().as_deref(),
+        Some("2026-11-08")
+    );
+}

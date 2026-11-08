@@ -9,8 +9,11 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
+use sinephile_metadata_api::tmdb::{Tmdb, TmdbError};
 use sinephile_metadata_api::Transport;
-use sinephile_persistence::repositories::{EpisodeRepository, MediaRepository, ProfileRepository};
+use sinephile_persistence::repositories::{
+    CredentialRepository, EpisodeRepository, MediaRepository, ProfileRepository, TmdbAccess,
+};
 
 use crate::state::AppState;
 
@@ -100,6 +103,7 @@ pub async fn keep_current(app: AppHandle) {
     let mut last_airing: Option<std::time::Instant> = None;
     loop {
         start(app.clone(), false);
+        showing_now(&app).await;
         if last_airing.is_none_or(|t| t.elapsed() >= AIRING_EVERY) {
             last_airing = Some(std::time::Instant::now());
             airing(&app).await;
@@ -131,4 +135,119 @@ async fn airing(app: &AppHandle) {
             }
         }
     }
+}
+
+// ---- TMDB, with the viewer's own key (Phase 16, ADR-0013, ADR-0027) ----------------------
+
+/// Today, UTC, `YYYY-MM-DD`.
+fn today() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs() as i64);
+    sinephile_subtitles::utc_day(secs)
+}
+
+/// For each profile with its own key, what is showing now, once a day.
+async fn showing_now(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let Some(db) = state.db() else { return };
+    let Ok(profiles) = ProfileRepository::new(&db).all().await else {
+        return;
+    };
+    let day = today();
+    for p in profiles {
+        let Ok(TmdbAccess::Configured(key)) =
+            CredentialRepository::new(&db).tmdb_access(p.id).await
+        else {
+            continue;
+        };
+        if sinephile_catalogue::now::fetched_on(&db, p.id)
+            .await
+            .ok()
+            .flatten()
+            .as_deref()
+            == Some(day.as_str())
+        {
+            continue;
+        }
+        let tmdb = Tmdb::new(state.http.clone(), key);
+        match sinephile_catalogue::now::refresh(&db, &tmdb, p.id, &day).await {
+            Ok(n) => {
+                tracing::info!(profile = p.id, matched = n, "showing now, from TMDB");
+                let _ = app.emit("catalogue-refreshed", ());
+            }
+            Err(error) => tracing::warn!(%error, profile = p.id, "showing now not fetched"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct TmdbStatus {
+    /// This profile has its own key saved.
+    pub has_key: bool,
+    /// When "showing now" was last fetched with it.
+    pub fetched_on: Option<String>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn tmdb_status(state: State<'_, AppState>) -> Result<TmdbStatus, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let me = state.profile().await?;
+    let has_key = matches!(
+        CredentialRepository::new(&db)
+            .tmdb_access(me)
+            .await
+            .map_err(|e| e.to_string())?,
+        TmdbAccess::Configured(_)
+    );
+    Ok(TmdbStatus {
+        has_key,
+        fetched_on: sinephile_catalogue::now::fetched_on(&db, me)
+            .await
+            .map_err(|e| e.to_string())?,
+    })
+}
+
+/// Save this profile's own TMDB key, checked first: a refused key is not saved. Then what
+/// is showing now is fetched with it, in the background.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_tmdb_key(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    key: String,
+) -> Result<(), String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let me = state.profile().await?;
+    let key = key.trim().to_string();
+    match Tmdb::new(state.http.clone(), key.clone()).check().await {
+        Err(TmdbError::BadKey) => return Err(
+            "TMDB did not accept that key. Copy the 'API Key' from your TMDB account's API page."
+                .into(),
+        ),
+        Err(e) => tracing::warn!(error = %e, "could not check the TMDB key; saved unchecked"),
+        Ok(()) => {}
+    }
+    CredentialRepository::new(&db)
+        .set_tmdb_key(me, &key)
+        .await
+        .map_err(|e| e.to_string())?;
+    tauri::async_runtime::spawn(async move { showing_now(&app).await });
+    Ok(())
+}
+
+/// Remove this profile's key and what was fetched with it (ADR-0027).
+#[tauri::command]
+#[specta::specta]
+pub async fn clear_tmdb_key(state: State<'_, AppState>) -> Result<bool, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let me = state.profile().await?;
+    let creds = CredentialRepository::new(&db);
+    let (removed, _) = creds.clear_tmdb_key(me).await.map_err(|e| e.to_string())?;
+    creds
+        .set(me, sinephile_catalogue::now::NOW_KEY, "")
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(removed)
 }

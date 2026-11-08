@@ -10,6 +10,7 @@ import { LibrarySection } from "@/features/settings/LibrarySection";
 import { SourcesSection } from "@/features/settings/SourcesSection";
 import { SubtitlesSection } from "@/features/settings/SubtitlesSection";
 import { NetworkSection } from "@/features/settings/NetworkSection";
+import { TmdbSection } from "@/features/settings/TmdbSection";
 import { Settings as DownloadsSettings } from "@/features/downloads/DownloadsScreen";
 import { TitleCards } from "./TitleCards";
 
@@ -38,6 +39,7 @@ const STEPS = [
   "Your films on this PC",
   "Where films come from",
   "Subtitles",
+  "What's showing now",
   "Downloads",
 ] as const;
 type Way = "cards" | "words" | "import";
@@ -208,6 +210,16 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             </div>
           )}
           {step === 5 && (
+            <div className="flex flex-col gap-2">
+              <p className="mb-6 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
+                Optional, about thirty seconds. The catalogue on this PC knows each film&apos;s year; your own TMDB key
+                tells it what is in cinemas and on the air this week, so New releases is really new. Skip it and
+                everything still works.
+              </p>
+              <TmdbSection />
+            </div>
+          )}
+          {step === 6 && (
             <div className="flex flex-col gap-2">
               <p className="mb-6 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
                 Downloads use the built-in engine. If you already use qBittorrent, connect it here and it does the

@@ -24,6 +24,7 @@ pub mod matching;
 pub mod measure;
 pub mod movielens;
 pub mod normalise;
+pub mod now;
 pub mod refresh;
 pub mod repair;
 pub mod search_index;

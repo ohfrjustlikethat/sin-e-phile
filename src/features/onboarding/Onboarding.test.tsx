@@ -24,6 +24,7 @@ vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(() => Promise.resolve(()
 vi.mock("@/features/settings/SourcesSection", () => ({ SourcesSection: () => <p>Sources here</p> }));
 vi.mock("@/features/settings/SubtitlesSection", () => ({ SubtitlesSection: () => <p>Subtitles here</p> }));
 vi.mock("@/features/settings/NetworkSection", () => ({ NetworkSection: () => <p>Network here</p> }));
+vi.mock("@/features/settings/TmdbSection", () => ({ TmdbSection: () => <p>TMDB here</p> }));
 vi.mock("@/features/downloads/DownloadsScreen", () => ({ Settings: () => <p>Download settings here</p> }));
 const { Onboarding } = await import("./Onboarding");
 
@@ -66,6 +67,8 @@ describe("First run (Phase 14)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(await screen.findByText("Subtitles here")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByText("TMDB here")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(await screen.findByText("Downloads")).toBeInTheDocument();
     expect(screen.getByText("Download settings here")).toBeInTheDocument();
     expect(screen.getByText("Network here")).toBeInTheDocument();
@@ -83,7 +86,7 @@ describe("First run (Phase 14)", () => {
     expect(await screen.findByText("Your films on this PC")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(await screen.findByText("What do you like?")).toBeInTheDocument();
-    for (let i = 0; i < 4; i++) fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+    for (let i = 0; i < 5; i++) fireEvent.click(screen.getByRole("button", { name: "Skip" }));
     expect(await screen.findByText("Downloads")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Skip, and start" }));
     await waitFor(() => expect(done).toHaveBeenCalled());

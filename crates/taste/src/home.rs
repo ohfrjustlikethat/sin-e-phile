@@ -35,6 +35,24 @@ fn civil(days: i64) -> (i64, i64, i64) {
     (yoe + era * 400 + i64::from(m <= 2), m, d)
 }
 
+/// Where `sinephile_catalogue::now` keeps a profile's "showing now" list.
+const NOW_KEY: &str = "tmdb.now";
+
+/// The profile's "showing now" list, in TMDB's order; empty without a key or a list.
+async fn now_showing(db: &Db, profile: i64) -> Result<Vec<i64>, DbError> {
+    let raw = sinephile_persistence::repositories::CredentialRepository::new(db)
+        .get(profile, NOW_KEY)
+        .await?;
+    Ok(raw
+        .and_then(|r| serde_json::from_str::<serde_json::Value>(&r).ok())
+        .and_then(|v| {
+            v["ids"]
+                .as_array()
+                .map(|a| a.iter().filter_map(serde_json::Value::as_i64).collect())
+        })
+        .unwrap_or_default())
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rail {
     /// "continue" | "new_episodes" | "library" | "new" | "taste" | "watchlist" | "loved"
@@ -167,6 +185,23 @@ pub async fn rails(
             .map(|(id, _)| *id)
             .filter(|id| !seen.contains(id))
             .collect(),
+    };
+
+    // With the profile's own TMDB key, what is in cinemas and on the air this week comes
+    // first (`sinephile_catalogue::now`); the catalogue alone knows only the year.
+    let showing: Vec<i64> = now_showing(db, profile)
+        .await?
+        .into_iter()
+        .filter(|id| !seen.contains(id))
+        .collect();
+    let new_releases: Vec<i64> = if showing.is_empty() {
+        new_releases
+    } else {
+        let have: HashSet<i64> = showing.iter().copied().collect();
+        showing
+            .into_iter()
+            .chain(new_releases.into_iter().filter(|id| !have.contains(id)))
+            .collect()
     };
 
     let taste = match &model {
