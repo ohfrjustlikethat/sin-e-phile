@@ -2895,3 +2895,14 @@ region is the evidence.
 - **Closing**: Back logged at 08:21:28.179, the video window hidden by .186 (7 ms), its region unchanged until then.
 - **The bar no longer moves in quarter-second steps**: between the backend's four reports a second the position
   glides on at the playback speed, never more than 0.5 s past a report or past the end (`glide`, unit-tested).
+
+### Subtitles in the player (16.6, 2026-11-08)
+
+`crates/subtitles/tests/chain.rs the_viewer_chooses_among_the_offers_and_only_a_download_spends_the_budget`:
+offers come back best first (the preferred language, this file's own timing first) and searching spends nothing;
+the chosen offer is downloaded within the budget; a refused download gives its reservation back (seen to fail
+with the refund removed). `src/features/player/SubtitleTools.test.tsx`: size, colour and outline saved for the
+profile and applied at once (seen to fail with the size step changed); found subtitles named by language,
+release and "timed for this file"; "align again" on an embedded track says why it cannot. Pad flow: Menu, the
+D-pad to "Find subtitles", A, the D-pad to the first found, A downloads and shows it. Not yet seen in the real
+window: the style reaching mpv, and "Load a file" (Windows' file picker).

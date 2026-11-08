@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { commands, type StatView, type TrackView } from "@/lib/ipc";
 import { SHORTCUTS } from "./intents";
+import { SubtitleTools } from "./SubtitleTools";
 
 /**
  * Phase 11's controls, each a panel cut out of the video like the player's bars.
@@ -84,6 +85,7 @@ export const PlayerMenu = forwardRef<HTMLDivElement, MenuProps>(function PlayerM
           <button type="button" className={small} aria-label="Subtitles earlier" onClick={() => p.onSubtitleDelay(-100)}>−</button>
           <button type="button" className={small} aria-label="Subtitles later" onClick={() => p.onSubtitleDelay(100)}>+</button>
         </div>
+        <SubtitleTools />
       </section>
       <section aria-label="Sound timing">
         <div className="flex items-center gap-2 px-2">

@@ -24,6 +24,8 @@ pub struct Offer {
     /// Timed for these exact bytes, not just this film.
     pub hash_match: bool,
     pub downloads: i64,
+    /// The release it was timed for, for choosing by eye (Phase 16).
+    pub release: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -143,6 +145,55 @@ pub async fn fetch<P: Provider>(
     }
 }
 
+/// What a provider offers for this file, best first (Phase 16: choosing a subtitle in the
+/// player). A search spends no download, so no budget is reserved for it.
+pub async fn offers<P: Provider>(
+    provider: &P,
+    media_hash: &str,
+    languages: &[String],
+) -> Result<Vec<Offer>, FetchError> {
+    let mut all = provider.search(media_hash, languages).await?;
+    let rank = |o: &Offer| {
+        let lang = languages
+            .iter()
+            .position(|l| l.eq_ignore_ascii_case(&o.language))
+            .unwrap_or(usize::MAX);
+        (lang, !o.hash_match, -o.downloads)
+    };
+    all.sort_by_key(rank);
+    Ok(all)
+}
+
+/// Download the offer the viewer chose, within today's budget: reserved first, given back
+/// if nothing comes of it. `Ok(None)`: the budget is spent for today.
+pub async fn take<P: Provider>(
+    db: &Db,
+    provider: &P,
+    data: &Path,
+    media_hash: &str,
+    offer: &Offer,
+    today: &str,
+) -> Result<Option<Found>, FetchError> {
+    let repo = SubtitleRepository::new(db);
+    if !repo
+        .reserve(provider.id(), today, provider.daily_budget())
+        .await?
+    {
+        return Ok(None);
+    }
+    match save(&repo, provider, data, media_hash, offer, today).await {
+        Ok(f) => Ok(Some(f)),
+        Err(FetchError::QuotaReached) => {
+            repo.set_server_remaining(provider.id(), today, 0).await?;
+            Ok(None)
+        }
+        Err(e) => {
+            repo.release(provider.id(), today).await?;
+            Err(e)
+        }
+    }
+}
+
 async fn download<P: Provider>(
     repo: &SubtitleRepository<'_>,
     provider: &P,
@@ -155,6 +206,20 @@ async fn download<P: Provider>(
     let Some(offer) = best(&offers, languages) else {
         return Ok(None);
     };
+    save(repo, provider, data, media_hash, offer, today)
+        .await
+        .map(Some)
+}
+
+/// One offer, downloaded, written under `cache/subtitles/` and remembered.
+async fn save<P: Provider>(
+    repo: &SubtitleRepository<'_>,
+    provider: &P,
+    data: &Path,
+    media_hash: &str,
+    offer: &Offer,
+    today: &str,
+) -> Result<Found, FetchError> {
     let got = provider.download(&offer.file_id).await?;
     if let Some(left) = got.remaining {
         repo.set_server_remaining(provider.id(), today, left)
@@ -179,7 +244,7 @@ async fn download<P: Provider>(
         relative_path: relative,
     };
     repo.remember(media_hash, &offer.language, &entry).await?;
-    Ok(Some(found(entry, &offer.language)))
+    Ok(found(entry, &offer.language))
 }
 
 fn found(c: CachedSubtitle, lang: &str) -> Found {

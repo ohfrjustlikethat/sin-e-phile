@@ -76,6 +76,9 @@ struct Item {
 #[derive(Deserialize)]
 struct Attributes {
     language: Option<String>,
+    /// The release it was timed for, as its uploader named it.
+    #[serde(default)]
+    release: Option<String>,
     #[serde(default)]
     download_count: i64,
     #[serde(default)]
@@ -132,6 +135,7 @@ impl Provider for OpenSubtitles {
                     language: a.language?.to_ascii_lowercase(),
                     hash_match: a.moviehash_match,
                     downloads: a.download_count,
+                    release: a.release.filter(|r| !r.trim().is_empty()),
                 })
             })
             .collect())

@@ -91,6 +91,10 @@ pub struct SubtitleStyle {
     pub position: u32,
     /// A dark box behind the text instead of an outline.
     pub background: bool,
+    /// The text's colour, `#RRGGBB` (Phase 16).
+    pub colour: String,
+    /// The outline's thickness, 0 none … 6 heavy; mpv's default is 3.
+    pub outline: u32,
 }
 
 impl Default for SubtitleStyle {
@@ -100,6 +104,8 @@ impl Default for SubtitleStyle {
             size: 46,
             position: 95,
             background: false,
+            colour: "#FFFFFF".into(),
+            outline: 3,
         }
     }
 }
@@ -433,6 +439,8 @@ impl Player {
         self.prop("sub-font-size", &style.size.to_string())?;
         // 100 is the bottom edge; lower raises the line.
         self.prop("sub-pos", &style.position.clamp(0, 100).to_string())?;
+        self.prop("sub-color", &colour_or_white(&style.colour))?;
+        self.prop("sub-border-size", &style.outline.min(6).to_string())?;
         if style.background {
             self.prop("sub-border-style", "opaque-box")?;
             self.prop("sub-back-color", "#B0000000")
@@ -612,5 +620,29 @@ mod bitrate_tests {
         assert_eq!(bitrate(1_000_000.0), "1.0 Mbit/s");
         assert_eq!(bitrate(38_400.0), "38 kbit/s");
         assert_eq!(bitrate(128_000.0), "128 kbit/s");
+    }
+}
+
+/// A `#RRGGBB` colour as given, or white: anything else would be sent to mpv as is, and a
+/// colour mpv cannot read leaves the subtitles unreadable.
+pub fn colour_or_white(c: &str) -> String {
+    let ok = c.len() == 7 && c.starts_with('#') && c[1..].chars().all(|x| x.is_ascii_hexdigit());
+    if ok {
+        c.to_ascii_uppercase()
+    } else {
+        "#FFFFFF".into()
+    }
+}
+
+#[cfg(test)]
+mod colour_tests {
+    use super::colour_or_white;
+
+    #[test]
+    fn a_colour_mpv_cannot_read_falls_back_to_white() {
+        assert_eq!(colour_or_white("#ffd400"), "#FFD400");
+        assert_eq!(colour_or_white("yellow"), "#FFFFFF");
+        assert_eq!(colour_or_white("#12345"), "#FFFFFF");
+        assert_eq!(colour_or_white("#GGGGGG"), "#FFFFFF");
     }
 }

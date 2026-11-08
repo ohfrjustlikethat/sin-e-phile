@@ -127,6 +127,13 @@ const FAKE = `(() => {
       window.__profiles.forEach((p) => { p.active = p.id === a.id; });
       return window.__profiles.find((p) => p.id === a.id);
     },
+    // Phase 16: subtitles found and chosen in the player.
+    subtitle_offers: () => [
+      { file_id: "3", language: "en", hash_match: true, downloads: 5, release: "Sunrise.1927.BluRay" },
+      { file_id: "2", language: "en", hash_match: false, downloads: 10, release: "Sunrise.1927.WEB" },
+    ],
+    subtitle_choose: () => "aligned: offset +1200 ms",
+    set_subtitle_settings: () => null,
     // Phase 16: the catalogue keeps itself current.
     catalogue_status: () => ({ refreshed_at: "2026-11-08T06:21:10Z", titles_added: 885, episodes_added: 7951,
       running: false }),
@@ -563,6 +570,30 @@ try {
   const picked = await waitFor(async () => (await actions("subtitles"))[0], "a subtitles choice", 25);
   check(picked.action.id === null, "A picks the focused choice (Off)");
   check(await evalJs(`!document.querySelector('[role="menu"]')`), "and the menu closes");
+
+  // Phase 16: subtitles found and chosen from the full panel, by pad alone.
+  await press(B.MENU);
+  await waitFor(() => evalJs(`!!document.querySelector('[aria-label="Player menu"]')`), "the player's panel", 25);
+  let onFind = false;
+  for (let i = 0; i < 20 && !onFind; i++) {
+    await press(B.DOWN);
+    onFind = ((await active())?.text ?? "").startsWith("Find subtitles");
+  }
+  check(onFind, "the D-pad reaches 'Find subtitles' in the panel");
+  await press(B.A);
+  await waitFor(() => evalJs(`document.body.textContent.includes("Sunrise.1927.WEB")`), "the subtitles found", 25);
+  let onOffer = false;
+  for (let i = 0; i < 4 && !onOffer; i++) {
+    await press(B.DOWN);
+    onOffer = ((await active())?.text ?? "").includes("Sunrise.1927.BluRay");
+  }
+  check(onOffer, "the D-pad reaches the first subtitle found");
+  await press(B.A);
+  const chose = await waitFor(async () => (await calls("subtitle_choose"))[0], "a subtitle chosen", 25);
+  check(chose.offer?.file_id === "3", "A downloads and shows the chosen subtitle");
+  check(await evalJs(`document.body.textContent.includes("Showing the chosen subtitles")`), "and says so");
+  await press(B.B);
+  await waitFor(() => evalJs(`!document.querySelector('[aria-label="Player menu"]')`), "the panel to close", 25);
 
   await press(B.A);
   await waitFor(() => evalJs(`document.body.textContent.includes("Paused")`), "the pause overlay", 25);

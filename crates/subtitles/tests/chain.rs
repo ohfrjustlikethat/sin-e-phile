@@ -7,7 +7,7 @@ use std::sync::Arc;
 use sinephile_metadata_api::{FakeTransport, Response, Transport};
 use sinephile_persistence::repositories::SubtitleRepository;
 use sinephile_persistence::Db;
-use sinephile_subtitles::fetch::{fetch, pick};
+use sinephile_subtitles::fetch::{fetch, offers, pick, take};
 use sinephile_subtitles::opensubtitles::{OpenSubtitles, FREE_DAILY};
 use sinephile_subtitles::{Found, Origin};
 
@@ -257,4 +257,86 @@ async fn the_best_offer_is_this_files_own_timing() {
         Some(r#"{"file_id":2}"#),
         "hash match beats popularity"
     );
+}
+
+#[tokio::test]
+async fn the_viewer_chooses_among_the_offers_and_only_a_download_spends_the_budget() {
+    // Phase 16: "download subtitles like in VLC" from the player. The search is free; the
+    // chosen offer is downloaded within today's budget, and a failure gives it back.
+    let s = setup().await;
+    s.fake.push(Response::new(
+        200,
+        r#"{"data":[
+          {"attributes":{"language":"de","download_count":900,"moviehash_match":true,"release":"Ein Film","files":[{"file_id":1}]}},
+          {"attributes":{"language":"en","download_count":10,"moviehash_match":false,"release":"Film.2019.WEB","files":[{"file_id":2}]}},
+          {"attributes":{"language":"en","download_count":5,"moviehash_match":true,"release":"Film.2019.BluRay","files":[{"file_id":3}]}}]}"#,
+    ));
+    let found = offers(&s.os, "0000000000000009", &en()).await.unwrap();
+    let order: Vec<(&str, Option<&str>)> = found
+        .iter()
+        .map(|o| (o.file_id.as_str(), o.release.as_deref()))
+        .collect();
+    assert_eq!(
+        order,
+        [
+            ("3", Some("Film.2019.BluRay")),
+            ("2", Some("Film.2019.WEB")),
+            ("1", Some("Ein Film"))
+        ],
+        "the preferred language first, this file's own timing first within it"
+    );
+    let quota = || async {
+        SubtitleRepository::new(&s.db)
+            .quota("opensubtitles", DAY)
+            .await
+            .unwrap()
+            .used
+    };
+    assert_eq!(quota().await, 0, "searching spends nothing");
+
+    // The viewer picks the WEB release, not the best: that one is downloaded.
+    s.fake.push(Response::new(
+        200,
+        "1\n00:00:01,000 --> 00:00:02,000\nHello\n",
+    ));
+    s.fake.push(Response::new(
+        200,
+        r#"{"link":"https://dl.example.test/2.srt","remaining":7}"#,
+    ));
+    let got = take(
+        &s.db,
+        &s.os,
+        s.dir.path(),
+        "0000000000000009",
+        &found[1],
+        DAY,
+    )
+    .await
+    .unwrap()
+    .expect("downloaded");
+    let Origin::Downloaded {
+        file_id,
+        relative_path,
+        ..
+    } = &got.origin
+    else {
+        panic!("{got:?}")
+    };
+    assert_eq!(file_id, "2");
+    assert!(s.dir.path().join(relative_path).is_file());
+    assert_eq!(quota().await, 1);
+
+    // A refused download gives its reservation back.
+    s.fake.push(Response::new(401, "{}"));
+    assert!(take(
+        &s.db,
+        &s.os,
+        s.dir.path(),
+        "0000000000000009",
+        &found[2],
+        DAY
+    )
+    .await
+    .is_err());
+    assert_eq!(quota().await, 1);
 }

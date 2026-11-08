@@ -174,6 +174,26 @@ pub async fn plan<P: Provider>(
     })
 }
 
+/// A subtitle file the viewer chose (downloaded from the offers, or loaded from disk),
+/// aligned to the film if it can be, as a file the player can load (Phase 16). `again`:
+/// "align again" — the same, run afresh.
+pub fn prepare(
+    data: &Path,
+    path: &Path,
+    language: Option<String>,
+    file_key: &str,
+    alignment: Alignment<'_>,
+) -> Show {
+    let found = Found {
+        origin: Origin::Sidecar {
+            path: path.to_string_lossy().into_owned(),
+        },
+        language,
+        forced: false,
+    };
+    in_step(data, path, &found, file_key, alignment)
+}
+
 /// The subtitle at `path`, aligned if it can be, as a file the player can load.
 fn in_step(
     data: &Path,

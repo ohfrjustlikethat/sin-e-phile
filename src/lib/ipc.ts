@@ -189,6 +189,14 @@ export const commands = {
 	 *  subtitle (Phase 10 E5). Returns the nudge now in force.
 	 */
 	subtitleNudge: (deltaMs: number) => typedError<number, string>(__TAURI_INVOKE("subtitle_nudge", { deltaMs })),
+	/**  What OpenSubtitles has for the playing film, best first. Searching spends nothing. */
+	subtitleOffers: () => typedError<SubtitleOfferView[], string>(__TAURI_INVOKE("subtitle_offers")),
+	/**  Download the offer the viewer chose (within today's budget), align it and show it. */
+	subtitleChoose: (offer: SubtitleOfferView) => typedError<string, string>(__TAURI_INVOKE("subtitle_choose", { offer })),
+	/**  A subtitle file from disk, chosen in Windows' file picker, aligned and shown. */
+	subtitleLoad: () => typedError<string | null, string>(__TAURI_INVOKE("subtitle_load")),
+	/**  Align the showing subtitle file again, from its original. */
+	subtitleRealign: () => typedError<string, string>(__TAURI_INVOKE("subtitle_realign")),
 	seriesDetail: (id: number) => typedError<SeriesView, string>(__TAURI_INVOKE("series_detail", { id })),
 	seasonEpisodes: (id: number, season: number | null) => typedError<EpisodeView[], string>(__TAURI_INVOKE("season_episodes", { id, season })),
 	episodeNeighbours: (id: number) => typedError<Neighbours, string>(__TAURI_INVOKE("episode_neighbours", { id })),
@@ -890,6 +898,14 @@ export type StoredView = {
 	watched: boolean,
 };
 
+export type SubtitleOfferView = {
+	file_id: string,
+	language: string,
+	hash_match: boolean,
+	downloads: number,
+	release: string | null,
+};
+
 /**  The viewer's subtitle settings, per profile. */
 export type SubtitleSettings = {
 	/**  Languages, most preferred first (`en`, `fr`). */
@@ -900,6 +916,10 @@ export type SubtitleSettings = {
 	size: number,
 	position: number,
 	background: boolean,
+	/**  `#RRGGBB` (Phase 16); settings saved before it read as white. */
+	colour?: string,
+	/**  0 … 6 (Phase 16); settings saved before it read as mpv's 3. */
+	outline?: number,
 };
 
 export type SubtitleSettingsView = {
