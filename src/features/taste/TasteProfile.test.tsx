@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
+import { useUi } from "@/lib/store";
 
 const ok = <T,>(data: T) => Promise.resolve({ status: "ok" as const, data });
 const commands = {
@@ -11,7 +12,7 @@ const commands = {
           anchor: 11,
           share: 0.62,
           sentence: "You gravitate toward horror, mostly from the 1970s and 80s (Halloween, Alien, The Thing).",
-          examples: [],
+          examples: [{ id: 501, title: "Halloween", year: 1978, made_by: "John Carpenter" }],
           correction: null,
         },
         {
@@ -26,6 +27,11 @@ const commands = {
     }),
   ),
   correctTaste: vi.fn(() => ok(null)),
+  home: vi.fn(() =>
+    ok([{ key: "taste", title: "Where your taste points", items: [
+      { id: 9, title: "The Fog", year: 1980, made_by: null, runtime_minutes: 89, note: null },
+    ] }]),
+  ),
   profiles: vi.fn(() => ok([])),
   activeProfile: vi.fn(() => ok(null)),
 };
@@ -51,6 +57,12 @@ describe("Your taste (Phase 15)", () => {
     await waitFor(() => expect(commands.correctTaste).toHaveBeenCalledWith(11, "more"));
     fireEvent.click(within(second).getByRole("radio", { name: "As it is" }));
     await waitFor(() => expect(commands.correctTaste).toHaveBeenCalledWith(22, null));
+    // Phase 16: the films as cards that open, and Home's taste rail as it now stands.
+    const card = screen.getByRole("button", { name: /Halloween.*1978 · John Carpenter/ });
+    fireEvent.click(card);
+    expect(useUi.getState().detail).toBe(501);
+    expect(await screen.findByText("The Fog")).toBeInTheDocument();
+    expect(commands.home).toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Change what you said" })).toBeInTheDocument();
   });
 

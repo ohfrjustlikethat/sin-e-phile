@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, EmptyState } from "@/design-system";
-import { commands, type TasteModeView } from "@/lib/ipc";
+import { commands, type TasteModeView, type TastePick } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
 import { ChoiceRow, type Choice } from "@/features/detail/ChoiceRow";
 import { useProfiles } from "@/features/profiles/useProfiles";
@@ -76,8 +76,7 @@ export function TasteProfile() {
         {active ? `${active.name}'s taste` : "Your taste"}
       </h1>
       <p className="mt-5 max-w-[60ch] text-[15px] text-ink-muted">
-        What the recommendations are made of, in plain words. If something here is not you, say so: Home
-        changes with it.
+        What your recommendations are made of. Not you? Say so, and Home follows.
       </p>
 
       {profile.isError && <p className="mt-10 text-sm text-danger">{profile.error.message}</p>}
@@ -111,11 +110,12 @@ export function TasteProfile() {
         </section>
       )}
 
+      {modes.length > 0 && <HomePreview />}
+
       {profile.isSuccess && (
         <section aria-label="What you said" className="mt-14 border-t border-line-subtle pt-8">
           <p className="max-w-[60ch] text-[14px] text-ink-muted">
-            Leanings come from what you watch and from what you said you like. If one is wrong, change what you
-            said: it counts until what you watch says otherwise.
+            A leaning wrong? Change what you said you like; it counts until what you watch says otherwise.
           </p>
           <div className="mt-4">
             <Button variant="secondary" size="sm" onClick={() => setTasteOpen(false)}>
@@ -138,21 +138,74 @@ function Mode({ mode, n }: { mode: TasteModeView; n: number }) {
     },
   });
   const off = mode.correction === "not_me";
+  const pct = Math.round((mode.share ?? 0) * 100);
   return (
-    <li className={`border-line-subtle py-8 ${n === 1 ? "" : "border-t"}`}>
-      <p className={`font-serif text-[24px] leading-snug ${off ? "text-ink-faint line-through" : "text-ink"}`}>
-        {mode.sentence}
-      </p>
-      <p className="label mt-3">{shareWords(mode.share)}</p>
-      <div className="mt-5">
-        <ChoiceRow
-          label={`Taste ${n}`}
-          choices={CORRECTIONS}
-          value={mode.correction ?? null}
-          onChange={(c) => correct.mutate(c)}
-        />
+    <li className={`grid grid-cols-[72px_1fr] gap-x-6 border-line-subtle py-10 ${n === 1 ? "" : "border-t"}`}>
+      <span aria-hidden className="font-serif text-[44px] leading-none text-ink-faint tabular-nums">
+        {String(n).padStart(2, "0")}
+      </span>
+      <div>
+        <p className={`font-serif text-[28px] leading-snug ${off ? "text-ink-faint line-through" : "text-ink"}`}>
+          {mode.sentence}
+        </p>
+        <div className="mt-4 flex items-center gap-3" aria-label={shareWords(mode.share)}>
+          <span className="h-[3px] w-40 bg-line" aria-hidden>
+            <span className="block h-full bg-ink-muted" style={{ width: `${Math.max(2, pct)}%` }} />
+          </span>
+          <span className="label">{shareWords(mode.share)}</span>
+        </div>
+        {mode.examples.length > 0 && <Examples films={mode.examples} />}
+        <div className="mt-6">
+          <ChoiceRow
+            label={`Taste ${n}`}
+            choices={CORRECTIONS}
+            value={mode.correction ?? null}
+            onChange={(c) => correct.mutate(c)}
+          />
+        </div>
+        {correct.isError && <p className="mt-2 text-sm text-danger">{correct.error.message}</p>}
       </div>
-      {correct.isError && <p className="mt-2 text-sm text-danger">{correct.error.message}</p>}
     </li>
+  );
+}
+
+/** A taste's best-known films, as small typographic cards that open the film. */
+function Examples({ films }: { films: TastePick[] }) {
+  const openDetail = useUi((s) => s.openDetail);
+  return (
+    <ul aria-label="Films in this taste" className="mt-5 flex flex-wrap gap-3">
+      {films.map((f) => (
+        <li key={f.id}>
+          <button
+            type="button"
+            onClick={() => openDetail(f.id)}
+            className="flex w-44 flex-col items-start gap-1 rounded-sm border border-line px-3 py-2.5 text-left hover:bg-raised"
+          >
+            <span className="font-serif text-[16px] leading-tight text-ink">{f.title}</span>
+            <span className="text-[12px] text-ink-muted">{[f.year, f.made_by].filter(Boolean).join(" · ")}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Home's taste rail as it stands, so a correction shows what it changed (Phase 16). */
+function HomePreview() {
+  const home = useQuery({ queryKey: ["home"], queryFn: () => ok(commands.home()) });
+  const rail = home.data?.find((r) => r.key === "taste");
+  if (!rail || rail.items.length === 0) return null;
+  return (
+    <section aria-label="Where your taste points now" className="mt-14 border-t border-line-subtle pt-8">
+      <h2 className="label mb-4">Where your taste points now</h2>
+      <ol className="flex flex-wrap gap-x-6 gap-y-2">
+        {rail.items.slice(0, 6).map((c) => (
+          <li key={c.id} className="font-serif text-[18px] text-ink">
+            {c.title}
+            {c.year ? <span className="ml-2 text-[13px] text-ink-faint">{c.year}</span> : null}
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
