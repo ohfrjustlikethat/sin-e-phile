@@ -362,6 +362,31 @@ impl<'a> MediaRepository<'a> {
         .await?)
     }
 
+    /// New releases (Phase 16): films and series of `from_year` or later with at least
+    /// `min_votes` (so they have come out and are being watched), with their votes, most
+    /// voted first. The catalogue has years, not dates, so "new" is "this year".
+    pub async fn new_releases(
+        &self,
+        from_year: i64,
+        min_votes: i64,
+        limit: i64,
+    ) -> Result<Vec<(i64, i64)>, DbError> {
+        Ok(sqlx::query_as(
+            // By year first (migration 0027): only this year's titles are read. Named,
+            // because the planner otherwise walks the votes index to avoid a sort and
+            // reads most of the catalogue (92 ms against 11 ms on the real one).
+            "SELECT id, rating_votes FROM media_items INDEXED BY idx_media_items_year_votes
+             WHERE release_year >= ?1 AND rating_votes >= ?2 AND is_adult = 0
+               AND +kind IN ('film', 'anime_film', 'series', 'anime_series')
+             ORDER BY rating_votes DESC, id LIMIT ?3",
+        )
+        .bind(from_year)
+        .bind(min_votes)
+        .bind(limit)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
     /// The most-voted titles with their votes, films and series, not adult: the pool the
     /// taste model's popularity prior draws from (Phase 15).
     pub async fn most_voted_with_votes(&self, limit: i64) -> Result<Vec<(i64, i64)>, DbError> {

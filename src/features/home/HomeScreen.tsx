@@ -23,6 +23,9 @@ export const HOME = ["home"];
 
 const WHY: Record<string, string> = {
   continue: "Where you left off",
+  new_episodes: "New in the shows you follow",
+  library: "On this PC, newest first",
+  new: "Out this year, by your taste",
   taste: "From what you liked and what you said you love",
   watchlist: "What you saved",
   loved: "The films most people have seen and rated",
@@ -81,7 +84,8 @@ function HomeRail({ rail, lead }: { rail: RailView; lead: boolean }) {
               id: String(c.id),
               title: c.title,
               year: c.year ?? 0,
-              director: c.made_by ?? "",
+              // A new episode's number says why the show is here; otherwise who made it.
+              director: c.note ?? c.made_by ?? "",
               // Its place in the rail: № 001 is the first widely loved, not "Uncatalogued".
               spine: i + 1,
             }}

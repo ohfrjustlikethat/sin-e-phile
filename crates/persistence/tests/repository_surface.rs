@@ -197,6 +197,16 @@ async fn media_repository_surface() {
         .await
         .expect("most_voted_with_votes");
     assert_eq!(pool, vec![(famous, 900_000), (known, 1_000)]);
+    // new_releases — this year's (here: 1990 on) with enough votes, most first
+    assert_eq!(
+        repo.new_releases(1990, 500, 5).await.expect("new_releases"),
+        vec![(famous, 900_000)]
+    );
+    assert!(repo
+        .new_releases(1990, 1_000_000, 5)
+        .await
+        .unwrap()
+        .is_empty());
 
     // most_voted_films_between — only the years asked for
     assert_eq!(
@@ -322,6 +332,22 @@ async fn episode_repository_surface() {
         repo.seasons(series).await.expect("seasons"),
         [(Some(1), 2), (Some(2), 1)]
     );
+    // new_episodes — nothing followed yet by this profile, so nothing new
+    let viewer = ProfileRepository::new(&db).ensure_default().await.unwrap();
+    assert!(repo
+        .new_episodes(viewer, 30, 0, 10)
+        .await
+        .expect("new_episodes")
+        .is_empty());
+    // followed (watchlist): its newest episode added this month, one row for the series
+    sqlx::query("INSERT INTO watchlist_items (profile_id, media_item_id) VALUES (?, ?)")
+        .bind(viewer)
+        .bind(series)
+        .execute(db.pool())
+        .await
+        .unwrap();
+    let fresh = repo.new_episodes(viewer, 30, 0, 10).await.unwrap();
+    assert_eq!(fresh, vec![(series, s2e1, Some(2), Some(1))]);
     let first = repo
         .episodes_of(series, Some(1))
         .await
@@ -1732,6 +1758,12 @@ async fn library_repository_surface() {
     );
     assert!(!repo.file(id).await.unwrap().unwrap().probed);
     assert!(repo.match_of(id).await.unwrap().unwrap().confirmed);
+
+    // recently_added — the matched film, once
+    assert_eq!(
+        repo.recently_added(10).await.expect("recently_added"),
+        vec![heat]
+    );
 
     // clear_match / set_candidates / candidates / review_queue / review_count
     repo.clear_match(id).await.expect("clear");

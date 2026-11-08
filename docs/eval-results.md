@@ -2848,3 +2848,18 @@ Tests (`crates/catalogue/tests/refresh.rs`): `an_interrupted_refresh_is_finished
 `a_resumed_refresh_reads_past_the_watermark_it_started_from`. **Seen to fail**: without the resume branch
 the first returns `AlreadyCurrent`, the author's bug exactly; with the watermark taken afresh the second
 loses the title between the start and the stored maximum.
+
+### Home in the author's order (16.3, 2026-11-08)
+
+Rails: continue, **new episodes of your shows**, **your library**, **new releases**, taste, watchlist,
+widely loved (`crates/taste/tests/home.rs home_is_in_the_authors_order_…`, seen to fail with two rails
+swapped and with the new-release vote floor removed). New releases on the real catalogue, 2026 with at
+least 1,000 votes: Project Hail Mary, The Odyssey, Spider-Man: Brand New Day, A Knight of the Seven
+Kingdoms, Backrooms, Michael …
+
+**A regression caught and fixed before commit (rule 13).** The new-releases query walked the votes index
+and filtered by year: 92–98 ms on the real catalogue, and `eval switch` went from 22.9 / 30.5 ms to
+**111.7 / 118.2 ms p95, over its 100 ms target**. Migration 0027 adds `idx_media_items_year_votes`, named in
+the query because the planner otherwise still walked the votes index to avoid a sort: **10.9 ms**. `eval
+switch` now **30.3 / 40.7 ms p95** (E5 MET); the remaining ~10 ms over Phase 15's numbers is the three new
+rails' queries (new episodes 1 ms, library 0 ms, new releases 11 ms).

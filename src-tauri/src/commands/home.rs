@@ -24,6 +24,8 @@ pub struct HomeCard {
     pub year: Option<i32>,
     pub made_by: Option<String>,
     pub runtime_minutes: Option<i32>,
+    /// A line beyond the card's own facts: "New: S2 E5" for a series with a new episode.
+    pub note: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -79,6 +81,7 @@ pub async fn home(state: State<'_, AppState>) -> Result<Vec<RailView>, String> {
                 year: m.release_year.map(|y| y as i32),
                 made_by: card.made_by,
                 runtime_minutes: m.runtime_minutes.map(|r| r as i32),
+                note: r.notes.get(&id).cloned(),
             });
         }
         out.push(RailView {

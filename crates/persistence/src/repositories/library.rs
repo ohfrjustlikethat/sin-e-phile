@@ -184,6 +184,24 @@ impl<'a> LibraryRepository<'a> {
     // ---- folders ----------------------------------------------------------------
 
     /// Add a folder, or return the one already added at that path.
+    /// What is in the library, most recently identified first (Phase 16, Home's "Your
+    /// library"): each film once, and an episode as its series, once.
+    pub async fn recently_added(&self, limit: i64) -> Result<Vec<i64>, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT item FROM (
+                 SELECT COALESCE(e.series_id, m.media_item_id) AS item, MAX(m.matched_at) AS at
+                   FROM local_file_matches m
+                   JOIN local_files f ON f.id = m.local_file_id
+                   LEFT JOIN episodes e ON e.media_item_id = m.media_item_id
+                  WHERE f.missing_since IS NULL AND f.ignored_at IS NULL
+                  GROUP BY item)
+             ORDER BY at DESC, item LIMIT ?",
+        )
+        .bind(limit)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
     pub async fn add_folder(&self, path: &str) -> Result<i64, DbError> {
         Ok(sqlx::query_scalar(
             "INSERT INTO library_folders (path) VALUES (?1)

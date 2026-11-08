@@ -558,6 +558,8 @@ export type HomeCard = {
 	year: number | null,
 	made_by: string | null,
 	runtime_minutes: number | null,
+	/**  A line beyond the card's own facts: "New: S2 E5" for a series with a new episode. */
+	note: string | null,
 };
 
 export type ImportView = {

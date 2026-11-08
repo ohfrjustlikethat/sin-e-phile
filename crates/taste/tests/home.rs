@@ -128,3 +128,116 @@ async fn a_round_spreads_across_decades_and_never_repeats() {
     );
     assert_eq!(second.len(), 5);
 }
+
+/// This year, as Home reckons it.
+fn this_year() -> i64 {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as f64;
+    (secs / 86_400.0 / 365.2425 + 1970.0).floor() as i64
+}
+
+#[tokio::test]
+async fn home_is_in_the_authors_order_with_new_episodes_the_library_and_new_releases() {
+    // Phase 16, the author's order: continue, new episodes of your shows, your library,
+    // new releases, then taste, watchlist, widely loved.
+    use sinephile_persistence::model::MediaKind;
+    use sinephile_persistence::repositories::library::{FileMatch, MatchMethod, NewLocalFile};
+    use sinephile_persistence::repositories::{EpisodeRepository, LibraryRepository};
+
+    let db = Db::in_memory().await.unwrap();
+    let year = this_year();
+    let classic = film(&db, "Heat", 1995, 900_000, &["Crime"]).await;
+    let premiere = film(&db, "A Film Just Out", year, 50_000, &["Drama"]).await;
+    let quiet = film(&db, "Barely Seen", year, 40, &["Drama"]).await;
+    let mine = film(&db, "On My Disk", 1981, 20_000, &["Crime"]).await;
+
+    // A show in the library (one episode on disk), and a newer episode the catalogue
+    // gained this month.
+    let media = MediaRepository::new(&db);
+    let show = media
+        .insert(&NewMediaItem {
+            kind: Some(MediaKind::Series),
+            rating_votes: Some(30_000),
+            ..NewMediaItem::film("A Followed Show", 2024)
+        })
+        .await
+        .unwrap();
+    let episodes = EpisodeRepository::new(&db);
+    episodes.create_series(show, false).await.unwrap();
+    let season = episodes.create_season(show, 2, None).await.unwrap();
+    let mut eps = Vec::new();
+    for n in 1..=2 {
+        let id = media
+            .insert(&NewMediaItem {
+                kind: Some(MediaKind::Episode),
+                ..NewMediaItem::film(format!("Part {n}"), year)
+            })
+            .await
+            .unwrap();
+        episodes
+            .create_episode(id, show, Some(season), Some(2), Some(n), None)
+            .await
+            .unwrap();
+        eps.push(id);
+    }
+    let library = LibraryRepository::new(&db);
+    let folder = library.add_folder("C:/Films").await.unwrap();
+    for (path, item) in [
+        ("C:/Films/a.mkv", mine),
+        ("C:/Films/show/s02e01.mkv", eps[0]),
+    ] {
+        let up = library
+            .upsert_file(&NewLocalFile {
+                folder_id: folder,
+                path,
+                size_bytes: 1,
+                modified_at: None,
+            })
+            .await
+            .unwrap();
+        library
+            .set_match(
+                up.id(),
+                &FileMatch {
+                    media_item_id: item,
+                    confidence: 1.0,
+                    method: MatchMethod::Filename,
+                    covers: 1,
+                    confirmed: false,
+                },
+            )
+            .await
+            .unwrap();
+    }
+    let me = ProfileRepository::new(&db).ensure_default().await.unwrap();
+    // The episode on disk was watched; the next one is new.
+    ProfileRepository::new(&db)
+        .record_viewing(me, eps[0], 2_400, true, 2_400)
+        .await
+        .unwrap();
+
+    let r = rails(&db, None, me, false, None, &Default::default())
+        .await
+        .unwrap();
+    let keys: Vec<&str> = r.iter().map(|x| x.key).collect();
+    assert_eq!(keys, ["new_episodes", "library", "new", "loved"], "{r:?}");
+    assert_eq!(r[0].items, vec![show], "one card, the series");
+    assert_eq!(
+        r[0].notes.get(&show).map(String::as_str),
+        Some("New: S2 E2")
+    );
+    assert!(
+        r[1].items.contains(&mine) && r[1].items.contains(&show),
+        "{:?}",
+        r[1]
+    );
+    assert_eq!(
+        r[2].items,
+        vec![premiere],
+        "out and watched; not the 40-vote film"
+    );
+    assert!(!r[2].items.contains(&quiet));
+    assert!(r[3].items.contains(&classic));
+}

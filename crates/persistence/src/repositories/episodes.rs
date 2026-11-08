@@ -223,6 +223,51 @@ impl<'a> EpisodeRepository<'a> {
             .transpose()
     }
 
+    /// New episodes of the series a profile follows (Phase 16, Home): episodes the
+    /// catalogue gained in the last `days` days, dated `from_year` or later, not watched by
+    /// the profile, of a series in its library, on its watchlist, or with an episode it
+    /// watched. One row per series, its newest such episode:
+    /// (series, episode, season, number), newest first. The catalogue has no air dates
+    /// (IMDb publishes years), so "new" is "new to the catalogue, and this year's"; the year
+    /// keeps out the back catalogue of a series that was only just followed.
+    pub async fn new_episodes(
+        &self,
+        profile_id: i64,
+        days: i64,
+        from_year: i64,
+        limit: i64,
+    ) -> Result<Vec<(i64, i64, Option<i64>, Option<i64>)>, DbError> {
+        Ok(sqlx::query_as(
+            "WITH followed(series_id) AS (
+                 SELECT COALESCE(e.series_id, l.media_item_id) FROM local_file_matches l
+                   LEFT JOIN episodes e ON e.media_item_id = l.media_item_id
+                 UNION SELECT media_item_id FROM watchlist_items WHERE profile_id = ?1
+                 UNION SELECT e.series_id FROM watch_events w
+                   JOIN episodes e ON e.media_item_id = w.media_item_id WHERE w.profile_id = ?1),
+             fresh AS (
+                 SELECT e.series_id, e.media_item_id, e.season_number, e.episode_number,
+                        ROW_NUMBER() OVER (PARTITION BY e.series_id
+                            ORDER BY e.season_number DESC, e.episode_number DESC) AS n,
+                        m.created_at
+                   FROM episodes e JOIN media_items m ON m.id = e.media_item_id
+                  WHERE e.series_id IN (SELECT series_id FROM followed)
+                    AND m.created_at >= datetime('now', '-' || ?2 || ' days')
+                    -- No year said is no evidence of being old: it arrived this month.
+                    AND COALESCE(m.release_year, ?3) >= ?3
+                    AND e.media_item_id NOT IN
+                        (SELECT media_item_id FROM watch_events WHERE profile_id = ?1))
+             SELECT series_id, media_item_id, season_number, episode_number FROM fresh
+              WHERE n = 1 ORDER BY created_at DESC, season_number DESC, episode_number DESC
+              LIMIT ?4",
+        )
+        .bind(profile_id)
+        .bind(days)
+        .bind(from_year)
+        .bind(limit)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
     /// A series' seasons, by number, with how many episodes the catalogue holds for each
     /// (Phase 11's series page). Episodes with no season number are season `None`.
     pub async fn seasons(&self, series_id: i64) -> Result<Vec<(Option<i64>, i64)>, DbError> {
