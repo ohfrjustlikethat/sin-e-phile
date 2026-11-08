@@ -22,6 +22,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -47,12 +49,34 @@ def check() -> bool:
     return DEST.is_file() and sha256(DEST) == DLL_SHA256
 
 
+# The release host has answered 504 twice running (CI, 2026-11-08): a gateway timeout is
+# the host's, not the file's, so it is tried again after a pause before giving up.
+ATTEMPTS = 4
+
+
+def download(url: str, to: Path) -> None:
+    for attempt in range(1, ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(url, timeout=120) as r, to.open("wb") as out:
+                shutil.copyfileobj(r, out)
+            return
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as e:
+            code = getattr(e, "code", None)
+            # A 4xx other than 429 will not change by waiting.
+            if code is not None and 400 <= code < 500 and code != 429:
+                raise
+            if attempt == ATTEMPTS:
+                raise
+            wait = 15 * attempt
+            print(f"  {e}; trying again in {wait} s ({attempt} of {ATTEMPTS})")
+            time.sleep(wait)
+
+
 def fetch() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         archive = Path(tmp) / ARCHIVE
         print(f"fetching {ARCHIVE} ({RELEASE}) ...")
-        with urllib.request.urlopen(URL, timeout=120) as r, archive.open("wb") as out:
-            shutil.copyfileobj(r, out)
+        download(URL, archive)
         got = sha256(archive)
         if got != ARCHIVE_SHA256:
             sys.exit(f"checksum mismatch for {ARCHIVE}: expected {ARCHIVE_SHA256}, got {got}")
