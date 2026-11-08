@@ -487,6 +487,12 @@ impl Player {
         self.mpv.get_property(key)
     }
 
+    /// One of mpv's properties, as text: for checking in a real window that a setting
+    /// reached the player (the debug probe, Phase 16).
+    pub fn property(&self, key: &str) -> Option<String> {
+        self.get(key)
+    }
+
     fn num(&self, key: &str) -> Option<f64> {
         self.get(key).and_then(|v| v.parse().ok())
     }

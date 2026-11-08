@@ -165,6 +165,8 @@ export const commands = {
 	 *  intents the probe sends on a timer, as a pad would, for real-window checks (Phase 16).
 	 */
 	devProbeScript: () => __TAURI_INVOKE<string | null>("dev_probe_script"),
+	/**  Debug builds only: one of mpv's properties as text, for the probe (Phase 16). */
+	devPlayerProp: (name: string) => __TAURI_INVOKE<string | null>("dev_player_prop", { name }),
 	itemDetail: (id: number) => typedError<{
 	id: number,
 	title: string,

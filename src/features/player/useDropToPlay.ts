@@ -73,6 +73,19 @@ function probe() {
     for (const step of (script ?? "").split(",").filter(Boolean)) {
       const [at, kind] = step.split(":");
       window.setTimeout(() => {
+        if (kind === "style") {
+          // The subtitle style, set as the panel sets it, then read back from mpv.
+          void (async () => {
+            const r = await commands.subtitleSettings();
+            if (r.status !== "ok") return;
+            await commands.setSubtitleSettings({ ...r.data.settings, colour: "#FFD400", outline: 5 });
+            const colour = await commands.devPlayerProp("sub-color");
+            const border = await commands.devPlayerProp("sub-border-size");
+            void commands.devLog(`probe style sub-color=${colour} sub-border-size=${border}`);
+            await commands.setSubtitleSettings(r.data.settings);
+          })();
+          return;
+        }
         const taken = sendPlayerIntent({ kind } as Intent);
         void commands.devLog(`probe intent=${kind} taken=${taken} at=${performance.now().toFixed(0)}`);
       }, Number(at));

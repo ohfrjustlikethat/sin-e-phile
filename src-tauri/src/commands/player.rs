@@ -490,6 +490,21 @@ pub fn dev_log(line: String) {
     let _ = line;
 }
 
+/// Debug builds only: one of mpv's properties as text, for the probe (Phase 16).
+#[tauri::command]
+#[specta::specta]
+pub fn dev_player_prop(state: State<'_, AppState>, name: String) -> Option<String> {
+    #[cfg(debug_assertions)]
+    {
+        state.player().and_then(|rt| rt.player.property(&name))
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        let _ = (state, name);
+        None
+    }
+}
+
 /// Debug builds only: `SINEPHILE_PROBE=<ms>:<intent>,…` (e.g. `4000:subtitles_menu`), player
 /// intents the probe sends on a timer, as a pad would, for real-window checks (Phase 16).
 #[tauri::command]

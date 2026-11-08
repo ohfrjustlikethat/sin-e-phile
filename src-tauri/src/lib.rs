@@ -74,6 +74,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::player::dev_autoplay,
             commands::player::dev_log,
             commands::player::dev_probe_script,
+            commands::player::dev_player_prop,
             commands::playback::item_detail,
             commands::playback::prepare_play,
             commands::playback::save_position,
