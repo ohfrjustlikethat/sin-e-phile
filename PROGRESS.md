@@ -16,11 +16,11 @@
 
 > Inserted by spec 4.0.0 (ADR-0045) after the author used the release build. Receives the author batch: Phase 8 E5, Phase 14 E1 and Phase 15 E3 discharged here from the author's answers of 2026-11-08; Phase 7 E7 and Phase 14 E4/E6 to be met here (16.10). Judge by using the release build as a person would, not only by fixtures.
 
-### Subtasks — 2/10 complete
+### Subtasks — 3/10 complete
 
 - [x] **16.1** TV shows from folders (crates/library): the show from its folder (`Show (Year)`), the season from a `Season N` subfolder, the episode from the file; flat `S01E03` files under a show folder; anime absolute numbers mapped per season where the data allows (never cumulated, ADR-0031); one show across folders or drives merged; no episode ever filed as a film. A TV-layout corpus in fixtures/ including a Twin Peaks-like case, judged by eval identify (E4); then the author's real folder rescanned on the release build. · `cabf03d`
 - [x] **16.2** The catalogue refreshes itself (ADR-0030 made automatic): a background job once a day while idle fetches IMDb's updated basics, ratings and episode files and adds titles and episodes past what is stored; AniList airing every few hours; TMDB now-playing and airing for a profile with a key; Settings says when it last ran and offers 'refresh now' (E5). · `345e392`
-- [ ] **16.3** Home in the specified order: Continue watching; New episodes of your shows; Your library (newest added first, shown the moment a scan finishes, by event); New releases filtered by taste; then the taste rails (E6).
+- [x] **16.3** Home in the specified order: Continue watching; New episodes of your shows; Your library (newest added first, shown the moment a scan finishes, by event); New releases filtered by taste; then the taste rails (E6). · `394b11e`
 - [ ] **16.4** The controller in the player (TV-standard: A, left/right seek with hold to scrub, up/down volume, LB/RB episode or chapter, Y subtitles quick menu, X audio quick menu, Menu panel, B back) and the right stick scrolling everything: page, panel, rail, the paused details, speed by deflection, focus following (E3).
 - [ ] **16.5** The hybrid player: clean while watching; the full panel (subtitles, style, sync, audio, speed, picture); controls answering in under 100 ms; opening, closing, bar and panels without jumps or flicker, measured in the UI audit (E1).
 - [ ] **16.6** Subtitles in the player: a live style editor kept per profile; find and download from OpenSubtitles in playback; sync in 0.1 s steps with 'align again'; load a file from disk; all by pad (E2).
@@ -47,7 +47,7 @@
 
 ## What's next
 
-Phase 16 subtask 16.3 (docs/phases/phase-16-ready-to-watch.md): Home in the specified order in crates/taste/src/home.rs rails(): continue (exists), 'new episodes' (episodes of followed series (sinephile_catalogue::refresh::followed_series) aired in the last 30 days and not yet watched, newest first, plus airing_schedule's next), 'library' (local_file_matches newest added first, film or series once), 'new releases' (films and series released in the last ~60 days with votes, ranked by the taste model, kids rule applied), then the taste rails; repository methods with surface lines; tests in crates/taste/tests/home.rs; HomeScreen shows them (episodes as 'S1 E3' cards); measure scan-finished -> Home updated under 2 s.
+Phase 16 subtask 16.4 (docs/phases/phase-16-ready-to-watch.md): the controller in the player and the right stick everywhere. Read src/lib/gamepad.ts and src/features/player/PlayerScreen.tsx/intents.ts first. Player mapping (TV-standard, ADR-0045): A play/pause; left/right seek 10 s, hold to scrub; up/down volume; LB/RB previous/next episode or chapter; Y subtitles quick menu; X audio quick menu; Menu the full panel; B back. Right stick: scroll the scrollable element under focus (page, panel, rail, paused details) at a speed set by deflection, focus following what scrolls into view. Unit-test the mapping and the scroll maths in src/lib/*.test.ts; cover each button and the stick in tools/uiaudit/controller.mjs. Still owed from 16.3: E6's 'a finished scan appears on Home within 2 s', measured in a real window (release build, add a folder, time to the Library rail).
 
 ---
 

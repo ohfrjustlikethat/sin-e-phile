@@ -27,8 +27,8 @@
       {
         "id": "16.3",
         "text": "Home in the specified order: Continue watching; New episodes of your shows; Your library (newest added first, shown the moment a scan finishes, by event); New releases filtered by taste; then the taste rails (E6).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "394b11e"
       },
       {
         "id": "16.4",
@@ -1939,8 +1939,8 @@
         {
           "id": "16.3",
           "text": "Home in the specified order: Continue watching; New episodes of your shows; Your library (newest added first, shown the moment a scan finishes, by event); New releases filtered by taste; then the taste rails (E6).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "394b11e"
         },
         {
           "id": "16.4",
@@ -2558,7 +2558,7 @@
       ]
     }
   ],
-  "next_action": "Phase 16 subtask 16.3 (docs/phases/phase-16-ready-to-watch.md): Home in the specified order in crates/taste/src/home.rs rails(): continue (exists), 'new episodes' (episodes of followed series (sinephile_catalogue::refresh::followed_series) aired in the last 30 days and not yet watched, newest first, plus airing_schedule's next), 'library' (local_file_matches newest added first, film or series once), 'new releases' (films and series released in the last ~60 days with votes, ranked by the taste model, kids rule applied), then the taste rails; repository methods with surface lines; tests in crates/taste/tests/home.rs; HomeScreen shows them (episodes as 'S1 E3' cards); measure scan-finished -> Home updated under 2 s.",
+  "next_action": "Phase 16 subtask 16.4 (docs/phases/phase-16-ready-to-watch.md): the controller in the player and the right stick everywhere. Read src/lib/gamepad.ts and src/features/player/PlayerScreen.tsx/intents.ts first. Player mapping (TV-standard, ADR-0045): A play/pause; left/right seek 10 s, hold to scrub; up/down volume; LB/RB previous/next episode or chapter; Y subtitles quick menu; X audio quick menu; Menu the full panel; B back. Right stick: scroll the scrollable element under focus (page, panel, rail, paused details) at a speed set by deflection, focus following what scrolls into view. Unit-test the mapping and the scroll maths in src/lib/*.test.ts; cover each button and the stick in tools/uiaudit/controller.mjs. Still owed from 16.3: E6's 'a finished scan appears on Home within 2 s', measured in a real window (release build, add a folder, time to the Library rail).",
   "blockers": [],
   "decisions_pending": [
     {

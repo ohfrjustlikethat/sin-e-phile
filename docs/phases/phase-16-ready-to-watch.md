@@ -29,7 +29,7 @@ A person can install the app, set it up once, and watch anything they choose (fr
 
 - [x] **16.1** TV shows from folders (crates/library): the show from its folder (`Show (Year)`), the season from a `Season N` subfolder, the episode from the file; flat `S01E03` files under a show folder; anime absolute numbers mapped per season where the data allows (never cumulated, ADR-0031); one show across folders or drives merged; no episode ever filed as a film. A TV-layout corpus in fixtures/ including a Twin Peaks-like case, judged by eval identify (E4); then the author's real folder rescanned on the release build.
 - [x] **16.2** The catalogue refreshes itself (ADR-0030 made automatic): a background job once a day while idle fetches IMDb's updated basics, ratings and episode files and adds titles and episodes past what is stored; AniList airing every few hours; TMDB now-playing and airing for a profile with a key; Settings says when it last ran and offers 'refresh now' (E5).
-- [ ] **16.3** Home in the specified order: Continue watching; New episodes of your shows; Your library (newest added first, shown the moment a scan finishes, by event); New releases filtered by taste; then the taste rails (E6).
+- [x] **16.3** Home in the specified order: Continue watching; New episodes of your shows; Your library (newest added first, shown the moment a scan finishes, by event); New releases filtered by taste; then the taste rails (E6).
 - [ ] **16.4** The controller in the player (TV-standard: A, left/right seek with hold to scrub, up/down volume, LB/RB episode or chapter, Y subtitles quick menu, X audio quick menu, Menu panel, B back) and the right stick scrolling everything: page, panel, rail, the paused details, speed by deflection, focus following (E3).
 - [ ] **16.5** The hybrid player: clean while watching; the full panel (subtitles, style, sync, audio, speed, picture); controls answering in under 100 ms; opening, closing, bar and panels without jumps or flicker, measured in the UI audit (E1).
 - [ ] **16.6** Subtitles in the player: a live style editor kept per profile; find and download from OpenSubtitles in playback; sync in 0.1 s steps with 'align again'; load a file from disk; all by pad (E2).
@@ -49,3 +49,4 @@ Input latency and how to measure it; spatial scrolling with an analogue stick; h
 ## Work log
 - **16.1** TV shows from folders (crates/library): the show from its folder (`Show (Year)`), the season fro · `cabf03d`
 - **16.2** The catalogue refreshes itself (ADR-0030 made automatic): a background job once a day while idle · `345e392`
+- **16.3** Home in the specified order: Continue watching; New episodes of your shows; Your library (newest · `394b11e`
