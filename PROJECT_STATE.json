@@ -2559,7 +2559,14 @@
     }
   ],
   "next_action": "Phase 16 subtask 16.8 (docs/phases/phase-16-ready-to-watch.md): write SETUP.md at the repo root: every prerequisite with its official download link and how to add it to the app — WebView2 (Windows 10/11 usually has it), FFmpeg (winget Gyan.FFmpeg), libmpv (where the app looks: SINEPHILE_LIBMPV), the search model files and the IMDb datasets + MovieLens (tools/ingest; personal, non-commercial; never redistributed), the OpenSubtitles and TMDB keys (their sign-up pages; Settings sections; checked on save), an optional qBittorrent (transport only, ADR-0029), an optional VPN and the adapter binding; and how to add ANY add-on by its address (Settings, Sources, Add a source: preview, then install). It names no content source and links to none (§2.1); run python tools/guard/guard.py --tree. Link it from README.md. Then 16.9 polish.",
-  "blockers": [],
+  "blockers": [
+    {
+      "id": "B15",
+      "raised": "2026-11-08T09:22:20Z",
+      "needs_user": false,
+      "description": "CI red on run 42464345446 (16.6 state commit): the Rust job's 'FFmpeg and libmpv' step got HTTP 504 Gateway Time-out from the libmpv download (tools/mpv/fetch.py), so the tests never ran. Infrastructure, not code; the failed job is rerun. Clear when CI is green."
+    }
+  ],
   "decisions_pending": [
     {
       "id": "P1",

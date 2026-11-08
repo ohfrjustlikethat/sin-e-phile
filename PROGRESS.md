@@ -53,7 +53,7 @@ Phase 16 subtask 16.8 (docs/phases/phase-16-ready-to-watch.md): write SETUP.md a
 
 ## Blockers
 
-None.
+- **B15** CI red on run 42464345446 (16.6 state commit): the Rust job's 'FFmpeg and libmpv' step got HTTP 504 Gateway Time-out from the libmpv download (tools/mpv/fetch.py), so the tests never ran. Infrastructure, not code; the failed job is rerun. Clear when CI is green.
 
 ---
 
