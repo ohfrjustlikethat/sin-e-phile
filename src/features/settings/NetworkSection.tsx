@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Input, Select, Toggle } from "@/design-system";
 import { commands, type TorrentSettingsView } from "@/lib/ipc";
+import { SETTINGS_HEADING } from "./heading";
 
 /**
  * Settings → Network — SPEC.md Phase 7.
@@ -133,7 +134,7 @@ function Form({ initial, onSaved }: { initial: TorrentSettingsView; onSaved: () 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-9">
-      <h2 className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
+      <h2 className={SETTINGS_HEADING}>
         {title}
       </h2>
       {children}

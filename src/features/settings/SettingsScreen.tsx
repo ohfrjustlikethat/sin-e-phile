@@ -10,6 +10,7 @@ import { LibrarySection } from "./LibrarySection";
 import { CatalogueSection } from "./CatalogueSection";
 import { TmdbSection } from "./TmdbSection";
 import { ProfilesSection } from "./ProfilesSection";
+import { SETTINGS_HEADING } from "./heading";
 
 /**
  * Settings — SPEC.md Phase 1, subtask 1.9.
@@ -43,8 +44,8 @@ export function SettingsScreen() {
     <div className="mx-auto max-w-3xl px-10 py-10">
       <header className="mb-9 flex items-start justify-between">
         <div>
-          <h1 className="text-[26px] font-semibold tracking-[-0.02em]">Settings</h1>
-          <p className="mt-1 text-sm text-ink-muted">
+          <h1 className="font-serif text-[56px] leading-none tracking-[-0.015em] text-ink">Settings</h1>
+          <p className="mt-4 text-sm text-ink-muted">
             Everything here stays on this machine.
           </p>
         </div>
@@ -309,7 +310,7 @@ function OverrideButton({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-9">
-      <h2 className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
+      <h2 className={SETTINGS_HEADING}>
         {title}
       </h2>
       {children}

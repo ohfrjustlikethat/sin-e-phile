@@ -4,6 +4,7 @@ import { Button, Input } from "@/design-system";
 import { onEvent } from "@/lib/events";
 import { commands, type LibraryFolderView, type LibraryScanEvent } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
+import { SETTINGS_HEADING } from "./heading";
 
 /**
  * Settings → Library — SPEC.md Phase 12.
@@ -95,7 +96,7 @@ export function LibrarySection() {
   const list = folders.data ?? [];
   return (
     <section className="mb-9" aria-label="Library">
-      <h2 className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">Library</h2>
+      <h2 className={SETTINGS_HEADING}>Library</h2>
       <p className="mb-4 text-sm text-ink-muted">
         Folders of films and episodes on this PC. Each file is identified from its name, its folders and its
         length; anything uncertain waits for you rather than being guessed.

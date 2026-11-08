@@ -7,6 +7,7 @@ import { PROFILES, useProfiles } from "@/features/profiles/useProfiles";
 import { ImportHistory } from "@/features/profiles/ImportHistory";
 import { TasteInput } from "@/features/profiles/TasteInput";
 import { useUi } from "@/lib/store";
+import { SETTINGS_HEADING } from "./heading";
 
 /**
  * Settings → Profiles — SPEC.md Phase 14. Add a profile (a name, a colour, kids or not,
@@ -29,7 +30,7 @@ export function ProfilesSection() {
 
   return (
     <section className="mb-9" aria-label="Profiles">
-      <h2 className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">Profiles</h2>
+      <h2 className={SETTINGS_HEADING}>Profiles</h2>
       <ul className="flex flex-col">
         {profiles.map((p) => (
           <ProfileRow key={p.id} profile={p} locked={locked} last={profiles.length === 1} />

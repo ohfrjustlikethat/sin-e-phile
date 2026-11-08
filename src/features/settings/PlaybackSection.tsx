@@ -1,5 +1,6 @@
 import { Toggle } from "@/design-system";
 import { usePlaybackChoice } from "@/lib/playbackChoice";
+import { SETTINGS_HEADING } from "./heading";
 
 /**
  * Settings → Playback (SPEC.md Phase 9): the expert panel's switch. Ctrl+Shift+S on a
@@ -12,7 +13,7 @@ export function PlaybackSection() {
   const setAutoplay = usePlaybackChoice((s) => s.setAutoplay);
   return (
     <section className="mb-9" aria-label="Playback">
-      <h2 className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
+      <h2 className={SETTINGS_HEADING}>
         Playback
       </h2>
       <Toggle

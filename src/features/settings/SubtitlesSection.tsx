@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Input, Select, Slider, Toggle } from "@/design-system";
 import { commands, type SubtitleSettings, type SubtitleSettingsView } from "@/lib/ipc";
 import { languageName } from "@/lib/playbackChoice";
+import { SETTINGS_HEADING } from "./heading";
 
 /**
  * Settings → Subtitles — SPEC.md Phase 10.
@@ -99,8 +100,9 @@ function Form({ view, onSaved }: { view: SubtitleSettingsView; onSaved: () => vo
         />
       </div>
       <p className="mt-1.5 text-[11px] leading-relaxed text-ink-faint">
-        For plain subtitles. A styled ASS/SSA file keeps the look it was made with. G and H (or the
-        bumpers) move subtitles a tenth of a second while watching, and the film remembers it.
+        For plain subtitles. A styled ASS/SSA file keeps the look it was made with. While watching, G and
+        H (or Timing in the player&apos;s panel, Menu on a controller) move subtitles a tenth of a second,
+        and the film remembers it; the panel also changes their look.
       </p>
 
       <div className="mt-4 flex items-center gap-3">
@@ -181,7 +183,7 @@ function OpenSubtitlesKey({ view, onChanged }: { view: SubtitleSettingsView; onC
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-9" aria-label={title}>
-      <h2 className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">{title}</h2>
+      <h2 className={SETTINGS_HEADING}>{title}</h2>
       {children}
     </section>
   );

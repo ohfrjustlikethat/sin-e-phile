@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Input } from "@/design-system";
 import { commands } from "@/lib/ipc";
+import { SETTINGS_HEADING } from "./heading";
 
 /**
  * TMDB, with this profile's own key (SPEC.md §14, ADR-0013, ADR-0027; Phase 16). Optional:
@@ -37,7 +38,7 @@ export function TmdbSection() {
 
   return (
     <section aria-label="TMDB" className="mb-12">
-      <h2 className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">TMDB</h2>
+      <h2 className={SETTINGS_HEADING}>TMDB</h2>
       <p className="mb-3 max-w-[62ch] text-[13px] text-ink-muted">
         Optional. With your own free TMDB key, New releases starts with what is in cinemas and on the air this week.
         No key comes with the app; yours is kept on this PC, for this profile only.

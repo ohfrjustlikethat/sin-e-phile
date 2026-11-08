@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/design-system";
 import { commands } from "@/lib/ipc";
 import { onEvent } from "@/lib/events";
+import { SETTINGS_HEADING } from "./heading";
 
 /**
  * The catalogue keeping itself current (SPEC.md Phase 16, ADR-0030): checked every hour,
@@ -58,7 +59,7 @@ export function CatalogueSection() {
 
   return (
     <section aria-label="Catalogue" className="mb-12">
-      <h2 className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">Catalogue</h2>
+      <h2 className={SETTINGS_HEADING}>Catalogue</h2>
       <p className="text-[14px] text-ink" role="status">
         {running ? "Updating the catalogue now. This runs in the background." : line}
       </p>
