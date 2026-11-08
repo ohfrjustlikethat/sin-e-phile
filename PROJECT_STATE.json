@@ -3067,7 +3067,7 @@
     },
     {
       "id": "D77",
-      "text": "CREATE_NO_WINDOW is now set on FFprobe and the subtitle aligner's FFmpeg; confirm in a release build (windows subsystem) that no console window flashes during a scan or an alignment. Batched with the Phase 13 author checks.",
+      "text": "CREATE_NO_WINDOW is now set on FFprobe and the subtitle aligner's FFmpeg; confirm in a release build (windows subsystem) that no console window flashes during a scan or an alignment. Batched with the Phase 13 author checks. RESOLVED 2026-11-08 (docs/eval-results.md 'D77'): the release exe is GUI subsystem (PE subsystem 2); from windowed (windows_subsystem) test programs, sinephile_library::probe::ffprobe and sinephile_subtitles::plan::ffmpeg_speech opened 0 console windows over 5 runs each, while the same FFprobe without CREATE_NO_WINDOW opened 5 (the control). The release build launched on the real data/ opened none in 45 s.",
       "phase_raised": 12
     },
     {

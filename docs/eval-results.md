@@ -2799,3 +2799,14 @@ Jeff Tremaine above all (Get Out, Saw, Super Size Me)", which says honestly that
 ### Regression check before merging Phase 15 (rule 13)
 
 2026-11-08, `cargo run --release -p eval -- all` (twice), `-- vector --report`, `-- import --from 600`, `-- taste`, `-- switch`, `-- modes`, `-- update`: E2 **43/43**; E3 meaning **0.0472**, filter **1.0000** (carried); p95 **15.6 ms** warm (16.4 at Phase 14: noise); recall@10 **0.9760**; subtitles **48/48** tuned, **32/32** held out, false accepts **0/10**; identify **99.05% / 0.39%** (held out 100% / 0%); import (fresh 600) **98.83% / 0 wrong**; taste **40.63%** against popularity 35.64%; switch **22.9 / 30.5 ms** p95; modes purity **96.6%**; update **125.5–133.2 ms**. Unchanged from Phase 14 and from this phase's own first runs.
+
+### D77: no console window from the release build (2026-11-08, ba98081)
+
+`npm run tauri build`, then: the release `sin-e-phile.exe` is a GUI-subsystem program (PE subsystem 2;
+the debug build is 3, console). Launched on the real `data/` and watched for 45 s (visible
+`ConsoleWindowClass` windows, sampled every 100 ms): **0** new console windows; it opened to the first-run
+wizard. A scan and an alignment were exercised from two temporary `#![windows_subsystem = "windows"]`
+programs calling the app's own code on an 8-second test video, five runs each, sampled every 20 ms:
+`sinephile_library::probe::ffprobe` **0** console windows, `sinephile_subtitles::plan::ffmpeg_speech`
+**0**. **Seen to fail**: the same FFprobe started without `CREATE_NO_WINDOW` opened **5**, one per run.
+The temporary programs were not committed.
