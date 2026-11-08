@@ -12,14 +12,14 @@
 
 **Phase 16 — Ready to Watch** (`in_progress`, branch `phase/16-ready-to-watch`)
 
-1 of 9 exit criteria met with evidence.
+2 of 9 exit criteria met with evidence.
 
 > Inserted by spec 4.0.0 (ADR-0045) after the author used the release build. Receives the author batch: Phase 8 E5, Phase 14 E1 and Phase 15 E3 discharged here from the author's answers of 2026-11-08; Phase 7 E7 and Phase 14 E4/E6 to be met here (16.10). Judge by using the release build as a person would, not only by fixtures.
 
-### Subtasks — 1/10 complete
+### Subtasks — 2/10 complete
 
 - [x] **16.1** TV shows from folders (crates/library): the show from its folder (`Show (Year)`), the season from a `Season N` subfolder, the episode from the file; flat `S01E03` files under a show folder; anime absolute numbers mapped per season where the data allows (never cumulated, ADR-0031); one show across folders or drives merged; no episode ever filed as a film. A TV-layout corpus in fixtures/ including a Twin Peaks-like case, judged by eval identify (E4); then the author's real folder rescanned on the release build. · `cabf03d`
-- [ ] **16.2** The catalogue refreshes itself (ADR-0030 made automatic): a background job once a day while idle fetches IMDb's updated basics, ratings and episode files and adds titles and episodes past what is stored; AniList airing every few hours; TMDB now-playing and airing for a profile with a key; Settings says when it last ran and offers 'refresh now' (E5).
+- [x] **16.2** The catalogue refreshes itself (ADR-0030 made automatic): a background job once a day while idle fetches IMDb's updated basics, ratings and episode files and adds titles and episodes past what is stored; AniList airing every few hours; TMDB now-playing and airing for a profile with a key; Settings says when it last ran and offers 'refresh now' (E5). · `345e392`
 - [ ] **16.3** Home in the specified order: Continue watching; New episodes of your shows; Your library (newest added first, shown the moment a scan finishes, by event); New releases filtered by taste; then the taste rails (E6).
 - [ ] **16.4** The controller in the player (TV-standard: A, left/right seek with hold to scrub, up/down volume, LB/RB episode or chapter, Y subtitles quick menu, X audio quick menu, Menu panel, B back) and the right stick scrolling everything: page, panel, rail, the paused details, speed by deflection, focus following (E3).
 - [ ] **16.5** The hybrid player: clean while watching; the full panel (subtitles, style, sync, audio, speed, picture); controls answering in under 100 ms; opening, closing, bar and panels without jumps or flicker, measured in the UI audit (E1).
@@ -36,7 +36,8 @@
 - [ ] **E3** The controller works in the player as specified, and the right stick scrolls pages, rails, panels and the paused details, each covered by the pad-flow audit.
 - [x] **E4** A TV-layout corpus (season folders, flat, anime absolute, split across drives, including a real-world case like the author's) is identified with at least 98% of episodes right and no episode filed as a film.
       - *Evidence:* cabf03d: cargo run --release -p eval -- tvlayouts (2026-11-08) over fixtures/tv-layouts/layouts.psv (184 files: the author's Twin Peaks layout with groups replaced, season folders, flat, anime fansub numbering, one show split across three folders): episodes 59/59 = 100%, 0 filed as films, the nested film 1/1, extras 105/105 left out and 0 searched for. Seen to fail: --before (no extras rule) searches all 105 extras as titles; crates/library/tests/scan.rs a_shows_extras_are_left_out_and_its_episodes_and_film_kept and tests/identify.rs a_fansub_number_is_the_episode_only_when_the_show_has_one_season each fail with their rule removed. On the author's real folder (eval tvlayouts --folder, read-only): 102 extras left out, 48 episodes under Twin Peaks (1990), the film found, 0 to review. eval identify unchanged (523/528, 2/510; 108/108, 0/103). docs/eval-results.md.
-- [ ] **E5** The catalogue refreshes daily in the background: titles and episodes released since the last refresh appear without the user doing anything, and a run on the real data adds the recent releases it lacked.
+- [x] **E5** The catalogue refreshes daily in the background: titles and episodes released since the last refresh appear without the user doing anything, and a run on the real data adds the recent releases it lacked.
+      - *Evidence:* 345e392: the app checks hourly from launch (src-tauri/src/commands/catalogue.rs keep_current -> sinephile_catalogue::freshness::refresh), an interrupted refresh finished first and resumed from its starting watermark, episodes refreshed with titles (followed series whatever their votes), AniList airing every 6 h. Real data (2026-11-08, target/release/ingest.exe keep, the same function): the refresh stuck since 2026-11-07 finished, 885 titles added (300 films of 2026) and 7,951 episodes, 86 s. Tests: crates/catalogue/tests/refresh.rs an_interrupted_refresh_is_finished_before_the_publisher_is_asked and a_resumed_refresh_reads_past_the_watermark_it_started_from, each seen to fail with its fix removed (the first returns AlreadyCurrent). docs/eval-results.md.
 - [ ] **E6** Home's rails are in the specified order, and a finished library scan appears on Home within 2 s.
 - [ ] **E7** A first run done only by pad leaves library folders, an add-on the user chose, keys and a download backend configured and tested; with no source, the app says so wherever play or download would be.
 - [ ] **E8** `SETUP.md` lists every prerequisite with its official link and how to add it, and passes the posture guard.
@@ -46,13 +47,13 @@
 
 ## What's next
 
-Phase 16 subtask 16.2 (docs/phases/phase-16-ready-to-watch.md): the catalogue refreshes itself. Read docs/specs/catalogue-freshness.md and what tools/ingest already does for layer 1 (incremental past the highest stored id) and for title.episode; check why Twin Peaks (1990) lacks its 2017 season 3 rows (18 episodes; the author's folder has them). Then move the incremental refresh into a crate callable from the app, run it from src-tauri once a day in a background task while idle (download IMDb's updated files into data/datasets, ingest the delta), add AniList airing every few hours and a 'last refreshed' line with 'refresh now' in Settings; prove with a fixture delta test and a real run that adds recent releases.
+Phase 16 subtask 16.3 (docs/phases/phase-16-ready-to-watch.md): Home in the specified order in crates/taste/src/home.rs rails(): continue (exists), 'new episodes' (episodes of followed series (sinephile_catalogue::refresh::followed_series) aired in the last 30 days and not yet watched, newest first, plus airing_schedule's next), 'library' (local_file_matches newest added first, film or series once), 'new releases' (films and series released in the last ~60 days with votes, ranked by the taste model, kids rule applied), then the taste rails; repository methods with surface lines; tests in crates/taste/tests/home.rs; HomeScreen shows them (episodes as 'S1 E3' cards); measure scan-finished -> Home updated under 2 s.
 
 ---
 
 ## Blockers
 
-- **B14** CI red on run 42446407507 (c7349e8): crates/torrent/tests/swarm.rs a_download_survives_a_restart lost progress across a restart (D83, second time). Engine::stop now waits for the librqbit session to end; clear this when the next CI run is green.
+None.
 
 ---
 
@@ -78,7 +79,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 8/8 |
 | [x] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 3/6 |
 | [x] | 15 | Taste Model | B | 5, 14 | 2 | 4/5 |
-| [~] | 16 | Ready to Watch | B | 15 | 3–4 | 1/9 |
+| [~] | 16 | Ready to Watch | B | 15 | 3–4 | 2/9 |
 | [ ] | 17 | Recommendation Engine | B | 15, 16 | 2–3 | 0/6 |
 | [ ] | 18 | Discovery Engine 🏁 | B | 17 | 2 | 0/6 |
 | [ ] | 19 | Browsing Surfaces | B | 18 | 4–5 | 0/13 |
@@ -182,6 +183,7 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D82** (raised in Phase 14) The first profile switch after launch costs about 112 ms (index and catalogue pages read from disk) against 11 ms warm. Touch the vector index and the votes index in the background after launch so the first switch, and the first Home, are warm.
 - **D83** (raised in Phase 14) crates/torrent/tests/swarm.rs a_download_survives_a_restart failed once in CI (run 42396646470, 2026-11-07, at ec78b82): 10,223,616 bytes before the stop, 0 after wait_ready on the restarted engine. Passes 5/5 locally and in every earlier CI run; code unchanged since Phase 13. Rerun. If it recurs: check that Engine::stop lets librqbit flush its writes and persistence before the session ends (a slow runner may lose the race). RECURRED 2026-11-08 (run 42446407507, at c7349e8, same numbers). Cause found in librqbit 9.0.1: Session::stop pauses and sleeps a fixed second; the torrents' files and their finished-piece record (.bitv, written every 16 MiB and on drop, from background tasks) are released only when the session's last reference goes. Engine::stop now waits (up to 5 s) until the session is gone and every .bitv has been rewritten; the test also checks the record is on disk when stop returns and prints the restarted torrent's state on failure. Not reproduced locally (passes 5/5 before and after); watch CI.
 - **D84** (raised in Phase 15) The offline catalogue has no countries or original languages (IMDb's free datasets do not carry them; the columns are empty), so the taste model cannot learn country or language preferences, or subtitle tolerance, from behaviour; the statements stand in. Fill them from TMDB for profiles with a key (and Wikidata, which is keyless) and add the axes in crates/taste/src/axes.rs.
+- **D85** (raised in Phase 16) A show IMDb splits where other sources do not: Twin Peaks' 2017 season is a separate IMDb series (tt-level), its 18 parts that series' season 1, so the author's files named S03E01..S03E18 under 'Twin Peaks (1990)' are placed on the 1990 series without an episode row. Mapping needs a source that publishes cross-numbering (TVDB/TMDB with a key); until then identification places the series and leaves the episode unresolved, which is honest.
 
 ---
 
