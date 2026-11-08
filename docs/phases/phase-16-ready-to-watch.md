@@ -22,7 +22,7 @@ A person can install the app, set it up once, and watch anything they choose (fr
 - [x] **E5** The catalogue refreshes daily in the background: titles and episodes released since the last refresh appear without the user doing anything, and a run on the real data adds the recent releases it lacked.
 - [ ] **E6** Home's rails are in the specified order, and a finished library scan appears on Home within 2 s.
 - [ ] **E7** A first run done only by pad leaves library folders, an add-on the user chose, keys and a download backend configured and tested; with no source, the app says so wherever play or download would be.
-- [ ] **E8** `SETUP.md` lists every prerequisite with its official link and how to add it, and passes the posture guard.
+- [x] **E8** `SETUP.md` lists every prerequisite with its official link and how to add it, and passes the posture guard.
 - [ ] **E9** The author signs off a screenshot set of the player, first run, Home, Settings and the taste screen, and confirms a download and a stream work with a source of their choosing.
 
 ## Subtasks
@@ -34,7 +34,7 @@ A person can install the app, set it up once, and watch anything they choose (fr
 - [x] **16.5** The hybrid player: clean while watching; the full panel (subtitles, style, sync, audio, speed, picture); controls answering in under 100 ms; opening, closing, bar and panels without jumps or flicker, measured in the UI audit (E1).
 - [x] **16.6** Subtitles in the player: a live style editor kept per profile; find and download from OpenSubtitles in playback; sync in 0.1 s steps with 'align again'; load a file from disk; all by pad (E2).
 - [x] **16.7** A first run that leaves the viewer ready to watch: library folders (scan starts at once), add-ons by address with a live check (the app suggests none, §2.1), TMDB and OpenSubtitles keys with links and live tests, the download backend with the VPN check; honest no-source states wherever play or download would be (E7).
-- [ ] **16.8** SETUP.md: every prerequisite with its official link and how to add it to the app, and how to add any add-on by its address; names no content source; passes the guard (E8).
+- [x] **16.8** SETUP.md: every prerequisite with its official link and how to add it to the app, and how to add any add-on by its address; names no content source; passes the guard (E8).
 - [ ] **16.9** Polish: Settings section headings clear and larger in the display face; the taste screen (films as cards, clearer hierarchy, live Home preview, fewer words); first run and Home audited for layout, clipping, focus jumps and content flashes at three window sizes, with automated checks added to the UI audit.
 - [ ] **16.10** The author batch: sign-off on a screenshot set (player, first run, Home, Settings, taste screen; Phase 14 E4/E6 with it), a download and a stream with a source of their choosing (Phase 7 E7's VPN cut with it); docs/specs, learning note, README and HOW_IT_WORKS, regression, close (E9).
 
@@ -54,3 +54,4 @@ Input latency and how to measure it; spatial scrolling with an analogue stick; h
 - **16.5** The hybrid player: clean while watching; the full panel (subtitles, style, sync, audio, speed, p · `989c481`
 - **16.6** Subtitles in the player: a live style editor kept per profile; find and download from OpenSubtit · `2416ab6`
 - **16.7** A first run that leaves the viewer ready to watch: library folders (scan starts at once), add-on · `c1cd70c`
+- **16.8** SETUP.md: every prerequisite with its official link and how to add it to the app, and how to add · `42533a9`

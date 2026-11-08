@@ -12,11 +12,11 @@
 
 **Phase 16 — Ready to Watch** (`in_progress`, branch `phase/16-ready-to-watch`)
 
-2 of 9 exit criteria met with evidence.
+3 of 9 exit criteria met with evidence.
 
 > Inserted by spec 4.0.0 (ADR-0045) after the author used the release build. Receives the author batch: Phase 8 E5, Phase 14 E1 and Phase 15 E3 discharged here from the author's answers of 2026-11-08; Phase 7 E7 and Phase 14 E4/E6 to be met here (16.10). Judge by using the release build as a person would, not only by fixtures.
 
-### Subtasks — 7/10 complete
+### Subtasks — 8/10 complete
 
 - [x] **16.1** TV shows from folders (crates/library): the show from its folder (`Show (Year)`), the season from a `Season N` subfolder, the episode from the file; flat `S01E03` files under a show folder; anime absolute numbers mapped per season where the data allows (never cumulated, ADR-0031); one show across folders or drives merged; no episode ever filed as a film. A TV-layout corpus in fixtures/ including a Twin Peaks-like case, judged by eval identify (E4); then the author's real folder rescanned on the release build. · `cabf03d`
 - [x] **16.2** The catalogue refreshes itself (ADR-0030 made automatic): a background job once a day while idle fetches IMDb's updated basics, ratings and episode files and adds titles and episodes past what is stored; AniList airing every few hours; TMDB now-playing and airing for a profile with a key; Settings says when it last ran and offers 'refresh now' (E5). · `345e392`
@@ -25,7 +25,7 @@
 - [x] **16.5** The hybrid player: clean while watching; the full panel (subtitles, style, sync, audio, speed, picture); controls answering in under 100 ms; opening, closing, bar and panels without jumps or flicker, measured in the UI audit (E1). · `989c481`
 - [x] **16.6** Subtitles in the player: a live style editor kept per profile; find and download from OpenSubtitles in playback; sync in 0.1 s steps with 'align again'; load a file from disk; all by pad (E2). · `2416ab6`
 - [x] **16.7** A first run that leaves the viewer ready to watch: library folders (scan starts at once), add-ons by address with a live check (the app suggests none, §2.1), TMDB and OpenSubtitles keys with links and live tests, the download backend with the VPN check; honest no-source states wherever play or download would be (E7). · `c1cd70c`
-- [ ] **16.8** SETUP.md: every prerequisite with its official link and how to add it to the app, and how to add any add-on by its address; names no content source; passes the guard (E8).
+- [x] **16.8** SETUP.md: every prerequisite with its official link and how to add it to the app, and how to add any add-on by its address; names no content source; passes the guard (E8). · `42533a9`
 - [ ] **16.9** Polish: Settings section headings clear and larger in the display face; the taste screen (films as cards, clearer hierarchy, live Home preview, fewer words); first run and Home audited for layout, clipping, focus jumps and content flashes at three window sizes, with automated checks added to the UI audit.
 - [ ] **16.10** The author batch: sign-off on a screenshot set (player, first run, Home, Settings, taste screen; Phase 14 E4/E6 with it), a download and a stream with a source of their choosing (Phase 7 E7's VPN cut with it); docs/specs, learning note, README and HOW_IT_WORKS, regression, close (E9).
 
@@ -40,14 +40,15 @@
       - *Evidence:* 345e392: the app checks hourly from launch (src-tauri/src/commands/catalogue.rs keep_current -> sinephile_catalogue::freshness::refresh), an interrupted refresh finished first and resumed from its starting watermark, episodes refreshed with titles (followed series whatever their votes), AniList airing every 6 h. Real data (2026-11-08, target/release/ingest.exe keep, the same function): the refresh stuck since 2026-11-07 finished, 885 titles added (300 films of 2026) and 7,951 episodes, 86 s. Tests: crates/catalogue/tests/refresh.rs an_interrupted_refresh_is_finished_before_the_publisher_is_asked and a_resumed_refresh_reads_past_the_watermark_it_started_from, each seen to fail with its fix removed (the first returns AlreadyCurrent). docs/eval-results.md.
 - [ ] **E6** Home's rails are in the specified order, and a finished library scan appears on Home within 2 s.
 - [ ] **E7** A first run done only by pad leaves library folders, an add-on the user chose, keys and a download backend configured and tested; with no source, the app says so wherever play or download would be.
-- [ ] **E8** `SETUP.md` lists every prerequisite with its official link and how to add it, and passes the posture guard.
+- [x] **E8** `SETUP.md` lists every prerequisite with its official link and how to add it, and passes the posture guard.
+      - *Evidence:* 42533a9: SETUP.md at the repository root, linked from README.md 'Set it up': WebView2, FFmpeg, libmpv, the catalogue (self-updating), library folders, add-ons by address (Settings, Sources, Add a source: preview before install), OpenSubtitles and TMDB keys (official sign-up pages, checked on save), qBittorrent (transport only, ADR-0029), VPN adapter binding, controller; each with its official source and how to add it. Names no content source. python tools/guard/guard.py --tree: clean; --selftest: all 54 checks passed (the guard fires when it should).
 - [ ] **E9** The author signs off a screenshot set of the player, first run, Home, Settings and the taste screen, and confirms a download and a stream work with a source of their choosing.
 
 ---
 
 ## What's next
 
-Phase 16 subtask 16.8 (docs/phases/phase-16-ready-to-watch.md): write SETUP.md at the repo root: every prerequisite with its official download link and how to add it to the app — WebView2 (Windows 10/11 usually has it), FFmpeg (winget Gyan.FFmpeg), libmpv (where the app looks: SINEPHILE_LIBMPV), the search model files and the IMDb datasets + MovieLens (tools/ingest; personal, non-commercial; never redistributed), the OpenSubtitles and TMDB keys (their sign-up pages; Settings sections; checked on save), an optional qBittorrent (transport only, ADR-0029), an optional VPN and the adapter binding; and how to add ANY add-on by its address (Settings, Sources, Add a source: preview, then install). It names no content source and links to none (§2.1); run python tools/guard/guard.py --tree. Link it from README.md. Then 16.9 polish.
+Phase 16 subtask 16.9 (docs/phases/phase-16-ready-to-watch.md): polish. (1) Settings section headings: today 11px faint uppercase labels (src/features/settings/*Section.tsx, each has a Section helper or an h2); make one shared SettingsSection component in src/features/settings/ with a clear, larger heading in the display face (about 22-26px, ink colour) and a one-line description, and use it everywhere; check contrast (npm run audit:contrast). (2) The taste screen (src/features/taste/TasteProfile.tsx): each mode's example films as cards that open, a clearer hierarchy (number, share as a bar, sentence larger), a live preview of Home's taste rail after a correction, fewer words. (3) First run and Home audited for layout, clipping, focus jumps and content flashes at three window sizes: add checks to tools/uiaudit (no element overflowing its container horizontally, focus never on body after a step, no empty->content flash), fix what they find. Screenshots for the author.
 
 ---
 
@@ -79,7 +80,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 8/8 |
 | [x] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 3/6 |
 | [x] | 15 | Taste Model | B | 5, 14 | 2 | 4/5 |
-| [~] | 16 | Ready to Watch | B | 15 | 3–4 | 2/9 |
+| [~] | 16 | Ready to Watch | B | 15 | 3–4 | 3/9 |
 | [ ] | 17 | Recommendation Engine | B | 15, 16 | 2–3 | 0/6 |
 | [ ] | 18 | Discovery Engine 🏁 | B | 17 | 2 | 0/6 |
 | [ ] | 19 | Browsing Surfaces | B | 18 | 4–5 | 0/13 |

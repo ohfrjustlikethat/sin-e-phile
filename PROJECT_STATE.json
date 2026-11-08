@@ -57,8 +57,8 @@
       {
         "id": "16.8",
         "text": "SETUP.md: every prerequisite with its official link and how to add it to the app, and how to add any add-on by its address; names no content source; passes the guard (E8).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "42533a9"
       },
       {
         "id": "16.9",
@@ -119,8 +119,8 @@
       {
         "id": "E8",
         "text": "`SETUP.md` lists every prerequisite with its official link and how to add it, and passes the posture guard.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "42533a9: SETUP.md at the repository root, linked from README.md 'Set it up': WebView2, FFmpeg, libmpv, the catalogue (self-updating), library folders, add-ons by address (Settings, Sources, Add a source: preview before install), OpenSubtitles and TMDB keys (official sign-up pages, checked on save), qBittorrent (transport only, ADR-0029), VPN adapter binding, controller; each with its official source and how to add it. Names no content source. python tools/guard/guard.py --tree: clean; --selftest: all 54 checks passed (the guard fires when it should)."
       },
       {
         "id": "E9",
@@ -1913,8 +1913,8 @@
         {
           "id": "E8",
           "text": "`SETUP.md` lists every prerequisite with its official link and how to add it, and passes the posture guard.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "42533a9: SETUP.md at the repository root, linked from README.md 'Set it up': WebView2, FFmpeg, libmpv, the catalogue (self-updating), library folders, add-ons by address (Settings, Sources, Add a source: preview before install), OpenSubtitles and TMDB keys (official sign-up pages, checked on save), qBittorrent (transport only, ADR-0029), VPN adapter binding, controller; each with its official source and how to add it. Names no content source. python tools/guard/guard.py --tree: clean; --selftest: all 54 checks passed (the guard fires when it should)."
         },
         {
           "id": "E9",
@@ -1969,8 +1969,8 @@
         {
           "id": "16.8",
           "text": "SETUP.md: every prerequisite with its official link and how to add it to the app, and how to add any add-on by its address; names no content source; passes the guard (E8).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "42533a9"
         },
         {
           "id": "16.9",
@@ -2558,7 +2558,7 @@
       ]
     }
   ],
-  "next_action": "Phase 16 subtask 16.8 (docs/phases/phase-16-ready-to-watch.md): write SETUP.md at the repo root: every prerequisite with its official download link and how to add it to the app — WebView2 (Windows 10/11 usually has it), FFmpeg (winget Gyan.FFmpeg), libmpv (where the app looks: SINEPHILE_LIBMPV), the search model files and the IMDb datasets + MovieLens (tools/ingest; personal, non-commercial; never redistributed), the OpenSubtitles and TMDB keys (their sign-up pages; Settings sections; checked on save), an optional qBittorrent (transport only, ADR-0029), an optional VPN and the adapter binding; and how to add ANY add-on by its address (Settings, Sources, Add a source: preview, then install). It names no content source and links to none (§2.1); run python tools/guard/guard.py --tree. Link it from README.md. Then 16.9 polish.",
+  "next_action": "Phase 16 subtask 16.9 (docs/phases/phase-16-ready-to-watch.md): polish. (1) Settings section headings: today 11px faint uppercase labels (src/features/settings/*Section.tsx, each has a Section helper or an h2); make one shared SettingsSection component in src/features/settings/ with a clear, larger heading in the display face (about 22-26px, ink colour) and a one-line description, and use it everywhere; check contrast (npm run audit:contrast). (2) The taste screen (src/features/taste/TasteProfile.tsx): each mode's example films as cards that open, a clearer hierarchy (number, share as a bar, sentence larger), a live preview of Home's taste rail after a correction, fewer words. (3) First run and Home audited for layout, clipping, focus jumps and content flashes at three window sizes: add checks to tools/uiaudit (no element overflowing its container horizontally, focus never on body after a step, no empty->content flash), fix what they find. Screenshots for the author.",
   "blockers": [
     {
       "id": "B15",
