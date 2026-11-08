@@ -370,6 +370,13 @@ component, no Docker.
 
 ---
 
+## Set it up
+
+[`SETUP.md`](SETUP.md): everything the app needs or can use, each from its official source, and
+how to add it — WebView2, FFmpeg, the player, the catalogue, your folders, add-ons by their
+address, your own OpenSubtitles and TMDB keys, qBittorrent, a VPN, a controller. The app comes
+with no content sources and names none.
+
 ## Build it
 
 See [`docs/SETUP.md`](docs/SETUP.md). Short version: clone, then
