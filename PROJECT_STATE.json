@@ -33,8 +33,8 @@
       {
         "id": "16.4",
         "text": "The controller in the player (TV-standard: A, left/right seek with hold to scrub, up/down volume, LB/RB episode or chapter, Y subtitles quick menu, X audio quick menu, Menu panel, B back) and the right stick scrolling everything: page, panel, rail, the paused details, speed by deflection, focus following (E3).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "0367901"
       },
       {
         "id": "16.5",
@@ -1945,8 +1945,8 @@
         {
           "id": "16.4",
           "text": "The controller in the player (TV-standard: A, left/right seek with hold to scrub, up/down volume, LB/RB episode or chapter, Y subtitles quick menu, X audio quick menu, Menu panel, B back) and the right stick scrolling everything: page, panel, rail, the paused details, speed by deflection, focus following (E3).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "0367901"
         },
         {
           "id": "16.5",
@@ -2558,7 +2558,7 @@
       ]
     }
   ],
-  "next_action": "Phase 16 subtask 16.4 (docs/phases/phase-16-ready-to-watch.md): the controller in the player and the right stick everywhere. Read src/lib/gamepad.ts and src/features/player/PlayerScreen.tsx/intents.ts first. Player mapping (TV-standard, ADR-0045): A play/pause; left/right seek 10 s, hold to scrub; up/down volume; LB/RB previous/next episode or chapter; Y subtitles quick menu; X audio quick menu; Menu the full panel; B back. Right stick: scroll the scrollable element under focus (page, panel, rail, paused details) at a speed set by deflection, focus following what scrolls into view. Unit-test the mapping and the scroll maths in src/lib/*.test.ts; cover each button and the stick in tools/uiaudit/controller.mjs. Still owed from 16.3: E6's 'a finished scan appears on Home within 2 s', measured in a real window (release build, add a folder, time to the Library rail).",
+  "next_action": "Phase 16 subtask 16.5 (docs/phases/phase-16-ready-to-watch.md): the hybrid player in src/features/player/PlayerScreen.tsx + PlayerPanels.tsx. First measure the author's 'choppy': in the debug build with SINEPHILE_AUTOPLAY and the dev_log probe, log input-to-visible latency for showing the bar (keydown/pad -> first frame with the bar) and frame gaps while opening and closing the player and the panels; record in docs/eval-results.md. Then: the bar appears in under 100 ms and moves without jumps (one transition, the window region updated in the same frame), the full panel from the right with Subtitles (track, style, sync, find, load), Audio, Speed, Picture, by pad, with button hints in the bar while a pad is in use; opening and closing without flicker. Cover in tools/uiaudit/controller.mjs; X (sound) and LB/RB (episode) steps with fake tracks and neighbours. E6 still owes the real-window scan->Home time.",
   "blockers": [],
   "decisions_pending": [
     {

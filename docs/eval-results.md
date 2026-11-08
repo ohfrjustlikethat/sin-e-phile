@@ -2863,3 +2863,17 @@ and filtered by year: 92–98 ms on the real catalogue, and `eval switch` went f
 the query because the planner otherwise still walked the votes index to avoid a sort: **10.9 ms**. `eval
 switch` now **30.3 / 40.7 ms p95** (E5 MET); the remaining ~10 ms over Phase 15's numbers is the three new
 rails' queries (new episodes 1 ms, library 0 ms, new releases 11 ms).
+
+### The pad in playback, and the right stick (16.4, 2026-11-08)
+
+**Measured first, because the first explanation was wrong.** A debug build with a `dev_log` probe
+(`SINEPHILE_AUTOPLAY`, the author's own film, 20 s of playback): every half second `visibility=visible
+focus=true frames=120`. The page was never hidden or unfocused behind the video window, so the pad was
+being read; the faults were in our handling. Found and fixed, each step in `node
+tools/uiaudit/controller.mjs` seen to fail first: Y opened nothing (the old mapping had Y for sound); with a
+quick menu open, Down turned the volume down instead of moving in the menu; a volume change said nothing.
+Now: Up 100 → 105 with "Volume 105%" on screen; Y opens the subtitles with focus on "Off"; Down stays in
+the menu; A picks and closes. Right stick: Settings scrolled 0 → 1,094 px in 0.6 s with focus following
+into view; the paused film's details 0 → 636 px in 0.4 s with focus left on Resume (0 px with the dialog
+fallback removed). Not yet covered: X (sound needs two audio tracks), LB/RB (needs a series), and a real
+controller in the author's hands.
