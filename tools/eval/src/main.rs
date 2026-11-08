@@ -22,6 +22,7 @@ mod search;
 mod subs;
 mod switching;
 mod taste;
+mod tvlayouts;
 mod update;
 mod vector;
 
@@ -100,6 +101,19 @@ async fn main() {
         "taste" => taste::run(Path::new(&data_dir), args.iter().any(|a| a == "--tune")).await,
         "switch" => switching::run(Path::new(&data_dir)).await,
         "update" => update::run(Path::new(&data_dir)).await,
+        "tvlayouts" if args.iter().any(|a| a == "--folder") => {
+            let at = args.iter().position(|a| a == "--folder").unwrap_or(0) + 1;
+            let root = args.get(at).cloned().unwrap_or_default();
+            tvlayouts::folder(Path::new(&data_dir), Path::new(&root)).await
+        }
+        "tvlayouts" => {
+            tvlayouts::run(
+                Path::new(&data_dir),
+                args.iter().any(|a| a == "--before"),
+                args.iter().any(|a| a == "--report"),
+            )
+            .await
+        }
         "modes" => modes::run(Path::new(&data_dir), args.iter().any(|a| a == "--prove")).await,
         "import" => {
             let from = args

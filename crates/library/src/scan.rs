@@ -134,7 +134,8 @@ fn skipped(entry: &walkdir::DirEntry) -> bool {
 }
 
 /// Every video under `root`. System and hidden folders are skipped; links are not
-/// followed (a loop would never end).
+/// followed (a loop would never end). A release's extras (featurettes, interviews, menus)
+/// are not the library's: left out, so none is ever searched for as a film (Phase 16).
 pub fn walk(root: &Path, progress: &(dyn Fn(Progress) + Sync)) -> Vec<OnDisk> {
     let mut out = Vec::new();
     let entries = walkdir::WalkDir::new(root)
@@ -143,6 +144,10 @@ pub fn walk(root: &Path, progress: &(dyn Fn(Progress) + Sync)) -> Vec<OnDisk> {
         .filter_entry(|e| e.depth() == 0 || !skipped(e));
     for entry in entries.flatten() {
         if entry.file_type().is_file() {
+            let name = entry.file_name().to_string_lossy();
+            if crate::folders::is_extra(&folders_between(root, entry.path()), &name) {
+                continue;
+            }
             if let Some(f) = on_disk(entry.path()) {
                 out.push(f);
                 if out.len() % 500 == 0 {

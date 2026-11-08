@@ -2810,3 +2810,25 @@ programs calling the app's own code on an 8-second test video, five runs each, s
 `sinephile_library::probe::ffprobe` **0** console windows, `sinephile_subtitles::plan::ffmpeg_speech`
 **0**. **Seen to fail**: the same FFprobe started without `CREATE_NO_WINDOW` opened **5**, one per run.
 The temporary programs were not committed.
+
+## Phase 16 — Ready to Watch
+
+### E4: TV layouts read from their folders (2026-11-08, 66be7cb plus the 16.1 change)
+
+`cargo run --release -p eval -- tvlayouts` over `fixtures/tv-layouts/layouts.psv` (184 files: the
+author's own Twin Peaks layout with its groups replaced, plus season folders, flat, anime fansub numbering
+and one show split across three folders). **Before** (`--before`, no extras rule; the scanner as it was):
+episodes 57/59 = 96.6%, and **105 of 105 extras searched for as titles** ("Cherry Pie", "The Log Lady 01",
+"Tim Hunter" …), which is what the author saw. **After**: episodes **59/59 = 100%**, **0** filed as films,
+the nested film 1/1, extras **105/105** kept out and **0** searched for. E4 MET.
+
+The two anime misses on the way were real: a fansub "- 05" had nothing to resolve against (no free source
+publishes absolute numbers; no AniList numbering is stored), and is now read as the fifth episode only when
+the show has exactly one season (the identity, not a sum, ADR-0031), and only to place the episode after the
+series is chosen. Used while scoring, it favoured one-season shows: `eval identify` went from 523 to 522 of
+528 ("Steins;Gate 0 - 03" to Steins;Gate) until it was confined to placement; now **523/528 = 99.05%,
+false-confident 2/510 = 0.39%, held out 108/108 and 0/103**, identical to Phase 12.
+
+On the author's real folder (`-- tvlayouts --folder <path>`, read-only): 151 videos, **102 extras left
+out**, 48 episodes all filed under Twin Peaks (1990) (30 on their episode; 18 from the 2017 season placed on
+the series, whose rows the catalogue lacks), Fire Walk with Me as the film, 0 to the review queue.

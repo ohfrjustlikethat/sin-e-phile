@@ -89,3 +89,14 @@ Migration 0021: `library_folders` (the user's own paths, allowed by the portabil
 with `local_files.path`), `local_files.folder_id` (a trigger, not a foreign key, so the down
 migration can drop it), `missing_since`, probe columns, `local_file_matches.covers`,
 `review_candidates`, `match_memory`. Migration 0022: `local_files.ignored_at`.
+
+## TV layouts and extras (Phase 16)
+
+A release's extras are not library items. A file under an extras folder (Featurettes, Extras, Behind the
+Scenes, Deleted Scenes, Interviews, Trailers, Menu Art, Bonus, Special Features …) or named as one (gag reel,
+NCOP, NCED, creditless, featurette) is left out by `scan::walk`, so it is never searched for as a film
+(`folders::is_extra`). The show is named by its nearest naming folder, the season by a `Season N` folder, the
+episode by the file. A fansub absolute number is placed as season 1's episode only when the chosen series has
+exactly one season, and never counts while scoring candidates. Measured by `eval tvlayouts` over
+`fixtures/tv-layouts/` (E4); a real folder can be checked read-only with `eval tvlayouts --folder <path>`.
+

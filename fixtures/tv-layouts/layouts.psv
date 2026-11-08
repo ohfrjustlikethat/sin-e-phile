@@ -1,0 +1,185 @@
+# fixtures/tv-layouts — how a library folder is laid out, and what each file is (Phase 16 E4)
+#
+# path | kind | title | year | season | episode
+#
+# path: relative to a library root, folders separated by "/". kind: episode (of the series
+# title/year, at season/episode), movie (title/year), or extra (featurettes, interviews,
+# menus: not a film, not an episode, and never searched for). Release groups are invented.
+#
+# A. The author's own layout (2026-11-08), names kept, groups replaced: a show folder with
+#    a season range in its name; Season N folders; extras in their own Season N folders;
+#    and the companion film nested inside the show's folder with its own extras.
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/Behind the Scenes/Caleb Deschanel.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/Behind the Scenes/Duwayne Dunham.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/Behind the Scenes/Frank Byers.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/Behind the Scenes/Harley Peyton.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/Behind the Scenes/Lesli Linka Glatter.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/Behind the Scenes/Richard Hoover.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/Behind the Scenes/Robert Engels.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/Behind the Scenes/Tim Hunter.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/Behind the Scenes/Tina Rathborne.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/Cherry Pie.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/Entering Twin Peaks.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/The Log Lady/The Log Lady 01.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/The Log Lady/The Log Lady 02.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/The Log Lady/The Log Lady 03.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/The Log Lady/The Log Lady 04.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/The Log Lady/The Log Lady 05.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/The Log Lady/The Log Lady 06.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/The Log Lady/The Log Lady 07.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/The Log Lady/The Log Lady 08.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/Trees Clip.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 1/TV Advert.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/A Slice of Lynch.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Advert & Messages.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Behind the Scenes/Advert Filming.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Behind the Scenes/Cast Interviews 1.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Behind the Scenes/Cast Interviews 2.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Behind the Scenes/Cast Interviews 3.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Behind the Scenes/Cast Interviews 4.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Behind the Scenes/Cast Interviews 5.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Behind the Scenes/Cop Car Scene.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Behind the Scenes/Dana Ashbrook.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Behind the Scenes/Making Bets.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Behind the Scenes/Meet the Makers.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Behind the Scenes/Pat Cokewell.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Behind the Scenes/Secrets From Another Place - Creating Twin Peaks.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Deleted Scenes/Delete Scenes 1.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Deleted Scenes/Phone Interview with Mark Frost.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Message to Allied Forces.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Notes.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Reading Backwards.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Scenery.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Seasons Greetings.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 01.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 02.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 03.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 04.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 05.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 06.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 07.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 08.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 09.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 10.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 11.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 12.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 13.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 14.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 15.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 16.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 17.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 18.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 19.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 20.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 21.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Log Lady/The Log Lady 22.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/The Owls.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Twin Peaks Fans.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 2/Where to Find.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/A Very Lovely Dream - One Week In Twin Peaks.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Comic-Con 2017 - Twin Peaks Panel.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Impressions - A Journey Behind the Scenes of Twin Peaks/A Bloody Finger In Your Mouth.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Impressions - A Journey Behind the Scenes of Twin Peaks/A Pot of Boiling Oil.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Impressions - A Journey Behind the Scenes of Twin Peaks/Bad Binoculars.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Impressions - A Journey Behind the Scenes of Twin Peaks/Do Not Pick Up Hitchhikers.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Impressions - A Journey Behind the Scenes of Twin Peaks/See You On the Other Side Dear Friend.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Impressions - A Journey Behind the Scenes of Twin Peaks/Tell It Martin.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Impressions - A Journey Behind the Scenes of Twin Peaks/The Man With the Gray Elevated Hair.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Impressions - A Journey Behind the Scenes of Twin Peaks/The Number of Completion.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Impressions - A Journey Behind the Scenes of Twin Peaks/The Polish Accountant.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Impressions - A Journey Behind the Scenes of Twin Peaks/Two Blue Balls.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Menu Art/Disk 1 Menu Art.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Menu Art/Disk 2 Menu Art.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Menu Art/Disk 3 Menu Art.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Menu Art/Disk 4 Menu Art.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Menu Art/Disk 5 Menu Art.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Menu Art/Disk 6 Menu Art.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Menu Art/Disk 7 Menu Art.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Menu Art/Disk 8 Menu Art.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Rancho Rosa Logos.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Richard Beymer Films/Behind the Red Curtain.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Richard Beymer Films/I Had Bad Milk In Dehradun.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Series Promos.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Twin Peaks Phenomenon/Part 1 - Creation.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Twin Peaks Phenomenon/Part 2 - Life After Death.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Featurettes/Season 3/Twin Peaks Phenomenon/Part 3 - Renaissance.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 1/Twin Peaks (1990) - S01E01 - Northwest Passage (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 1 | 1
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 1/Twin Peaks (1990) - S01E02 - Traces to Nowhere (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 1 | 2
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 1/Twin Peaks (1990) - S01E03 - Zen, or the Skill to Catch a Killer (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 1 | 3
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 1/Twin Peaks (1990) - S01E04 - Rest in Pain (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 1 | 4
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 1/Twin Peaks (1990) - S01E05 - The One-Armed Man (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 1 | 5
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 1/Twin Peaks (1990) - S01E06 - Cooper's Dreams (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 1 | 6
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 1/Twin Peaks (1990) - S01E07 - Realization Time (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 1 | 7
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 1/Twin Peaks (1990) - S01E08 - The Last Evening (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 1 | 8
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E01 - May the Giant Be with You (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 1
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E02 - Coma (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 2
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E03 - The Man Behind the Glass (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 3
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E04 - Laura's Secret Diary (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 4
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E05 - The Orchid's Curse (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 5
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E06 - Demons (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 6
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E07 - Lonely Souls (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 7
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E08 - Drive with a Dead Girl (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 8
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E09 - Arbitrary Law (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 9
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E10 - Dispute Between Brothers (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 10
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E11 - Masked Ball (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 11
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E12 - The Black Widow (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 12
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E13 - Checkmate (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 13
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E14 - Double Play (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 14
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E15 - Slaves and Masters (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 15
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E16 - The Condemned Woman (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 16
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E17 - Wounds and Scars (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 17
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E18 - On the Wings of Love (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 18
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E19 - Variations and Relations (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 19
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E20 - The Path to the Black Lodge (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 20
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E21 - Miss Twin Peaks (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 21
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 2/Twin Peaks (1990) - S02E22 - Beyond Life and Death (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 2 | 22
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 3/Twin Peaks (1990) - S03E01 - Part 1 My Log Has a Message for You (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 3 | 1
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 3/Twin Peaks (1990) - S03E02 - Part 2 The Stars Turn and a Time Presents Itself (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 3 | 2
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 3/Twin Peaks (1990) - S03E03 - Part 3 Call for Help (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 3 | 3
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 3/Twin Peaks (1990) - S03E04 - Part 4 ...Brings Back Some Memories (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 3 | 4
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 3/Twin Peaks (1990) - S03E05 - Part 5 Case Files (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 3 | 5
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 3/Twin Peaks (1990) - S03E06 - Part 6 Don't Die (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 3 | 6
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 3/Twin Peaks (1990) - S03E07 - Part 7 There's a Body All Right (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 3 | 7
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 3/Twin Peaks (1990) - S03E08 - Part 8 Gotta Light (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 3 | 8
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 3/Twin Peaks (1990) - S03E09 - Part 9 This Is the Chair (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 3 | 9
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 3/Twin Peaks (1990) - S03E10 - Part 10 Laura Is the One (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 3 | 10
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 3/Twin Peaks (1990) - S03E11 - Part 11 There's Fire Where You Are Going (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 3 | 11
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 3/Twin Peaks (1990) - S03E12 - Part 12 Let's Rock (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 3 | 12
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 3/Twin Peaks (1990) - S03E13 - Part 13 What Story Is That, Charlie (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 3 | 13
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 3/Twin Peaks (1990) - S03E14 - Part 14 We Are Like the Dreamer (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 3 | 14
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 3/Twin Peaks (1990) - S03E15 - Part 15 There's Some Fear in Letting Go (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 3 | 15
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 3/Twin Peaks (1990) - S03E16 - Part 16 No Knock, No Doorbell (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 3 | 16
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 3/Twin Peaks (1990) - S03E17 - Part 17 The Past Dictates the Future (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 3 | 17
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Season 3/Twin Peaks (1990) - S03E18 - Part 18 What Is Your Name (1080p BluRay x265 NORDALE).mkv | episode | Twin Peaks | 1990 | 3 | 18
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Twin Peaks - Fire Walk with Me (1992) Criterion (1080p BluRay x265 HEVC 10bit AAC 7.1 VESPERIN)/Featurettes/Archival Interviews.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Twin Peaks - Fire Walk with Me (1992) Criterion (1080p BluRay x265 HEVC 10bit AAC 7.1 VESPERIN)/Featurettes/Interview - Angelo Badalamenti.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Twin Peaks - Fire Walk with Me (1992) Criterion (1080p BluRay x265 HEVC 10bit AAC 7.1 VESPERIN)/Featurettes/Interview - Lynch, Lee, Wise and Zabriskie (2014).mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Twin Peaks - Fire Walk with Me (1992) Criterion (1080p BluRay x265 HEVC 10bit AAC 7.1 VESPERIN)/Featurettes/Interview - Sheryl Lee.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Twin Peaks - Fire Walk with Me (1992) Criterion (1080p BluRay x265 HEVC 10bit AAC 7.1 VESPERIN)/Featurettes/The Missing Pieces - Deleted and Extended Scenes.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Twin Peaks - Fire Walk with Me (1992) Criterion (1080p BluRay x265 HEVC 10bit AAC 7.1 VESPERIN)/Featurettes/Trailer 1.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Twin Peaks - Fire Walk with Me (1992) Criterion (1080p BluRay x265 HEVC 10bit AAC 7.1 VESPERIN)/Featurettes/Trailer 2.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Twin Peaks - Fire Walk with Me (1992) Criterion (1080p BluRay x265 HEVC 10bit AAC 7.1 VESPERIN)/Featurettes/Trailer 3.mkv | extra | | | |
+Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 HEVC 10bit AAC 7.1 NORDALE)/Twin Peaks - Fire Walk with Me (1992) Criterion (1080p BluRay x265 HEVC 10bit AAC 7.1 VESPERIN)/Twin Peaks - Fire Walk with Me (1992) Criterion (1080p BluRay x265 10bit VESPERIN).mkv | movie | Twin Peaks: Fire Walk with Me | 1992 | |
+
+# B. Season folders, the show named only by the folder; files named by episode alone.
+The Wire (2002)/Season 01/01 - The Target.mkv | episode | The Wire | 2002 | 1 | 1
+The Wire (2002)/Season 01/03 - The Buys.mkv | episode | The Wire | 2002 | 1 | 3
+The Wire (2002)/Season 02/Episode 4.mkv | episode | The Wire | 2002 | 2 | 4
+The Wire (2002)/Specials/The Wire - Behind the Scenes.mkv | extra | | | |
+
+# C. Flat: no season folders, scene-style names under a show folder.
+Breaking Bad (2008)/Breaking.Bad.S01E01.Pilot.1080p.BluRay.x264-QUORVA.mkv | episode | Breaking Bad | 2008 | 1 | 1
+Breaking Bad (2008)/Breaking.Bad.S03E07.One.Minute.1080p.BluRay.x264-QUORVA.mkv | episode | Breaking Bad | 2008 | 3 | 7
+Breaking Bad (2008)/Breaking.Bad.S05E16.Felina.1080p.BluRay.x264-QUORVA.mkv | episode | Breaking Bad | 2008 | 5 | 16
+Breaking Bad (2008)/Extras/Breaking.Bad.Gag.Reel.mkv | extra | | | |
+
+# D. Anime, fansub style: absolute numbers under the show's folder, one entry (one cour).
+Cowboy Bebop (1998)/[KOHAKU] Cowboy Bebop - 05 [1080p].mkv | episode | Cowboy Bebop | 1998 | 1 | 5
+Cowboy Bebop (1998)/[KOHAKU] Cowboy Bebop - 24 [1080p].mkv | episode | Cowboy Bebop | 1998 | 1 | 24
+Cowboy Bebop (1998)/Extras/[KOHAKU] Cowboy Bebop - NCOP [1080p].mkv | extra | | | |
+
+# E. One show across two folders (two drives, or two library roots): both halves are the
+#    same series, so the show is one show.
+Mad Men (2007)/Season 1/Mad.Men.S01E01.720p.BluRay.x264-QUORVA.mkv | episode | Mad Men | 2007 | 1 | 1
+TV/Mad Men/Season 4/Mad.Men.S04E07.The.Suitcase.720p.BluRay.x264-QUORVA.mkv | episode | Mad Men | 2007 | 4 | 7
+Mad Men (2007) S05/Mad Men - 5x02 - A Little Kiss.mkv | episode | Mad Men | 2007 | 5 | 2

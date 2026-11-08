@@ -284,6 +284,51 @@ async fn the_watcher_sees_a_rename_and_keeps_one_row() {
 /// Found by `eval scan`: a film whose title starts with "$" or "." was skipped as if it
 /// were a system folder.
 #[test]
+fn a_shows_extras_are_left_out_and_its_episodes_and_film_kept() {
+    // The author's Twin Peaks layout (Phase 16), in miniature.
+    use sinephile_library::scan::walk;
+    let dir = tempfile::tempdir().unwrap();
+    let show = "Twin Peaks (1990) Season 1-3 S01-S03 (1080p BluRay x265 NORDALE)";
+    file(
+        dir.path(),
+        &format!("{show}/Season 1/Twin Peaks (1990) - S01E03 - Zen.mkv"),
+        1000,
+    );
+    file(
+        dir.path(),
+        &format!("{show}/Featurettes/Season 2/Cherry Pie.mkv"),
+        1000,
+    );
+    file(
+        dir.path(),
+        &format!("{show}/Featurettes/Season 1/Behind the Scenes/Tim Hunter.mkv"),
+        1000,
+    );
+    file(
+        dir.path(),
+        &format!("{show}/Twin Peaks - Fire Walk with Me (1992)/Twin Peaks - Fire Walk with Me (1992).mkv"),
+        1000,
+    );
+    file(
+        dir.path(),
+        &format!("{show}/Twin Peaks - Fire Walk with Me (1992)/Featurettes/Trailer 1.mkv"),
+        1000,
+    );
+    let mut names: Vec<String> = walk(dir.path(), &quiet)
+        .iter()
+        .map(|f| f.path.file_name().unwrap().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert_eq!(
+        names,
+        vec![
+            "Twin Peaks (1990) - S01E03 - Zen.mkv",
+            "Twin Peaks - Fire Walk with Me (1992).mkv"
+        ]
+    );
+}
+
+#[test]
 fn titles_that_look_like_system_names_are_still_found() {
     use sinephile_library::scan::walk;
     let dir = tempfile::tempdir().unwrap();
