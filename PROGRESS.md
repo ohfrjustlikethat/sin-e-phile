@@ -12,13 +12,13 @@
 
 **Phase 16 — Ready to Watch** (`in_progress`, branch `phase/16-ready-to-watch`)
 
-0 of 9 exit criteria met with evidence.
+1 of 9 exit criteria met with evidence.
 
 > Inserted by spec 4.0.0 (ADR-0045) after the author used the release build. Receives the author batch: Phase 8 E5, Phase 14 E1 and Phase 15 E3 discharged here from the author's answers of 2026-11-08; Phase 7 E7 and Phase 14 E4/E6 to be met here (16.10). Judge by using the release build as a person would, not only by fixtures.
 
-### Subtasks — 0/10 complete
+### Subtasks — 1/10 complete
 
-- [ ] **16.1** TV shows from folders (crates/library): the show from its folder (`Show (Year)`), the season from a `Season N` subfolder, the episode from the file; flat `S01E03` files under a show folder; anime absolute numbers mapped per season where the data allows (never cumulated, ADR-0031); one show across folders or drives merged; no episode ever filed as a film. A TV-layout corpus in fixtures/ including a Twin Peaks-like case, judged by eval identify (E4); then the author's real folder rescanned on the release build.
+- [x] **16.1** TV shows from folders (crates/library): the show from its folder (`Show (Year)`), the season from a `Season N` subfolder, the episode from the file; flat `S01E03` files under a show folder; anime absolute numbers mapped per season where the data allows (never cumulated, ADR-0031); one show across folders or drives merged; no episode ever filed as a film. A TV-layout corpus in fixtures/ including a Twin Peaks-like case, judged by eval identify (E4); then the author's real folder rescanned on the release build. · `cabf03d`
 - [ ] **16.2** The catalogue refreshes itself (ADR-0030 made automatic): a background job once a day while idle fetches IMDb's updated basics, ratings and episode files and adds titles and episodes past what is stored; AniList airing every few hours; TMDB now-playing and airing for a profile with a key; Settings says when it last ran and offers 'refresh now' (E5).
 - [ ] **16.3** Home in the specified order: Continue watching; New episodes of your shows; Your library (newest added first, shown the moment a scan finishes, by event); New releases filtered by taste; then the taste rails (E6).
 - [ ] **16.4** The controller in the player (TV-standard: A, left/right seek with hold to scrub, up/down volume, LB/RB episode or chapter, Y subtitles quick menu, X audio quick menu, Menu panel, B back) and the right stick scrolling everything: page, panel, rail, the paused details, speed by deflection, focus following (E3).
@@ -34,7 +34,8 @@
 - [ ] **E1** The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.
 - [ ] **E2** Subtitles: the style editor applies live and persists per profile; find and download, sync in 0.1 s steps, and load from disk each work in the player, by pad.
 - [ ] **E3** The controller works in the player as specified, and the right stick scrolls pages, rails, panels and the paused details, each covered by the pad-flow audit.
-- [ ] **E4** A TV-layout corpus (season folders, flat, anime absolute, split across drives, including a real-world case like the author's) is identified with at least 98% of episodes right and no episode filed as a film.
+- [x] **E4** A TV-layout corpus (season folders, flat, anime absolute, split across drives, including a real-world case like the author's) is identified with at least 98% of episodes right and no episode filed as a film.
+      - *Evidence:* cabf03d: cargo run --release -p eval -- tvlayouts (2026-11-08) over fixtures/tv-layouts/layouts.psv (184 files: the author's Twin Peaks layout with groups replaced, season folders, flat, anime fansub numbering, one show split across three folders): episodes 59/59 = 100%, 0 filed as films, the nested film 1/1, extras 105/105 left out and 0 searched for. Seen to fail: --before (no extras rule) searches all 105 extras as titles; crates/library/tests/scan.rs a_shows_extras_are_left_out_and_its_episodes_and_film_kept and tests/identify.rs a_fansub_number_is_the_episode_only_when_the_show_has_one_season each fail with their rule removed. On the author's real folder (eval tvlayouts --folder, read-only): 102 extras left out, 48 episodes under Twin Peaks (1990), the film found, 0 to review. eval identify unchanged (523/528, 2/510; 108/108, 0/103). docs/eval-results.md.
 - [ ] **E5** The catalogue refreshes daily in the background: titles and episodes released since the last refresh appear without the user doing anything, and a run on the real data adds the recent releases it lacked.
 - [ ] **E6** Home's rails are in the specified order, and a finished library scan appears on Home within 2 s.
 - [ ] **E7** A first run done only by pad leaves library folders, an add-on the user chose, keys and a download backend configured and tested; with no source, the app says so wherever play or download would be.
@@ -45,7 +46,7 @@
 
 ## What's next
 
-Phase 16 subtask 16.1 (docs/phases/phase-16-ready-to-watch.md): in crates/library, make the scanner read TV layouts from their folders. First reproduce the author's case: build a fixture tree 'Twin Peaks (1990)/Season 1/Twin Peaks - S01E01 - Pilot.mkv' (empty files are enough for naming) and see how identify places it today; then derive the show from the nearest ancestor folder that is not a 'Season N'/'Specials' folder, the season from the folder, the episode from the file, and file every such item as an episode of one series. Add the corpus to fixtures/ and eval identify.
+Phase 16 subtask 16.2 (docs/phases/phase-16-ready-to-watch.md): the catalogue refreshes itself. Read docs/specs/catalogue-freshness.md and what tools/ingest already does for layer 1 (incremental past the highest stored id) and for title.episode; check why Twin Peaks (1990) lacks its 2017 season 3 rows (18 episodes; the author's folder has them). Then move the incremental refresh into a crate callable from the app, run it from src-tauri once a day in a background task while idle (download IMDb's updated files into data/datasets, ingest the delta), add AniList airing every few hours and a 'last refreshed' line with 'refresh now' in Settings; prove with a fixture delta test and a real run that adds recent releases.
 
 ---
 
@@ -77,7 +78,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 8/8 |
 | [x] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 3/6 |
 | [x] | 15 | Taste Model | B | 5, 14 | 2 | 4/5 |
-| [~] | 16 | Ready to Watch | B | 15 | 3–4 | 0/9 |
+| [~] | 16 | Ready to Watch | B | 15 | 3–4 | 1/9 |
 | [ ] | 17 | Recommendation Engine | B | 15, 16 | 2–3 | 0/6 |
 | [ ] | 18 | Discovery Engine 🏁 | B | 17 | 2 | 0/6 |
 | [ ] | 19 | Browsing Surfaces | B | 18 | 4–5 | 0/13 |

@@ -15,8 +15,8 @@
       {
         "id": "16.1",
         "text": "TV shows from folders (crates/library): the show from its folder (`Show (Year)`), the season from a `Season N` subfolder, the episode from the file; flat `S01E03` files under a show folder; anime absolute numbers mapped per season where the data allows (never cumulated, ADR-0031); one show across folders or drives merged; no episode ever filed as a film. A TV-layout corpus in fixtures/ including a Twin Peaks-like case, judged by eval identify (E4); then the author's real folder rescanned on the release build.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "cabf03d"
       },
       {
         "id": "16.2",
@@ -95,8 +95,8 @@
       {
         "id": "E4",
         "text": "A TV-layout corpus (season folders, flat, anime absolute, split across drives, including a real-world case like the author's) is identified with at least 98% of episodes right and no episode filed as a film.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "cabf03d: cargo run --release -p eval -- tvlayouts (2026-11-08) over fixtures/tv-layouts/layouts.psv (184 files: the author's Twin Peaks layout with groups replaced, season folders, flat, anime fansub numbering, one show split across three folders): episodes 59/59 = 100%, 0 filed as films, the nested film 1/1, extras 105/105 left out and 0 searched for. Seen to fail: --before (no extras rule) searches all 105 extras as titles; crates/library/tests/scan.rs a_shows_extras_are_left_out_and_its_episodes_and_film_kept and tests/identify.rs a_fansub_number_is_the_episode_only_when_the_show_has_one_season each fail with their rule removed. On the author's real folder (eval tvlayouts --folder, read-only): 102 extras left out, 48 episodes under Twin Peaks (1990), the film found, 0 to review. eval identify unchanged (523/528, 2/510; 108/108, 0/103). docs/eval-results.md."
       },
       {
         "id": "E5",
@@ -1889,8 +1889,8 @@
         {
           "id": "E4",
           "text": "A TV-layout corpus (season folders, flat, anime absolute, split across drives, including a real-world case like the author's) is identified with at least 98% of episodes right and no episode filed as a film.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "cabf03d: cargo run --release -p eval -- tvlayouts (2026-11-08) over fixtures/tv-layouts/layouts.psv (184 files: the author's Twin Peaks layout with groups replaced, season folders, flat, anime fansub numbering, one show split across three folders): episodes 59/59 = 100%, 0 filed as films, the nested film 1/1, extras 105/105 left out and 0 searched for. Seen to fail: --before (no extras rule) searches all 105 extras as titles; crates/library/tests/scan.rs a_shows_extras_are_left_out_and_its_episodes_and_film_kept and tests/identify.rs a_fansub_number_is_the_episode_only_when_the_show_has_one_season each fail with their rule removed. On the author's real folder (eval tvlayouts --folder, read-only): 102 extras left out, 48 episodes under Twin Peaks (1990), the film found, 0 to review. eval identify unchanged (523/528, 2/510; 108/108, 0/103). docs/eval-results.md."
         },
         {
           "id": "E5",
@@ -1927,8 +1927,8 @@
         {
           "id": "16.1",
           "text": "TV shows from folders (crates/library): the show from its folder (`Show (Year)`), the season from a `Season N` subfolder, the episode from the file; flat `S01E03` files under a show folder; anime absolute numbers mapped per season where the data allows (never cumulated, ADR-0031); one show across folders or drives merged; no episode ever filed as a film. A TV-layout corpus in fixtures/ including a Twin Peaks-like case, judged by eval identify (E4); then the author's real folder rescanned on the release build.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "cabf03d"
         },
         {
           "id": "16.2",
@@ -2558,7 +2558,7 @@
       ]
     }
   ],
-  "next_action": "Phase 16 subtask 16.1 (docs/phases/phase-16-ready-to-watch.md): in crates/library, make the scanner read TV layouts from their folders. First reproduce the author's case: build a fixture tree 'Twin Peaks (1990)/Season 1/Twin Peaks - S01E01 - Pilot.mkv' (empty files are enough for naming) and see how identify places it today; then derive the show from the nearest ancestor folder that is not a 'Season N'/'Specials' folder, the season from the folder, the episode from the file, and file every such item as an episode of one series. Add the corpus to fixtures/ and eval identify.",
+  "next_action": "Phase 16 subtask 16.2 (docs/phases/phase-16-ready-to-watch.md): the catalogue refreshes itself. Read docs/specs/catalogue-freshness.md and what tools/ingest already does for layer 1 (incremental past the highest stored id) and for title.episode; check why Twin Peaks (1990) lacks its 2017 season 3 rows (18 episodes; the author's folder has them). Then move the incremental refresh into a crate callable from the app, run it from src-tauri once a day in a background task while idle (download IMDb's updated files into data/datasets, ingest the delta), add AniList airing every few hours and a 'last refreshed' line with 'refresh now' in Settings; prove with a fixture delta test and a real run that adds recent releases.",
   "blockers": [
     {
       "id": "B14",
