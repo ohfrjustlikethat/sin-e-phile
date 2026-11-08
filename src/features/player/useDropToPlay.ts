@@ -2,6 +2,7 @@ import { sendPlayerIntent } from "./intentBus";
 import type { Intent } from "./intents";
 import { useEffect } from "react";
 import { commands } from "@/lib/ipc";
+import { layoutProblems } from "@/lib/layoutCheck";
 import { useUi } from "@/lib/store";
 
 const VIDEO = /\.(mkv|mp4|m4v|avi|mov|webm|ts|m2ts|mpg|mpeg|wmv|ogv)$/i;
@@ -43,9 +44,12 @@ export function useDropToPlay() {
           else unlisten = u;
         }),
     );
-    void commands.devAutoplay().then((r) => {
+    void commands.devAutoplay().then(async (r) => {
       if (r.status === "ok" && r.data) {
         play({ target: r.data, title: titleFromPath(r.data), mediaItemId: null, start: null });
+        probe();
+      } else if (await commands.devProbeScript()) {
+        // A probe script without a film: checks of the browsing screens (debug builds).
         probe();
       }
     });
@@ -73,6 +77,11 @@ function probe() {
     for (const step of (script ?? "").split(",").filter(Boolean)) {
       const [at, kind] = step.split(":");
       window.setTimeout(() => {
+        if (kind === "layout") {
+          const found = layoutProblems();
+          void commands.devLog(`probe layout ${innerWidth}x${innerHeight}: ${found.length ? found.join("; ") : "none"}`);
+          return;
+        }
         if (kind === "style") {
           // The subtitle style, set as the panel sets it, then read back from mpv.
           void (async () => {

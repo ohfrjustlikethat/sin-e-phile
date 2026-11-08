@@ -313,6 +313,73 @@ await waitFor(() => evalJs(`!!document.querySelector("header, nav") && !!window.
 
 // ── the pad ─────────────────────────────────────────────────────────────────
 const B = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, MENU: 9, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
+/**
+ * Phase 16 (the author: "glitches and weird ui/gui", layout and spacing, cards and text):
+ * what is wrong with the layout on screen now. The page must not scroll sideways; no text
+ * may be cut off inside its box; nothing may run off the right edge, except inside
+ * something that scrolls on purpose (a rail).
+ */
+const layoutProblems = () =>
+  // The same rules as src/lib/layoutCheck.ts (kept in step by hand: this runs in a plain
+  // browser page, the other in the app through the debug probe).
+  evalJs(`(() => {
+  const out = [];
+  if (document.documentElement.scrollWidth > innerWidth + 1) {
+    const culprit = [...document.body.querySelectorAll("*")].find(
+      (el) => el.getBoundingClientRect().right > innerWidth + 1 && (el.parentElement?.getBoundingClientRect().right ?? 0) <= innerWidth + 1,
+    );
+    out.push(
+      \`the window scrolls sideways by \${document.documentElement.scrollWidth - innerWidth}px: \${
+        culprit ? \`\${culprit.tagName.toLowerCase()}.\${String(culprit.className).split(" ").slice(0, 5).join(".")}\` : "unknown"
+      }\`,
+    );
+  }
+  const pages = [...document.querySelectorAll('main, [role="dialog"][aria-modal="true"]')];
+  for (const pg of pages) {
+    if (pg.scrollWidth <= pg.clientWidth + 1) continue;
+    // Name the outermost element that crosses the edge: the one to fix.
+    const edge = pg.getBoundingClientRect().right + 1;
+    const culprit = [...pg.querySelectorAll("*")].find(
+      (el) => el.getBoundingClientRect().right > edge && (el.parentElement?.getBoundingClientRect().right ?? 0) <= edge,
+    );
+    const name = culprit
+      ? \`\${culprit.tagName.toLowerCase()}.\${String(culprit.className).split(" ").slice(0, 6).join(".")} (\${Math.round(culprit.getBoundingClientRect().width)}px) "\${(culprit.textContent ?? "").trim().slice(0, 30)}"\`
+      : "unknown";
+    out.push(\`the page scrolls sideways: \${name}\`);
+  }
+  const inScroller = (el) => {
+    for (let a = el.parentElement; a && !pages.includes(a); a = a.parentElement) {
+      const o = getComputedStyle(a).overflowX;
+      if (o === "auto" || o === "scroll" || o === "hidden") return true;
+    }
+    return false;
+  };
+  for (const el of document.querySelectorAll("h1, h2, h3, p, button, a, label, li span")) {
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
+    const cs = getComputedStyle(el);
+    const text = (el.textContent ?? "").trim().slice(0, 40);
+    if (cs.overflow === "hidden" && cs.textOverflow !== "ellipsis" && el.scrollWidth > el.clientWidth + 2) {
+      out.push(\`cut off: \${text}\`);
+    }
+    if (r.right > innerWidth + 1 && cs.position !== "fixed" && !inScroller(el)) out.push(\`off the edge: \${text}\`);
+  }
+  return [...new Set(out)].slice(0, 12);
+})()`);
+const SIZES = [[1280, 720], [1600, 900], [1920, 1080]];
+/** Check the layout at each size, then put the window back. */
+const layoutAtSizes = async (where) => {
+  const found = [];
+  for (const [width, height] of SIZES) {
+    await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
+    await sleep(250);
+    for (const p of await layoutProblems()) found.push(`${width}x${height} ${p}`);
+  }
+  await send("Emulation.clearDeviceMetricsOverride");
+  await sleep(200);
+  check(found.length === 0, `${where}: no layout problems at 1280, 1600 and 1920 wide${found.length ? " — " + found.join("; ") : ""}`);
+};
+
 /** Down for a few frames, then up: one press, as a thumb makes it. */
 const press = async (b) => {
   await evalJs(`__padSet(${b}, true)`);
@@ -420,6 +487,7 @@ try {
   ]) {
     await waitFor(() => evalJs(`[...document.querySelectorAll("h1")].some((h) => h.textContent === ${JSON.stringify(title)})`), title, 25);
     check(await evalJs(`document.body.textContent.includes(${JSON.stringify(check_)})`), `first run: "${title}" says what it is for`);
+    await layoutAtSizes(`first run, "${title}"`);
     if (title !== "Downloads") {
       await steerToButton("Continue");
       await press(B.A);
@@ -453,6 +521,13 @@ try {
   check(switched.length === 2 && switched[1].pin === "2468", "the right PIN, typed with the D-pad and A, opens the profile");
   check(await evalJs(`!!document.querySelector('[aria-label="Jon: switch profile"]')`), "the masthead shows who is watching");
   await shoot("01-home");
+  await layoutAtSizes("Home");
+  // The control: the check must see a page that runs off the edge, or it measures nothing.
+  await evalJs(`(() => { const d = document.createElement("p"); d.id = "too-wide"; d.textContent = "too wide";
+    d.style.width = "3000px"; document.querySelector("main").appendChild(d); })()`);
+  const seen = await layoutProblems();
+  await evalJs(`document.getElementById("too-wide").remove()`);
+  check(seen.length > 0, `the layout check sees a 3000 px paragraph (${seen.join("; ")})`);
 
   await press(B.Y);
   const kb = await waitFor(() => evalJs(`!!document.querySelector('[aria-label="On-screen keyboard"]')`), "the keyboard", 20);

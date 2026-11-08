@@ -69,7 +69,9 @@ export function HomeScreen() {
 function HomeRail({ rail, lead }: { rail: RailView; lead: boolean }) {
   const openDetail = useUi((s) => s.openDetail);
   return (
-    <section aria-label={rail.title} className="px-16">
+    // No padding of its own: the rail's grid holds the page margin and the index column
+    // (ADR-0024). Padding here as well pushed the column in and cut the rail short (Phase 16).
+    <section aria-label={rail.title}>
       <Rail<HomeCard>
         label={rail.title}
         why={WHY[rail.key] ?? ""}

@@ -2911,3 +2911,20 @@ window: the style reaching mpv, and "Load a file" (Windows' file picker).
 setting yellow and outline 5 exactly as the panel does, then reading mpv back through `dev_player_prop`:
 `sub-color=#FFFFD400 sub-border-size=5.000000`. The style reaches the playing film live. Still unseen in the
 real window: "Load a file" (Windows' file picker needs a hand).
+
+### First run and Home at three window sizes (16.9, 2026-11-08)
+
+A layout check (`src/lib/layoutCheck.ts`, the same rules in the pad-flow audit): the page must not scroll
+sideways, no text cut off in its box, nothing off the right edge outside a deliberate scroller. **Its control**:
+a 3,000 px paragraph injected into Home must be reported, and is ("the page scrolls sideways: p (3750px)"). The
+first version did not report it: it excused everything inside `main`, which scrolls, and so excused the page.
+
+**What it found, which the fake pages had not shown:** on the author's real Home through the debug probe,
+at 1280×720 on their 150% display (839 CSS px wide), the window scrolled sideways: "TV Shows" wrapped onto two
+lines and the window buttons were pushed off the edge; Home's rails had padding of their own on top of the
+rail's own margins, pushing the index column in and cutting the rail short. In the audit with a controller
+(TV mode's 125% zoom), the window buttons overflowed by 20 px at 1280. Fixed: the masthead measures whether it
+fits and goes compact when it does not (a breakpoint could not, since TV mode zooms without changing what a
+media query sees), and Home's extra padding went. **After**: the real app at 1280×720, 1600×900 and
+1920×1080, two runs: no problems; the pad-flow audit in TV mode, every first-run step and Home at all three
+sizes: no problems.
