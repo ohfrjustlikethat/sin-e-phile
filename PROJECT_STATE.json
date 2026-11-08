@@ -51,8 +51,8 @@
       {
         "id": "16.7",
         "text": "A first run that leaves the viewer ready to watch: library folders (scan starts at once), add-ons by address with a live check (the app suggests none, §2.1), TMDB and OpenSubtitles keys with links and live tests, the download backend with the VPN check; honest no-source states wherever play or download would be (E7).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "c1cd70c"
       },
       {
         "id": "16.8",
@@ -1963,8 +1963,8 @@
         {
           "id": "16.7",
           "text": "A first run that leaves the viewer ready to watch: library folders (scan starts at once), add-ons by address with a live check (the app suggests none, §2.1), TMDB and OpenSubtitles keys with links and live tests, the download backend with the VPN check; honest no-source states wherever play or download would be (E7).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "c1cd70c"
         },
         {
           "id": "16.8",
@@ -2558,7 +2558,7 @@
       ]
     }
   ],
-  "next_action": "Phase 16 subtask 16.7 (docs/phases/phase-16-ready-to-watch.md): a first run that leaves the viewer ready to watch. Read src/features/onboarding/Onboarding.tsx and its three steps first. Add steps (each skippable, pad-complete): library folders (pick_library_folder; the scan starts at once), add-ons by address (the existing add-on install command; a live check that it answers and what it offers; the app suggests none, §2.1), the TMDB and OpenSubtitles keys (each with its official sign-up link, a live test), and where downloads go (built-in engine or the user's qBittorrent, the VPN check). Then honest no-source states wherever play or download would be: the film page says 'No source can play this yet: add one in Settings, Sources' with a button there. Extend tools/uiaudit/controller.mjs's onboarding steps. E1 and E2 owe: 'Load a file' in the real window (author), and E6 the real-window scan->Home time.",
+  "next_action": "Phase 16 subtask 16.8 (docs/phases/phase-16-ready-to-watch.md): write SETUP.md at the repo root: every prerequisite with its official download link and how to add it to the app — WebView2 (Windows 10/11 usually has it), FFmpeg (winget Gyan.FFmpeg), libmpv (where the app looks: SINEPHILE_LIBMPV), the search model files and the IMDb datasets + MovieLens (tools/ingest; personal, non-commercial; never redistributed), the OpenSubtitles and TMDB keys (their sign-up pages; Settings sections; checked on save), an optional qBittorrent (transport only, ADR-0029), an optional VPN and the adapter binding; and how to add ANY add-on by its address (Settings, Sources, Add a source: preview, then install). It names no content source and links to none (§2.1); run python tools/guard/guard.py --tree. Link it from README.md. Then 16.9 polish.",
   "blockers": [],
   "decisions_pending": [
     {
