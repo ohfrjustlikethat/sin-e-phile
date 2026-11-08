@@ -38,6 +38,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
             commands::system::get_hardware_profile,
+            commands::system::open_sign_up,
             commands::system::set_tier_override,
             commands::system::has_capability,
             commands::system::get_data_dir,

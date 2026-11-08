@@ -14,6 +14,8 @@ export const commands = {
 	 *  moment, not an apology").
 	 */
 	getHardwareProfile: () => __TAURI_INVOKE<HardwareProfile>("get_hardware_profile"),
+	/**  Open one of `sign_up_page`'s pages in the default browser. */
+	openSignUp: (which: string) => typedError<null, string>(__TAURI_INVOKE("open_sign_up", { which })),
 	/**
 	 *  Override the detected tier, or clear the override with `None`.
 	 * 

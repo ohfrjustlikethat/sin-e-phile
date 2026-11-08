@@ -409,7 +409,20 @@ try {
   await shoot("00b-title-cards");
   await steerToButton("Continue");
   await press(B.A);
-  await waitFor(() => evalJs(`document.body.textContent.includes("Where to watch")`), "step 3", 25);
+  // Phase 16: four steps that leave the viewer ready to watch, each moved through by pad.
+  for (const [title, check_] of [
+    ["Your films on this PC", "Add a folder"],
+    ["Where films come from", "comes with no sources of its own"],
+    ["Subtitles", "Get a free key"],
+    ["Downloads", "choose its network adapter"],
+  ]) {
+    await waitFor(() => evalJs(`[...document.querySelectorAll("h1")].some((h) => h.textContent === ${JSON.stringify(title)})`), title, 25);
+    check(await evalJs(`document.body.textContent.includes(${JSON.stringify(check_)})`), `first run: "${title}" says what it is for`);
+    if (title !== "Downloads") {
+      await steerToButton("Continue");
+      await press(B.A);
+    }
+  }
   await steerToButton("Start watching");
   await press(B.A);
   await waitFor(async () => (await calls("finish_onboarding")).length === 1, "the wizard to finish", 25);

@@ -303,7 +303,9 @@ function KeptItem({ item }: { item: StoredView }) {
   );
 }
 
-function Settings() {
+/** Where downloads go and how many at once: the built-in engine, or the viewer's own
+ * qBittorrent as a transport only (ADR-0029). Also the first run's Downloads step. */
+export function Settings() {
   const view = useQuery({ queryKey: SETTINGS, queryFn: () => ok(commands.downloadsSettings()) });
   return (
     <section aria-label="Download settings" className="mt-16 max-w-xl">

@@ -67,3 +67,26 @@ pub fn frontend_ready(window: tauri::Window) -> u32 {
     let _ = window.set_focus();
     elapsed_ms
 }
+
+/// The official pages where a viewer signs up for their own keys (Phase 16's first run,
+/// ADR-0013, ADR-0027). The page names one; it never passes an address, so nothing else
+/// can be opened this way.
+fn sign_up_page(which: &str) -> Option<&'static str> {
+    match which {
+        "opensubtitles" => Some("https://www.opensubtitles.com/en/consumers"),
+        "tmdb" => Some("https://www.themoviedb.org/settings/api"),
+        _ => None,
+    }
+}
+
+/// Open one of `sign_up_page`'s pages in the default browser.
+#[tauri::command]
+#[specta::specta]
+pub fn open_sign_up(which: String) -> Result<(), String> {
+    let url = sign_up_page(&which).ok_or("no such page")?;
+    std::process::Command::new("explorer")
+        .arg(url)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}

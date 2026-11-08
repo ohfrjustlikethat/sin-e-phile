@@ -44,6 +44,14 @@ impl OpenSubtitles {
             .header("Accept", "application/json")
     }
 
+    /// Whether the key is accepted (Phase 16: checked when it is entered, not on the first
+    /// film that needs it). One small request that needs the key and spends no download.
+    pub async fn check(&self) -> Result<(), FetchError> {
+        self.send(Request::get(format!("{BASE}/infos/languages")).limit(MAX_SEARCH))
+            .await
+            .map(|_| ())
+    }
+
     async fn send(&self, r: Request) -> Result<String, FetchError> {
         let response = self
             .transport

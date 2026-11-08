@@ -60,6 +60,18 @@ export function DetailScreen() {
   const id = useUi((s) => s.detail);
   const closeDetail = useUi((s) => s.closeDetail);
   const play = useUi((s) => s.play);
+  const setSettingsOpen = useUi((s) => s.setSettingsOpen);
+  // No source can play this: Settings, at the place to add one, with focus there for a pad.
+  const addSource = () => {
+    setSettingsOpen(true);
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const at = document.querySelector<HTMLElement>('[aria-label="Add a source"]');
+        at?.scrollIntoView({ block: "start" });
+        at?.querySelector<HTMLElement>("input, button")?.focus();
+      }),
+    );
+  };
   const [plan, setPlan] = useState<PlanState>({ phase: "finding" });
   const [offers, setOffers] = useState<Offers | null>(null);
   const { audio, quality, setAudio, setQuality, details } = usePlaybackChoice();
@@ -172,6 +184,18 @@ export function DetailScreen() {
           {plan.phase === "none" && plan.reason}
         </p>
       </div>
+      {plan.phase === "none" && (
+        // Phase 16: the author could not download or stream anything and nothing said why.
+        <div className="mt-5 flex max-w-[62ch] flex-col items-start gap-3">
+          <p className="text-[14px] text-ink-muted">
+            Nothing you have set up can play or download this yet. sin·e·phile comes with no sources of its own:
+            add one you have chosen, by its address, and films like this one can play.
+          </p>
+          <Button variant="secondary" onClick={addSource}>
+            Add a source
+          </Button>
+        </div>
+      )}
       {plan.phase === "ready" && plan.plan.why && (
         <p className="mt-3 text-[13px] text-ink-faint" aria-label="Why this source">
           {plan.plan.why}

@@ -439,7 +439,7 @@ function YourLinks() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mb-9">
+    <section aria-label={title} className="mb-9">
       <h2 className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
         {title}
       </h2>

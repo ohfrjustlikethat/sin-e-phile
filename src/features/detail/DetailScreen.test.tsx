@@ -90,6 +90,10 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
     await screen.findByText("Sunrise");
     resolvePlan({ status: "error", error: "none of your sources has this" });
     expect(await screen.findByText("none of your sources has this")).toBeInTheDocument();
+    // Phase 16: said plainly, with the way to fix it one press away.
+    expect(screen.getByText(/comes with no sources of its own/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add a source" }));
+    expect(useUi.getState().settingsOpen).toBe(true);
     expect(screen.getByRole("button", { name: "Play" })).toBeDisabled();
   });
 

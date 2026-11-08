@@ -171,6 +171,21 @@ pub async fn set_subtitle_settings(
 pub async fn set_opensubtitles_key(state: State<'_, AppState>, key: String) -> Result<(), String> {
     let db = state.db().ok_or("the library is still opening")?;
     let profile = state.profile().await?;
+    // Checked as it is entered (Phase 16). Refused: not saved. Unreachable: saved, since
+    // being offline says nothing about the key.
+    let http: Arc<dyn sinephile_metadata_api::Transport> = state.http.clone();
+    match OpenSubtitles::new(http, key.trim().to_string())
+        .check()
+        .await
+    {
+        Err(sinephile_subtitles::fetch::FetchError::BadKey) => {
+            return Err("OpenSubtitles did not accept that key. Check it on your OpenSubtitles account page.".into());
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "could not check the OpenSubtitles key; saved unchecked")
+        }
+        Ok(()) => {}
+    }
     CredentialRepository::new(&db)
         .set_opensubtitles_key(profile, &key)
         .await

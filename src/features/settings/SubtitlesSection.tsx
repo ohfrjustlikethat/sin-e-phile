@@ -149,6 +149,14 @@ function OpenSubtitlesKey({ view, onChanged }: { view: SubtitleSettingsView; onC
           </Button>
         </div>
       ) : (
+        <>
+        <p className="mb-3 text-[12px] text-ink-muted">
+          A free OpenSubtitles account gives you a key in a minute.{" "}
+          <button type="button" className="underline hover:text-ink" onClick={() => void commands.openSignUp("opensubtitles")}>
+            Get a free key
+          </button>
+          , then paste it here. It is checked as you save it.
+        </p>
         <div className="flex items-end gap-3">
           <div className="flex-1">
             <Input
@@ -164,6 +172,7 @@ function OpenSubtitlesKey({ view, onChanged }: { view: SubtitleSettingsView; onC
             Save key
           </Button>
         </div>
+        </>
       )}
     </div>
   );

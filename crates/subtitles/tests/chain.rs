@@ -340,3 +340,25 @@ async fn the_viewer_chooses_among_the_offers_and_only_a_download_spends_the_budg
     .is_err());
     assert_eq!(quota().await, 1);
 }
+
+#[tokio::test]
+async fn a_key_is_checked_when_it_is_entered() {
+    // Phase 16: a wrong key says so at once, not on the first film that needs subtitles.
+    let s = setup().await;
+    s.fake.push(Response::new(200, r#"{"data":[]}"#));
+    assert!(s.os.check().await.is_ok());
+    s.fake.push(Response::new(401, "{}"));
+    assert!(matches!(
+        s.os.check().await,
+        Err(sinephile_subtitles::fetch::FetchError::BadKey)
+    ));
+    assert_eq!(
+        SubtitleRepository::new(&s.db)
+            .quota("opensubtitles", DAY)
+            .await
+            .unwrap()
+            .used,
+        0,
+        "checking spends no download"
+    );
+}

@@ -8,15 +8,20 @@ import { TasteInput } from "@/features/profiles/TasteInput";
 import { PROFILES, useProfiles } from "@/features/profiles/useProfiles";
 import { LibrarySection } from "@/features/settings/LibrarySection";
 import { SourcesSection } from "@/features/settings/SourcesSection";
+import { SubtitlesSection } from "@/features/settings/SubtitlesSection";
+import { NetworkSection } from "@/features/settings/NetworkSection";
+import { Settings as DownloadsSettings } from "@/features/downloads/DownloadsScreen";
 import { TitleCards } from "./TitleCards";
 
 /**
- * First run (SPEC.md Phase 14): three steps a non-technical person finishes in under two
- * minutes. 1, who this is for; 2, what they like (films to pick by name, statements that
- * are not genres, their own words, or an import); 3, where to watch (optional: the
- * Internet Archive works already, a folder of their own is one press). Every step can be
- * skipped and none is a dead end: skipping everything still lands on a Home with films on
- * it. No launch intro (ADR-0043): the first screen asks the first question.
+ * First run (SPEC.md Phase 14; Phase 16 makes it leave the viewer ready to watch): who this
+ * is for; what they like; their films on this PC; where films come from (add-ons by the
+ * address they chose — the app names none, §2.1); subtitles (their languages and their own
+ * OpenSubtitles key, checked as it is entered); and downloads (the built-in engine or their
+ * own qBittorrent, and the VPN adapter). Every step can be skipped and none is a dead end:
+ * skipping everything still lands on a Home with films on it. No launch intro (ADR-0043).
+ * The author found in Phase 15's review that skipping the old third step left nothing to
+ * play or download from, and nothing said so; each step now says what it is for.
  *
  * Pad: the D-pad moves, A chooses, B goes back a step.
  */
@@ -27,7 +32,14 @@ async function ok<T>(p: Promise<{ status: "ok"; data: T } | { status: "error"; e
   return r.data;
 }
 
-const STEPS = ["Who's this for?", "What do you like?", "Where to watch"] as const;
+const STEPS = [
+  "Who's this for?",
+  "What do you like?",
+  "Your films on this PC",
+  "Where films come from",
+  "Subtitles",
+  "Downloads",
+] as const;
 type Way = "cards" | "words" | "import";
 
 export function Onboarding({ onDone }: { onDone: () => void }) {
@@ -168,12 +180,41 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
 
           {step === 2 && (
             <div className="flex flex-col gap-2">
-              <p className="mb-6 max-w-[62ch] text-[13px] leading-relaxed text-ink-muted">
-                Optional. Films from the Internet Archive play already, and anything on this PC can be added from a
-                folder. A source someone gave you is an address to paste. You can do all of this later in Settings.
+              <p className="mb-6 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
+                Choose the folders your films and shows are in. They are read at once, shows by their folders and
+                seasons, and appear on Home as soon as they are found.
               </p>
               <LibrarySection />
+            </div>
+          )}
+          {step === 3 && (
+            <div className="flex flex-col gap-2">
+              <p className="mb-6 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
+                sin·e·phile comes with no sources of its own: public-domain films from the Internet Archive play
+                already, and everything else comes from add-ons you choose. Paste the address of one you have; it is
+                checked, and you see what it offers, before it is added. Without one, a film you do not have here has
+                nothing to play or download from.
+              </p>
               <SourcesSection />
+            </div>
+          )}
+          {step === 4 && (
+            <div className="flex flex-col gap-2">
+              <p className="mb-6 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
+                Which languages you want subtitles in, and, if you like, your own OpenSubtitles key, so a film
+                without subtitles can find them.
+              </p>
+              <SubtitlesSection />
+            </div>
+          )}
+          {step === 5 && (
+            <div className="flex flex-col gap-2">
+              <p className="mb-6 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
+                Downloads use the built-in engine. If you already use qBittorrent, connect it here and it does the
+                downloading instead. If you use a VPN, choose its network adapter so downloads stop if it drops.
+              </p>
+              <DownloadsSettings />
+              <NetworkSection />
             </div>
           )}
         </div>
