@@ -2832,3 +2832,19 @@ false-confident 2/510 = 0.39%, held out 108/108 and 0/103**, identical to Phase 
 On the author's real folder (`-- tvlayouts --folder <path>`, read-only): 151 videos, **102 extras left
 out**, 48 episodes all filed under Twin Peaks (1990) (30 on their episode; 18 from the 2017 season placed on
 the series, whose rows the catalogue lacks), Fire Walk with Me as the film, 0 to the review queue.
+
+### E5: the catalogue refreshes itself (2026-11-08)
+
+The author's catalogue before: a refresh job `running` since 2026-11-07 06:05 UTC, never resumed, every
+launch answering `AlreadyCurrent`; 2,734,015 titles, 539,817 episodes, 52,426 films of 2026.
+`target/release/ingest.exe keep` (the function the app's hourly timer calls,
+`freshness::refresh(…, force = false)`), on the real data: **finished the interrupted refresh — 885 titles
+added (300 of them 2026 films) and 7,951 episodes — in 86 s**; job 26 `complete`, job 28
+`refresh-episodes` `complete`; `catalogue.last_refresh` = `{"at":"2026-11-08T06:21:10Z","titles_added":885,
+"episodes_added":7951}`. After: 2,734,900 titles, 547,768 episodes, 52,726 films of 2026.
+
+Tests (`crates/catalogue/tests/refresh.rs`): `an_interrupted_refresh_is_finished_before_the_publisher_is_asked`
+(a new film and an episode of a 40-vote series on a watchlist, zero requests to the publisher) and
+`a_resumed_refresh_reads_past_the_watermark_it_started_from`. **Seen to fail**: without the resume branch
+the first returns `AlreadyCurrent`, the author's bug exactly; with the watermark taken afresh the second
+loses the title between the start and the stored maximum.

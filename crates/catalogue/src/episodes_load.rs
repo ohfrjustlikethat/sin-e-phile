@@ -101,11 +101,14 @@ pub async fn series(db: &Db) -> Result<HashMap<String, SeriesInfo>, JobError> {
         .collect())
 }
 
-/// Pass 1 — which episodes the scope admits.
+/// Pass 1 — which episodes the scope admits. `also`: series admitted whatever their
+/// votes, because the user has them (in the library, on the watchlist, or watched):
+/// a show you follow gets its new episodes however few people vote on it (Phase 16).
 pub fn collect(
     episodes_path: &std::path::Path,
     series: &HashMap<String, SeriesInfo>,
     scope: EpisodeScope,
+    also: &HashSet<i64>,
     skip: &HashSet<u32>,
 ) -> Result<Vec<Wanted>, JobError> {
     let mut reader = TsvReader::open(episodes_path)?;
@@ -116,7 +119,7 @@ pub fn collect(
         let Some(parent) = row.get("parentTconst").and_then(|p| series.get(p)) else {
             continue;
         };
-        if !scope.admits(parent) {
+        if !scope.admits(parent) && !also.contains(&parent.media_item_id) {
             continue;
         }
         let Some(tconst) = row.get("tconst").and_then(tconst_id) else {

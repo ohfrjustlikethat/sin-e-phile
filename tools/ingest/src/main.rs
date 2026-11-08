@@ -41,6 +41,8 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            measure what that will cost.
   ingest repair-variants   recompute titles.variant for rows the region-over-
                            language bug labelled english. Narrow and re-runnable.
+  ingest keep              what the app does hourly: finish an interrupted refresh,
+                           or refresh titles and episodes if IMDb republished
   ingest refresh           ADR-0030 layer 1: re-download title.basics and
                            title.ratings, insert only titles newer than the
                            highest id already held, and re-apply every rating.
@@ -164,6 +166,7 @@ async fn main() -> Result<(), JobError> {
         }
         "repair-variants" => repair_variants(&db).await,
         "refresh" => refresh(&db, &dir.join("datasets")).await,
+        "keep" => keep(&db, &dir.join("datasets")).await,
         "embed" => embed_artefact(&db, &dir).await,
         "search-index" => {
             let trigram = args.iter().any(|a| a == "--trigram");
@@ -235,6 +238,7 @@ const COMPACT_AFTER: &[&str] = &[
     "movielens",
     "repair-variants",
     "refresh",
+    "keep",
     "wikipedia",
     "search-index",
 ];
@@ -601,7 +605,7 @@ async fn episodes(
         skip.len()
     );
 
-    let wanted = ep::collect(&path, &series, scope, &skip)?;
+    let wanted = ep::collect(&path, &series, scope, &Default::default(), &skip)?;
     tracing::info!("{} episodes in scope", wanted.len());
     if wanted.is_empty() {
         println!(
@@ -741,6 +745,19 @@ async fn movielens(
         after.saturating_sub(before) as f64 / 1_048_576.0,
         started.elapsed().as_secs_f64()
     );
+    println!();
+    Ok(())
+}
+
+/// What the app's hourly timer does (Phase 16): finish an interrupted refresh, or refresh
+/// if IMDb has republished, titles then episodes. The same function the app calls.
+async fn keep(db: &Db, datasets: &Path) -> Result<(), JobError> {
+    let started = std::time::Instant::now();
+    let transport = sinephile_metadata_api::HttpTransport::new();
+    let outcome = sinephile_catalogue::freshness::refresh(db, &transport, datasets, false).await;
+    println!();
+    println!("  {outcome:?}");
+    println!("  {:.0}s", started.elapsed().as_secs_f64());
     println!();
     Ok(())
 }

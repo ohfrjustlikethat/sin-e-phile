@@ -1,7 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PosterCard, Rail, Skeleton } from "@/design-system";
 import { commands, type HomeCard, type RailView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
+import { onEvent } from "@/lib/events";
 
 /**
  * Home, first version (SPEC.md Phase 14; Phase 18 overhauls it). Continue watching, where
@@ -28,6 +30,19 @@ const WHY: Record<string, string> = {
 
 export function HomeScreen() {
   const home = useQuery({ queryKey: HOME, queryFn: () => ok(commands.home()) });
+  // New titles from the catalogue, and anything new in the library, show at once.
+  const client = useQueryClient();
+  useEffect(() => {
+    const again = () => void client.invalidateQueries({ queryKey: HOME });
+    const offs = [
+      onEvent<null>("catalogue-refreshed", again),
+      onEvent<number>("library-changed", again),
+      onEvent<{ phase: string }>("library-scan", (e) => {
+        if (e.phase === "done") again();
+      }),
+    ];
+    return () => offs.forEach((off) => off());
+  }, [client]);
   if (home.isPending) {
     return (
       <div className="flex flex-col gap-10 px-16 pt-12">

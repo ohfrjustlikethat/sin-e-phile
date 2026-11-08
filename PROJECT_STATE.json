@@ -2559,14 +2559,7 @@
     }
   ],
   "next_action": "Phase 16 subtask 16.2 (docs/phases/phase-16-ready-to-watch.md): the catalogue refreshes itself. Read docs/specs/catalogue-freshness.md and what tools/ingest already does for layer 1 (incremental past the highest stored id) and for title.episode; check why Twin Peaks (1990) lacks its 2017 season 3 rows (18 episodes; the author's folder has them). Then move the incremental refresh into a crate callable from the app, run it from src-tauri once a day in a background task while idle (download IMDb's updated files into data/datasets, ingest the delta), add AniList airing every few hours and a 'last refreshed' line with 'refresh now' in Settings; prove with a fixture delta test and a real run that adds recent releases.",
-  "blockers": [
-    {
-      "id": "B14",
-      "raised": "2026-11-08T05:39:46Z",
-      "needs_user": false,
-      "description": "CI red on run 42446407507 (c7349e8): crates/torrent/tests/swarm.rs a_download_survives_a_restart lost progress across a restart (D83, second time). Engine::stop now waits for the librqbit session to end; clear this when the next CI run is green."
-    }
-  ],
+  "blockers": [],
   "decisions_pending": [
     {
       "id": "P1",
@@ -3266,6 +3259,11 @@
       "id": "D84",
       "text": "The offline catalogue has no countries or original languages (IMDb's free datasets do not carry them; the columns are empty), so the taste model cannot learn country or language preferences, or subtitle tolerance, from behaviour; the statements stand in. Fill them from TMDB for profiles with a key (and Wikidata, which is keyless) and add the axes in crates/taste/src/axes.rs.",
       "phase_raised": 15
+    },
+    {
+      "id": "D85",
+      "phase_raised": 16,
+      "text": "A show IMDb splits where other sources do not: Twin Peaks' 2017 season is a separate IMDb series (tt-level), its 18 parts that series' season 1, so the author's files named S03E01..S03E18 under 'Twin Peaks (1990)' are placed on the 1990 series without an episode row. Mapping needs a source that publishes cross-numbering (TVDB/TMDB with a key); until then identification places the series and leaves the episode unresolved, which is honest."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

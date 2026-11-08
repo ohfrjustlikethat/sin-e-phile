@@ -149,32 +149,46 @@ pub async fn refresh_if_stale(
     transport: &dyn Transport,
     datasets: &std::path::Path,
 ) -> Outcome {
-    let freshness = check(db, transport).await;
-    let Freshness::Stale { validator } = freshness else {
-        return match freshness {
-            Freshness::UpToDate => Outcome::AlreadyCurrent,
-            _ => Outcome::CouldNotTell,
-        };
-    };
+    refresh(db, transport, datasets, false).await
+}
 
-    // WHERE THE VALIDATOR IS RECORDED, AND WHY IT IS HERE.
-    //
-    // After the download, before the load. Measured, having got it wrong twice:
-    //
-    //   after the whole refresh — the app exits when its window closes, the refresh
-    //     takes about a minute, and a user who opens and closes quickly never reaches
-    //     the end. Nothing is ever remembered, so EVERY launch re-downloads 216 MB.
-    //     Observed on real launches: two in a row, the second adding `titles_added: 0`.
-    //   before the download — an interrupted refresh looks complete, and the catalogue
-    //     silently never updates again.
-    //
-    // The download is the expensive, all-or-nothing half; the load is resumable through
-    // `Job`. So the boundary between them is the only place that is wrong in neither
-    // direction: killed mid-download, nothing is recorded and it is fetched again;
-    // killed mid-load, the bytes are kept and the job resumes.
+/// Where the outcome of the last refresh that did something is kept, for Settings.
+pub const LAST_REFRESH: &str = "catalogue.last_refresh";
+
+/// `refresh_if_stale`, or with `force` a refresh whatever the publisher says ("refresh
+/// now" in Settings).
+///
+/// # An interrupted refresh is finished first (Phase 16)
+///
+/// The validator is remembered as soon as the 216 MB is on disk, so an interrupted load
+/// never downloads it again. But the load was resumed only by a later refresh, and a
+/// later refresh never came: the next launch found the validator current and stopped.
+/// The author's catalogue sat on a refresh job left `running` on 2026-11-07 while every
+/// launch said `AlreadyCurrent`. So an unfinished refresh is resumed before anything is
+/// asked of the publisher.
+pub async fn refresh(
+    db: &Db,
+    transport: &dyn Transport,
+    datasets: &std::path::Path,
+    force: bool,
+) -> Outcome {
+    match crate::refresh::unfinished(db).await {
+        Ok(true) => return finish(db, datasets).await,
+        Ok(false) => {}
+        Err(error) => {
+            tracing::warn!(%error, "could not read the refresh jobs");
+            return Outcome::Failed;
+        }
+    }
+    let freshness = check(db, transport).await;
+    let validator = match freshness {
+        Freshness::Stale { validator } => validator,
+        Freshness::UpToDate if !force => return Outcome::AlreadyCurrent,
+        Freshness::Unknown if !force => return Outcome::CouldNotTell,
+        _ => None,
+    };
     let validator = match validator {
         Some(validator) => Some(validator),
-        // Nothing was cached, so `check` returned stale without asking. Ask now.
         None => current_validator(transport, &cache_key()).await,
     };
 
@@ -187,25 +201,56 @@ pub async fn refresh_if_stale(
             tracing::warn!(%error, "downloaded, but could not record the validator");
         }
     }
+    finish(db, datasets).await
+}
 
-    match crate::refresh::load(db, datasets).await {
-        Ok(refreshed) => Outcome::Refreshed {
-            titles_added: refreshed.titles_added,
-        },
-        Err(error) => {
-            // The bytes are on disk and the validator is recorded, so this does not
-            // re-download; `Job` resumes the load on the next launch.
-            tracing::warn!(%error, "catalogue load failed; it will resume next launch");
-            Outcome::Failed
+/// The resumable half: titles past the watermark, every rating, then episodes. Downloads
+/// `title.basics` and `title.ratings` again only if they are no longer on disk.
+async fn finish(db: &Db, datasets: &std::path::Path) -> Outcome {
+    let missing = [
+        &crate::imdb::TITLE_BASICS,
+        &crate::imdb::TITLE_RATINGS,
+        &crate::imdb::TITLE_EPISODE,
+    ]
+    .iter()
+    .any(|d| !datasets.join(d.filename).is_file());
+    if missing {
+        if let Err(error) = crate::refresh::download(datasets).await {
+            tracing::warn!(%error, "catalogue download failed; it will resume next time");
+            return Outcome::Failed;
         }
+    }
+    let titles = match crate::refresh::load(db, datasets).await {
+        Ok(refreshed) => refreshed.titles_added,
+        Err(error) => {
+            tracing::warn!(%error, "catalogue load failed; it will resume next time");
+            return Outcome::Failed;
+        }
+    };
+    let episodes = match crate::refresh::episodes(db, datasets).await {
+        Ok(n) => n,
+        Err(error) => {
+            tracing::warn!(%error, "episode load failed; it will resume next time");
+            return Outcome::Failed;
+        }
+    };
+    let at: String = sqlx::query_scalar("SELECT strftime('%Y-%m-%dT%H:%M:%SZ', 'now')")
+        .fetch_one(db.pool())
+        .await
+        .unwrap_or_default();
+    let record = format!(r#"{{"at":"{at}","titles_added":{titles},"episodes_added":{episodes}}}"#);
+    if let Err(error) = sinephile_persistence::repositories::ProfileRepository::new(db)
+        .set_setting(LAST_REFRESH, &record)
+        .await
+    {
+        tracing::warn!(%error, "refreshed, but could not record when");
+    }
+    Outcome::Refreshed {
+        titles_added: titles,
+        episodes_added: episodes,
     }
 }
 
-/// The publisher's current validator, or `None` if it will not say.
-///
-/// Separate from [`check`] because it answers a different question: not "has this
-/// changed" but "what is it now", which is what a first refresh needs in order to have
-/// something to compare against next time.
 async fn current_validator(transport: &dyn Transport, url: &str) -> Option<String> {
     let response = transport.send(Request::head(url)).await.ok()?;
     if !(200..300).contains(&response.status) {
@@ -223,6 +268,7 @@ pub enum Outcome {
     AlreadyCurrent,
     Refreshed {
         titles_added: i64,
+        episodes_added: i64,
     },
     /// Offline, or the publisher would not say. Not an error.
     CouldNotTell,

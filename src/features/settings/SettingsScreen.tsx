@@ -7,6 +7,7 @@ import { SourcesSection } from "./SourcesSection";
 import { PlaybackSection } from "./PlaybackSection";
 import { SubtitlesSection } from "./SubtitlesSection";
 import { LibrarySection } from "./LibrarySection";
+import { CatalogueSection } from "./CatalogueSection";
 import { ProfilesSection } from "./ProfilesSection";
 
 /**
@@ -57,6 +58,7 @@ export function SettingsScreen() {
 
       <ProfilesSection />
       <LibrarySection />
+      <CatalogueSection />
       <SourcesSection />
       <PlaybackSection />
       <SubtitlesSection />

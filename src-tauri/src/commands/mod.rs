@@ -5,6 +5,7 @@
 //! handle and reused from somewhere that is not IPC.
 
 pub mod assets;
+pub mod catalogue;
 pub mod downloads;
 pub mod home;
 pub mod imports;

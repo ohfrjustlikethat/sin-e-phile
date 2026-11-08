@@ -124,6 +124,10 @@ const FAKE = `(() => {
       window.__profiles.forEach((p) => { p.active = p.id === a.id; });
       return window.__profiles.find((p) => p.id === a.id);
     },
+    // Phase 16: the catalogue keeps itself current.
+    catalogue_status: () => ({ refreshed_at: "2026-11-08T06:21:10Z", titles_added: 885, episodes_added: 7951,
+      running: false }),
+    refresh_catalogue: () => true,
     subtitle_settings: () => ({ settings: { languages: ["en"], always: false, font: "Segoe UI", size: 46,
       position: 95, background: false }, has_key: false, used_today: 0, budget: 5, server_remaining: null }),
   };
@@ -610,10 +614,14 @@ try {
   // Phase 12 E5: the review queue by pad alone. From the key field the D-pad climbs to
   // "Check them"; then each A answers the focused (first) card, twenty times.
   let onCheck = false;
+  const walked = [];
   for (let i = 0; i < 60 && !onCheck; i++) {
     await press(B.UP);
-    onCheck = (await active())?.text === "Check them";
+    const at = (await active())?.text;
+    walked.push(at);
+    onCheck = at === "Check them";
   }
+  if (!onCheck) console.log("  walked up through: " + walked.slice(-12).join(" | "));
   check(onCheck, "the D-pad reaches the review queue's 'Check them' in Settings");
   await press(B.A);
   await waitFor(() => evalJs(`document.body.textContent.includes("Check your library")`), "the review queue", 25);

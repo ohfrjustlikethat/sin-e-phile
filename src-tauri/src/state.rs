@@ -159,6 +159,13 @@ impl AppState {
         *self.data_dir.write().expect("data dir lock poisoned") = Some(dir);
     }
 
+    pub fn data_dir(&self) -> Option<PathBuf> {
+        self.data_dir
+            .read()
+            .expect("data dir lock poisoned")
+            .clone()
+    }
+
     /// The torrent runtime, started on first call with the stored settings. The
     /// engine's rules are in `crates/torrent`; this only builds it once.
     pub async fn torrent(&self) -> Result<Arc<TorrentRuntime>, String> {

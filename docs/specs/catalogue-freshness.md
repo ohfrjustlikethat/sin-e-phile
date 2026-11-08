@@ -157,3 +157,39 @@ Saying so plainly is better than implying a freshness the design cannot deliver.
 | 2 — airing schedules | Phase 4 for AniList; Phase 11 for the UI |
 | 3 — search-triggered backfill | Phase 6 from backend-reported titles; Phase 12 adds the parser and the IMDb merge |
 | 4 — full re-ingest | Phase 4 (already exists — `ingest imdb` is idempotent) |
+
+---
+
+## Phase 16 — the layers made automatic, and two bugs that kept them from running
+
+The author, 2026-11-08: *"the problem of having latest tv shows and their latest episodes, as well
+as latest movies still persists, they are not updated like i said they should be, at all."*
+
+**What was wrong.** The launch-time `refresh_if_stale` remembers IMDb's validator as soon as the
+216 MB is on disk, so an interrupted load never downloads it again. But only a later refresh resumed
+the load, and a later refresh never came: the next launch found the validator current and stopped.
+The author's catalogue had a refresh job left `running` since 2026-11-07, and the one before it took
+twelve days to finish across launches. Episodes were never refreshed at all: `title.episode` was
+loaded once, for series over 5,000 votes and anime.
+
+**What it does now** (`freshness::refresh`, called by `src-tauri/src/commands/catalogue.rs`):
+
+- **An unfinished refresh is finished first**, before the publisher is asked anything.
+- **The resume reads past the watermark it started from**, kept in the `catalogue.refresh_watermark`
+  setting. Taken afresh it would include the new ids the interrupted run already stored, and skip for
+  good the new titles below them (the file is ordered as text). A refresh batch also drops ids it
+  already holds, so a resume can never die on a duplicate.
+- **Episodes are part of every refresh**: `title.episode` (52 MB) is fetched with the other two, and
+  every episode not yet held is added for anime, a series over 5,000 votes, or **a series the user
+  follows** (matched in the library, on a watchlist, or with a watched episode) whatever its votes.
+- **The app checks every hour**, launch included: one HEAD request, and a download only when IMDb has
+  republished (about daily). **AniList's next airing** is fetched every six hours for every followed
+  anime. Settings shows when the catalogue last changed and what it added, with "Refresh now";
+  Home refetches when a refresh adds something.
+- `ingest keep` runs the same function from the command line.
+
+**Not covered**: a show that IMDb splits where other sources do not. Twin Peaks' 2017 season is a
+separate IMDb series (its 18 parts are that series' season 1), so files named `S03E01` under the 1990
+show are placed on the 1990 series without an episode row. Mapping one numbering onto another needs a
+source that publishes it (D85).
+

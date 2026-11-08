@@ -117,7 +117,9 @@ export function LibrarySection() {
       </ul>
 
       {(review.data ?? 0) > 0 && (
-        <div className="mb-5 flex items-center justify-between gap-4 rounded-md border border-line px-4 py-3">
+        // On the page's left edge with every other control, so a pad going up or down the
+        // column meets it (Phase 16: at the far right, the D-pad passed it by).
+        <div className="mb-5 flex flex-col items-start gap-3 rounded-md border border-line px-4 py-3">
           <p className="text-sm text-ink">
             {review.data} {review.data === 1 ? "file needs" : "files need"} a quick check.
           </p>

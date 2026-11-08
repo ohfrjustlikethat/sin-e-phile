@@ -297,6 +297,9 @@ export const commands = {
 	 *  decades and, once something is liked, half near the taste so far.
 	 */
 	tasteRound: (shown: number[], size: number | null) => typedError<TastePick[], string>(__TAURI_INVOKE("taste_round", { shown, size })),
+	catalogueStatus: () => typedError<CatalogueStatus, string>(__TAURI_INVOKE("catalogue_status")),
+	/**  "Refresh now": a refresh whatever the publisher says, in the background. */
+	refreshCatalogue: () => typedError<boolean, string>(__TAURI_INVOKE("refresh_catalogue")),
 	/**
 	 *  The profile's taste, described (Phase 15): its modes from the model, its axes from its
 	 *  signals and statements. Without the vector half there are no modes, only the axes.
@@ -450,6 +453,14 @@ export type CatalogueItem = {
 	name: string,
 	description: string,
 	manifest: string,
+};
+
+export type CatalogueStatus = {
+	/**  When the last refresh that did something finished (UTC, ISO 8601). */
+	refreshed_at: string | null,
+	titles_added: number | null,
+	episodes_added: number | null,
+	running: boolean,
 };
 
 export type CatalogueView = {

@@ -128,6 +128,8 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::taste::set_taste_input,
             commands::taste::taste_preview,
             commands::taste::taste_round,
+            commands::catalogue::catalogue_status,
+            commands::catalogue::refresh_catalogue,
             commands::taste::taste_profile,
             commands::taste::correct_taste,
             commands::home::home,
@@ -225,14 +227,11 @@ pub fn run() {
                     .state::<AppState>()
                     .set_engine(crate::commands::assets::engine_for(&dir));
 
-                let transport = sinephile_metadata_api::HttpTransport::new();
-                let outcome = sinephile_catalogue::freshness::refresh_if_stale(
-                    &db,
-                    &transport,
-                    &dir.join("datasets"),
-                )
-                .await;
-                tracing::info!(?outcome, "catalogue freshness");
+                // The catalogue keeps itself current from here on: checked now and every
+                // hour, an interrupted refresh finished first (Phase 16).
+                tauri::async_runtime::spawn(crate::commands::catalogue::keep_current(
+                    db_handle.clone(),
+                ));
             });
 
             // The window stays hidden (tauri.conf.json `visible: false`) until the

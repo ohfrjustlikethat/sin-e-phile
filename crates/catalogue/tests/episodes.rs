@@ -151,7 +151,8 @@ async fn fixture() -> Fixture {
 async fn run(f: &Fixture, scope: ep::EpisodeScope) -> usize {
     let series = ep::series(&f.db).await.expect("series");
     let skip = ep::already_loaded(&f.db).await.expect("skip");
-    let wanted = ep::collect(&f.episodes, &series, scope, &skip).expect("collect");
+    let wanted =
+        ep::collect(&f.episodes, &series, scope, &Default::default(), &skip).expect("collect");
     if wanted.is_empty() {
         return 0;
     }
@@ -380,6 +381,7 @@ async fn an_episode_whose_parent_is_not_in_the_catalogue_is_skipped() {
         &episodes,
         &series,
         ep::EpisodeScope::ANIME_ONLY,
+        &HashSet::new(),
         &HashSet::new(),
     )
     .expect("collect");
