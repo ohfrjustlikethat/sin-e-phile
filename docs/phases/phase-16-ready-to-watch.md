@@ -32,7 +32,7 @@ A person can install the app, set it up once, and watch anything they choose (fr
 - [x] **16.3** Home in the specified order: Continue watching; New episodes of your shows; Your library (newest added first, shown the moment a scan finishes, by event); New releases filtered by taste; then the taste rails (E6).
 - [x] **16.4** The controller in the player (TV-standard: A, left/right seek with hold to scrub, up/down volume, LB/RB episode or chapter, Y subtitles quick menu, X audio quick menu, Menu panel, B back) and the right stick scrolling everything: page, panel, rail, the paused details, speed by deflection, focus following (E3).
 - [x] **16.5** The hybrid player: clean while watching; the full panel (subtitles, style, sync, audio, speed, picture); controls answering in under 100 ms; opening, closing, bar and panels without jumps or flicker, measured in the UI audit (E1).
-- [ ] **16.6** Subtitles in the player: a live style editor kept per profile; find and download from OpenSubtitles in playback; sync in 0.1 s steps with 'align again'; load a file from disk; all by pad (E2).
+- [x] **16.6** Subtitles in the player: a live style editor kept per profile; find and download from OpenSubtitles in playback; sync in 0.1 s steps with 'align again'; load a file from disk; all by pad (E2).
 - [ ] **16.7** A first run that leaves the viewer ready to watch: library folders (scan starts at once), add-ons by address with a live check (the app suggests none, §2.1), TMDB and OpenSubtitles keys with links and live tests, the download backend with the VPN check; honest no-source states wherever play or download would be (E7).
 - [ ] **16.8** SETUP.md: every prerequisite with its official link and how to add it to the app, and how to add any add-on by its address; names no content source; passes the guard (E8).
 - [ ] **16.9** Polish: Settings section headings clear and larger in the display face; the taste screen (films as cards, clearer hierarchy, live Home preview, fewer words); first run and Home audited for layout, clipping, focus jumps and content flashes at three window sizes, with automated checks added to the UI audit.
@@ -52,3 +52,4 @@ Input latency and how to measure it; spatial scrolling with an analogue stick; h
 - **16.3** Home in the specified order: Continue watching; New episodes of your shows; Your library (newest · `394b11e`
 - **16.4** The controller in the player (TV-standard: A, left/right seek with hold to scrub, up/down volume · `0367901`
 - **16.5** The hybrid player: clean while watching; the full panel (subtitles, style, sync, audio, speed, p · `989c481`
+- **16.6** Subtitles in the player: a live style editor kept per profile; find and download from OpenSubtit · `2416ab6`

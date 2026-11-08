@@ -2906,3 +2906,8 @@ profile and applied at once (seen to fail with the size step changed); found sub
 release and "timed for this file"; "align again" on an embedded track says why it cannot. Pad flow: Menu, the
 D-pad to "Find subtitles", A, the D-pad to the first found, A downloads and shows it. Not yet seen in the real
 window: the style reaching mpv, and "Load a file" (Windows' file picker).
+
+**16.6 in the real window** (2026-11-08): the debug build playing the author's film, the probe's `style` step
+setting yellow and outline 5 exactly as the panel does, then reading mpv back through `dev_player_prop`:
+`sub-color=#FFFFD400 sub-border-size=5.000000`. The style reaches the playing film live. Still unseen in the
+real window: "Load a file" (Windows' file picker needs a hand).
