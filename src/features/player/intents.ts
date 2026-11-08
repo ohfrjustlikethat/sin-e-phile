@@ -176,3 +176,28 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: "Esc", pad: "B", does: "Back", sample: k("Escape"), intent: { kind: "back" } },
   { keys: "", pad: "Menu", does: "The player menu: everything above, by pad", sample: k(""), intent: { kind: "player_menu" } },
 ];
+
+/** What the player last reported, and when (ms on the page's clock). */
+export interface Reported {
+  position: number;
+  at: number;
+  speed: number;
+  playing: boolean;
+  duration: number | null;
+}
+
+/** The longest the bar runs ahead of a report: a stall then shows as a stall. */
+export const GLIDE_MAX_S = 0.5;
+
+/**
+ * Where playback is now, between reports (Phase 16): the backend reports four times a
+ * second, and a bar drawn from the reports alone moves in quarter-second jumps. Playing,
+ * the position runs on at the playback speed from the last report, at most `GLIDE_MAX_S`
+ * past it and never past the end; paused, it is the report.
+ */
+export function glide(r: Reported, now: number): number {
+  if (!r.playing) return r.position;
+  const ahead = Math.min(GLIDE_MAX_S, Math.max(0, (now - r.at) / 1000) * r.speed);
+  const p = r.position + ahead;
+  return r.duration != null && r.duration > 0 ? Math.min(p, r.duration) : p;
+}

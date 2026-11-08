@@ -544,9 +544,17 @@ try {
     await evalJs(`[...document.querySelectorAll('[role="status"]')].some((e) => e.textContent.includes("Volume 105%"))`),
     "and the change is said on screen (Volume 105%)",
   );
+  check(
+    await evalJs(`document.querySelector('[aria-label="Controller buttons"]')?.textContent.includes("Subtitles")`),
+    "the player's bar shows the pad's buttons",
+  );
+  const holes = async () => ((await calls("player_layout")).at(-1)?.cutouts ?? []).length;
+  const holesBefore = await holes();
   await press(B.Y);
   await waitFor(() => evalJs(`!!document.querySelector('[role="menu"][aria-label="Subtitles"]')`), "the subtitles menu", 25);
   check((await active())?.text === "Off", "Y opens the subtitles, focus on its first choice");
+  await waitFor(async () => (await holes()) === holesBefore + 1, "a hole for the menu", 25);
+  check(true, `the menu is cut out of the video: ${holesBefore} -> ${holesBefore + 1} holes`);
   const volumes = (await actions("volume")).length;
   await press(B.DOWN);
   check((await actions("volume")).length === volumes, "Down inside the menu does not change the volume");

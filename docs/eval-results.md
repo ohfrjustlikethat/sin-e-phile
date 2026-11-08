@@ -2877,3 +2877,21 @@ the menu; A picks and closes. Right stick: Settings scrolled 0 → 1,094 px in 0
 into view; the paused film's details 0 → 636 px in 0.4 s with focus left on Resume (0 px with the dialog
 fallback removed). Not yet covered: X (sound needs two audio tracks), LB/RB (needs a series), and a real
 controller in the author's hands.
+
+### The player, measured in its real window (16.5, 2026-11-08)
+
+Debug build, `SINEPHILE_AUTOPLAY` (the author's own film) and `SINEPHILE_PROBE` (timed player intents sent as
+the pad sends them); the page logs through `dev_log`, and the video window's region is read from Windows by
+process id (`GetWindowRgn`, sampled every 10 ms). PrintWindow cannot show what is seen through the holes, so the
+region is the evidence.
+
+- **The subtitles menu opened unseen beneath the video.** Before: with the menu open the page sent two holes
+  (the bars) and none for the menu above the bar. After (every overlay marked `data-cutout`, holes recomputed
+  when one comes or goes): three holes; Windows' region 39 rectangles with the bars, **49 with the menu**, 39 when
+  it closes, 1 when the bars hide. Pad flow: "the menu is cut out of the video: 2 -> 3 holes", seen to fail with
+  the menu's mark removed.
+- **Controls respond in about 14 ms**: intent logged at 08:21:00.033, region 1 rectangle at .017 and 49 at .046.
+- **Opening**: the video window stays hidden until the first frame (430 ms after open), so no black flash.
+- **Closing**: Back logged at 08:21:28.179, the video window hidden by .186 (7 ms), its region unchanged until then.
+- **The bar no longer moves in quarter-second steps**: between the backend's four reports a second the position
+  glides on at the playback speed, never more than 0.5 s past a report or past the end (`glide`, unit-tested).

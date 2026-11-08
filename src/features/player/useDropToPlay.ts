@@ -1,3 +1,5 @@
+import { sendPlayerIntent } from "./intentBus";
+import type { Intent } from "./intents";
 import { useEffect } from "react";
 import { commands } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
@@ -60,6 +62,22 @@ export function useDropToPlay() {
  * found the pad dead while video plays; this is how the real window says why.
  */
 function probe() {
+  (window as unknown as { __probe?: boolean }).__probe = true;
+  window.addEventListener(
+    "keydown",
+    (e) => void commands.devLog(`probe key=${e.key} at=${performance.now().toFixed(0)}`),
+    true,
+  );
+  // A timed script of player intents, sent as the pad sends them.
+  void commands.devProbeScript().then((script) => {
+    for (const step of (script ?? "").split(",").filter(Boolean)) {
+      const [at, kind] = step.split(":");
+      window.setTimeout(() => {
+        const taken = sendPlayerIntent({ kind } as Intent);
+        void commands.devLog(`probe intent=${kind} taken=${taken} at=${performance.now().toFixed(0)}`);
+      }, Number(at));
+    }
+  });
   let frames = 0;
   const count = () => {
     frames++;

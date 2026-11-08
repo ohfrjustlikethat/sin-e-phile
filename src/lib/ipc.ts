@@ -160,6 +160,11 @@ export const commands = {
 	 *  A no-op in release builds.
 	 */
 	devLog: (line: string) => __TAURI_INVOKE<void>("dev_log", { line }),
+	/**
+	 *  Debug builds only: `SINEPHILE_PROBE=<ms>:<intent>,…` (e.g. `4000:subtitles_menu`), player
+	 *  intents the probe sends on a timer, as a pad would, for real-window checks (Phase 16).
+	 */
+	devProbeScript: () => __TAURI_INVOKE<string | null>("dev_probe_script"),
 	itemDetail: (id: number) => typedError<{
 	id: number,
 	title: string,

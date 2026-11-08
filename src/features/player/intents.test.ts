@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clock, keyIntent, nextSpeed, SHORTCUTS } from "./intents";
+import { clock, glide, keyIntent, nextSpeed, SHORTCUTS } from "./intents";
 
 const key = (k: string, mods: Partial<{ shiftKey: boolean; ctrlKey: boolean }> = {}) =>
   keyIntent({ key: k, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...mods });
@@ -58,3 +58,17 @@ describe("the shortcuts list (Phase 11 E4)", () => {
   });
 });
 
+
+describe("the bar moves smoothly between reports (Phase 16)", () => {
+  const r = { position: 100, at: 1_000, speed: 1, playing: true, duration: 7_200 };
+  it("runs on at the playback speed from the last report", () => {
+    expect(glide(r, 1_250)).toBeCloseTo(100.25);
+    expect(glide({ ...r, speed: 2 }, 1_100)).toBeCloseTo(100.2);
+  });
+  it("never more than half a second ahead, never past the end, and not at all when paused", () => {
+    expect(glide(r, 9_000)).toBeCloseTo(100.5);
+    expect(glide({ ...r, position: 7_199.9 }, 1_400)).toBe(7_200);
+    expect(glide({ ...r, playing: false }, 2_000)).toBe(100);
+    expect(glide(r, 900)).toBe(100);
+  });
+});

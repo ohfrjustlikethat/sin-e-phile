@@ -490,6 +490,21 @@ pub fn dev_log(line: String) {
     let _ = line;
 }
 
+/// Debug builds only: `SINEPHILE_PROBE=<ms>:<intent>,…` (e.g. `4000:subtitles_menu`), player
+/// intents the probe sends on a timer, as a pad would, for real-window checks (Phase 16).
+#[tauri::command]
+#[specta::specta]
+pub fn dev_probe_script() -> Option<String> {
+    #[cfg(debug_assertions)]
+    {
+        std::env::var("SINEPHILE_PROBE").ok()
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        None
+    }
+}
+
 /// Debug builds only: `SINEPHILE_AUTOPLAY=<address or path>` plays it on launch, so the
 /// real window can be checked without driving the UI. Compiled out of release builds.
 #[tauri::command]

@@ -20,7 +20,10 @@ interface MenuProps {
   tracks: TrackView[];
   picture: Picture;
   audioDelayMs: number;
+  /** Playback speed, 1 normal. */
+  speed: number;
   stats: boolean;
+  onSpeed: (faster: boolean) => void;
   onAudio: (id: number) => void;
   onSubtitles: (id: number | null) => void;
   onSubtitleDelay: (ms: number) => void;
@@ -48,6 +51,7 @@ export const PlayerMenu = forwardRef<HTMLDivElement, MenuProps>(function PlayerM
   return (
     <div
       ref={ref}
+      data-cutout
       role="dialog"
       aria-label="Player menu"
       className="absolute top-[68px] right-3 bottom-[96px] flex w-[min(420px,38%)] flex-col gap-5 overflow-y-auto rounded-md bg-surface px-5 py-5"
@@ -88,6 +92,15 @@ export const PlayerMenu = forwardRef<HTMLDivElement, MenuProps>(function PlayerM
           </span>
           <button type="button" className={small} aria-label="Sound earlier" onClick={() => p.onAudioDelay(-100)}>−</button>
           <button type="button" className={small} aria-label="Sound later" onClick={() => p.onAudioDelay(100)}>+</button>
+        </div>
+      </section>
+      <section aria-label="Speed">
+        <div className="flex items-center gap-2 px-2">
+          <span className="flex-1 text-[13px] text-ink-muted">
+            Speed <span className="tabular-nums text-ink">{p.speed === 1 ? "Normal" : `${p.speed}×`}</span>
+          </span>
+          <button type="button" className={small} aria-label="Slower" onClick={() => p.onSpeed(false)}>−</button>
+          <button type="button" className={small} aria-label="Faster" onClick={() => p.onSpeed(true)}>+</button>
         </div>
       </section>
       <section aria-label="Picture">
@@ -143,7 +156,7 @@ export const StatsPanel = forwardRef<HTMLDivElement, object>(function StatsPanel
     };
   }, []);
   return (
-    <div ref={ref} aria-label="Statistics" className="absolute top-[68px] left-3 rounded-md bg-surface px-4 py-3">
+    <div ref={ref} data-cutout aria-label="Statistics" className="absolute top-[68px] left-3 rounded-md bg-surface px-4 py-3">
       <table className="text-[12px]">
         <tbody>
           {stats.map((s) => (
@@ -164,6 +177,7 @@ export const ShortcutsPanel = forwardRef<HTMLDivElement, { onClose: () => void }
   return (
     <div
       ref={ref}
+      data-cutout
       role="dialog"
       aria-label="Shortcuts"
       className="absolute top-1/2 left-1/2 max-h-[80%] w-[min(720px,90%)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-md bg-surface px-6 py-5"

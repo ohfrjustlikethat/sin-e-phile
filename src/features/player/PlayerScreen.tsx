@@ -3,7 +3,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { useQuery } from "@tanstack/react-query";
 import { commands, type ChapterView, type PlayerStateView, type TrackView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
-import { clock, keyIntent, nextSpeed, type Intent } from "./intents";
+import { clock, glide, keyIntent, nextSpeed, type Intent } from "./intents";
+import { usePadMode } from "@/design-system/focus/FocusLayer";
 import { onPlayerIntent } from "./intentBus";
 import { PauseOverlay } from "./PauseOverlay";
 import { PlayerMenu, ShortcutsPanel, StatsPanel, type Picture } from "./PlayerPanels";
@@ -248,20 +249,16 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
     };
   }, [playing]);
 
-  // Tell the native window where to sit and which shapes to cut out (ADR-0020).
+  // Tell the native window where to sit and which shapes to cut out (ADR-0020). Every
+  // overlay is marked `data-cutout` and gets its hole by being on screen: a hand-kept list
+  // forgot the subtitles and sound menus, which opened unseen beneath the video (Phase 16,
+  // measured in the real window). Paused, the video window is hidden and needs none.
   const layout = useCallback(() => {
-    const s = stage.current?.getBoundingClientRect();
-    if (!s) return;
-    const panels = [
-      ...(chrome && !paused ? [top.current, bottom.current] : []),
-      ...(showNextCard ? [card.current] : []),
-      ...(hover && chrome ? [preview.current] : []),
-      ...(panel === "menu" ? [menuPanel.current] : []),
-      ...(panel === "shortcuts" ? [shortcutsPanel.current] : []),
-      ...(stats ? [statsPanel.current] : []),
-    ];
-    const cutouts = panels
-      .filter((el): el is HTMLDivElement => !!el)
+    const root = stage.current;
+    const s = root?.getBoundingClientRect();
+    if (!root || !s) return;
+    const marked = paused ? [] : [...root.querySelectorAll<HTMLElement>("[data-cutout]")];
+    const cutouts = marked
       .map((el) => {
         const r = el.getBoundingClientRect();
         return {
@@ -273,15 +270,34 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
         };
       });
     void commands.playerLayout(s.x, s.y, s.width, s.height, window.devicePixelRatio, cutouts);
-  }, [chrome, paused, showNextCard, hover, panel, stats, mini]);
+    if ((window as unknown as { __probe?: boolean }).__probe) {
+      void commands.devLog(
+        `probe layout at=${performance.now().toFixed(0)} chrome=${chrome} menu=${menu} holes=${cutouts
+          .map((c) => `${Math.round(c.x)},${Math.round(c.y)},${Math.round(c.width)}x${Math.round(c.height)}`)
+          .join(" ")}`,
+      );
+    }
+  }, [chrome, paused, showNextCard, hover, panel, stats, mini, menu]);
 
   useLayoutEffect(() => {
     layout();
     const ro = new ResizeObserver(layout);
     if (stage.current) ro.observe(stage.current);
     window.addEventListener("resize", layout);
+    // An overlay appearing or going away reshapes the holes in the same frame.
+    let queued = 0;
+    const mo = new MutationObserver(() => {
+      if (queued) return;
+      queued = requestAnimationFrame(() => {
+        queued = 0;
+        layout();
+      });
+    });
+    if (stage.current) mo.observe(stage.current, { childList: true, subtree: true });
     return () => {
       ro.disconnect();
+      mo.disconnect();
+      cancelAnimationFrame(queued);
       window.removeEventListener("resize", layout);
     };
   }, [layout, menu]);
@@ -505,9 +521,32 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
     };
   }, [run, mini]);
 
+  // Between the backend's four reports a second, the bar and clock run on smoothly while
+  // the bar is shown (Phase 16: "jumpy"); `glide` keeps them honest about a stall.
+  const reported = useRef({ position: 0, at: 0, speed: 1, playing: false, duration: null as number | null });
+  useEffect(() => {
+    reported.current = {
+      position: state?.position ?? 0,
+      at: performance.now(),
+      speed: state?.speed ?? 1,
+      playing: !!state?.started && !state.paused && !state.ended && !paused,
+      duration: state?.duration ?? null,
+    };
+  }, [state, paused]);
+  const [frameAt, setFrameAt] = useState(() => performance.now());
+  const gliding = !mini && (chrome || !!menu || !!panel) && !!state?.started && !state.paused && !paused;
+  useEffect(() => {
+    if (!gliding) return;
+    let id = requestAnimationFrame(function frame(t) {
+      setFrameAt(t);
+      id = requestAnimationFrame(frame);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [gliding]);
+  const position = gliding ? glide(reported.current, frameAt) : (state?.position ?? 0);
+  const pad = usePadMode();
   if (!playing) return null;
   const duration = state?.duration ?? 0;
-  const position = state?.position ?? 0;
   const tracks = state?.tracks ?? [];
   const showChrome = !mini && (chrome || paused || !!menu || !!panel);
 
@@ -569,6 +608,8 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
           tracks={tracks}
           picture={picture}
           audioDelayMs={audioDelayMs}
+          speed={state?.speed ?? 1}
+          onSpeed={(faster) => run({ kind: "speed", faster })}
           stats={stats}
           onAudio={(id) => act({ kind: "audio", id })}
           onSubtitles={(id) => act({ kind: "subtitles", id })}
@@ -602,6 +643,7 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
         return (
           <div
             ref={preview}
+            data-cutout
             aria-hidden
             className="absolute bottom-[96px] overflow-hidden rounded-sm bg-surface"
             style={{ left: previewLeft(hover.x, width + 8, hover.barLeft, hover.barWidth) }}
@@ -678,6 +720,7 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
           {!pip && (
           <div
             ref={top}
+            data-cutout
             data-tauri-drag-region
             className="absolute inset-x-3 top-3 flex h-12 items-center gap-4 rounded-md bg-surface px-3"
           >
@@ -692,7 +735,7 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
           </div>
           )}
 
-          <div ref={bottom} className="absolute inset-x-3 bottom-3 rounded-md bg-surface px-4 pt-3 pb-2.5">
+          <div ref={bottom} data-cutout className="absolute inset-x-3 bottom-3 rounded-md bg-surface px-4 pt-3 pb-2.5">
             <Scrub
               position={position}
               duration={duration}
@@ -743,6 +786,7 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
               </>
               )}
             </div>
+            {pad && <PadHints />}
           </div>
         </>
       )}
@@ -817,7 +861,7 @@ function TrackMenu({
         {label}
       </button>
       {open && (
-        <ul role="menu" aria-label={label} className="absolute right-0 bottom-9 min-w-44 rounded-md border border-line bg-raised py-1">
+        <ul role="menu" data-cutout aria-label={label} className="absolute right-0 bottom-9 min-w-44 rounded-md border border-line bg-raised py-1">
           {kind === "sub" && (
             <li>
               <button type="button" role="menuitem" onClick={() => onPick(null)} className="w-full px-3 py-1.5 text-left hover:bg-surface">
@@ -837,6 +881,33 @@ function TrackMenu({
           {list.length === 0 && <li className="px-3 py-1.5 text-ink-faint">None in this file</li>}
         </ul>
       )}
+    </div>
+  );
+}
+
+/** ADR-0045's TV-standard buttons, in the bar while a pad is in use (Phase 16). Inside the
+ * bar, so inside its hole: a hints footer elsewhere would sit under the video. */
+const PAD_HINTS: [string, string][] = [
+  ["A", "Pause"],
+  ["◀▶", "Seek"],
+  ["▲▼", "Volume"],
+  ["Y", "Subtitles"],
+  ["X", "Sound"],
+  ["≡", "More"],
+  ["B", "Back"],
+];
+
+function PadHints() {
+  return (
+    <div aria-label="Controller buttons" role="note" className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[12px] text-ink-muted">
+      {PAD_HINTS.map(([b, what]) => (
+        <span key={what} className="flex items-center gap-1.5">
+          <span className="hint-glyph" aria-hidden>
+            {b}
+          </span>
+          {what}
+        </span>
+      ))}
     </div>
   );
 }
