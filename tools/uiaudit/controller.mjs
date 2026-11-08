@@ -63,6 +63,9 @@ const FAKE = `(() => {
     item_detail: () => ({ id: 7, title: "Sunrise", year: 1927, kind: "film", runtime_minutes: 94,
       synopsis: "A married farmer falls under the spell of a woman from the city.",
       credits: [{ name: "F. W. Murnau", role: "director", character: null }] }),
+    // The paused film's details, long enough to scroll (Phase 16's right stick).
+    pause_details: () => ({ cast: Array.from({ length: 40 }, (_, i) => ({ person_id: i + 1, name: "Player " + (i + 1),
+      part: "Part " + (i + 1) })), crew: [], ratings: [], more_like_this: [] }),
     prepare_play: () => ({ title: "Sunrise", open: "https://films.example/sunrise.mp4", start: null,
       from: "Internet Archive", offered: 2, languages: ["en", "de"], original_language: null,
       qualities: ["full_hd", "hd"], unmet: null, why: "1080p · served directly", candidates: [] }),
@@ -162,6 +165,7 @@ const FAKE = `(() => {
   const pad = { id: "Xbox Wireless Controller (simulated)", index: 0, connected: true, mapping: "standard",
     timestamp: 0, axes: [0, 0, 0, 0], buttons };
   window.__padSet = (b, down) => { buttons[b] = { pressed: down, touched: down, value: down ? 1 : 0 }; pad.timestamp++; };
+  window.__padAxis = (i, v) => { pad.axes[i] = v; pad.timestamp++; };
   navigator.getGamepads = () => [pad, null, null, null];
 })();`;
 
@@ -529,10 +533,40 @@ try {
   check(opened.target === "https://films.example/sunrise.mp4", "A on Play starts the player");
   await shoot("05-playing");
 
+  // Phase 16 (ADR-0045's TV-standard mapping): the author found the pad changed nothing
+  // during playback. Up raises the volume and says so; Y opens the subtitles with focus in
+  // the menu; Down then moves within it rather than lowering the volume; A picks.
+  const actions = async (kind) => (await calls("player_action")).filter((a) => a.action?.kind === kind);
+  await press(B.UP);
+  const louder = await waitFor(async () => (await actions("volume"))[0], "a volume change", 25);
+  check(louder.action.percent > 100, `Up raises the volume (${louder.action.percent})`);
+  check(
+    await evalJs(`[...document.querySelectorAll('[role="status"]')].some((e) => e.textContent.includes("Volume 105%"))`),
+    "and the change is said on screen (Volume 105%)",
+  );
+  await press(B.Y);
+  await waitFor(() => evalJs(`!!document.querySelector('[role="menu"][aria-label="Subtitles"]')`), "the subtitles menu", 25);
+  check((await active())?.text === "Off", "Y opens the subtitles, focus on its first choice");
+  const volumes = (await actions("volume")).length;
+  await press(B.DOWN);
+  check((await actions("volume")).length === volumes, "Down inside the menu does not change the volume");
+  await press(B.UP);
+  await press(B.A);
+  const picked = await waitFor(async () => (await actions("subtitles"))[0], "a subtitles choice", 25);
+  check(picked.action.id === null, "A picks the focused choice (Off)");
+  check(await evalJs(`!document.querySelector('[role="menu"]')`), "and the menu closes");
+
   await press(B.A);
   await waitFor(() => evalJs(`document.body.textContent.includes("Paused")`), "the pause overlay", 25);
   check((await calls("player_pause_still")).length === 1, "A pauses, into a still frame");
   await shoot("06-paused");
+  // Phase 16: the right stick reads the paused film's details, focus staying on Resume.
+  const about = () => evalJs(`document.querySelector('[aria-label="About this film"]')?.scrollTop ?? -1`);
+  await waitFor(async () => (await about()) >= 0, "the film's details", 25);
+  await evalJs(`__padAxis(3, 0.9)`);
+  await sleep(400);
+  await evalJs(`__padAxis(3, 0)`);
+  check((await about()) > 100, `the right stick scrolls the paused film's details (${await about()})`);
 
   await press(B.RT);
   const seeks = await calls("player_action");
@@ -674,6 +708,21 @@ try {
   await press(B.B);
   await waitFor(() => evalJs(`document.body.textContent.includes("OpenSubtitles")`), "Settings after the taste", 25);
   check(true, "B returns from the taste profile to Settings");
+
+  // Phase 16: the right stick scrolls the page under focus, and focus follows onto what is
+  // in view, so the next D-pad press starts from where the eye is.
+  const scrolled = () => evalJs(`document.querySelector("main").scrollTop`);
+  const top = await scrolled();
+  await evalJs(`__padAxis(3, 0.9)`);
+  await sleep(600);
+  await evalJs(`__padAxis(3, 0)`);
+  await sleep(200);
+  const after = await scrolled();
+  check(after > top + 200, `the right stick scrolls Settings down (${top} -> ${after})`);
+  check(
+    await evalJs(`(() => { const r = document.activeElement?.getBoundingClientRect(); return !!r && r.bottom > 0 && r.top < innerHeight; })()`),
+    "focus follows onto something in view",
+  );
   await press(B.B); // leave Settings
 
   // Reduced motion: every transform goes, the ring stops gliding.

@@ -478,6 +478,18 @@ pub async fn state_loop(app: AppHandle) {
     }
 }
 
+/// Debug builds only: a line from the page into the log, for real-window checks the page
+/// cannot report any other way (Phase 16: is the page still running while video plays?).
+/// A no-op in release builds.
+#[tauri::command]
+#[specta::specta]
+pub fn dev_log(line: String) {
+    #[cfg(debug_assertions)]
+    tracing::info!(page = %line, "page");
+    #[cfg(not(debug_assertions))]
+    let _ = line;
+}
+
 /// Debug builds only: `SINEPHILE_AUTOPLAY=<address or path>` plays it on launch, so the
 /// real window can be checked without driving the UI. Compiled out of release builds.
 #[tauri::command]

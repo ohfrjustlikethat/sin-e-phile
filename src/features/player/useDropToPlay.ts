@@ -42,11 +42,35 @@ export function useDropToPlay() {
         }),
     );
     void commands.devAutoplay().then((r) => {
-      if (r.status === "ok" && r.data) play({ target: r.data, title: titleFromPath(r.data), mediaItemId: null, start: null });
+      if (r.status === "ok" && r.data) {
+        play({ target: r.data, title: titleFromPath(r.data), mediaItemId: null, start: null });
+        probe();
+      }
     });
     return () => {
       cancelled = true;
       unlisten?.();
     };
   }, [play]);
+}
+
+/**
+ * Debug builds, under `SINEPHILE_AUTOPLAY` only: every half second, log whether the page
+ * thinks it is visible, how many animation frames ran, and whether a pad is seen. Phase 16
+ * found the pad dead while video plays; this is how the real window says why.
+ */
+function probe() {
+  let frames = 0;
+  const count = () => {
+    frames++;
+    requestAnimationFrame(count);
+  };
+  requestAnimationFrame(count);
+  setInterval(() => {
+    const pads = navigator.getGamepads?.().filter((p) => p && p.connected).length ?? 0;
+    void commands.devLog(
+      `probe visibility=${document.visibilityState} focus=${document.hasFocus()} frames=${frames} pads=${pads}`,
+    );
+    frames = 0;
+  }, 500);
 }

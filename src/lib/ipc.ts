@@ -154,6 +154,12 @@ export const commands = {
 	 *  real window can be checked without driving the UI. Compiled out of release builds.
 	 */
 	devAutoplay: () => typedError<string | null, string>(__TAURI_INVOKE("dev_autoplay")),
+	/**
+	 *  Debug builds only: a line from the page into the log, for real-window checks the page
+	 *  cannot report any other way (Phase 16: is the page still running while video plays?).
+	 *  A no-op in release builds.
+	 */
+	devLog: (line: string) => __TAURI_INVOKE<void>("dev_log", { line }),
 	itemDetail: (id: number) => typedError<{
 	id: number,
 	title: string,

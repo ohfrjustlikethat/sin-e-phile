@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  BUTTON, heldDirections, navAction, nearest, nearestInRegion, newlyPressed, playerIntent, shouldRepeat,
+  BUTTON, heldDirections, navAction, nearest, nearestBox, nearestInRegion, newlyPressed, playerIntent,
+  scrollSpeed, SCROLL_MAX, shouldRepeat,
   startGamepad, tiltFor, TILT_MAX, type Box, type PadFrame,
 } from "./gamepad";
 
@@ -25,15 +26,40 @@ describe("gamepad decisions", () => {
     expect(heldDirections(frame([], 0.3, -0.2)).size).toBe(0);
   });
 
-  it("maps the player buttons as ADR-0041's table says", () => {
+  it("maps the player buttons as ADR-0045's TV-standard table says", () => {
     expect(playerIntent(BUTTON.A)).toEqual({ kind: "toggle_pause" });
     expect(playerIntent(BUTTON.B)).toEqual({ kind: "back" });
-    expect(playerIntent(BUTTON.X)).toEqual({ kind: "subtitles_menu" });
-    expect(playerIntent(BUTTON.RT)).toEqual({ kind: "seek", seconds: 30 });
+    expect(playerIntent(BUTTON.Y)).toEqual({ kind: "subtitles_menu" });
+    expect(playerIntent(BUTTON.X)).toEqual({ kind: "audio_menu" });
+    expect(playerIntent(BUTTON.MENU)).toEqual({ kind: "player_menu" });
     expect(playerIntent(BUTTON.LEFT)).toEqual({ kind: "seek", seconds: -10 });
-    // Phase 10: the bumpers nudge the subtitles, as G and H do.
-    expect(playerIntent(BUTTON.LB)).toEqual({ kind: "subtitle_delay", ms: -100 });
-    expect(playerIntent(BUTTON.RB)).toEqual({ kind: "subtitle_delay", ms: 100 });
+    expect(playerIntent(BUTTON.RIGHT)).toEqual({ kind: "seek", seconds: 10 });
+    expect(playerIntent(BUTTON.UP)).toEqual({ kind: "volume", delta: 5 });
+    expect(playerIntent(BUTTON.DOWN)).toEqual({ kind: "volume", delta: -5 });
+    expect(playerIntent(BUTTON.LB)).toEqual({ kind: "episode", next: false });
+    expect(playerIntent(BUTTON.RB)).toEqual({ kind: "episode", next: true });
+    expect(playerIntent(BUTTON.RT)).toEqual({ kind: "seek", seconds: 30 });
+    // The right stick scrolls; clicking it does nothing in the player.
+    expect(playerIntent(BUTTON.RS)).toBeNull();
+  });
+
+  it("the right stick scrolls faster the further it is pushed, nothing when resting", () => {
+    expect(scrollSpeed(0.15)).toBe(0);
+    expect(scrollSpeed(-0.2)).toBe(0);
+    expect(scrollSpeed(1)).toBe(SCROLL_MAX);
+    expect(scrollSpeed(-1)).toBe(-SCROLL_MAX);
+    const half = scrollSpeed(0.6);
+    expect(half).toBeGreaterThan(0);
+    expect(half).toBeLessThan(SCROLL_MAX / 2);
+  });
+
+  it("focus that scrolled out of view goes to the nearest box in view", () => {
+    const gone: Box = { x: 100, y: -200, width: 100, height: 40 };
+    const top: Box = { x: 100, y: 10, width: 100, height: 40 };
+    const far: Box = { x: 900, y: 10, width: 100, height: 40 };
+    const lower: Box = { x: 100, y: 400, width: 100, height: 40 };
+    expect(nearestBox(gone, [lower, far, top])).toBe(2);
+    expect(nearestBox(gone, [])).toBe(-1);
   });
 
   it("maps browsing buttons to navigation", () => {

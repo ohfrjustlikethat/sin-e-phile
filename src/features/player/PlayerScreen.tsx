@@ -181,6 +181,14 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
   const [paused, setPaused] = useState(false);
   const [chrome, setChrome] = useState(true);
   const [menu, setMenu] = useState<"audio" | "sub" | null>(null);
+  // A quick menu takes focus when it opens, on its first choice, so the pad is in it.
+  useEffect(() => {
+    if (!menu) return;
+    const id = requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('[role="menu"] [role="menuitem"]')?.focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [menu]);
   // The last nudge, shown for a moment in the controls (G/H, LB/RB).
   const [nudge, setNudge] = useState<string | null>(null);
   useEffect(() => {
@@ -377,6 +385,11 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
         }
         if (intent.kind === "seek" || intent.kind === "volume" || intent.kind === "toggle_pause") return false;
       }
+      // A quick menu (subtitles, sound) is a panel too: the D-pad moves within it and A
+      // picks (Phase 16: Down in the subtitles menu used to turn the volume down).
+      if (menu && (intent.kind === "seek" || intent.kind === "volume" || intent.kind === "toggle_pause")) {
+        return false;
+      }
       wake();
       const s = state;
       switch (intent.kind) {
@@ -415,9 +428,13 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
           if (paused) void resume();
           act({ kind: "seek_by", seconds: intent.seconds });
           break;
-        case "volume":
-          act({ kind: "volume", percent: Math.min(130, Math.max(0, (s?.volume ?? 100) + intent.delta)) });
+        case "volume": {
+          const percent = Math.min(130, Math.max(0, (s?.volume ?? 100) + intent.delta));
+          act({ kind: "volume", percent });
+          // Said on screen: with the controls hidden, a change nobody sees reads as broken.
+          setNudge(`Volume ${Math.round(percent)}%`);
           break;
+        }
         case "mute":
           act({ kind: "mute", muted: !(s?.muted ?? false) });
           break;
@@ -800,7 +817,7 @@ function TrackMenu({
         {label}
       </button>
       {open && (
-        <ul role="menu" className="absolute right-0 bottom-9 min-w-44 rounded-md border border-line bg-raised py-1">
+        <ul role="menu" aria-label={label} className="absolute right-0 bottom-9 min-w-44 rounded-md border border-line bg-raised py-1">
           {kind === "sub" && (
             <li>
               <button type="button" role="menuitem" onClick={() => onPick(null)} className="w-full px-3 py-1.5 text-left hover:bg-surface">

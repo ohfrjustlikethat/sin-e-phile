@@ -31,11 +31,48 @@ export type NavAction =
   | { kind: "search" }
   | { kind: "settings" };
 
-/** One frame of a pad: which buttons are down, and the left stick. */
+/** One frame of a pad: which buttons are down, and the sticks. */
 export interface PadFrame {
   pressed: boolean[];
   stickX: number;
   stickY: number;
+  /** The right stick, which scrolls (Phase 16). */
+  rightX?: number;
+  rightY?: number;
+}
+
+/** Below this the right stick is resting, not scrolling. */
+export const SCROLL_FROM = 0.2;
+/** The fastest scroll, the stick pushed all the way, in pixels a second. */
+export const SCROLL_MAX = 2400;
+
+/**
+ * The right stick's scroll speed, in pixels a second (Phase 16): nothing inside the dead
+ * zone, then rising with the square of how far it is pushed past it, so a gentle push reads
+ * a line at a time and a full push crosses a page in about a third of a second.
+ */
+export function scrollSpeed(v: number): number {
+  const a = Math.abs(v);
+  if (a <= SCROLL_FROM) return 0;
+  const t = Math.min(1, (a - SCROLL_FROM) / (1 - SCROLL_FROM));
+  return Math.sign(v) * t * t * SCROLL_MAX;
+}
+
+/** Of `boxes`, the one nearest `from` (centre to centre), or -1: where focus goes when
+ * the box it was in has scrolled out of view. */
+export function nearestBox(from: Box, boxes: Box[]): number {
+  const cx = from.x + from.width / 2;
+  const cy = from.y + from.height / 2;
+  let best = -1;
+  let bestD = Infinity;
+  boxes.forEach((b, i) => {
+    const d = Math.hypot(b.x + b.width / 2 - cx, b.y + b.height / 2 - cy);
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  });
+  return best;
 }
 
 const DEADZONE = 0.5;
@@ -84,23 +121,19 @@ export function playerIntent(button: number): Intent | null {
       return { kind: "player_menu" };
     case BUTTON.B:
       return { kind: "back" };
-    case BUTTON.X:
-      return { kind: "subtitles_menu" };
+    // ADR-0045's TV-standard mapping: Y the subtitles, X the sound, the bumpers the
+    // episode. Moving the subtitles in time is the panel's (Menu), as G and H are the keys'.
     case BUTTON.Y:
+      return { kind: "subtitles_menu" };
+    case BUTTON.X:
       return { kind: "audio_menu" };
     case BUTTON.LT:
       return { kind: "seek", seconds: -30 };
     case BUTTON.RT:
       return { kind: "seek", seconds: 30 };
-    // The bumpers nudge the subtitles, as G and H do (SPEC.md Phase 10).
     case BUTTON.LB:
-      return { kind: "subtitle_delay", ms: -100 };
-    case BUTTON.RB:
-      return { kind: "subtitle_delay", ms: 100 };
-    // Clicking a stick changes episode: left for the previous, right for the next.
-    case BUTTON.LS:
       return { kind: "episode", next: false };
-    case BUTTON.RS:
+    case BUTTON.RB:
       return { kind: "episode", next: true };
     case BUTTON.LEFT:
       return { kind: "seek", seconds: -10 };
@@ -285,6 +318,72 @@ export function moveFocus(direction: Direction): boolean {
   return true;
 }
 
+/** Whether `el` scrolls along an axis: it overflows, and its style lets it. */
+function scrolls(el: Element, vertical: boolean): boolean {
+  const style = getComputedStyle(el);
+  const overflow = vertical ? style.overflowY : style.overflowX;
+  if (overflow !== "auto" && overflow !== "scroll") return false;
+  return vertical ? el.scrollHeight > el.clientHeight + 1 : el.scrollWidth > el.clientWidth + 1;
+}
+
+/** What the right stick scrolls: the nearest scrolling ancestor of the focused element
+ * along that axis; else what scrolls in the open dialog (the paused film's details beside
+ * its Resume button); else the page. */
+function scrollTarget(vertical: boolean): Element | null {
+  for (let el = document.activeElement; el && el !== document.body; el = el.parentElement) {
+    if (scrolls(el, vertical)) return el;
+  }
+  const dialogs = document.querySelectorAll('[role="dialog"]');
+  const dialog = dialogs[dialogs.length - 1];
+  if (dialog) {
+    const inside = [...dialog.querySelectorAll("*")].find((el) => scrolls(el, vertical));
+    if (inside) return inside;
+  }
+  if (!vertical) return null;
+  const main = document.querySelector("main");
+  if (main && scrolls(main, true)) return main;
+  return document.scrollingElement;
+}
+
+/**
+ * Scroll by the right stick for `dtMs` (Phase 16, ADR-0045), then, if the focused element
+ * has left the view, move focus to the visible control nearest where it was, so the next
+ * D-pad press starts from what is on screen.
+ */
+export function scrollByStick(x: number, y: number, dtMs: number): boolean {
+  const dy = (scrollSpeed(y) * dtMs) / 1000;
+  const dx = (scrollSpeed(x) * dtMs) / 1000;
+  let moved = false;
+  if (dy !== 0) {
+    const t = scrollTarget(true);
+    if (t) {
+      const before = t.scrollTop;
+      t.scrollTop += dy;
+      moved ||= t.scrollTop !== before;
+    }
+  }
+  if (dx !== 0) {
+    const t = scrollTarget(false);
+    if (t) {
+      const before = t.scrollLeft;
+      t.scrollLeft += dx;
+      moved ||= t.scrollLeft !== before;
+    }
+  }
+  if (moved) {
+    const current = document.activeElement as HTMLElement | null;
+    const r = current?.getBoundingClientRect();
+    const inView = !!r && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
+    if (!inView) {
+      const all = visibleFocusables();
+      const from = r ? { x: r.x, y: r.y, width: r.width, height: r.height } : { x: innerWidth / 2, y: innerHeight / 2, width: 0, height: 0 };
+      const i = nearestBox(from, all.map(box));
+      all[i]?.focus({ preventScroll: true });
+    }
+  }
+  return moved;
+}
+
 /** Mark the document as driven by a pad (or not), for the ten-foot focus treatment. */
 export function setPadMode(on: boolean): void {
   if (on) {
@@ -312,6 +411,8 @@ function frameOf(pad: Gamepad): PadFrame {
     pressed: pad.buttons.map((b) => b.pressed || b.value > 0.6),
     stickX: pad.axes[0] ?? 0,
     stickY: pad.axes[1] ?? 0,
+    rightX: pad.axes[2] ?? 0,
+    rightY: pad.axes[3] ?? 0,
   };
 }
 
@@ -336,6 +437,7 @@ export function startGamepad(handlers: GamepadHandlers): () => void {
   let raf = 0;
   let pickedUp = false;
   let lastTilt = { rx: 0, ry: 0 };
+  let lastTick = 0;
 
   const fireDirection = (d: Direction) => {
     const asButton = { up: BUTTON.UP, down: BUTTON.DOWN, left: BUTTON.LEFT, right: BUTTON.RIGHT }[d];
@@ -350,7 +452,10 @@ export function startGamepad(handlers: GamepadHandlers): () => void {
       const pressed = newlyPressed(prev, frame).filter((b) => b < BUTTON.UP || b > BUTTON.RIGHT);
       const dirs = heldDirections(frame);
       const tilt = tiltFor(frame.stickX, frame.stickY);
-      const active = pressed.length > 0 || dirs.size > 0 || tilt.rx !== 0 || tilt.ry !== 0;
+      const rx = frame.rightX ?? 0;
+      const ry = frame.rightY ?? 0;
+      const scrolling = scrollSpeed(rx) !== 0 || scrollSpeed(ry) !== 0;
+      const active = pressed.length > 0 || dirs.size > 0 || tilt.rx !== 0 || tilt.ry !== 0 || scrolling;
       if (active) {
         travel = 0;
         setPadMode(true);
@@ -366,6 +471,9 @@ export function startGamepad(handlers: GamepadHandlers): () => void {
       const aNow = !!frame.pressed[BUTTON.A];
       if (aNow !== !!prev?.pressed[BUTTON.A] && (aNow || prev)) handlers.press?.(aNow);
       if (pressed.includes(BUTTON.VIEW)) handlers.view?.();
+      // The right stick scrolls whatever holds focus (Phase 16). A frame's time, capped so
+      // a stall does not throw the page.
+      if (scrolling) scrollByStick(rx, ry, Math.min(50, lastTick ? now - lastTick : 16));
       for (const b of pressed) {
         // Something on screen may own a button outright: the on-screen keyboard's X, Y,
         // triggers, bumpers and Menu (ADR-0043).
@@ -391,6 +499,7 @@ export function startGamepad(handlers: GamepadHandlers): () => void {
       }
       prev = frame;
     }
+    lastTick = now;
     raf = requestAnimationFrame(tick);
   };
   raf = requestAnimationFrame(tick);
