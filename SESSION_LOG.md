@@ -2208,3 +2208,30 @@ Both were caught by rereading, which is not a process.
 **Carry forward.** The author batch now: a real controller (8 E5), a VPN cut (7 E7), the review screen's
 feel, D77, a first-time person through onboarding (14 E1), sign-off on onboarding and Home (14 E4, E6), and
 the taste screen on a real profile (15 E3).
+
+### Session 22, continued (2026-11-08) — the author's review, and spec 4.0.0
+
+**What happened.** The author used the release build after Phase 15 and answered the batch: the taste screen
+works (more polish wanted); first run is under two minutes; the controller and TV mode are good; first run
+and Home still have glitches; downloads could not be tested (the library had 0 add-ons, and nothing said
+so); Settings headings are weak; a `Twin Peaks` folder with season subfolders was read as films; the
+player feels choppy, the pad cannot change volume or subtitles, there is no subtitle style, download or
+sync; the right stick does nothing; new films and episodes never arrive; the local library is not on Home
+straight after a scan. They asked for a list of every plugin "like stremio" with download links.
+
+**Questions asked and answered** (twelve, in three rounds): recorded in ADR-0045's table.
+
+**D77 resolved** in a release build: 0 console windows from the app's FFprobe and FFmpeg paths in a
+windowed program; 5 from the same FFprobe without the flag (the control).
+
+**D83 recurred** in CI; cause traced into librqbit's shutdown and `Engine::stop` made to wait for the
+session to end (details in D83). Not reproduced locally.
+
+**Decisions.** A fix-first phase, **Phase 16 — Ready to Watch**, before the recommendation engine; every
+later phase moves up by one. The plugin list becomes `SETUP.md`: every prerequisite with its official link,
+and how to add any add-on by its address; it names no content source (§2.1), and I said so to the author.
+Phase 8 E5, Phase 14 E1 and Phase 15 E3 discharged from the author's answers; Phase 7 E7 and Phase 14 E4/E6
+received by Phase 16.
+
+**Spec amendments.** spec_version 4.0.0 (A35, ADR-0045): Phase 16 inserted; Phases 17–28 renumbered; tiers
+and gates moved; CLAUDE.md resynced; the state tools and schema now expect 29 phases.

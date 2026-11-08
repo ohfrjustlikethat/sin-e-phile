@@ -244,7 +244,7 @@
         "number": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 27
+          "maximum": 28
         },
         "slug": {
           "type": "string",
@@ -285,9 +285,9 @@
     },
     "phases": {
       "type": "array",
-      "minItems": 28,
-      "maxItems": 28,
-      "description": "All 28 phases, 0..27. Generated from SPEC.md §15 by tools/state/build_state.py so it cannot drift from the specification.",
+      "minItems": 29,
+      "maxItems": 29,
+      "description": "All 29 phases, 0..28 (spec 4.0.0 inserted Phase 16, ADR-0045). Generated from SPEC.md §15 by tools/state/build_state.py so it cannot drift from the specification.",
       "items": {
         "type": "object",
         "required": [
@@ -302,7 +302,7 @@
           "number": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 27
+            "maximum": 28
           },
           "slug": {
             "type": "string",
@@ -441,7 +441,7 @@
               "null"
             ],
             "minimum": 0,
-            "maximum": 27,
+            "maximum": 28,
             "description": "The phase by which this blocker must be resolved."
           }
         }
@@ -475,7 +475,7 @@
               "null"
             ],
             "minimum": 0,
-            "maximum": 27
+            "maximum": 28
           }
         }
       }
@@ -549,7 +549,7 @@
           "phase_raised": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 27
+            "maximum": 28
           }
         }
       }

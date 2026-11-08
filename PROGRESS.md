@@ -4,50 +4,58 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 3.3.0** · 21 session(s) completed · last updated 2026-11-07
+**Spec version 4.0.0** · 21 session(s) completed · last updated 2026-11-08
 
 ---
 
 ## Where we are right now
 
-**Phase 16 — Recommendation Engine** (`in_progress`, branch `phase/16-recommendation-engine`)
+**Phase 16 — Ready to Watch** (`in_progress`, branch `phase/16-ready-to-watch`)
 
-0 of 6 exit criteria met with evidence.
+0 of 9 exit criteria met with evidence.
 
-> Receives the author checks batched after Phase 15: Phase 7 E7 (VPN cut), Phase 8 E5 (real controller), Phase 14 E1 (first-time person), E4 and E6 (sign-off on onboarding and Home), Phase 15 E3 (the taste screen is accurate). Asked of the author at Phase 15's close; recorded here as they answer.
+> Inserted by spec 4.0.0 (ADR-0045) after the author used the release build. Receives the author batch: Phase 8 E5, Phase 14 E1 and Phase 15 E3 discharged here from the author's answers of 2026-11-08; Phase 7 E7 and Phase 14 E4/E6 to be met here (16.10). Judge by using the release build as a person would, not only by fixtures.
 
-### Subtasks — 0/5 complete
+### Subtasks — 0/10 complete
 
-- [ ] **16.1** Layer 2, item-item collaborative filtering (crates/recommend, new): built during ingestion from the local MovieLens ratings (never shipped, ADR-0044), positive co-occurrence normalised against popularity (cosine with shrinkage, or lift damped by log popularity, chosen on a tuning split) so an obscure favourite can outrank a blockbuster; the top neighbours per title persisted (migration 0027, repository methods with surface lines); titles with no ratings fall back to content neighbours (cold start).
-- [ ] **16.2** Layer 3, the hybrid ranker: about 1,000 candidates cheaply (each mode's nearest, the CF neighbours of what was liked, the popularity pool), scored by a blend of content similarity, CF, the popularity prior, the axes (boosts) and avoids (penalties), availability and freshness; maximal marginal relevance with caps per director, franchise and year; ranking 1,000 candidates timed (E5, under 150 ms).
-- [ ] **16.3** Explanations: every recommendation carries a reason built from the signal that put it there (the liked titles behind a CF score, the mode behind a content score, the axis behind a boost), tested so that every reason names something true of the profile (E4); Home's taste rail uses the ranker and shows the reasons, pad-complete.
-- [ ] **16.4** fixtures/recommender/ and eval recommend: Recall@20 against popularity on a held-out split (E1, more than 40% relative), catalogue coverage over the users (E2, above 15%), intra-list diversity against a documented target and no rail dominated by one director, franchise or year (E3), ranking time (E5); seen to fail for each.
-- [ ] **16.5** The case study (docs/case-studies/recommender.md) with real numbers (E6); the received author checks (Phase 7 E7, Phase 8 E5, Phase 14 E1/E4/E6, Phase 15 E3) recorded as the author reports them; docs/specs/recommender.md, learning note, README and HOW_IT_WORKS, regression, close.
+- [ ] **16.1** TV shows from folders (crates/library): the show from its folder (`Show (Year)`), the season from a `Season N` subfolder, the episode from the file; flat `S01E03` files under a show folder; anime absolute numbers mapped per season where the data allows (never cumulated, ADR-0031); one show across folders or drives merged; no episode ever filed as a film. A TV-layout corpus in fixtures/ including a Twin Peaks-like case, judged by eval identify (E4); then the author's real folder rescanned on the release build.
+- [ ] **16.2** The catalogue refreshes itself (ADR-0030 made automatic): a background job once a day while idle fetches IMDb's updated basics, ratings and episode files and adds titles and episodes past what is stored; AniList airing every few hours; TMDB now-playing and airing for a profile with a key; Settings says when it last ran and offers 'refresh now' (E5).
+- [ ] **16.3** Home in the specified order: Continue watching; New episodes of your shows; Your library (newest added first, shown the moment a scan finishes, by event); New releases filtered by taste; then the taste rails (E6).
+- [ ] **16.4** The controller in the player (TV-standard: A, left/right seek with hold to scrub, up/down volume, LB/RB episode or chapter, Y subtitles quick menu, X audio quick menu, Menu panel, B back) and the right stick scrolling everything: page, panel, rail, the paused details, speed by deflection, focus following (E3).
+- [ ] **16.5** The hybrid player: clean while watching; the full panel (subtitles, style, sync, audio, speed, picture); controls answering in under 100 ms; opening, closing, bar and panels without jumps or flicker, measured in the UI audit (E1).
+- [ ] **16.6** Subtitles in the player: a live style editor kept per profile; find and download from OpenSubtitles in playback; sync in 0.1 s steps with 'align again'; load a file from disk; all by pad (E2).
+- [ ] **16.7** A first run that leaves the viewer ready to watch: library folders (scan starts at once), add-ons by address with a live check (the app suggests none, §2.1), TMDB and OpenSubtitles keys with links and live tests, the download backend with the VPN check; honest no-source states wherever play or download would be (E7).
+- [ ] **16.8** SETUP.md: every prerequisite with its official link and how to add it to the app, and how to add any add-on by its address; names no content source; passes the guard (E8).
+- [ ] **16.9** Polish: Settings section headings clear and larger in the display face; the taste screen (films as cards, clearer hierarchy, live Home preview, fewer words); first run and Home audited for layout, clipping, focus jumps and content flashes at three window sizes, with automated checks added to the UI audit.
+- [ ] **16.10** The author batch: sign-off on a screenshot set (player, first run, Home, Settings, taste screen; Phase 14 E4/E6 with it), a download and a stream with a source of their choosing (Phase 7 E7's VPN cut with it); docs/specs, learning note, README and HOW_IT_WORKS, regression, close (E9).
 
 ### Exit criteria
 
-- [ ] **E1** Recall@20 beats a popularity baseline by > 40% relative on a held-out split — i.e. `(recall_model / recall_baseline) - 1 > 0.40`, not 40 percentage points.
-- [ ] **E2** Catalogue coverage > 15% — the recommender does not only ever surface the same 2,000 films.
-- [ ] **E3** Intra-list diversity meets the documented target; no rail is dominated by one director, franchise, or year.
-- [ ] **E4** Every recommendation has a truthful explanation.
-- [ ] **E5** Ranking 1,000 candidates completes in < 150 ms on Tier 0.
-- [ ] **E6** Case study written with real numbers.
+- [ ] **E1** The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.
+- [ ] **E2** Subtitles: the style editor applies live and persists per profile; find and download, sync in 0.1 s steps, and load from disk each work in the player, by pad.
+- [ ] **E3** The controller works in the player as specified, and the right stick scrolls pages, rails, panels and the paused details, each covered by the pad-flow audit.
+- [ ] **E4** A TV-layout corpus (season folders, flat, anime absolute, split across drives, including a real-world case like the author's) is identified with at least 98% of episodes right and no episode filed as a film.
+- [ ] **E5** The catalogue refreshes daily in the background: titles and episodes released since the last refresh appear without the user doing anything, and a run on the real data adds the recent releases it lacked.
+- [ ] **E6** Home's rails are in the specified order, and a finished library scan appears on Home within 2 s.
+- [ ] **E7** A first run done only by pad leaves library folders, an add-on the user chose, keys and a download backend configured and tested; with no source, the app says so wherever play or download would be.
+- [ ] **E8** `SETUP.md` lists every prerequisite with its official link and how to add it, and passes the posture guard.
+- [ ] **E9** The author signs off a screenshot set of the player, first run, Home, Settings and the taste screen, and confirms a download and a stream work with a source of their choosing.
 
 ---
 
 ## What's next
 
-Phase 16 subtask 16.1 (docs/phases/phase-16-recommendation-engine.md): create crates/recommend with item-item CF built from the local MovieLens ratings in data/datasets/ml-25m.zip (as tools/eval/src/taste.rs reads them): positive pairs (4 stars and up) per user, co-occurrence normalised against popularity with the normaliser chosen on a tuning split, top 50 neighbours per title stored by a migration 0027 table item_neighbours (crates/persistence, surface lines), built from tools/ingest; cold start falls back to content neighbours.
+Phase 16 subtask 16.1 (docs/phases/phase-16-ready-to-watch.md): in crates/library, make the scanner read TV layouts from their folders. First reproduce the author's case: build a fixture tree 'Twin Peaks (1990)/Season 1/Twin Peaks - S01E01 - Pilot.mkv' (empty files are enough for naming) and see how identify places it today; then derive the show from the nearest ancestor folder that is not a 'Season N'/'Specials' folder, the season from the folder, the episode from the file, and file every such item as an episode of one series. Add the corpus to fixtures/ and eval identify.
 
 ---
 
 ## Blockers
 
-None.
+- **B14** CI red on run 42446407507 (c7349e8): crates/torrent/tests/swarm.rs a_download_survives_a_restart lost progress across a restart (D83, second time). Engine::stop now waits for the librqbit session to end; clear this when the next CI run is green.
 
 ---
 
-## All 28 phases
+## All 29 phases
 
 Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is the definition of done** — complete it and the project has succeeded.
 
@@ -69,18 +77,19 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 8/8 |
 | [x] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 3/6 |
 | [x] | 15 | Taste Model | B | 5, 14 | 2 | 4/5 |
-| [~] | 16 | Recommendation Engine | B | 15 | 2–3 | 0/6 |
-| [ ] | 17 | Discovery Engine | B | 16 | 2 | 0/6 |
-| [ ] | 18 | Browsing Surfaces 🏁 | B | 17 | 4–5 | 0/13 |
-| [ ] | 19 | Watchlist and External Sync | C | 18 | 1–2 | 0/5 |
-| [ ] | 20 | Windows Platform Integration | C | 12, 18 | 2–3 | 0/5 |
-| [ ] | 21 | Performance Engineering and the Low-End Path | B | 18 (20 optional) | 2 | 0/5 |
-| [ ] | 22 | Vision Layer (Tier 2) | D | 11 | 1–2 | 0/5 |
-| [ ] | 23 | Binge Intelligence | C | 11, 12 | 1–2 | 0/4 |
-| [ ] | 24 | Live Channels | D | 18 | 2 | 0/5 |
-| [ ] | 25 | Manga and Comics | D | 3, 5, 16 | 2–3 | 0/8 |
-| [ ] | 26 | Connected Playback | D | 11 | 2 | 0/5 |
-| [ ] | 27 | Hardening, Packaging, and Portfolio Finalisation | B | everything | 2–3 | 0/6 |
+| [~] | 16 | Ready to Watch | B | 15 | 3–4 | 0/9 |
+| [ ] | 17 | Recommendation Engine | B | 15, 16 | 2–3 | 0/6 |
+| [ ] | 18 | Discovery Engine 🏁 | B | 17 | 2 | 0/6 |
+| [ ] | 19 | Browsing Surfaces | B | 18 | 4–5 | 0/13 |
+| [ ] | 20 | Watchlist and External Sync | C | 19 | 1–2 | 0/5 |
+| [ ] | 21 | Windows Platform Integration | C | 12, 19 | 2–3 | 0/5 |
+| [ ] | 22 | Performance Engineering and the Low-End Path | B | 19 (21 optional) | 2 | 0/5 |
+| [ ] | 23 | Vision Layer (Tier 2) | D | 11 | 1–2 | 0/5 |
+| [ ] | 24 | Binge Intelligence | C | 11, 12 | 1–2 | 0/4 |
+| [ ] | 25 | Live Channels | D | 19 | 2 | 0/5 |
+| [ ] | 26 | Manga and Comics | D | 3, 5, 17 | 2–3 | 0/8 |
+| [ ] | 27 | Connected Playback | D | 11 | 2 | 0/5 |
+| [ ] | 28 | Hardening, Packaging, and Portfolio Finalisation | B | everything | 2–3 | 0/6 |
 
 Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting review · `[ ]` not started. 🏁 marks Phase 8 (first demoable build) and Phase 18 (complete product).
 
@@ -170,7 +179,7 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D80** (raised in Phase 13) Upstream (librqbit 9.0.1): create_torrent writes one piece hash too many when the content is a whole number of pieces (500 bytes of hashes for 24 pieces of 256 KiB); libtorrent refuses such a torrent as invalid (stays fetching metadata, then errors; a .torrent of it is never added). The app never creates torrents, so only test fixtures are affected; crates/downloads/tests/qbittorrent_real.rs uses a size that is not a whole number. Worth reporting upstream (the author's call: an outward-facing issue).
 - **D81** (raised in Phase 14) Kids profiles filter by genre (MovieLens 'Children' or IMDb 'Family', not adult, none of Adult/Horror/Thriller/Crime/War/Film-Noir) because the free catalogue has no certifications. The kids_limit column waits for TMDB release-date certifications, which are not fetched yet; until then a profile's limit is not a certification. Home rails (Phases 16-18) must ask MediaRepository::suitable_for_children like search does.
 - **D82** (raised in Phase 14) The first profile switch after launch costs about 112 ms (index and catalogue pages read from disk) against 11 ms warm. Touch the vector index and the votes index in the background after launch so the first switch, and the first Home, are warm.
-- **D83** (raised in Phase 14) crates/torrent/tests/swarm.rs a_download_survives_a_restart failed once in CI (run 42396646470, 2026-11-07, at ec78b82): 10,223,616 bytes before the stop, 0 after wait_ready on the restarted engine. Passes 5/5 locally and in every earlier CI run; code unchanged since Phase 13. Rerun. If it recurs: check that Engine::stop lets librqbit flush its writes and persistence before the session ends (a slow runner may lose the race).
+- **D83** (raised in Phase 14) crates/torrent/tests/swarm.rs a_download_survives_a_restart failed once in CI (run 42396646470, 2026-11-07, at ec78b82): 10,223,616 bytes before the stop, 0 after wait_ready on the restarted engine. Passes 5/5 locally and in every earlier CI run; code unchanged since Phase 13. Rerun. If it recurs: check that Engine::stop lets librqbit flush its writes and persistence before the session ends (a slow runner may lose the race). RECURRED 2026-11-08 (run 42446407507, at c7349e8, same numbers). Cause found in librqbit 9.0.1: Session::stop pauses and sleeps a fixed second; the torrents' files and their finished-piece record (.bitv, written every 16 MiB and on drop, from background tasks) are released only when the session's last reference goes. Engine::stop now waits (up to 5 s) until the session is gone and every .bitv has been rewritten; the test also checks the record is on disk when stop returns and prints the restarted torrent's state on failure. Not reproduced locally (passes 5/5 before and after); watch CI.
 - **D84** (raised in Phase 15) The offline catalogue has no countries or original languages (IMDb's free datasets do not carry them; the columns are empty), so the taste model cannot learn country or language preferences, or subtitle tolerance, from behaviour; the statements stand in. Fill them from TMDB for profiles with a key (and Wikidata, which is keyless) and add the axes in crates/taste/src/axes.rs.
 
 ---
