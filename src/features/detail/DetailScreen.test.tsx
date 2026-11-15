@@ -36,13 +36,15 @@ const commands = {
   preparePlay: vi.fn(() => new Promise((r) => (resolvePlan = r))),
   downloadAdvice: vi.fn(() => ok(null)),
   seriesDetail: vi.fn(() =>
-    ok({ seasons: [{ number: 0, episodes: 1 }, { number: 1, episodes: 2 }, { number: 2, episodes: 1 }], next_airing: { episode: 7, airs_at: 4102444800 } }),
+    ok({ seasons: [{ number: 0, episodes: 1 }, { number: 1, episodes: 2 }, { number: 2, episodes: 1 }], next_airing: { episode: 7, airs_at: 4102444800 }, watched: 1 }),
   ),
+  titleWatched: vi.fn(() => ok(false)),
+  setWatched: vi.fn((_scope: unknown, _watched: boolean) => ok(1)),
   seasonEpisodes: vi.fn((_id: number, season: number | null) =>
     ok(
       season === 1
-        ? [{ id: 71, season: 1, episode: 1, title: "Pilot", air_date: "1990-04-08" }, { id: 72, season: 1, episode: 2, title: "Traces to Nowhere", air_date: null }]
-        : [{ id: 81, season: 2, episode: 1, title: "May the Giant Be with You", air_date: null }],
+        ? [{ id: 71, season: 1, episode: 1, title: "Pilot", air_date: "1990-04-08", watched: true }, { id: 72, season: 1, episode: 2, title: "Traces to Nowhere", air_date: null, watched: false }]
+        : [{ id: 81, season: 2, episode: 1, title: "May the Giant Be with You", air_date: null, watched: false }],
     ),
   ),
 };
@@ -200,5 +202,38 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
     expect(await screen.findByText("May the Giant Be with You")).toBeInTheDocument();
     fireEvent.click(screen.getByText("May the Giant Be with You"));
     expect(useUi.getState().detail).toBe(81);
+  });
+
+  it("marks a film watched, and Resume no longer offers a place that is gone (Appendix F, I21)", async () => {
+    renderIt();
+    await screen.findByText("Sunrise");
+    resolvePlan({ status: "ok", data: { title: "Sunrise", open: "https://films.example/s.mp4", start: 1200, from: "Internet Archive", offered: 3, ...NO_OFFERS } });
+    await screen.findByRole("button", { name: "Resume from 20:00" });
+    fireEvent.click(await screen.findByRole("button", { name: "Mark as watched" }));
+    await waitFor(() => expect(commands.setWatched).toHaveBeenCalledWith({ kind: "title", id: 7 }, true));
+    expect(await screen.findByRole("button", { name: "Play" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start over" })).not.toBeInTheDocument();
+  });
+
+  it("a film already watched offers the way back", async () => {
+    commands.titleWatched.mockImplementationOnce(() => ok(true));
+    renderIt();
+    await screen.findByText("Sunrise");
+    fireEvent.click(await screen.findByRole("button", { name: "Watched · mark as not watched" }));
+    await waitFor(() => expect(commands.setWatched).toHaveBeenCalledWith({ kind: "title", id: 7 }, false));
+  });
+
+  it("a series says how much is seen, ticks watched episodes, and marks a season or the show", async () => {
+    commands.itemDetail.mockImplementationOnce(() => ok({ ...DETAIL, title: "Twin Peaks", kind: "series" }));
+    renderIt();
+    const pilot = (await screen.findByText("Pilot")).closest("button")!;
+    expect(within(pilot).getByText("Watched")).toBeInTheDocument();
+    expect(within(screen.getByText("Traces to Nowhere").closest("button")!).queryByText("Watched")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Watched")).toHaveTextContent("Seen 1 of 4");
+    // One of season 1's two is seen, so the season is offered as watched, not as unwatched.
+    fireEvent.click(screen.getByRole("button", { name: "Mark this season as watched" }));
+    await waitFor(() => expect(commands.setWatched).toHaveBeenCalledWith({ kind: "season", series: 7, season: 1 }, true));
+    fireEvent.click(screen.getByRole("button", { name: "Mark the whole show as watched" }));
+    await waitFor(() => expect(commands.setWatched).toHaveBeenCalledWith({ kind: "series", id: 7 }, true));
   });
 });

@@ -57,6 +57,17 @@ pub struct PlaybackPosition {
     pub subtitle_language: Option<String>,
 }
 
+/// What a mark as watched covers (Appendix F, I21).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WatchScope {
+    /// One film or one episode.
+    Title(i64),
+    /// One season of a series; `None` is its episodes without a season number.
+    Season { series: i64, season: Option<i64> },
+    /// Every episode of a series.
+    Series(i64),
+}
+
 pub struct ProfileRepository<'a> {
     db: &'a Db,
 }
@@ -498,6 +509,105 @@ impl<'a> ProfileRepository<'a> {
         .bind(profile_id)
         .bind(media_item_id)
         .fetch_one(self.db.pool())
+        .await?)
+    }
+
+    /// Mark what `scope` covers as watched or not, by hand (Appendix F, I21). Returns how
+    /// many titles changed.
+    ///
+    /// - **Watched** records one completed viewing of each title not already finished, the
+    ///   length of its running time, exactly as an imported "watched" does, and drops the
+    ///   resume position so it leaves Continue watching.
+    /// - **Unwatched** removes every viewing and the resume position: as if never played.
+    ///   A rating is not a viewing and stays.
+    pub async fn set_watched(
+        &self,
+        profile_id: i64,
+        scope: WatchScope,
+        watched: bool,
+    ) -> Result<u64, DbError> {
+        // The titles a scope covers, as a subquery over ?2 (a title or a series) and ?3 (a
+        // season number; NULL is the episodes without one).
+        let ids = match scope {
+            WatchScope::Title(_) => "SELECT ?2 AS id WHERE ?3 IS NULL",
+            WatchScope::Season { .. } => {
+                "SELECT media_item_id AS id FROM episodes WHERE series_id = ?2 AND season_number IS ?3"
+            }
+            WatchScope::Series(_) => {
+                "SELECT media_item_id AS id FROM episodes WHERE series_id = ?2 AND ?3 IS NULL"
+            }
+        };
+        let (target, season) = match scope {
+            WatchScope::Title(id) | WatchScope::Series(id) => (id, None),
+            WatchScope::Season { series, season } => (series, season),
+        };
+        let mut tx = self.db.pool().begin().await?;
+        let changed = if watched {
+            sqlx::query(&format!(
+                "INSERT INTO watch_events (profile_id, media_item_id, watched_seconds, completed, ended_at)
+                 SELECT ?1, t.id, COALESCE(m.runtime_minutes, 0) * 60, 1, datetime('now')
+                 FROM ({ids}) t JOIN media_items m ON m.id = t.id
+                 WHERE NOT EXISTS (SELECT 1 FROM watch_events w
+                                   WHERE w.profile_id = ?1 AND w.media_item_id = t.id AND w.completed = 1)"
+            ))
+            .bind(profile_id)
+            .bind(target)
+            .bind(season)
+            .execute(&mut *tx)
+            .await?
+            .rows_affected()
+        } else {
+            sqlx::query(&format!(
+                "DELETE FROM watch_events WHERE profile_id = ?1 AND media_item_id IN ({ids})"
+            ))
+            .bind(profile_id)
+            .bind(target)
+            .bind(season)
+            .execute(&mut *tx)
+            .await?
+            .rows_affected()
+        };
+        let positions = sqlx::query(&format!(
+            "DELETE FROM playback_positions WHERE profile_id = ?1 AND media_item_id IN ({ids})"
+        ))
+        .bind(profile_id)
+        .bind(target)
+        .bind(season)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+        tx.commit().await?;
+        // Unwatching a title that was only ever part-played still changed something.
+        Ok(if watched {
+            changed
+        } else {
+            changed.max(positions)
+        })
+    }
+
+    /// Which of a season's episodes this profile has seen through, by the same rule as
+    /// [`Self::finished`] (Appendix F, I21: the ticks on a series' page).
+    pub async fn finished_in_season(
+        &self,
+        profile_id: i64,
+        series_id: i64,
+        season: Option<i64>,
+    ) -> Result<Vec<i64>, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT e.media_item_id FROM episodes e
+             WHERE e.series_id = ?2 AND e.season_number IS ?3
+               AND (EXISTS (SELECT 1 FROM watch_events w
+                            WHERE w.profile_id = ?1 AND w.media_item_id = e.media_item_id AND w.completed = 1)
+                    OR EXISTS (SELECT 1 FROM playback_positions p
+                               WHERE p.profile_id = ?1 AND p.media_item_id = e.media_item_id
+                                 AND p.duration_seconds IS NOT NULL
+                                 AND p.position_seconds >= (p.duration_seconds * 95 / 100)))
+             ORDER BY e.media_item_id",
+        )
+        .bind(profile_id)
+        .bind(series_id)
+        .bind(season)
+        .fetch_all(self.db.pool())
         .await?)
     }
 

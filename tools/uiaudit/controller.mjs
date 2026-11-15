@@ -60,6 +60,9 @@ const FAKE = `(() => {
     search: (a) => searchResponse(a.query),
     search_backfill: () => ({ found: 0, added: [] }),
     optional_assets: () => ({ missing: [], total_bytes: 0 }),
+    // Appendix F, I21: marked by hand, and remembered for the rest of the flow.
+    title_watched: () => window.__watched === true,
+    set_watched: (a) => { window.__watched = a.watched; return 1; },
     item_detail: () => ({ id: 7, title: "Sunrise", year: 1927, kind: "film", runtime_minutes: 94,
       synopsis: "A married farmer falls under the spell of a woman from the city.",
       credits: [{ name: "F. W. Murnau", role: "director", character: null }] }),
@@ -612,6 +615,16 @@ try {
   await waitFor(() => evalJs(`document.body.textContent.includes("so download it first")`), "the advisor's sentence", 25);
   await press(B.DOWN);
   check((await active())?.text.startsWith("Download"), `D-pad down from Play reaches Download (${(await active())?.text})`);
+  // Appendix F, I21: below Download, the film is marked watched by hand, and back.
+  await press(B.DOWN);
+  check((await active())?.text === "Mark as watched", `D-pad down from Download reaches "Mark as watched" (${(await active())?.text})`);
+  await press(B.A);
+  await waitFor(async () => (await active())?.text === "Watched · mark as not watched", "the mark to show", 25);
+  const marked = (await calls("set_watched")).at(-1);
+  check(marked.watched === true && marked.scope.kind === "title" && marked.scope.id === 7, "A marks the film watched, and the button says so");
+  await press(B.A);
+  await waitFor(async () => (await active())?.text === "Mark as watched", "the mark to clear", 25);
+  check((await calls("set_watched")).at(-1).watched === false, "A again marks it as not watched");
   await press(B.DOWN);
   await waitFor(async () => (await active())?.text === "Auto", "the Audio row", 25);
   await press(B.RIGHT);

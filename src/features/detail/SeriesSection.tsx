@@ -4,6 +4,7 @@ import { commands } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
 import { airsLine } from "./airing";
 import { ChoiceRow } from "./ChoiceRow";
+import { SeriesMarks } from "./Watched";
 
 /**
  * A series' seasons and episodes — SPEC.md Phase 11.
@@ -54,6 +55,16 @@ export function SeriesSection({ id }: { id: number }) {
           />
         </div>
       )}
+      {series.data && (
+        <SeriesMarks
+          series={id}
+          season={chosen}
+          seasonSeen={(episodes.data ?? []).filter((e) => e.watched).length}
+          seasonTotal={episodes.data?.length ?? 0}
+          showSeen={series.data.watched}
+          showTotal={seasons.reduce((n, s) => n + s.episodes, 0)}
+        />
+      )}
       {seasons.length === 0 && !series.isPending && (
         <p className="text-sm text-ink-muted">The catalogue lists no episodes for this series yet.</p>
       )}
@@ -66,7 +77,8 @@ export function SeriesSection({ id }: { id: number }) {
               className="flex w-full items-baseline gap-5 border-t border-line-subtle py-3 text-left hover:bg-raised"
             >
               <span className="w-8 shrink-0 text-right tabular-nums text-ink-faint">{e.episode ?? "·"}</span>
-              <span className="flex-1 text-[15px] text-ink">{e.title}</span>
+              <span className={`flex-1 text-[15px] ${e.watched ? "text-ink-muted" : "text-ink"}`}>{e.title}</span>
+              {e.watched && <span className="label text-ink-faint">Watched</span>}
               {e.air_date && <span className="label text-ink-faint">{e.air_date}</span>}
             </button>
           </li>

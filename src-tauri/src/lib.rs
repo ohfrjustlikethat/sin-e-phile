@@ -92,6 +92,8 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::subtitles::subtitle_realign,
             commands::series::series_detail,
             commands::series::season_episodes,
+            commands::series::set_watched,
+            commands::series::title_watched,
             commands::series::episode_neighbours,
             commands::overlay::pause_details,
             commands::overlay::filmography,

@@ -9,6 +9,7 @@ import { ChoiceRow, type Choice } from "./ChoiceRow";
 import { SourcePanel } from "./SourcePanel";
 import { DownloadAdvice } from "./DownloadAdvice";
 import { SeriesSection } from "./SeriesSection";
+import { WatchedToggle } from "./Watched";
 
 /**
  * The minimal detail page — SPEC.md Phase 8: title, synopsis, cast, and a Play button
@@ -208,6 +209,15 @@ export function DetailScreen() {
         </p>
       )}
       {plan.phase === "ready" && <DownloadAdvice id={d.id} plan={plan.plan.open} />}
+      <div className="mt-4 flex">
+        {/* Marked either way, the place it was left at is gone: "Resume from" would lie. */}
+        <WatchedToggle
+          id={d.id}
+          onChange={() =>
+            setPlan((p) => (p.phase === "ready" ? { phase: "ready", plan: { ...p.plan, start: null } } : p))
+          }
+        />
+      </div>
 
       {offers && (offers.languages.length > 0 || audio || offers.qualities.length > 1 || quality) && (
         <div className="mt-8 flex flex-col gap-3">

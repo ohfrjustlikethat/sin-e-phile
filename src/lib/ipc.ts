@@ -203,6 +203,13 @@ export const commands = {
 	subtitleRealign: () => typedError<string, string>(__TAURI_INVOKE("subtitle_realign")),
 	seriesDetail: (id: number) => typedError<SeriesView, string>(__TAURI_INVOKE("series_detail", { id })),
 	seasonEpisodes: (id: number, season: number | null) => typedError<EpisodeView[], string>(__TAURI_INVOKE("season_episodes", { id, season })),
+	/**
+	 *  Mark a film, an episode, a season or a whole show as watched, or as not. Returns how
+	 *  many titles changed. **Thin**: the rule is `ProfileRepository::set_watched`'s.
+	 */
+	setWatched: (scope: WatchedScope, watched: boolean) => typedError<number, string>(__TAURI_INVOKE("set_watched", { scope, watched })),
+	/**  Whether this profile has seen a film or an episode through. */
+	titleWatched: (id: number) => typedError<boolean, string>(__TAURI_INVOKE("title_watched", { id })),
 	episodeNeighbours: (id: number) => typedError<Neighbours, string>(__TAURI_INVOKE("episode_neighbours", { id })),
 	pauseDetails: (id: number) => typedError<PauseDetails, string>(__TAURI_INVOKE("pause_details", { id })),
 	/**  A cast or crew member's other work, from the overlay. */
@@ -559,6 +566,8 @@ export type EpisodeView = {
 	episode: number | null,
 	title: string,
 	air_date: string | null,
+	/**  Seen through by this profile. Only a season's list fills it in. */
+	watched: boolean,
 };
 
 /**
@@ -852,6 +861,8 @@ export type SeasonView = {
 export type SeriesView = {
 	seasons: SeasonView[],
 	next_airing: AiringView | null,
+	/**  How many of its episodes this profile has seen through (Appendix F, I21). */
+	watched: number,
 };
 
 export type SheetsView = {
@@ -1061,6 +1072,11 @@ export type UnmatchedView = {
 	year: number | null,
 	why: string,
 };
+
+/**  What a mark as watched covers, from the page that asked (Appendix F, I21). */
+export type WatchedScope = 
+/**  A film or one episode. */
+{ kind: "title"; id: number } | { kind: "season"; series: number; season: number | null } | { kind: "series"; id: number };
 
 /**
  *  The engine's [`MatchReason`], in the words a person would use.

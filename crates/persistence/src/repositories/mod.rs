@@ -29,7 +29,7 @@ pub use library::{
     NewLocalFile, Probe, Upserted,
 };
 pub use media::{Appearance, Credit, MediaRepository};
-pub use profiles::{NewProfile, Profile, ProfileRepository, Viewing};
+pub use profiles::{NewProfile, Profile, ProfileRepository, Viewing, WatchScope};
 pub use search::{Hit, HitDetail, MatchReason, SearchRepository};
 pub use sources::{
     AddonRow, BackendRow, DirectLinkRepository, DirectLinkRow, Sample, SourceRepository,

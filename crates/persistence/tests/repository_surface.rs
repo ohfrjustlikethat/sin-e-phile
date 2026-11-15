@@ -406,6 +406,98 @@ async fn episode_repository_surface() {
             .len(),
         1
     );
+
+    // set_watched / finished_in_season (Appendix F, I21): a season, a series, a title.
+    use sinephile_persistence::repositories::WatchScope;
+    let profiles = ProfileRepository::new(&db);
+    let season_one = WatchScope::Season {
+        series,
+        season: Some(1),
+    };
+    assert!(profiles
+        .finished_in_season(viewer, series, Some(1))
+        .await
+        .expect("finished_in_season")
+        .is_empty());
+    assert_eq!(
+        profiles
+            .set_watched(viewer, season_one, true)
+            .await
+            .expect("set_watched (a season)"),
+        2,
+        "season 1's two episodes, not season 2's"
+    );
+    assert_eq!(
+        profiles
+            .finished_in_season(viewer, series, Some(1))
+            .await
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(profiles
+        .finished_in_season(viewer, series, Some(2))
+        .await
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        profiles
+            .set_watched(viewer, season_one, true)
+            .await
+            .unwrap(),
+        0,
+        "marking again records no second viewing"
+    );
+    assert_eq!(
+        profiles
+            .set_watched(viewer, WatchScope::Series(series), true)
+            .await
+            .expect("set_watched (a series)"),
+        1,
+        "only the episode not yet watched"
+    );
+    assert!(profiles.finished(viewer, s2e1).await.unwrap());
+    // Unwatched: the viewing goes, and so does the place it was left at.
+    let part_way = PlaybackPosition {
+        media_item_id: s2e1,
+        position_seconds: 10,
+        duration_seconds: Some(100),
+        audio_language: None,
+        subtitle_language: None,
+    };
+    profiles.save_position(viewer, &part_way).await.unwrap();
+    assert_eq!(
+        profiles
+            .set_watched(viewer, WatchScope::Title(s2e1), false)
+            .await
+            .expect("set_watched (a title, unwatched)"),
+        1
+    );
+    assert!(!profiles.finished(viewer, s2e1).await.unwrap());
+    assert!(profiles.position(viewer, s2e1).await.unwrap().is_none());
+    // Watched: a part-played title leaves Continue watching.
+    profiles.save_position(viewer, &part_way).await.unwrap();
+    assert_eq!(
+        profiles
+            .set_watched(viewer, WatchScope::Title(s2e1), true)
+            .await
+            .unwrap(),
+        1
+    );
+    assert!(profiles
+        .continue_watching(viewer, 10)
+        .await
+        .unwrap()
+        .iter()
+        .all(|p| p.media_item_id != s2e1));
+    assert_eq!(
+        profiles
+            .set_watched(viewer, WatchScope::Series(series), false)
+            .await
+            .unwrap(),
+        3,
+        "unwatching the series clears all three episodes"
+    );
 }
 
 /// Exercise every public method on `ProfileRepository`.

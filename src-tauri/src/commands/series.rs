@@ -10,7 +10,9 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use sinephile_metadata_api::{AniList, Transport};
-use sinephile_persistence::repositories::{EpisodeRepository, EpisodeRow, MediaRepository};
+use sinephile_persistence::repositories::{
+    EpisodeRepository, EpisodeRow, MediaRepository, ProfileRepository, WatchScope,
+};
 
 use crate::state::AppState;
 
@@ -33,6 +35,8 @@ pub struct AiringView {
 pub struct SeriesView {
     pub seasons: Vec<SeasonView>,
     pub next_airing: Option<AiringView>,
+    /// How many of its episodes this profile has seen through (Appendix F, I21).
+    pub watched: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -42,6 +46,8 @@ pub struct EpisodeView {
     pub episode: Option<i32>,
     pub title: String,
     pub air_date: Option<String>,
+    /// Seen through by this profile. Only a season's list fills it in.
+    pub watched: bool,
 }
 
 impl From<EpisodeRow> for EpisodeView {
@@ -52,6 +58,7 @@ impl From<EpisodeRow> for EpisodeView {
             episode: e.episode_number.map(|n| n as i32),
             title: e.title,
             air_date: e.air_date,
+            watched: false,
         }
     }
 }
@@ -102,11 +109,23 @@ pub async fn series_detail(state: State<'_, AppState>, id: i32) -> Result<Series
         });
     }
 
+    let seasons = episodes.seasons(series).await.map_err(err)?;
+    // Seen so far, season by season: a series has a handful of seasons.
+    let mut watched = 0;
+    if let Ok(profile) = state.profile().await {
+        let profiles = ProfileRepository::new(&db);
+        for (number, _) in &seasons {
+            watched += profiles
+                .finished_in_season(profile, series, *number)
+                .await
+                .map_err(err)?
+                .len();
+        }
+    }
+
     Ok(SeriesView {
-        seasons: episodes
-            .seasons(series)
-            .await
-            .map_err(err)?
+        watched: watched as i32,
+        seasons: seasons
             .into_iter()
             .map(|(n, count)| SeasonView {
                 number: n.map(|n| n as i32),
@@ -132,13 +151,81 @@ pub async fn season_episodes(
     season: Option<i32>,
 ) -> Result<Vec<EpisodeView>, String> {
     let db = state.db().ok_or("the library is still opening")?;
+    let profile = state.profile().await?;
+    let seen = ProfileRepository::new(&db)
+        .finished_in_season(profile, i64::from(id), season.map(i64::from))
+        .await
+        .map_err(err)?;
     Ok(EpisodeRepository::new(&db)
         .episodes_of(i64::from(id), season.map(i64::from))
         .await
         .map_err(err)?
         .into_iter()
-        .map(EpisodeView::from)
+        .map(|e| {
+            let watched = seen.contains(&e.media_item_id);
+            EpisodeView {
+                watched,
+                ..EpisodeView::from(e)
+            }
+        })
         .collect())
+}
+
+/// What a mark as watched covers, from the page that asked (Appendix F, I21).
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum WatchedScope {
+    /// A film or one episode.
+    Title {
+        id: i32,
+    },
+    Season {
+        series: i32,
+        season: Option<i32>,
+    },
+    Series {
+        id: i32,
+    },
+}
+
+/// Mark a film, an episode, a season or a whole show as watched, or as not. Returns how
+/// many titles changed. **Thin**: the rule is `ProfileRepository::set_watched`'s.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_watched(
+    state: State<'_, AppState>,
+    scope: WatchedScope,
+    watched: bool,
+) -> Result<i32, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let profile = state.profile().await?;
+    let scope = match scope {
+        WatchedScope::Title { id } => WatchScope::Title(i64::from(id)),
+        WatchedScope::Season { series, season } => WatchScope::Season {
+            series: i64::from(series),
+            season: season.map(i64::from),
+        },
+        WatchedScope::Series { id } => WatchScope::Series(i64::from(id)),
+    };
+    let changed = ProfileRepository::new(&db)
+        .set_watched(profile, scope, watched)
+        .await
+        .map_err(err)?;
+    // What was watched is what the taste model reads.
+    crate::commands::home::refresh_model(&state, profile);
+    Ok(changed as i32)
+}
+
+/// Whether this profile has seen a film or an episode through.
+#[tauri::command]
+#[specta::specta]
+pub async fn title_watched(state: State<'_, AppState>, id: i32) -> Result<bool, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let profile = state.profile().await?;
+    ProfileRepository::new(&db)
+        .finished(profile, i64::from(id))
+        .await
+        .map_err(err)
 }
 
 /// The episodes either side of this one, for the player (Phase 11).

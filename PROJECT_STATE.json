@@ -2559,14 +2559,7 @@
     }
   ],
   "next_action": "Phase 16 subtask 16.10 (docs/phases/phase-16-ready-to-watch.md): confirm CI is green on the 1.98.0 pin (gh run list --branch phase/16-ready-to-watch); if so clear B15. Then wait for the author batch sent 2026-11-16 and record each answer as evidence: the release build target/release/sin-e-phile.exe used by the author for sign-off on player, first run, Home, Settings and taste screen (Phase 14 E4/E6, Phase 16 E9); a download and a stream with a source of their choosing, with Phase 7 E7's VPN adapter cut mid-download; 'Load a file' in the player (E2); X sound menu and LB/RB episode on a real controller (E3); scan-to-Home time on a real folder (E6); a first run end to end by pad (E7); and the embeddings-v3 release-asset decision (legal posture, ADR-0044/ADR-0014). Then python tools/phasedoc/generate.py --log 16, retrospective in SESSION_LOG.md, and /closephase.",
-  "blockers": [
-    {
-      "id": "B15",
-      "raised": "2026-11-08T09:22:20Z",
-      "needs_user": false,
-      "description": "CI red since run 42464345446: the libmpv release download (github.com, shinchiro/mpv-winbuild-cmake 20261021) answers HTTP 504 Gateway Time-out, from CI and from the dev machine alike (2026-11-08 ~09:20-09:40 UTC), so the Rust tests and the fresh-clone job cannot fetch the player. Not our code. Done: fetch.py retries 5xx (15/30/45 s), and CI now caches the checksum-pinned DLL (actions/cache, verified by fetch.py) so a host outage cannot turn CI red once one run has fetched it. Clear when a run is green. 2026-11-16: the libmpv step now passes; CI's remaining red was Rust 1.100's build-dir layout breaking ort-sys's copy-dylibs (D86); toolchain pinned to 1.98.0."
-    }
-  ],
+  "blockers": [],
   "decisions_pending": [
     {
       "id": "P1",
