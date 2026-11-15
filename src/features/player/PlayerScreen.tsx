@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { useQuery } from "@tanstack/react-query";
 import { commands, type ChapterView, type PlayerStateView, type TrackView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
-import { clock, glide, keyIntent, nextSpeed, type Intent } from "./intents";
+import { chapterTarget, clock, glide, keyIntent, nextSpeed, type Intent } from "./intents";
 import { usePadMode } from "@/design-system/focus/FocusLayer";
 import { onPlayerIntent } from "./intentBus";
 import { PauseOverlay } from "./PauseOverlay";
@@ -471,7 +471,20 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
           break;
         case "episode": {
           const target = intent.next ? neighbours.data?.next : neighbours.data?.previous;
-          if (target) void goTo(target.id);
+          if (target) {
+            void goTo(target.id);
+            break;
+          }
+          // A film has no episode either side: the bumpers move by chapter (Phase 16).
+          const to = chapterTarget(chapters, s?.position ?? 0, intent.next);
+          if (to === null) {
+            setNudge(intent.next ? "No next chapter" : "No earlier chapter");
+            break;
+          }
+          if (paused) void resume();
+          act({ kind: "seek_to", seconds: to });
+          const title = chapters.find((c) => c.time === to)?.title;
+          setNudge(title ? `Chapter: ${title}` : `Chapter at ${clock(to)}`);
           break;
         }
         case "subtitle_delay":
@@ -501,7 +514,7 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
       return true;
     },
     [
-      act, audioDelayMs, fullscreen, goTo, leave, menu, mini, neighbours.data, next, panel, pause, paused,
+      act, audioDelayMs, chapters, fullscreen, goTo, leave, menu, mini, neighbours.data, next, panel, pause, paused,
       resume, setMini, showNextCard, state, togglePip, wake,
     ],
   );

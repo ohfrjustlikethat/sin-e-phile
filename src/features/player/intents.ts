@@ -202,3 +202,31 @@ export function glide(r: Reported, now: number): number {
   const p = r.position + ahead;
   return r.duration != null && r.duration > 0 ? Math.min(p, r.duration) : p;
 }
+
+/** Within this many seconds of a chapter's start, "previous" means the chapter before. */
+export const CHAPTER_BACK_S = 3;
+
+/**
+ * Where the bumpers go in a film (Phase 16: "LB/RB previous/next episode or chapter"), in
+ * seconds, or `null` when there is no chapter that way.
+ *
+ * Forward is the next chapter's start. Back is this chapter's start, unless playback is
+ * within `CHAPTER_BACK_S` of it, when it is the one before: what every player's "previous"
+ * does, so one press restarts the scene and two go back a scene.
+ */
+export function chapterTarget(
+  chapters: { time: number | null }[],
+  position: number,
+  next: boolean,
+): number | null {
+  const starts = chapters
+    .map((c) => c.time)
+    .filter((t): t is number => t !== null)
+    .sort((a, b) => a - b);
+  if (next) return starts.find((t) => t > position + 0.5) ?? null;
+  const here = starts.filter((t) => t <= position);
+  const current = here.at(-1);
+  if (current === undefined) return null;
+  if (position - current > CHAPTER_BACK_S) return current;
+  return here.at(-2) ?? null;
+}

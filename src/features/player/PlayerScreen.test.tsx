@@ -26,7 +26,7 @@ const commands = {
     }),
   ),
   filmography: vi.fn(() => ok([{ id: 11, title: "Faust", year: 1926, kind: "film", part: "Mephisto" }])),
-  playerChapters: vi.fn(() => ok([])),
+  playerChapters: vi.fn(() => ok([] as { time: number | null; title: string | null }[])),
   episodeNeighbours: vi.fn(() =>
     ok({ previous: null, next: null } as { previous: unknown; next: unknown }),
   ),
@@ -239,6 +239,27 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
       delete w.__TAURI_INTERNALS__;
     }
   }
+
+  it("in a film the bumpers move by chapter, and say where they went (Phase 16)", async () => {
+    commands.playerChapters.mockImplementation(() =>
+      ok([{ time: 0, title: "Opening" }, { time: 600, title: "The city" }, { time: 1500, title: null }]),
+    );
+    await inTauri(async () => {
+      render(<PlayerScreen />);
+      await waitFor(() => expect(events.on["player-state"]).toBeDefined());
+      act(() => events.on["player-state"]?.({ payload: { ...STATE, duration: 5640, position: 30 } }));
+      await waitFor(() => expect(commands.playerChapters).toHaveBeenCalled());
+      await waitFor(() => {
+        act(() => void sendPlayerIntent({ kind: "episode", next: true }));
+        expect(commands.playerAction).toHaveBeenCalledWith({ kind: "seek_to", seconds: 600 });
+      });
+      expect(await screen.findByText("Chapter: The city")).toBeInTheDocument();
+      // Thirty seconds in, back restarts the opening chapter.
+      act(() => void sendPlayerIntent({ kind: "episode", next: false }));
+      expect(commands.playerAction).toHaveBeenCalledWith({ kind: "seek_to", seconds: 0 });
+    });
+    commands.playerChapters.mockImplementation(() => ok([]));
+  });
 
   it("N plays the next episode (Phase 11)", async () => {
     commands.episodeNeighbours.mockImplementation(() => ok({ previous: null, next: NEXT }));

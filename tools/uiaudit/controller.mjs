@@ -61,6 +61,8 @@ const FAKE = `(() => {
     search_backfill: () => ({ found: 0, added: [] }),
     optional_assets: () => ({ missing: [], total_bytes: 0 }),
     // Appendix F, I21: marked by hand, and remembered for the rest of the flow.
+    // Phase 16 E3: a film with chapters, for the bumpers.
+    player_chapters: () => [{ time: 0, title: "Opening" }, { time: 600, title: "The city" }, { time: 1500, title: null }],
     // Appendix F, I39: the watchlist, saved from the film page and read by its own page.
     title_watchlisted: () => window.__saved === true,
     set_watchlisted: (a) => { window.__saved = a.on; return null; },
@@ -170,14 +172,18 @@ const FAKE = `(() => {
     name: "Monster - " + String(i + 1).padStart(2, "0") + " [DVD].mkv", folders: "Anime", minutes: 24, height: 480,
     read_title: "Monster", read_year: null, read_episode: "Episode " + (i + 1), same_name: 0,
     options: [monster(10, "anime_series", 24), monster(11, "series", 45)] }));
+  window.__on = {};
+  window.__cbs = {};
+  window.__emit = (event, payload) => (window.__on[event] ?? []).forEach((h) => window.__cbs[h]?.({ event, id: h, payload }));
   window.__TAURI_INTERNALS__ = {
     invoke: async (cmd, args) => {
       window.__calls.push([cmd, args ?? {}]);
-      if (cmd === "plugin:event|listen") return nextId++;
+      // An event's handler is kept, so the flow can send what the backend would (__emit).
+      if (cmd === "plugin:event|listen") { (window.__on[args.event] ??= []).push(args.handler); return nextId++; }
       const f = answers[cmd];
       return f ? f(args ?? {}) : null;
     },
-    transformCallback: () => nextId++,
+    transformCallback: (fn) => { const id = nextId++; window.__cbs[id] = fn; return id; },
     unregisterCallback: () => {},
     convertFileSrc: (s) => s,
     metadata: { currentWindow: { label: "main" }, currentWebview: { windowLabel: "main", label: "main" } },
@@ -693,6 +699,44 @@ try {
   const picked = await waitFor(async () => (await actions("subtitles"))[0], "a subtitles choice", 25);
   check(picked.action.id === null, "A picks the focused choice (Off)");
   check(await evalJs(`!document.querySelector('[role="menu"]')`), "and the menu closes");
+
+  // Phase 16 E3: X and the bumpers. The backend's report arrives as its event does: a film
+  // 30 s in, with two sound tracks and chapters.
+  await evalJs(`__emit("player-state", { position: 30, duration: 5640, paused: false, buffered_until: null, volume: 105,
+    muted: false, speed: 1, hwdec: null, ended: false, started: true, chapter: 0, dropped_frames: 0,
+    tracks: [{ id: 1, kind: "audio", lang: "en", title: "English", selected: true },
+             { id: 2, kind: "audio", lang: "de", title: "German", selected: false },
+             { id: 3, kind: "sub", lang: "en", title: "English", selected: false }] })`);
+  await press(B.X);
+  await waitFor(() => evalJs(`!!document.querySelector('[role="menu"][aria-label="Audio"]')`), "the sound menu", 25);
+  check((await active())?.text.startsWith("English"), `X opens the sound menu, focus on its first track (${(await active())?.text})`);
+  await press(B.DOWN);
+  await press(B.A);
+  const sound = await waitFor(async () => (await actions("audio"))[0], "a sound track chosen", 25);
+  check(sound.action.id === 2, "Down and A choose the second sound track (German)");
+  check(await evalJs(`!document.querySelector('[role="menu"]')`), "and the sound menu closes");
+  await press(B.RB);
+  const forward = await waitFor(async () => (await actions("seek_to")).at(-1), "a chapter jump", 25);
+  check(forward.action.seconds === 600, "RB in a film goes to the next chapter (10:00)");
+  check(
+    await evalJs(`[...document.querySelectorAll('[role="status"]')].some((e) => e.textContent.includes("Chapter: The city"))`),
+    "and says which chapter",
+  );
+  await press(B.LB);
+  await waitFor(async () => (await actions("seek_to")).length === 2, "a second chapter jump", 25);
+  check((await actions("seek_to")).at(-1).action.seconds === 0, "LB restarts the chapter it is in (0:00)");
+  // Left and right seek ten seconds; held, they repeat, which is the scrub.
+  const seeksBefore = (await actions("seek_by")).length;
+  await press(B.RIGHT);
+  const tap = (await actions("seek_by")).slice(seeksBefore);
+  check(tap.length === 1 && tap[0].action.seconds === 10, `Right seeks forward 10 s, once for one press (${tap.length})`);
+  await evalJs(`__padSet(${B.LEFT}, true)`);
+  await sleep(900);
+  await evalJs(`__padSet(${B.LEFT}, false)`);
+  await sleep(160);
+  const held = (await actions("seek_by")).slice(seeksBefore + 1);
+  check(held.length >= 3 && held.every((a) => a.action.seconds === -10),
+    `Left held for 0.9 s scrubs back: ${held.length} steps of 10 s`);
 
   // Phase 16 E1: every control in the full panel is reachable by pad. Walk it row by row —
   // right along a row until focus stops moving, then down — marking what focus lands on,
