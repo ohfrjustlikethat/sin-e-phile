@@ -2564,7 +2564,7 @@
       "id": "B15",
       "raised": "2026-11-08T09:22:20Z",
       "needs_user": false,
-      "description": "CI red since run 42464345446: the libmpv release download (github.com, shinchiro/mpv-winbuild-cmake 20261021) answers HTTP 504 Gateway Time-out, from CI and from the dev machine alike (2026-11-08 ~09:20-09:40 UTC), so the Rust tests and the fresh-clone job cannot fetch the player. Not our code. Done: fetch.py retries 5xx (15/30/45 s), and CI now caches the checksum-pinned DLL (actions/cache, verified by fetch.py) so a host outage cannot turn CI red once one run has fetched it. Clear when a run is green."
+      "description": "CI red since run 42464345446: the libmpv release download (github.com, shinchiro/mpv-winbuild-cmake 20261021) answers HTTP 504 Gateway Time-out, from CI and from the dev machine alike (2026-11-08 ~09:20-09:40 UTC), so the Rust tests and the fresh-clone job cannot fetch the player. Not our code. Done: fetch.py retries 5xx (15/30/45 s), and CI now caches the checksum-pinned DLL (actions/cache, verified by fetch.py) so a host outage cannot turn CI red once one run has fetched it. Clear when a run is green. 2026-11-16: the libmpv step now passes; CI's remaining red was Rust 1.100's build-dir layout breaking ort-sys's copy-dylibs (D86); toolchain pinned to 1.98.0."
     }
   ],
   "decisions_pending": [
@@ -3271,6 +3271,11 @@
       "id": "D85",
       "phase_raised": 16,
       "text": "A show IMDb splits where other sources do not: Twin Peaks' 2017 season is a separate IMDb series (tt-level), its 18 parts that series' season 1, so the author's files named S03E01..S03E18 under 'Twin Peaks (1990)' are placed on the 1990 series without an episode row. Mapping needs a source that publishes cross-numbering (TVDB/TMDB with a key); until then identification places the series and leaves the episode unresolved, which is honest."
+    },
+    {
+      "id": "D86",
+      "phase_raised": 16,
+      "text": "The Rust toolchain is pinned to 1.98.0 (rust-toolchain.toml) because Rust 1.100 changed cargo's build-dir layout and ort-sys 2.0.0-rc.13's copy-dylibs finds the target folder by counting up from OUT_DIR, so on 1.100 it copies ONNX Runtime's DLLs into target/debug/build and panics (CI run 43739589636). Before moving past 1.98: an ort release that handles the new layout, checked with a cold `cargo clippy --all-targets --all-features` (ORT_CACHE_DIR and CARGO_TARGET_DIR fresh)."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

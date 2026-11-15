@@ -2235,3 +2235,39 @@ received by Phase 16.
 
 **Spec amendments.** spec_version 4.0.0 (A35, ADR-0045): Phase 16 inserted; Phases 17–28 renumbered; tiers
 and gates moved; CLAUDE.md resynced; the state tools and schema now expect 29 phases.
+
+### Session 23 (2026-11-16) — Phase 16 resumed: B15, E1, the docs
+
+**Resumed** eight days after the last entry (under the 14-day cold-resume line). statecheck clean; the
+repository agreed with the state file except that five commits from 2026-11-08 had never been pushed.
+
+**Pushed after the full pre-push suite.** gitleaks flagged two `generic-api-key` hits in local commit
+112059e: a literal cache key (`libmpv-<hash prefix>`) in `ci.yml`, a false positive already replaced by
+`hashFiles(...)` in the next commit. Both were unpushed, so they were folded into one commit (a635fe1) and
+history never carried the literal; no allowlist entry, no ADR needed.
+
+**B15.** The libmpv host answers again and the cached-DLL step ran, but CI went red for a new reason:
+ort-sys's build script panicked on a cold build. My first explanation (a missing `target/debug/examples`
+on a cold cache) was wrong: making the folders changed nothing. The build-script log showed the cause:
+`OUT_DIR` was `target\debuguild\ort-sys/<hash>\out`. **Rust 1.100 (2026-11-09) changed cargo's
+build-dir layout**, CI's `@stable` picked it up, and ort-sys rc.13's `copy-dylibs` counts three levels up
+from `OUT_DIR` to find the target folder, so it landed in `target/debug/build` and failed on
+`build/examples`. The dev machine is on 1.98.0. Fix: `rust-toolchain.toml` pins 1.98.0 (rule 15), so CI
+and the dev machine build with the same compiler; the folder step was taken out again. Recorded as debt:
+moving past 1.98 needs ort-sys fixed or bumped first.
+
+**E1 met.** The pad-flow audit only proved "Find subtitles" was reachable in the player panel. A new step
+walks the whole panel by D-pad, row by row, and requires every enabled control: 34/34, seen to fail at
+20/34 with the Speed section made inert. The walk's first version looped because Right on a full-width row
+goes up-right — correct navigation, a wrong walk.
+
+**Docs.** `docs/specs/ready-to-watch.md` (player, pad map, right stick, subtitles in the player, Home order,
+first run, layout check); `docs/learning/phase-16-notes.md` with its five questions; README and
+HOW_IT_WORKS updated, including two references left stale by the renumbering (Phase 5's carried meaning
+criterion is Phase 17's, not 16's).
+
+**Regression (rule 13)**: identify 99.05% / 0.39%, tvlayouts 59/59, import E2 met, taste 40.63%, switch
+32.3 / 37.3 ms p95, modes 96.6%, update 131.9 ms — no regression (`docs/eval-results.md`).
+
+**Decisions taken.** Fold the unpushed commits rather than allowlist; pin the Rust toolchain to 1.98.0
+rather than drop `--all-features` or patch ort-sys. **Spec amendments:** none.
