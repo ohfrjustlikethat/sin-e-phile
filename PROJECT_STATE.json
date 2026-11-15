@@ -1,7 +1,7 @@
 {
   "spec_version": "4.0.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-11-08",
+  "last_updated": "2026-11-16",
   "sessions_completed": 21,
   "current_phase": {
     "number": 16,
@@ -77,8 +77,8 @@
       {
         "id": "E1",
         "text": "The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "node tools/uiaudit/controller.mjs (2026-11-16) 'the D-pad reaches every control in the player panel (34/34; missed: none)', seen to fail with the Speed section inert (20/34); 16.5's real-window measurement (docs/eval-results.md 'The player, measured in its real window'): intent to video-region change ~14 ms (under 100 ms); video window hidden until the first frame (430 ms), so no black flash on open; hidden 7 ms after Back on close; the menu cut out of the video ('2 -> 3 holes', seen to fail without data-cutout); the bar glides between reports (src/features/player/intents.ts glide, unit-tested). Spec: docs/specs/ready-to-watch.md."
       },
       {
         "id": "E2",
@@ -1871,8 +1871,8 @@
         {
           "id": "E1",
           "text": "The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "node tools/uiaudit/controller.mjs (2026-11-16) 'the D-pad reaches every control in the player panel (34/34; missed: none)', seen to fail with the Speed section inert (20/34); 16.5's real-window measurement (docs/eval-results.md 'The player, measured in its real window'): intent to video-region change ~14 ms (under 100 ms); video window hidden until the first frame (430 ms), so no black flash on open; hidden 7 ms after Back on close; the menu cut out of the video ('2 -> 3 holes', seen to fail without data-cutout); the bar glides between reports (src/features/player/intents.ts glide, unit-tested). Spec: docs/specs/ready-to-watch.md."
         },
         {
           "id": "E2",

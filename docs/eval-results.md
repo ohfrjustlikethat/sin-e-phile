@@ -2928,3 +2928,19 @@ fits and goes compact when it does not (a breakpoint could not, since TV mode zo
 media query sees), and Home's extra padding went. **After**: the real app at 1280×720, 1600×900 and
 1920×1080, two runs: no problems; the pad-flow audit in TV mode, every first-run step and Home at all three
 sizes: no problems.
+
+### E1: every control in the player panel, by pad (16.10, 2026-11-16)
+
+`node tools/uiaudit/controller.mjs`, new step "the D-pad reaches every control in the player panel": Menu opens
+the panel, then the walk goes row by row as a thumb would (Left to the row's start, Right along it, Down to the
+next), marking each control focus lands on, and compares with every enabled control in the panel: **34/34, none
+missed**. Seen to fail: the Speed section made `inert` gives 20/34 (Slower … Close missed); restored, 34/34.
+With 16.5's real-window numbers (input to the video region changed in ~14 ms; the video window hidden until the
+first frame, 430 ms after open; hidden 7 ms after Back) E1 is met. The first version of the walk pressed Right
+on full-width rows, where spatial navigation correctly goes up and to the right, and looped; the walk was wrong,
+not the navigation.
+
+**Regression, 2026-11-16** (`cargo run --release -p eval -- all`, `tvlayouts`, `import --from 600`, `taste`,
+`switch`, `modes`, `update`): identify **99.05% / 0.39%** (held out 100% / 0%); tvlayouts **59/59**, 0 as films,
+extras 105/105; import **E2 MET**, 0 new on re-import; taste **40.63%** against 35.64%; switch **32.3 / 37.3 ms**
+p95 (30.3 / 40.7 at 16.3: noise); modes purity **96.6%**; update slowest **131.9 ms**. No regression.

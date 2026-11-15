@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 4.0.0** · 21 session(s) completed · last updated 2026-11-08
+**Spec version 4.0.0** · 21 session(s) completed · last updated 2026-11-16
 
 ---
 
@@ -12,7 +12,7 @@
 
 **Phase 16 — Ready to Watch** (`in_progress`, branch `phase/16-ready-to-watch`)
 
-3 of 9 exit criteria met with evidence.
+4 of 9 exit criteria met with evidence.
 
 > Inserted by spec 4.0.0 (ADR-0045) after the author used the release build. Receives the author batch: Phase 8 E5, Phase 14 E1 and Phase 15 E3 discharged here from the author's answers of 2026-11-08; Phase 7 E7 and Phase 14 E4/E6 to be met here (16.10). Judge by using the release build as a person would, not only by fixtures.
 
@@ -31,7 +31,8 @@
 
 ### Exit criteria
 
-- [ ] **E1** The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.
+- [x] **E1** The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.
+      - *Evidence:* node tools/uiaudit/controller.mjs (2026-11-16) 'the D-pad reaches every control in the player panel (34/34; missed: none)', seen to fail with the Speed section inert (20/34); 16.5's real-window measurement (docs/eval-results.md 'The player, measured in its real window'): intent to video-region change ~14 ms (under 100 ms); video window hidden until the first frame (430 ms), so no black flash on open; hidden 7 ms after Back on close; the menu cut out of the video ('2 -> 3 holes', seen to fail without data-cutout); the bar glides between reports (src/features/player/intents.ts glide, unit-tested). Spec: docs/specs/ready-to-watch.md.
 - [ ] **E2** Subtitles: the style editor applies live and persists per profile; find and download, sync in 0.1 s steps, and load from disk each work in the player, by pad.
 - [ ] **E3** The controller works in the player as specified, and the right stick scrolls pages, rails, panels and the paused details, each covered by the pad-flow audit.
 - [x] **E4** A TV-layout corpus (season folders, flat, anime absolute, split across drives, including a real-world case like the author's) is identified with at least 98% of episodes right and no episode filed as a film.
@@ -80,7 +81,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 8/8 |
 | [x] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 3/6 |
 | [x] | 15 | Taste Model | B | 5, 14 | 2 | 4/5 |
-| [~] | 16 | Ready to Watch | B | 15 | 3–4 | 3/9 |
+| [~] | 16 | Ready to Watch | B | 15 | 3–4 | 4/9 |
 | [ ] | 17 | Recommendation Engine | B | 15, 16 | 2–3 | 0/6 |
 | [ ] | 18 | Discovery Engine 🏁 | B | 17 | 2 | 0/6 |
 | [ ] | 19 | Browsing Surfaces | B | 18 | 4–5 | 0/13 |

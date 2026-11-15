@@ -15,7 +15,7 @@ A person can install the app, set it up once, and watch anything they choose (fr
 
 ## Exit criteria
 
-- [ ] **E1** The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.
+- [x] **E1** The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.
 - [ ] **E2** Subtitles: the style editor applies live and persists per profile; find and download, sync in 0.1 s steps, and load from disk each work in the player, by pad.
 - [ ] **E3** The controller works in the player as specified, and the right stick scrolls pages, rails, panels and the paused details, each covered by the pad-flow audit.
 - [x] **E4** A TV-layout corpus (season folders, flat, anime absolute, split across drives, including a real-world case like the author's) is identified with at least 98% of episodes right and no episode filed as a film.

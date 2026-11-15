@@ -661,6 +661,38 @@ try {
   check(picked.action.id === null, "A picks the focused choice (Off)");
   check(await evalJs(`!document.querySelector('[role="menu"]')`), "and the menu closes");
 
+  // Phase 16 E1: every control in the full panel is reachable by pad. Walk it row by row —
+  // right along a row until focus stops moving, then down — marking what focus lands on,
+  // and compare with every enabled control the panel holds.
+  await press(B.MENU);
+  await waitFor(() => evalJs(`!!document.querySelector('[aria-label="Player menu"]')`), "the player's panel", 25);
+  const PANEL_CONTROLS = `[...document.querySelectorAll('[aria-label="Player menu"] :is(button, input, select, [tabindex="0"]):not(:disabled)')]`;
+  const mark = () => evalJs(`(() => { const a = document.activeElement; if (!a) return null; a.dataset.padSeen ??= String((window.__padSeen = (window.__padSeen ?? 0) + 1)); return a.dataset.padSeen; })()`);
+  await mark();
+  // Right only while the row has a control further right: on a full-width row, Right goes
+  // to the nearest thing up and to the right, which is correct navigation but not a walk.
+  const moreOnRow = (sign) => evalJs(`(() => { const a = document.activeElement.getBoundingClientRect();
+    return ${PANEL_CONTROLS}.some((e) => { const r = e.getBoundingClientRect();
+      return r.top < a.bottom - 1 && r.bottom > a.top + 1 && ${sign} * (r.left + r.width / 2 - (a.left + a.width / 2)) > 1; }); })()`);
+  for (let row = 0; row < 40; row++) {
+    for (let i = 0; i < 8 && (await moreOnRow(-1)); i++) {
+      await press(B.LEFT);
+      await mark();
+    }
+    for (let i = 0; i < 8 && (await moreOnRow(1)); i++) {
+      await press(B.RIGHT);
+      await mark();
+    }
+    const before = await mark();
+    await press(B.DOWN);
+    if ((await mark()) === before) break;
+  }
+  const unreached = await evalJs(`${PANEL_CONTROLS}.filter((e) => !e.dataset.padSeen).map((e) => e.getAttribute("aria-label") ?? e.textContent.trim())`);
+  const total = await evalJs(`${PANEL_CONTROLS}.length`);
+  check(total > 10 && unreached.length === 0, `the D-pad reaches every control in the player panel (${total - unreached.length}/${total}; missed: ${unreached.join(", ") || "none"})`);
+  await press(B.B);
+  await waitFor(() => evalJs(`!document.querySelector('[aria-label="Player menu"]')`), "the panel to close", 25);
+
   // Phase 16: subtitles found and chosen from the full panel, by pad alone.
   await press(B.MENU);
   await waitFor(() => evalJs(`!!document.querySelector('[aria-label="Player menu"]')`), "the player's panel", 25);
