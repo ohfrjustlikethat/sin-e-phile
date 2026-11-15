@@ -49,13 +49,13 @@
 
 ## What's next
 
-Phase 16 subtask 16.10 (docs/phases/phase-16-ready-to-watch.md): confirm CI is green on the 1.98.0 pin (gh run list --branch phase/16-ready-to-watch); if so clear B15. Then wait for the author batch sent 2026-11-16 and record each answer as evidence: the release build target/release/sin-e-phile.exe used by the author for sign-off on player, first run, Home, Settings and taste screen (Phase 14 E4/E6, Phase 16 E9); a download and a stream with a source of their choosing, with Phase 7 E7's VPN adapter cut mid-download; 'Load a file' in the player (E2); X sound menu and LB/RB episode on a real controller (E3); scan-to-Home time on a real folder (E6); a first run end to end by pad (E7); and the embeddings-v3 release-asset decision (legal posture, ADR-0044/ADR-0014). Then python tools/phasedoc/generate.py --log 16, retrospective in SESSION_LOG.md, and /closephase.
+Phase 16, subtask 16.10. Six local commits since 592ccc2 are NOT pushed (5a374a1 spec 4.1.0 through the chapter-jump commit): run the full pre-push suite in CLAUDE.md, then push. Then bookkeeping: fill SPEC.md Appendix F's Done column for I01, I33, I71, I72 (7776473), I21 (643e750), I39 (2cd797f), I38 (6000ceb) and run python tools/phasedoc/generate.py --log 16; re-mark E1 met in BOTH current_phase and phases[16] (panel now has Shape and Zoom: crates/player framing tests, tests/playback.rs the_shape_and_zoom_reach_the_playing_film, pad flow 40/40 controls) and mark E3 met (pad flow: X sound menu, RB/LB chapter, Right seek, Left held scrubs, Y, Menu, A, B, right stick on Settings and paused details); record both in docs/eval-results.md; add the new pieces to docs/specs/ready-to-watch.md and docs/learning/phase-16-notes.md. Then npm run tauri build and send the author batch (sign-off screenshots E9, a download and a stream, Phase 7 E7 VPN cut, Load a file E2, scan-to-Home time E6, first run by pad E7, the embeddings-v3 release-asset decision), and /closephase.
 
 ---
 
 ## Blockers
 
-- **B15** CI red since run 42464345446: the libmpv release download (github.com, shinchiro/mpv-winbuild-cmake 20261021) answers HTTP 504 Gateway Time-out, from CI and from the dev machine alike (2026-11-08 ~09:20-09:40 UTC), so the Rust tests and the fresh-clone job cannot fetch the player. Not our code. Done: fetch.py retries 5xx (15/30/45 s), and CI now caches the checksum-pinned DLL (actions/cache, verified by fetch.py) so a host outage cannot turn CI red once one run has fetched it. Clear when a run is green. 2026-11-16: the libmpv step now passes; CI's remaining red was Rust 1.100's build-dir layout breaking ort-sys's copy-dylibs (D86); toolchain pinned to 1.98.0.
+None.
 
 ---
 
