@@ -316,7 +316,15 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
     expect(taken).toBe(false);
     expect(commands.playerAction).not.toHaveBeenCalledWith({ kind: "seek_by", seconds: 10 });
     fireEvent.click(screen.getByRole("button", { name: "More brightness" }));
-    expect(commands.playerAction).toHaveBeenCalledWith({ kind: "picture", brightness: 10, contrast: 0, saturation: 0 });
+    expect(commands.playerAction).toHaveBeenCalledWith({ kind: "picture", brightness: 10, contrast: 0, saturation: 0, aspect: "auto", zoom: 100 });
+    // Phase 16: the picture's shape and zoom, each one press.
+    fireEvent.click(screen.getByRole("button", { name: "Shape: As filmed" }));
+    expect(commands.playerAction).toHaveBeenLastCalledWith({ kind: "picture", brightness: 10, contrast: 0, saturation: 0, aspect: "16:9", zoom: 100 });
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    expect(commands.playerAction).toHaveBeenLastCalledWith({ kind: "picture", brightness: 10, contrast: 0, saturation: 0, aspect: "16:9", zoom: 110 });
+    expect(screen.getByRole("button", { name: "Shape: 16:9" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reset the picture" }));
+    expect(commands.playerAction).toHaveBeenLastCalledWith({ kind: "picture", brightness: 0, contrast: 0, saturation: 0, aspect: "auto", zoom: 100 });
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Player menu" })).not.toBeInTheDocument();
     expect(useUi.getState().playing).not.toBeNull();

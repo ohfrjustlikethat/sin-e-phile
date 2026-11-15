@@ -259,6 +259,27 @@ fn audio_delay_picture_and_stats_are_set_and_reported() {
 }
 
 #[test]
+fn the_shape_and_zoom_reach_the_playing_film() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = player();
+    p.load(clip(dir.path()).to_str().unwrap(), None).unwrap();
+    p.wait_first_frame(Duration::from_secs(10)).unwrap();
+    let num = |k: &str| p.property(k).and_then(|v| v.parse::<f64>().ok());
+
+    p.set_framing("4:3", 200).unwrap();
+    assert_eq!(num("video-zoom"), Some(1.0));
+    assert_eq!(num("panscan"), Some(0.0));
+    // mpv reports the override as a number: 4:3 is 1.333.
+    let ratio = num("video-aspect-override").unwrap();
+    assert!((ratio - 4.0 / 3.0).abs() < 0.01, "{ratio}");
+
+    p.set_framing("fill", 100).unwrap();
+    assert_eq!(num("panscan"), Some(1.0));
+    assert_eq!(num("video-zoom"), Some(0.0));
+    assert_eq!(num("video-aspect-override"), Some(-1.0));
+}
+
+#[test]
 fn an_exact_seek_lands_on_the_frame_asked_for() {
     // Phase 8 E3: "Seeking is frame-accurate and responsive."
     let dir = tempfile::tempdir().unwrap();

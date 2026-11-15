@@ -150,9 +150,10 @@ export function DetailScreen() {
     .filter(Boolean)
     .join(" · ");
 
-  const start = () => {
+  /** Play from where it was left, or (Appendix F, I01) from the beginning. */
+  const start = (over = false) => {
     if (plan.phase !== "ready") return;
-    play({ target: plan.plan.open, title: d.title, mediaItemId: d.id, start: plan.plan.start });
+    play({ target: plan.plan.open, title: d.title, mediaItemId: d.id, start: over ? null : plan.plan.start });
   };
 
   return (
@@ -172,12 +173,17 @@ export function DetailScreen() {
           id="detail-play"
           variant="primary"
           size="lg"
-          onClick={start}
+          onClick={() => start()}
           disabled={plan.phase !== "ready"}
           aria-describedby="play-status"
         >
           {plan.phase === "ready" && plan.plan.start ? `Resume from ${clock(plan.plan.start)}` : "Play"}
         </Button>
+        {plan.phase === "ready" && plan.plan.start ? (
+          <Button variant="secondary" size="lg" onClick={() => start(true)}>
+            Start over
+          </Button>
+        ) : null}
         <p id="play-status" className="text-sm text-ink-muted" role="status">
           {plan.phase === "finding" && "Asking your sources…"}
           {plan.phase === "ready" && (unmetText(plan.plan, audio, quality) ?? `From ${plan.plan.from}`)}

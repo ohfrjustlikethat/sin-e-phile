@@ -706,8 +706,11 @@ export type PlayPlanView = {
 export type PlayerAction = { kind: "pause"; paused: boolean } | { kind: "seek_to"; seconds: number | null } | { kind: "seek_by"; seconds: number | null } | { kind: "frame_step"; forward: boolean } | { kind: "volume"; percent: number | null } | { kind: "mute"; muted: boolean } | { kind: "speed"; speed: number | null } | { kind: "audio"; id: number } | { kind: "subtitles"; id: number | null } | 
 /**  Seconds; positive plays the sound later. */
 { kind: "audio_delay"; seconds: number | null } | 
-/**  Each −100…100. */
-{ kind: "picture"; brightness: number; contrast: number; saturation: number };
+/**
+ *  The three adjustments each −100…100; `aspect` one of `sinephile_player::ASPECTS`;
+ *  `zoom` a percentage, 100 untouched.
+ */
+{ kind: "picture"; brightness: number; contrast: number; saturation: number; aspect: string; zoom: number };
 
 /**  The player as the chrome draws it, a few times a second. */
 export type PlayerStateView = {

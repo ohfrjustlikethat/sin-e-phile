@@ -129,8 +129,10 @@ function Entry({
       onKeyDown={(e) => {
         if (e.key === "Enter") onOpen();
       }}
-      className={`grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-x-4 border-b border-line-subtle ${
-        weight === "lead" ? "pb-8" : weight === "second" ? "py-5" : "py-3"
+      // -mx-4 px-4: the text keeps its column, and the focus ring gets room on both sides
+      // (Appendix F, I33: the number and the match label touched the ring).
+      className={`-mx-4 grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-x-4 border-b border-line-subtle px-4 ${
+        weight === "lead" ? "pt-4 pb-8" : weight === "second" ? "py-5" : "py-3"
       } ${focused ? "bg-raised" : ""}`}
     >
       <span className="spine">{String(number).padStart(2, "0")}</span>

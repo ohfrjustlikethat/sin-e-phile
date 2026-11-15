@@ -7,7 +7,7 @@ import { clock, glide, keyIntent, nextSpeed, type Intent } from "./intents";
 import { usePadMode } from "@/design-system/focus/FocusLayer";
 import { onPlayerIntent } from "./intentBus";
 import { PauseOverlay } from "./PauseOverlay";
-import { PlayerMenu, ShortcutsPanel, StatsPanel, type Picture } from "./PlayerPanels";
+import { PICTURE_DEFAULT, PlayerMenu, ShortcutsPanel, StatsPanel, type Picture } from "./PlayerPanels";
 import { EndCard, NextEpisodeCard } from "./WhatNext";
 import { moment } from "./endCard";
 import { previewLeft, tileAt } from "./scrubPreview";
@@ -165,7 +165,7 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
   const setMini = useUi((s) => s.setMini);
   const [panel, setPanel] = useState<"menu" | "shortcuts" | null>(null);
   const [stats, setStats] = useState(false);
-  const [picture, setPicture] = useState<Picture>({ brightness: 0, contrast: 0, saturation: 0 });
+  const [picture, setPicture] = useState<Picture>(PICTURE_DEFAULT);
   const [audioDelayMs, setAudioDelayMs] = useState(0);
   const menuPanel = useRef<HTMLDivElement>(null);
   const statsPanel = useRef<HTMLDivElement>(null);
@@ -697,7 +697,7 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
           <p className="label text-ink-muted">
             {playing.start ? `Resuming from ${clock(playing.start)}` : "Opening"}
           </p>
-          <h1 className="max-w-[70%] font-display text-[44px] leading-[1.05] font-semibold tracking-[-0.03em]">
+          <h1 className="max-w-[70%] font-serif text-[52px] leading-[1.02] tracking-[-0.015em]">
             {playing.title}
           </h1>
         </div>

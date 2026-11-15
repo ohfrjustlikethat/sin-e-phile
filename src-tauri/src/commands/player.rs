@@ -261,11 +261,14 @@ pub enum PlayerAction {
     AudioDelay {
         seconds: f64,
     },
-    /// Each −100…100.
+    /// The three adjustments each −100…100; `aspect` one of `sinephile_player::ASPECTS`;
+    /// `zoom` a percentage, 100 untouched.
     Picture {
         brightness: i32,
         contrast: i32,
         saturation: i32,
+        aspect: String,
+        zoom: i32,
     },
 }
 
@@ -289,11 +292,15 @@ pub async fn player_action(state: State<'_, AppState>, action: PlayerAction) -> 
             brightness,
             contrast,
             saturation,
-        } => p.set_picture(
-            i64::from(brightness),
-            i64::from(contrast),
-            i64::from(saturation),
-        ),
+            aspect,
+            zoom,
+        } => p
+            .set_picture(
+                i64::from(brightness),
+                i64::from(contrast),
+                i64::from(saturation),
+            )
+            .and_then(|()| p.set_framing(&aspect, i64::from(zoom))),
     }
     .map_err(err)
 }

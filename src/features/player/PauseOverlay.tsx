@@ -74,7 +74,7 @@ export function PauseOverlay({ title, still, position, duration, chapter, detail
           Paused · {clock(position)} of {clock(duration)}
           {left !== null && ` · ${Math.round(left / 60)} min left`}
         </p>
-        <h1 className="font-display text-[44px] leading-[1.05] font-semibold tracking-[-0.03em]">{title}</h1>
+        <h1 className="font-serif text-[52px] leading-[1.02] tracking-[-0.015em]">{title}</h1>
         {chapter && <p className="text-[15px] text-ink-muted">{chapter}</p>}
         <div>
           <button

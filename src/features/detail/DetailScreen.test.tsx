@@ -85,6 +85,24 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
     );
   });
 
+  it("offers to start over beside Resume, and only when there is a place to resume from", async () => {
+    renderIt();
+    await screen.findByText("Sunrise");
+    resolvePlan({ status: "ok", data: { title: "Sunrise", open: "https://films.example/s.mp4", start: 1200, from: "Internet Archive", offered: 3, ...NO_OFFERS } });
+    fireEvent.click(await screen.findByRole("button", { name: "Start over" }));
+    await waitFor(() =>
+      expect(useUi.getState().playing).toEqual({ target: "https://films.example/s.mp4", title: "Sunrise", mediaItemId: 7, start: null }),
+    );
+  });
+
+  it("offers no Start over for a film that has not been started", async () => {
+    renderIt();
+    await screen.findByText("Sunrise");
+    resolvePlan({ status: "ok", data: { ...PLAN, ...NO_OFFERS } });
+    await screen.findByRole("button", { name: "Play" });
+    expect(screen.queryByRole("button", { name: "Start over" })).not.toBeInTheDocument();
+  });
+
   it("says why nothing can play", async () => {
     renderIt();
     await screen.findByText("Sunrise");
