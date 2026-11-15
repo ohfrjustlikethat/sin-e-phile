@@ -15,6 +15,7 @@ import { DownloadNotices } from "@/features/downloads/DownloadNotices";
 import { ProfilePicker } from "@/features/profiles/ProfilePicker";
 import { Onboarding } from "@/features/onboarding/Onboarding";
 import { HomeScreen } from "@/features/home/HomeScreen";
+import { WatchlistScreen } from "@/features/watchlist/WatchlistScreen";
 import { commands as ipc } from "@/lib/ipc";
 import { useProfileSync, useProfiles } from "@/features/profiles/useProfiles";
 import { SearchScreen } from "@/features/search/SearchScreen";
@@ -282,6 +283,8 @@ export function App() {
               <SearchScreen />
             ) : destination === "home" ? (
               <HomeScreen />
+            ) : destination === "watchlist" ? (
+              <WatchlistScreen />
             ) : (
               <Placeholder destination={destination} />
             )}

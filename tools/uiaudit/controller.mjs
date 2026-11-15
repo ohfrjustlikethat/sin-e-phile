@@ -61,6 +61,11 @@ const FAKE = `(() => {
     search_backfill: () => ({ found: 0, added: [] }),
     optional_assets: () => ({ missing: [], total_bytes: 0 }),
     // Appendix F, I21: marked by hand, and remembered for the rest of the flow.
+    // Appendix F, I39: the watchlist, saved from the film page and read by its own page.
+    title_watchlisted: () => window.__saved === true,
+    set_watchlisted: (a) => { window.__saved = a.on; return null; },
+    watchlist: () => (window.__saved === true
+      ? [{ id: 7, title: "Sunrise", year: 1927, made_by: "F. W. Murnau", runtime_minutes: 94, note: null }] : []),
     title_watched: () => window.__watched === true,
     set_watched: (a) => { window.__watched = a.watched; return 1; },
     item_detail: () => ({ id: 7, title: "Sunrise", year: 1927, kind: "film", runtime_minutes: 94,
@@ -625,6 +630,13 @@ try {
   await press(B.A);
   await waitFor(async () => (await active())?.text === "Mark as watched", "the mark to clear", 25);
   check((await calls("set_watched")).at(-1).watched === false, "A again marks it as not watched");
+  // Appendix F, I39: beside it, the film is saved to the watchlist.
+  await press(B.RIGHT);
+  check((await active())?.text === "Add to watchlist", `Right reaches "Add to watchlist" (${(await active())?.text})`);
+  await press(B.A);
+  await waitFor(async () => (await active())?.text === "On your watchlist · remove", "the film to be saved", 25);
+  check((await calls("set_watchlisted")).at(-1).on === true, "A saves the film to the watchlist");
+  await press(B.LEFT);
   await press(B.DOWN);
   await waitFor(async () => (await active())?.text === "Auto", "the Audio row", 25);
   await press(B.RIGHT);
@@ -782,6 +794,18 @@ try {
   await press(B.B);
   await waitFor(() => evalJs(`!document.body.textContent.includes("Downloading at once")`), "the page to close", 25);
   check(true, "B leaves the Downloads page");
+
+  // Appendix F, I39: the Watchlist tab is a page now, and holds what was saved.
+  const onWatchlist = () => evalJs(`!!document.querySelector('section[aria-label="Watchlist"]')`);
+  for (let i = 0; i < 5 && !(await onWatchlist()); i++) await press(B.RB);
+  check(await onWatchlist(), "RB reaches the Watchlist tab, and it is a page, not a placeholder");
+  check(await evalJs(`document.querySelector('section[aria-label="Watchlist"]').textContent.includes("Sunrise")`),
+    "the film saved from its page is on it");
+  // The first press lands in the masthead (nothing had focus after the tab changed).
+  for (let i = 0; i < 3 && !((await active())?.text ?? "").includes("Sunrise"); i++) await press(B.DOWN);
+  check(((await active())?.text ?? "").includes("Sunrise"), `the D-pad reaches the saved film (${(await active())?.text})`);
+  await shoot("07e-watchlist");
+  await layoutAtSizes("Watchlist");
 
   // ADR-0043 (Phase 11 E6): every text field, not just search. Menu opens Settings, the
   // D-pad walks down to the OpenSubtitles key, and the pad types a key with upper case.

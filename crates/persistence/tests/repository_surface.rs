@@ -712,6 +712,19 @@ async fn profile_repository_surface() {
     // watchlist
     assert_eq!(repo.watchlist(second).await.expect("watchlist"), vec![film]);
 
+    // on_watchlist / remove_from_watchlist (Appendix F, I39) — per profile; a second
+    // removal finds nothing to remove
+    assert!(repo.on_watchlist(second, film).await.expect("on_watchlist"));
+    assert!(!repo.on_watchlist(first, film).await.unwrap());
+    assert!(repo
+        .remove_from_watchlist(second, film)
+        .await
+        .expect("remove_from_watchlist"));
+    assert!(!repo.remove_from_watchlist(second, film).await.unwrap());
+    assert!(!repo.on_watchlist(second, film).await.unwrap());
+    assert!(repo.watchlist(second).await.unwrap().is_empty());
+    repo.add_to_watchlist(second, film, None).await.unwrap();
+
     // set_setting — insert and ON CONFLICT update
     repo.set_setting("theme", "dark")
         .await

@@ -346,6 +346,12 @@ export const commands = {
 	/**  Correct one mode of the profile's taste: "more", "less", "not_me", or `None` to undo. */
 	correctTaste: (anchor: number, correction: string | null) => typedError<null, string>(__TAURI_INVOKE("correct_taste", { anchor, correction })),
 	home: () => typedError<RailView[], string>(__TAURI_INVOKE("home")),
+	/**  The watchlist page (Appendix F, I39): what this profile saved, newest first. */
+	watchlist: () => typedError<HomeCard[], string>(__TAURI_INVOKE("watchlist")),
+	/**  Whether a title is on this profile's watchlist. */
+	titleWatchlisted: (id: number) => typedError<boolean, string>(__TAURI_INVOKE("title_watchlisted", { id })),
+	/**  Save a title to the watchlist, or take it off. */
+	setWatchlisted: (id: number, on: boolean) => typedError<null, string>(__TAURI_INVOKE("set_watchlisted", { id, on })),
 	/**
 	 *  The player left a title (Phase 15): seconds actually played, where it stopped, its
 	 *  length. Recorded as a viewing, completed or abandoned at its point; a skim is not.

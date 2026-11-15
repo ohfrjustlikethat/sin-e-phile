@@ -62,27 +62,11 @@ pub async fn home(state: State<'_, AppState>) -> Result<Vec<RailView>, String> {
     }
     .map_err(|e| e.to_string())?;
 
-    let ids: Vec<i64> = rails.iter().flat_map(|r| r.items.iter().copied()).collect();
-    let mut cards = sinephile_search_engine::card::cards(&db, &ids)
-        .await
-        .map_err(|e| e.to_string())?;
-    let media = MediaRepository::new(&db);
     let mut out = Vec::new();
     for r in rails {
-        let mut items = Vec::new();
-        for id in r.items {
-            let Some(m) = media.by_id(id).await.map_err(|e| e.to_string())? else {
-                continue;
-            };
-            let card = cards.remove(&id).unwrap_or_default();
-            items.push(HomeCard {
-                id: id as i32,
-                title: m.primary_title,
-                year: m.release_year.map(|y| y as i32),
-                made_by: card.made_by,
-                runtime_minutes: m.runtime_minutes.map(|r| r as i32),
-                note: r.notes.get(&id).cloned(),
-            });
+        let mut items = home_cards(&db, &r.items).await?;
+        for card in &mut items {
+            card.note = r.notes.get(&i64::from(card.id)).cloned();
         }
         out.push(RailView {
             key: r.key.into(),
@@ -91,6 +75,79 @@ pub async fn home(state: State<'_, AppState>) -> Result<Vec<RailView>, String> {
         });
     }
     Ok(out)
+}
+
+/// What a card shows for each title, in the order given; a title the catalogue no longer
+/// holds is left out.
+async fn home_cards(db: &sinephile_persistence::Db, ids: &[i64]) -> Result<Vec<HomeCard>, String> {
+    let mut cards = sinephile_search_engine::card::cards(db, ids)
+        .await
+        .map_err(|e| e.to_string())?;
+    let media = MediaRepository::new(db);
+    let mut out = Vec::new();
+    for &id in ids {
+        let Some(m) = media.by_id(id).await.map_err(|e| e.to_string())? else {
+            continue;
+        };
+        let card = cards.remove(&id).unwrap_or_default();
+        out.push(HomeCard {
+            id: id as i32,
+            title: m.primary_title,
+            year: m.release_year.map(|y| y as i32),
+            made_by: card.made_by,
+            runtime_minutes: m.runtime_minutes.map(|r| r as i32),
+            note: None,
+        });
+    }
+    Ok(out)
+}
+
+/// The watchlist page (Appendix F, I39): what this profile saved, newest first.
+#[tauri::command]
+#[specta::specta]
+pub async fn watchlist(state: State<'_, AppState>) -> Result<Vec<HomeCard>, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let me = state.profile().await?;
+    let ids = ProfileRepository::new(&db)
+        .watchlist(me)
+        .await
+        .map_err(|e| e.to_string())?;
+    home_cards(&db, &ids).await
+}
+
+/// Whether a title is on this profile's watchlist.
+#[tauri::command]
+#[specta::specta]
+pub async fn title_watchlisted(state: State<'_, AppState>, id: i32) -> Result<bool, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let me = state.profile().await?;
+    ProfileRepository::new(&db)
+        .on_watchlist(me, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Save a title to the watchlist, or take it off.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_watchlisted(state: State<'_, AppState>, id: i32, on: bool) -> Result<(), String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let me = state.profile().await?;
+    let profiles = ProfileRepository::new(&db);
+    if on {
+        profiles
+            .add_to_watchlist(me, i64::from(id), None)
+            .await
+            .map_err(|e| e.to_string())?;
+    } else {
+        profiles
+            .remove_from_watchlist(me, i64::from(id))
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    // What is saved is one of the taste model's signals.
+    refresh_model(&state, me);
+    Ok(())
 }
 
 /// Whether the first-run wizard has been finished or skipped.

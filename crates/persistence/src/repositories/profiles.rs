@@ -685,6 +685,32 @@ impl<'a> ProfileRepository<'a> {
         Ok(())
     }
 
+    /// Take a title off the watchlist. Returns whether it was on it.
+    pub async fn remove_from_watchlist(
+        &self,
+        profile_id: i64,
+        media_item_id: i64,
+    ) -> Result<bool, DbError> {
+        let removed =
+            sqlx::query("DELETE FROM watchlist_items WHERE profile_id = ? AND media_item_id = ?")
+                .bind(profile_id)
+                .bind(media_item_id)
+                .execute(self.db.pool())
+                .await?
+                .rows_affected();
+        Ok(removed == 1)
+    }
+
+    pub async fn on_watchlist(&self, profile_id: i64, media_item_id: i64) -> Result<bool, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM watchlist_items WHERE profile_id = ? AND media_item_id = ?)",
+        )
+        .bind(profile_id)
+        .bind(media_item_id)
+        .fetch_one(self.db.pool())
+        .await?)
+    }
+
     pub async fn watchlist(&self, profile_id: i64) -> Result<Vec<i64>, DbError> {
         Ok(sqlx::query_scalar(
             "SELECT media_item_id FROM watchlist_items

@@ -9,7 +9,7 @@ import { ChoiceRow, type Choice } from "./ChoiceRow";
 import { SourcePanel } from "./SourcePanel";
 import { DownloadAdvice } from "./DownloadAdvice";
 import { SeriesSection } from "./SeriesSection";
-import { WatchedToggle } from "./Watched";
+import { WatchedToggle, WatchlistToggle } from "./Watched";
 
 /**
  * The minimal detail page — SPEC.md Phase 8: title, synopsis, cast, and a Play button
@@ -166,7 +166,12 @@ export function DetailScreen() {
       {byline && <p className="label mt-5">{byline}</p>}
 
       {isSeries ? (
-        <SeriesSection id={d.id} />
+        <>
+          <div className="mt-6 flex">
+            <WatchlistToggle id={d.id} />
+          </div>
+          <SeriesSection id={d.id} />
+        </>
       ) : (
       <>
       <div className="mt-10 flex items-center gap-5">
@@ -209,7 +214,7 @@ export function DetailScreen() {
         </p>
       )}
       {plan.phase === "ready" && <DownloadAdvice id={d.id} plan={plan.plan.open} />}
-      <div className="mt-4 flex">
+      <div className="mt-4 flex gap-8">
         {/* Marked either way, the place it was left at is gone: "Resume from" would lie. */}
         <WatchedToggle
           id={d.id}
@@ -217,6 +222,7 @@ export function DetailScreen() {
             setPlan((p) => (p.phase === "ready" ? { phase: "ready", plan: { ...p.plan, start: null } } : p))
           }
         />
+        <WatchlistToggle id={d.id} />
       </div>
 
       {offers && (offers.languages.length > 0 || audio || offers.qualities.length > 1 || quality) && (

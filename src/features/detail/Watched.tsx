@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { commands, type WatchedScope } from "@/lib/ipc";
 import { HOME } from "@/features/home/HomeScreen";
+import { WATCHLIST } from "@/features/watchlist/WatchlistScreen";
 
 /**
  * Marking things watched by hand (SPEC.md Appendix F, I21): a film, an episode, a season,
@@ -21,7 +22,7 @@ export function useSetWatched(onDone?: () => void) {
   return useMutation({
     mutationFn: (v: { scope: WatchedScope; watched: boolean }) => ok(commands.setWatched(v.scope, v.watched)),
     onSuccess: () => {
-      for (const key of [["watched"], ["series"], ["season"], HOME]) {
+      for (const key of [["watched"], ["series"], ["season"], HOME, WATCHLIST]) {
         void client.invalidateQueries({ queryKey: key });
       }
       onDone?.();
@@ -46,6 +47,27 @@ export function WatchedToggle({ id, onChange }: { id: number; onChange?: () => v
       onClick={() => set.mutate({ scope: { kind: "title", id }, watched: !seen })}
     >
       {seen ? "Watched · mark as not watched" : "Mark as watched"}
+    </button>
+  );
+}
+
+/** Save a film or a show for later, or take it off the list (Appendix F, I39). */
+export function WatchlistToggle({ id }: { id: number }) {
+  const client = useQueryClient();
+  const saved = useQuery({ queryKey: ["watchlisted", id], queryFn: () => ok(commands.titleWatchlisted(id)) });
+  const set = useMutation({
+    mutationFn: (on: boolean) => ok(commands.setWatchlisted(id, on)),
+    onSuccess: () => {
+      for (const key of [["watchlisted", id], WATCHLIST, HOME]) {
+        void client.invalidateQueries({ queryKey: key });
+      }
+    },
+  });
+  if (saved.data === undefined) return null;
+  const on = saved.data;
+  return (
+    <button type="button" className={quiet} disabled={set.isPending} aria-pressed={on} onClick={() => set.mutate(!on)}>
+      {on ? "On your watchlist · remove" : "Add to watchlist"}
     </button>
   );
 }

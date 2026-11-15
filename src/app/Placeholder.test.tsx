@@ -17,7 +17,7 @@ describe("Placeholder", () => {
   it("states which phase makes the destination real", () => {
     render(<Placeholder destination="live" />);
     // Honest about being unfinished rather than pretending otherwise.
-    expect(screen.getByText(/Phase 24/i)).toBeInTheDocument();
+    expect(screen.getByText(/Phase 25/i)).toBeInTheDocument();
   });
 
   it("does not promise content the app ships", () => {

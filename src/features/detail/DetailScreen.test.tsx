@@ -31,6 +31,8 @@ const RANKED = [
 ];
 
 let resolvePlan: (v: unknown) => void = () => {};
+/** The fake watchlist: whether the film on the page is saved. */
+let saved = false;
 const commands = {
   itemDetail: vi.fn(() => ok(DETAIL)),
   preparePlay: vi.fn(() => new Promise((r) => (resolvePlan = r))),
@@ -39,6 +41,11 @@ const commands = {
     ok({ seasons: [{ number: 0, episodes: 1 }, { number: 1, episodes: 2 }, { number: 2, episodes: 1 }], next_airing: { episode: 7, airs_at: 4102444800 }, watched: 1 }),
   ),
   titleWatched: vi.fn(() => ok(false)),
+  titleWatchlisted: vi.fn(() => ok(saved)),
+  setWatchlisted: vi.fn((_id: number, on: boolean) => {
+    saved = on;
+    return ok(null);
+  }),
   setWatched: vi.fn((_scope: unknown, _watched: boolean) => ok(1)),
   seasonEpisodes: vi.fn((_id: number, season: number | null) =>
     ok(
@@ -235,5 +242,22 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
     await waitFor(() => expect(commands.setWatched).toHaveBeenCalledWith({ kind: "season", series: 7, season: 1 }, true));
     fireEvent.click(screen.getByRole("button", { name: "Mark the whole show as watched" }));
     await waitFor(() => expect(commands.setWatched).toHaveBeenCalledWith({ kind: "series", id: 7 }, true));
+  });
+
+  it("saves a film to the watchlist and takes it off again (Appendix F, I39)", async () => {
+    renderIt();
+    await screen.findByText("Sunrise");
+    fireEvent.click(await screen.findByRole("button", { name: "Add to watchlist" }));
+    await waitFor(() => expect(commands.setWatchlisted).toHaveBeenCalledWith(7, true));
+    fireEvent.click(await screen.findByRole("button", { name: "On your watchlist · remove" }));
+    await waitFor(() => expect(commands.setWatchlisted).toHaveBeenCalledWith(7, false));
+    expect(await screen.findByRole("button", { name: "Add to watchlist" })).toBeInTheDocument();
+  });
+
+  it("a series can be saved too", async () => {
+    commands.itemDetail.mockImplementationOnce(() => ok({ ...DETAIL, title: "Twin Peaks", kind: "series" }));
+    renderIt();
+    await screen.findByText("Pilot");
+    expect(await screen.findByRole("button", { name: "Add to watchlist" })).toBeInTheDocument();
   });
 });
