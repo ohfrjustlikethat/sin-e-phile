@@ -2271,3 +2271,11 @@ criterion is Phase 17's, not 16's).
 
 **Decisions taken.** Fold the unpushed commits rather than allowlist; pin the Rust toolchain to 1.98.0
 rather than drop `--all-features` or patch ort-sys. **Spec amendments:** none.
+
+**Spec amendment, same day: 4.1.0 (A36, ADR-0046) — the improvement backlog.** The author switched models
+to go faster and asked for every improvement worth making, saved to the spec. The app was reviewed as a
+person uses it; 78 items (I01–I78) went into `SPEC.md` Appendix F, each assigned to the phase that touches
+the same code, as deliverables rather than exit criteria. Seven are built in Phase 16. `tools/phasedoc`
+prints a phase's items in its doc; CLAUDE.md resynced in the same commit. **The review also found a gap in
+Phase 16 itself**: the picture panel has no aspect or zoom, which the phase specifies, so E1 was marked met
+too early this morning and is reopened until they exist.

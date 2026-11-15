@@ -1,5 +1,5 @@
 {
-  "spec_version": "4.0.0",
+  "spec_version": "4.1.0",
   "project": "sin-e-phile",
   "last_updated": "2026-11-16",
   "sessions_completed": 21,
@@ -77,8 +77,8 @@
       {
         "id": "E1",
         "text": "The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.",
-        "met": true,
-        "evidence": "node tools/uiaudit/controller.mjs (2026-11-16) 'the D-pad reaches every control in the player panel (34/34; missed: none)', seen to fail with the Speed section inert (20/34); 16.5's real-window measurement (docs/eval-results.md 'The player, measured in its real window'): intent to video-region change ~14 ms (under 100 ms); video window hidden until the first frame (430 ms), so no black flash on open; hidden 7 ms after Back on close; the menu cut out of the video ('2 -> 3 holes', seen to fail without data-cutout); the bar glides between reports (src/features/player/intents.ts glide, unit-tested). Spec: docs/specs/ready-to-watch.md."
+        "met": false,
+        "evidence": "REOPENED 2026-11-16: the panel lacks the aspect and zoom controls the phase specifies ('picture (aspect, zoom, brightness)'). Held so far: node tools/uiaudit/controller.mjs (2026-11-16) 'the D-pad reaches every control in the player panel (34/34; missed: none)', seen to fail with the Speed section inert (20/34); 16.5's real-window measurement (docs/eval-results.md 'The player, measured in its real window'): intent to video-region change ~14 ms (under 100 ms); video window hidden until the first frame (430 ms), so no black flash on open; hidden 7 ms after Back on close; the menu cut out of the video ('2 -> 3 holes', seen to fail without data-cutout); the bar glides between reports (src/features/player/intents.ts glide, unit-tested). Spec: docs/specs/ready-to-watch.md."
       },
       {
         "id": "E2",
@@ -1871,8 +1871,8 @@
         {
           "id": "E1",
           "text": "The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.",
-          "met": true,
-          "evidence": "node tools/uiaudit/controller.mjs (2026-11-16) 'the D-pad reaches every control in the player panel (34/34; missed: none)', seen to fail with the Speed section inert (20/34); 16.5's real-window measurement (docs/eval-results.md 'The player, measured in its real window'): intent to video-region change ~14 ms (under 100 ms); video window hidden until the first frame (430 ms), so no black flash on open; hidden 7 ms after Back on close; the menu cut out of the video ('2 -> 3 holes', seen to fail without data-cutout); the bar glides between reports (src/features/player/intents.ts glide, unit-tested). Spec: docs/specs/ready-to-watch.md."
+          "met": false,
+          "evidence": "REOPENED 2026-11-16: the panel lacks the aspect and zoom controls the phase specifies ('picture (aspect, zoom, brightness)'). Held so far: node tools/uiaudit/controller.mjs (2026-11-16) 'the D-pad reaches every control in the player panel (34/34; missed: none)', seen to fail with the Speed section inert (20/34); 16.5's real-window measurement (docs/eval-results.md 'The player, measured in its real window'): intent to video-region change ~14 ms (under 100 ms); video window hidden until the first frame (430 ms), so no black flash on open; hidden 7 ms after Back on close; the menu cut out of the video ('2 -> 3 holes', seen to fail without data-cutout); the bar glides between reports (src/features/player/intents.ts glide, unit-tested). Spec: docs/specs/ready-to-watch.md."
         },
         {
           "id": "E2",
@@ -2558,7 +2558,7 @@
       ]
     }
   ],
-  "next_action": "Phase 16 subtask 16.10 (docs/phases/phase-16-ready-to-watch.md): first clear B15 (rerun CI once the libmpv host answers; gh run list --branch phase/16-ready-to-watch). Then the author batch: a release build (npm run tauri build), the screenshot set (player, first run, Home, Settings, taste screen) for their sign-off (Phase 14 E4/E6 and Phase 16 E9), and the checks only they can do: a download and a stream with a source of their choosing, Phase 7 E7's VPN cut, 'Load a file' in the player (E2), the controller in the player (E3), E6's scan-to-Home time on a real folder, E7's first run end to end; plus the legal-posture question on the meaning-index release asset (derived from IMDb data, ADR-0044). Then docs/specs (player, subtitles in player, tv-layouts, freshness already), docs/learning/phase-16-notes.md, README and HOW_IT_WORKS, regression (eval all, tvlayouts, identify, import --from 600, taste, switch, modes, update), session log with retrospective, close.",
+  "next_action": "Phase 16 subtask 16.10 (docs/phases/phase-16-ready-to-watch.md): confirm CI is green on the 1.98.0 pin (gh run list --branch phase/16-ready-to-watch); if so clear B15. Then wait for the author batch sent 2026-11-16 and record each answer as evidence: the release build target/release/sin-e-phile.exe used by the author for sign-off on player, first run, Home, Settings and taste screen (Phase 14 E4/E6, Phase 16 E9); a download and a stream with a source of their choosing, with Phase 7 E7's VPN adapter cut mid-download; 'Load a file' in the player (E2); X sound menu and LB/RB episode on a real controller (E3); scan-to-Home time on a real folder (E6); a first run end to end by pad (E7); and the embeddings-v3 release-asset decision (legal posture, ADR-0044/ADR-0014). Then python tools/phasedoc/generate.py --log 16, retrospective in SESSION_LOG.md, and /closephase.",
   "blockers": [
     {
       "id": "B15",
@@ -2830,6 +2830,11 @@
       "id": "0045",
       "title": "Ready to Watch: a fix-first phase, inserted as Phase 16",
       "date": "2026-11-08"
+    },
+    {
+      "id": "0046",
+      "title": "An improvement backlog, scheduled into the phases",
+      "date": "2026-11-16"
     }
   ],
   "environment": {

@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **4.0.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **4.1.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -343,6 +343,10 @@ typographic treatment rather than breaking.
   the session log, phase docs and notes up to 15) use the old numbers. Judge features by using the
   release build the way a person would (no add-ons installed, a real TV folder), not only by
   fixtures. Never name or link a content-source add-on, even in `SETUP.md`.
+- **The improvement backlog** (ADR-0046): `SPEC.md` Appendix F lists 78 improvements (I01–I78), each
+  assigned to a phase. They are that phase's deliverables, not exit criteria, and the phase doc prints
+  them. At phase close each is done (commit in the Done column) or carried to a named phase with a
+  reason, never dropped. ⚑ items are taste calls for Phase 19's mockups; the default is no change.
 - **Every phase is finished** (ADR-0043): all 29, at full depth, within about two weeks of
   2026-11-06. No tier is cut; tier boundaries are understanding-gate checkpoints, not stops.
 - **Windows only.** Use Windows APIs directly where they give a better result.

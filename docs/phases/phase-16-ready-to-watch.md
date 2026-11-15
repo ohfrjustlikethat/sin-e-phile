@@ -15,7 +15,7 @@ A person can install the app, set it up once, and watch anything they choose (fr
 
 ## Exit criteria
 
-- [x] **E1** The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.
+- [ ] **E1** The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.
 - [ ] **E2** Subtitles: the style editor applies live and persists per profile; find and download, sync in 0.1 s steps, and load from disk each work in the player, by pad.
 - [ ] **E3** The controller works in the player as specified, and the right stick scrolls pages, rails, panels and the paused details, each covered by the pad-flow audit.
 - [x] **E4** A TV-layout corpus (season folders, flat, anime absolute, split across drives, including a real-world case like the author's) is identified with at least 98% of episodes right and no episode filed as a film.
@@ -37,6 +37,18 @@ A person can install the app, set it up once, and watch anything they choose (fr
 - [x] **16.8** SETUP.md: every prerequisite with its official link and how to add it to the app, and how to add any add-on by its address; names no content source; passes the guard (E8).
 - [x] **16.9** Polish: Settings section headings clear and larger in the display face; the taste screen (films as cards, clearer hierarchy, live Home preview, fewer words); first run and Home audited for layout, clipping, focus jumps and content flashes at three window sizes, with automated checks added to the UI audit.
 - [ ] **16.10** The author batch: sign-off on a screenshot set (player, first run, Home, Settings, taste screen; Phase 14 E4/E6 with it), a download and a stream with a source of their choosing (Phase 7 E7's VPN cut with it); docs/specs, learning note, README and HOW_IT_WORKS, regression, close (E9).
+
+## Improvements assigned (SPEC.md Appendix F)
+
+Deliverables, not exit criteria: each is done or carried by name at close (ADR-0046).
+
+- [ ] **I01** (S) "Start over" beside "Resume from 42:10", on the film page and on episode rows
+- [ ] **I21** (M) Mark watched and unwatched: a film, an episode, a season, a show
+- [ ] **I33** (S) Result rows: the number and the match label padded inside the focus ring
+- [ ] **I38** (M) A "Finish setting up" card on Home until it is done: library, a source, subtitles, downloads; each line opens its setting
+- [ ] **I39** (S) A working Watchlist page now (a grid of what was saved); Phase 20 deepens it
+- [ ] **I71** (S) One title face: the pause panel and the player use the display face, as the film page does
+- [ ] **I72** (S) Home's rail descriptors on one line under the rail title
 
 ## Learning note
 

@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 4.0.0** · 21 session(s) completed · last updated 2026-11-16
+**Spec version 4.1.0** · 21 session(s) completed · last updated 2026-11-16
 
 ---
 
@@ -12,7 +12,7 @@
 
 **Phase 16 — Ready to Watch** (`in_progress`, branch `phase/16-ready-to-watch`)
 
-4 of 9 exit criteria met with evidence.
+3 of 9 exit criteria met with evidence.
 
 > Inserted by spec 4.0.0 (ADR-0045) after the author used the release build. Receives the author batch: Phase 8 E5, Phase 14 E1 and Phase 15 E3 discharged here from the author's answers of 2026-11-08; Phase 7 E7 and Phase 14 E4/E6 to be met here (16.10). Judge by using the release build as a person would, not only by fixtures.
 
@@ -31,8 +31,8 @@
 
 ### Exit criteria
 
-- [x] **E1** The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.
-      - *Evidence:* node tools/uiaudit/controller.mjs (2026-11-16) 'the D-pad reaches every control in the player panel (34/34; missed: none)', seen to fail with the Speed section inert (20/34); 16.5's real-window measurement (docs/eval-results.md 'The player, measured in its real window'): intent to video-region change ~14 ms (under 100 ms); video window hidden until the first frame (430 ms), so no black flash on open; hidden 7 ms after Back on close; the menu cut out of the video ('2 -> 3 holes', seen to fail without data-cutout); the bar glides between reports (src/features/player/intents.ts glide, unit-tested). Spec: docs/specs/ready-to-watch.md.
+- [ ] **E1** The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.
+      - *Evidence:* REOPENED 2026-11-16: the panel lacks the aspect and zoom controls the phase specifies ('picture (aspect, zoom, brightness)'). Held so far: node tools/uiaudit/controller.mjs (2026-11-16) 'the D-pad reaches every control in the player panel (34/34; missed: none)', seen to fail with the Speed section inert (20/34); 16.5's real-window measurement (docs/eval-results.md 'The player, measured in its real window'): intent to video-region change ~14 ms (under 100 ms); video window hidden until the first frame (430 ms), so no black flash on open; hidden 7 ms after Back on close; the menu cut out of the video ('2 -> 3 holes', seen to fail without data-cutout); the bar glides between reports (src/features/player/intents.ts glide, unit-tested). Spec: docs/specs/ready-to-watch.md.
 - [ ] **E2** Subtitles: the style editor applies live and persists per profile; find and download, sync in 0.1 s steps, and load from disk each work in the player, by pad.
 - [ ] **E3** The controller works in the player as specified, and the right stick scrolls pages, rails, panels and the paused details, each covered by the pad-flow audit.
 - [x] **E4** A TV-layout corpus (season folders, flat, anime absolute, split across drives, including a real-world case like the author's) is identified with at least 98% of episodes right and no episode filed as a film.
@@ -49,7 +49,7 @@
 
 ## What's next
 
-Phase 16 subtask 16.10 (docs/phases/phase-16-ready-to-watch.md): first clear B15 (rerun CI once the libmpv host answers; gh run list --branch phase/16-ready-to-watch). Then the author batch: a release build (npm run tauri build), the screenshot set (player, first run, Home, Settings, taste screen) for their sign-off (Phase 14 E4/E6 and Phase 16 E9), and the checks only they can do: a download and a stream with a source of their choosing, Phase 7 E7's VPN cut, 'Load a file' in the player (E2), the controller in the player (E3), E6's scan-to-Home time on a real folder, E7's first run end to end; plus the legal-posture question on the meaning-index release asset (derived from IMDb data, ADR-0044). Then docs/specs (player, subtitles in player, tv-layouts, freshness already), docs/learning/phase-16-notes.md, README and HOW_IT_WORKS, regression (eval all, tvlayouts, identify, import --from 600, taste, switch, modes, update), session log with retrospective, close.
+Phase 16 subtask 16.10 (docs/phases/phase-16-ready-to-watch.md): confirm CI is green on the 1.98.0 pin (gh run list --branch phase/16-ready-to-watch); if so clear B15. Then wait for the author batch sent 2026-11-16 and record each answer as evidence: the release build target/release/sin-e-phile.exe used by the author for sign-off on player, first run, Home, Settings and taste screen (Phase 14 E4/E6, Phase 16 E9); a download and a stream with a source of their choosing, with Phase 7 E7's VPN adapter cut mid-download; 'Load a file' in the player (E2); X sound menu and LB/RB episode on a real controller (E3); scan-to-Home time on a real folder (E6); a first run end to end by pad (E7); and the embeddings-v3 release-asset decision (legal posture, ADR-0044/ADR-0014). Then python tools/phasedoc/generate.py --log 16, retrospective in SESSION_LOG.md, and /closephase.
 
 ---
 
@@ -81,7 +81,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 13 | Download Manager and the Stream-vs-Download Advisor | B | 7, 9, 12 | 1–2 | 8/8 |
 | [x] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 3/6 |
 | [x] | 15 | Taste Model | B | 5, 14 | 2 | 4/5 |
-| [~] | 16 | Ready to Watch | B | 15 | 3–4 | 4/9 |
+| [~] | 16 | Ready to Watch | B | 15 | 3–4 | 3/9 |
 | [ ] | 17 | Recommendation Engine | B | 15, 16 | 2–3 | 0/6 |
 | [ ] | 18 | Discovery Engine 🏁 | B | 17 | 2 | 0/6 |
 | [ ] | 19 | Browsing Surfaces | B | 18 | 4–5 | 0/13 |

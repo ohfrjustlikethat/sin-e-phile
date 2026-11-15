@@ -939,6 +939,8 @@ Treat the quota as a scarce resource with a budget and a cache. This constraint 
 
 Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the start of the phase and gains a retrospective at the end.
 
+**Each phase also builds the Appendix F improvements assigned to it** (ADR-0046): deliverables, not exit criteria, each done or carried by name when the phase closes.
+
 ---
 
 ### Phase 0 — Bootstrap and Project Infrastructure
@@ -1649,9 +1651,143 @@ Face recognition, live TV, manga and comics, casting and watch-together. Fully i
 
 ---
 
+### F. Improvement backlog (ADR-0046)
+
+Seventy-eight improvements found by reviewing the app as a person uses it (2026-11-16), each scheduled into the phase that already touches the same code. **Rules:**
+
+- An item is a **deliverable of its phase, not an exit criterion**. The phase's plan lists its items, and `tools/phasedoc` prints them in the phase doc.
+- At phase close each item is **done** (its commit in the Done column) or **carried** to a named later phase with the reason in the retrospective. Never dropped silently. Filling Done, or moving an item to another phase, is bookkeeping and not an amendment.
+- A small item may be built earlier when the same file is already open.
+- **⚑** marks a taste call or a change to an earlier decision: shown both ways in Phase 19's mockups, the author chooses, and the default is no change.
+- **Constraints win**: no item may breach §2.1, §9.0, a locked technology or a budget. One that would is cut with a note.
+
+Size: **S** one commit · **M** a subtask · **L** several subtasks.
+
+**The player**
+
+| ID | Improvement | Phase | Size | Done |
+|---|---|---|---|---|
+| I01 | "Start over" beside "Resume from 42:10", on the film page and on episode rows | 16 | S | |
+| I02 | Sleep timer: stop in 30, 60 or 90 minutes, or at the end of this episode | 24 | S | |
+| I03 | "Still watching?" after three episodes played with no input | 24 | S | |
+| I04 | Night mode: the volume levelled so speech is audible and loud scenes are not, per profile | 24 | S | |
+| I05 | Per-series memory of the audio track, the subtitle track and the subtitle delay | 24 | S | |
+| I06 | Two subtitle languages at once | 24 | M | |
+| I07 | What is buffered shown on the seek bar for streams and torrents; a stall says why (peers, speed against what is needed) and offers "Download instead" | 24 | M | |
+| I08 | Chapter marks on the seek bar and a chapter list in the panel | 24 | S | |
+| I09 | A–B repeat | 24 | S | |
+| I10 | Automatic deinterlacing | 24 | S | |
+| I11 | "Try the next subtitle": one press when the chosen one is wrong | 24 | S | |
+| I12 | Play a random episode of a show | 24 | S | |
+| I13 | A whole season downloaded in one press; optionally the next N unwatched episodes of a followed show kept downloaded, from the user's own sources | 24 | M | |
+| I14 | The mouse in the player, verified and completed: a click pauses, a double-click is full screen, the wheel is volume, the pointer hides when idle | 19 | S | |
+| I15 | Extras (featurettes, deleted scenes) offered under "Extras" on the film or show's page instead of being left out | 19 | M | |
+| I16 | A screenshot key, saved to Pictures, with or without subtitles | 21 | S | |
+| I17 | A choice of audio output device, and passthrough to a receiver | 21 | M | |
+| I18 | The display kept awake while playing and allowed to sleep when paused ten minutes, verified with `powercfg /requests` | 21 | S | |
+| I19 | HDR handled deliberately: passed through on an HDR display, tone-mapped on SDR; the display and decoder probed (D67) | 22 | M | |
+| I20 | A busy sound device does not delay the picture, and the player says the device is in use (D64) | 22 | S | |
+
+**The library**
+
+| ID | Improvement | Phase | Size | Done |
+|---|---|---|---|---|
+| I21 | Mark watched and unwatched: a film, an episode, a season, a show | 16 | M | |
+| I22 | A menu on every tile (hold A, right-click, or the Menu key): Play, Start over, Watchlist, Mark watched, Not interested, Show in Explorer, Fix the match | 19 | M | |
+| I23 | Fix a wrong match from the film's own page | 19 | S | |
+| I24 | Pictures without a key: `poster.jpg`, `folder.jpg` or `fanart.jpg` beside the file, cover art inside the file, else a frame from the film | 19 | M | |
+| I25 | Scan progress in the masthead | 19 | S | |
+| I26 | `.nfo` files (an IMDb or TMDB id inside) read as the strongest identification signal | 21 | M | |
+| I27 | Library health: duplicates (keep the better copy), episodes missing from a season, files that will not play | 21 | M | |
+| I28 | A drive that is not connected shows its films as "drive not connected", not gone; missing files purged after a quiet period (D74) | 21 | S | |
+| I29 | A file holding two episodes is offered for both (D73) | 21 | S | |
+| I30 | A show IMDb splits where others do not (D85), mapped with TMDB's numbering when a key is present | 21 | M | |
+| I31 | Optional rename-and-organise: off by default, a preview first, an undo log | 21 | L | |
+| I32 | Library statistics: hours, size by resolution and codec | 20 | S | |
+
+**Search**
+
+| ID | Improvement | Phase | Size | Done |
+|---|---|---|---|---|
+| I33 | Result rows: the number and the match label padded inside the focus ring | 16 | S | |
+| I34 | Filter chips under the search field: films, series, in my library, playable now, decade | 19 | M | |
+| I35 | Example searches in the empty search state | 19 | S | |
+| I36 | Typo tolerance that works: a weak keyword hit no longer blocks a good fuzzy one (D31), within the budget (D30) | 22 | M | |
+| I37 | Exact-title searches skip the embedding (D35); the indices warmed after launch (D34, D82) | 22 | S | |
+
+**Home and browsing**
+
+| ID | Improvement | Phase | Size | Done |
+|---|---|---|---|---|
+| I38 | A "Finish setting up" card on Home until it is done: library, a source, subtitles, downloads; each line opens its setting | 16 | M | |
+| I39 | A working Watchlist page now (a grid of what was saved); Phase 20 deepens it | 16 | S | |
+| I40 | Films and TV Shows show a simple working grid (the library first, then widely loved) until Phase 19 builds them | 17 | M | |
+| I41 | "Playable now": a rail of public-domain films from the built-in Internet Archive source, so a fresh install can play something at once | 17 | M | |
+| I42 | "I have 90 minutes": a length limit on Surprise me and on Home | 18 | S | |
+| I43 | A mark on every tile for "on this PC" and "can stream" | 19 | S | |
+| I44 | Home per profile: hide, pin and reorder rails | 19 | M | |
+| I45 | Jump by letter (LB/RB) and by page (LT/RT) in long grids | 19 | S | |
+| I46 | A person's page: the filmography in order, with "seen 4 of 23" | 19 | S | |
+| I47 | Follow a show, and an Upcoming page: new episodes of followed shows by date | 20 | M | |
+
+**Downloads and the network**
+
+| ID | Improvement | Phase | Size | Done |
+|---|---|---|---|---|
+| I48 | A storage rule: keep downloads under N GB, delete watched first, automatically | 21 | S | |
+| I49 | Seeding rules: by ratio or by time, a default and per download | 21 | S | |
+| I50 | Ask before quitting mid-download; optionally keep downloading in the tray | 21 | M | |
+| I51 | Connection health in Downloads: port reachable, DHT nodes, the bound adapter | 22 | S | |
+| I52 | Faster torrent starts: DHT state saved sooner and the best copy pre-started (D61, D63); an abandoned swarm removed (D69) | 22 | M | |
+| I53 | Subtitle files inside a torrent used (D70); a stream hashed for subtitle lookup (D71) | 24 | M | |
+
+**Settings and the system**
+
+| ID | Improvement | Phase | Size | Done |
+|---|---|---|---|---|
+| I54 | A System status page: catalogue age, FFmpeg, libmpv, model files, each add-on, keys, subtitle quota, VPN binding, disk; each line with its fix | 19 | M | |
+| I55 | Search inside Settings; a one-line explanation of each setting; reset a section | 19 | M | |
+| I56 | Run the first run again from Settings | 19 | S | |
+| I57 | Button hints fade after a few sessions, with a setting to keep them | 19 | S | |
+| I58 | Back up and restore: one file of profiles, history, ratings, watchlist and settings (never the catalogue); a daily backup kept seven days; an integrity check at launch | 20 | M | |
+| I59 | Private session: watch without recording history or changing taste; hide a title from history | 20 | S | |
+| I60 | Import a Netflix viewing-activity CSV, and watched state from Kodi and Jellyfin | 20 | M | |
+| I61 | A share card: a film with your rating, or your year in film, saved as an image | 20 | S | |
+| I62 | Remap keys and pad buttons | 21 | M | |
+| I63 | Start in TV mode: a `--tv` flag, and when a controller is connected at launch | 21 | S | |
+| I64 | A pad system menu (hold Menu): switch profile, Settings, exit, sleep or shut down the PC | 21 | S | |
+| I65 | Database care: `PRAGMA optimize` on exit, a WAL checkpoint, a weekly integrity check | 22 | S | |
+| I66 | Text size (90–150%) independent of TV mode; a high-contrast option | 28 | M | |
+| I67 | Copy a diagnostic report (versions, tier, what was found, last errors, no file names); open the log folder | 28 | S | |
+| I68 | An opt-in notice that a newer version exists, off by default | 28 | S | |
+| I69 | Interface text in one place, so a translation is possible later | 28 | L | |
+| I70 | A demo profile: one press fills the app with public-domain films and sample history, so a reviewer sees a living app in a minute | 28 | M | |
+
+**The look**
+
+| ID | Improvement | Phase | Size | Done |
+|---|---|---|---|---|
+| I71 | One title face: the pause panel and the player use the display face, as the film page does | 16 | S | |
+| I72 | Home's rail descriptors on one line under the rail title | 16 | S | |
+| I73 | The film page without artwork: a second column of facts (ratings, leading cast, genres, where it plays) so the page is not half empty | 19 | M | |
+| I74 | Every page's skeleton matches its final layout; nothing jumps when content arrives | 19 | S | |
+| I75 | Dates and numbers in the viewer's locale; tabular figures for every time | 19 | S | |
+| I76 | ⚑ Typographic cards tinted by kind (film, series, anime) in flat tones | 19 | S | |
+| I77 | ⚑ A true-black option for OLED screens | 19 | S | |
+| I78 | ⚑ A tab hidden until its phase builds it (Live until Phase 25) | 19 | S | |
+
+---
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 4.1.0 — 2026-11-16 (an improvement backlog)
+
+Minor: it adds deliverables; no decision is reversed and no exit criterion changes.
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A36 | §15 (preamble), new Appendix F | **The improvement backlog**, asked for by the author: 78 improvements to function, look and usability, each with an id (I01–I78), a size and the phase that builds it. They are deliverables of their phases, not exit criteria; at phase close each is done or carried by name. Seven are built in Phase 16 (I01, I21, I33, I38, I39, I71, I72). Three taste calls are marked ⚑ and wait for Phase 19's mockups. `tools/phasedoc` prints a phase's items in its doc. | 0046 |
 
 ### spec_version 4.0.0 — 2026-11-08 (Ready to Watch, and the phases renumbered)
 

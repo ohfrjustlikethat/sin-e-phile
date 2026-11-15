@@ -117,6 +117,23 @@ def risks_for(section: str, number: int) -> list[str]:
     ]
 
 
+def improvements_for(number: int) -> list[str]:
+    """The Appendix F improvements assigned to this phase (ADR-0046).
+
+    Rows look like `| I07 | text | 24 | M | done-commit |`. A session reads only the state
+    file and the phase doc, so an item that is not printed here is an item that is missed.
+    """
+    text = SPEC.read_text(encoding="utf-8")
+    rows = re.findall(
+        r"^\| (I\d+) \| (.+?) \| (\d+) \| ([SML]) \| *(.*?) *\|$", text, re.M
+    )
+    return [
+        f"- [{'x' if done else ' '}] **{iid}** ({size}) {what}" + (f" · `{done}`" if done else "")
+        for iid, what, phase, size, done in rows
+        if int(phase) == number
+    ]
+
+
 def doc_path(phase: dict) -> Path:
     return PHASES / f"phase-{phase['number']:02d}-{phase['slug']}.md"
 
@@ -168,6 +185,16 @@ def render_open(phase: dict) -> str:
             lines.append(f"- [{box}] **{subtask['id']}** {subtask['text']}")
     else:
         lines.append("_none authored yet — write them when the phase is planned._")
+
+    improvements = improvements_for(number)
+    if improvements:
+        lines += [
+            "",
+            "## Improvements assigned (SPEC.md Appendix F)",
+            "",
+            "Deliverables, not exit criteria: each is done or carried by name at close (ADR-0046).",
+            "",
+        ] + improvements
 
     if risks:
         lines += ["", "## Risks named by this phase", ""] + risks
