@@ -265,7 +265,7 @@ wrong film through is worse than a smaller shelf.
 **The analogy:** a good video shop's regulars each have a card; the clerk who knows your card does not
 recommend from someone else's.
 
-### Taste and discovery — the reason to use this at all `✅ Phase 15 · ⬜ Phases 16–17`
+### Taste and discovery — the reason to use this at all `✅ Phase 15 · ⬜ Phases 17–18`
 
 The taste model does not average you into one vector, because someone who loves both
 Tarkovsky and slasher films is not described by their midpoint. Positive signals are
@@ -274,7 +274,7 @@ fade. It also learns *negative* preferences from what you abandon, and where you
 it: bailing at 5 minutes and at 80 minutes mean different things. A taste screen says the
 modes back in sentences and lets you correct each one. That much exists (Phase 15).
 
-Still to come (Phases 16–17): recommendations combine content similarity against each mode with **collaborative
+Still to come (Phases 17–18): recommendations combine content similarity against each mode with **collaborative
 filtering** — "people who loved this also loved" — precomputed offline, so there is
 no server and no other users involved.
 
@@ -414,6 +414,15 @@ recommendations across modes with a popularity prior, axes with the statements a
 modes described in sentences, corrections per profile, and a model cache rebuilt in the
 background after a watch. The taste screen is reached from Settings → Profiles and from Who's
 watching?. How it all fits: `docs/specs/taste-model.md`.
+
+### Ready to watch ✅ `Phase 16`
+
+The phase that made the release build usable. TV folders are read by their nearest naming folder and
+`Season N` (`crates/library/src/folders.rs`); the catalogue checks hourly whether IMDb's files have
+changed and refreshes only then, with AniList airing and TMDB "showing now" beside it
+(`crates/catalogue/src/freshness.rs`); Home's rails follow the author's order; the player answers the pad
+like a TV, the right stick scrolls whatever is under focus, and subtitles are styled, found, synced and
+loaded from inside playback. How it all fits: `docs/specs/ready-to-watch.md`.
 
 ### Profiles ✅ `Phase 14`
 

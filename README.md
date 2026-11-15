@@ -228,9 +228,9 @@ off means the pause overlay shows the full cast list, beautifully.
 
 ## What actually works today
 
-**Phases 0–14 — the shell, the design system, the catalogue, search, sources, torrents,
+**Phases 0–16 — the shell, the design system, the catalogue, search, sources, torrents,
 the player, choosing a source, subtitles, the player experience, the local library,
-downloads, and profiles.**
+downloads, profiles, the taste model, and making it ready to watch.**
 Honestly:
 
 - ✅ Posture guard, secret scanner, and prerequisite doctor — all three verified by
@@ -264,7 +264,7 @@ Honestly:
 - ❌ **Searching by meaning is not good enough.** nDCG@10 is **0.047** against a 0.75
   target, after five attempts; the last one, a full re-embed, made it worse. The
   [case study](docs/case-study/search.md) shows the failures with screenshots and
-  explains them. This criterion is carried to Phase 16, not hidden.
+  explains them. This criterion is carried to Phase 17, not hidden.
 - ✅ Sources: one interface that every source implements, a resolver that asks them all
   at once and never lets a slow one hold up the rest, and per-source health in plain
   words. Built in: the Internet Archive's public-domain films (a live query found
@@ -352,6 +352,16 @@ Honestly:
   "the most popular" on MovieLens users. A taste screen says it back in sentences ("You gravitate
   toward horror, mostly from the 1970s and 80s …") and takes corrections: more of this, less, not
   me. It updates about 130 ms after a watch, in the background.
+- ✅ **Ready to watch.** Added after the author used the release build and found it was not
+  usable yet, though every test passed. TV shows are read from their folders (`Show (Year)/Season N`,
+  flat `S01E03`, one show across drives, extras left out): 184 files of real-world layouts with no
+  episode filed as a film. The catalogue keeps itself current in the background, downloading only
+  when the published files have changed. Home runs continue, new episodes of your shows, your library,
+  new releases by taste, then your tastes. The player is clean while watching with a full panel one
+  button away, and answers in about 14 ms; subtitles can be restyled live, found, chosen, synced and
+  loaded without leaving it. The controller works there as on a TV, and the right stick scrolls
+  anything. A seven-step first run ends ready to watch, and where no source is set up the app says so.
+  [`SETUP.md`](SETUP.md) lists every prerequisite with its official link.
 - ⬜ Everything else described above this section
 
 ---
