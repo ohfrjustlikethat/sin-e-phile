@@ -16,7 +16,7 @@
 
 > Inserted by spec 4.0.0 (ADR-0045) after the author used the release build. Receives the author batch: Phase 8 E5, Phase 14 E1 and Phase 15 E3 discharged here from the author's answers of 2026-11-08; Phase 7 E7 and Phase 14 E4/E6 to be met here (16.10). Judge by using the release build as a person would, not only by fixtures.
 
-### Subtasks — 8/10 complete
+### Subtasks — 9/10 complete
 
 - [x] **16.1** TV shows from folders (crates/library): the show from its folder (`Show (Year)`), the season from a `Season N` subfolder, the episode from the file; flat `S01E03` files under a show folder; anime absolute numbers mapped per season where the data allows (never cumulated, ADR-0031); one show across folders or drives merged; no episode ever filed as a film. A TV-layout corpus in fixtures/ including a Twin Peaks-like case, judged by eval identify (E4); then the author's real folder rescanned on the release build. · `cabf03d`
 - [x] **16.2** The catalogue refreshes itself (ADR-0030 made automatic): a background job once a day while idle fetches IMDb's updated basics, ratings and episode files and adds titles and episodes past what is stored; AniList airing every few hours; TMDB now-playing and airing for a profile with a key; Settings says when it last ran and offers 'refresh now' (E5). · `345e392`
@@ -26,7 +26,7 @@
 - [x] **16.6** Subtitles in the player: a live style editor kept per profile; find and download from OpenSubtitles in playback; sync in 0.1 s steps with 'align again'; load a file from disk; all by pad (E2). · `2416ab6`
 - [x] **16.7** A first run that leaves the viewer ready to watch: library folders (scan starts at once), add-ons by address with a live check (the app suggests none, §2.1), TMDB and OpenSubtitles keys with links and live tests, the download backend with the VPN check; honest no-source states wherever play or download would be (E7). · `c1cd70c`
 - [x] **16.8** SETUP.md: every prerequisite with its official link and how to add it to the app, and how to add any add-on by its address; names no content source; passes the guard (E8). · `42533a9`
-- [ ] **16.9** Polish: Settings section headings clear and larger in the display face; the taste screen (films as cards, clearer hierarchy, live Home preview, fewer words); first run and Home audited for layout, clipping, focus jumps and content flashes at three window sizes, with automated checks added to the UI audit.
+- [x] **16.9** Polish: Settings section headings clear and larger in the display face; the taste screen (films as cards, clearer hierarchy, live Home preview, fewer words); first run and Home audited for layout, clipping, focus jumps and content flashes at three window sizes, with automated checks added to the UI audit. · `511a621`
 - [ ] **16.10** The author batch: sign-off on a screenshot set (player, first run, Home, Settings, taste screen; Phase 14 E4/E6 with it), a download and a stream with a source of their choosing (Phase 7 E7's VPN cut with it); docs/specs, learning note, README and HOW_IT_WORKS, regression, close (E9).
 
 ### Exit criteria
@@ -48,13 +48,13 @@
 
 ## What's next
 
-Phase 16 subtask 16.9 (docs/phases/phase-16-ready-to-watch.md): polish. (1) Settings section headings: today 11px faint uppercase labels (src/features/settings/*Section.tsx, each has a Section helper or an h2); make one shared SettingsSection component in src/features/settings/ with a clear, larger heading in the display face (about 22-26px, ink colour) and a one-line description, and use it everywhere; check contrast (npm run audit:contrast). (2) The taste screen (src/features/taste/TasteProfile.tsx): each mode's example films as cards that open, a clearer hierarchy (number, share as a bar, sentence larger), a live preview of Home's taste rail after a correction, fewer words. (3) First run and Home audited for layout, clipping, focus jumps and content flashes at three window sizes: add checks to tools/uiaudit (no element overflowing its container horizontally, focus never on body after a step, no empty->content flash), fix what they find. Screenshots for the author.
+Phase 16 subtask 16.10 (docs/phases/phase-16-ready-to-watch.md): first clear B15 (rerun CI once the libmpv host answers; gh run list --branch phase/16-ready-to-watch). Then the author batch: a release build (npm run tauri build), the screenshot set (player, first run, Home, Settings, taste screen) for their sign-off (Phase 14 E4/E6 and Phase 16 E9), and the checks only they can do: a download and a stream with a source of their choosing, Phase 7 E7's VPN cut, 'Load a file' in the player (E2), the controller in the player (E3), E6's scan-to-Home time on a real folder, E7's first run end to end; plus the legal-posture question on the meaning-index release asset (derived from IMDb data, ADR-0044). Then docs/specs (player, subtitles in player, tv-layouts, freshness already), docs/learning/phase-16-notes.md, README and HOW_IT_WORKS, regression (eval all, tvlayouts, identify, import --from 600, taste, switch, modes, update), session log with retrospective, close.
 
 ---
 
 ## Blockers
 
-- **B15** CI red on run 42464345446 (16.6 state commit): the Rust job's 'FFmpeg and libmpv' step got HTTP 504 Gateway Time-out from the libmpv download (tools/mpv/fetch.py), so the tests never ran. Infrastructure, not code; the failed job is rerun. Clear when CI is green.
+- **B15** CI red since run 42464345446: the libmpv release download (github.com, shinchiro/mpv-winbuild-cmake 20261021) answers HTTP 504 Gateway Time-out, from CI and from the dev machine alike (2026-11-08 ~09:20-09:40 UTC), so the Rust tests and the fresh-clone job cannot fetch the player. Not our code. Done: fetch.py retries 5xx (15/30/45 s), and CI now caches the checksum-pinned DLL (actions/cache, verified by fetch.py) so a host outage cannot turn CI red once one run has fetched it. Clear when a run is green.
 
 ---
 

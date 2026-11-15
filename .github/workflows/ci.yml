@@ -131,6 +131,16 @@ jobs:
 
       # The player's tests play a real clip headless (Phase 8): FFmpeg builds the clip,
       # and libmpv is the pinned, checksum-verified build developers fetch the same way.
+      # Kept between runs, keyed by fetch.py (which pins its checksum): the release host answered 504 for an
+      # hour on 2026-11-08 (B15), and a host's bad hour should not turn CI red. fetch.py checks
+      # the checksum of whatever it finds, so a cached copy is verified like a downloaded one.
+      - name: libmpv from the cache, if a run has fetched it
+        if: steps.detect.outputs.present == 'true'
+        uses: actions/cache@v4
+        with:
+          path: lib/libmpv-2.dll
+          key: libmpv-${{ hashFiles('tools/mpv/fetch.py') }}
+
       - name: FFmpeg and libmpv for the player tests
         if: steps.detect.outputs.present == 'true'
         run: |
@@ -240,6 +250,13 @@ jobs:
 
       # Phase 8: the player's native library, pinned and checksum-verified, per
       # docs/SETUP.md. The same command a developer runs.
+      # The same cache as the test job (see there); fetch.py verifies the checksum either way.
+      - name: libmpv from the cache, if a run has fetched it
+        uses: actions/cache@v4
+        with:
+          path: fresh/lib/libmpv-2.dll
+          key: libmpv-fresh-${{ hashFiles('tools/mpv/fetch.py') }}
+
       - name: Fetch libmpv per docs/SETUP.md
         working-directory: fresh
         run: python tools/mpv/fetch.py

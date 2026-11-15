@@ -63,8 +63,8 @@
       {
         "id": "16.9",
         "text": "Polish: Settings section headings clear and larger in the display face; the taste screen (films as cards, clearer hierarchy, live Home preview, fewer words); first run and Home audited for layout, clipping, focus jumps and content flashes at three window sizes, with automated checks added to the UI audit.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "511a621"
       },
       {
         "id": "16.10",
@@ -1975,8 +1975,8 @@
         {
           "id": "16.9",
           "text": "Polish: Settings section headings clear and larger in the display face; the taste screen (films as cards, clearer hierarchy, live Home preview, fewer words); first run and Home audited for layout, clipping, focus jumps and content flashes at three window sizes, with automated checks added to the UI audit.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "511a621"
         },
         {
           "id": "16.10",
@@ -2558,13 +2558,13 @@
       ]
     }
   ],
-  "next_action": "Phase 16 subtask 16.9 (docs/phases/phase-16-ready-to-watch.md): polish. (1) Settings section headings: today 11px faint uppercase labels (src/features/settings/*Section.tsx, each has a Section helper or an h2); make one shared SettingsSection component in src/features/settings/ with a clear, larger heading in the display face (about 22-26px, ink colour) and a one-line description, and use it everywhere; check contrast (npm run audit:contrast). (2) The taste screen (src/features/taste/TasteProfile.tsx): each mode's example films as cards that open, a clearer hierarchy (number, share as a bar, sentence larger), a live preview of Home's taste rail after a correction, fewer words. (3) First run and Home audited for layout, clipping, focus jumps and content flashes at three window sizes: add checks to tools/uiaudit (no element overflowing its container horizontally, focus never on body after a step, no empty->content flash), fix what they find. Screenshots for the author.",
+  "next_action": "Phase 16 subtask 16.10 (docs/phases/phase-16-ready-to-watch.md): first clear B15 (rerun CI once the libmpv host answers; gh run list --branch phase/16-ready-to-watch). Then the author batch: a release build (npm run tauri build), the screenshot set (player, first run, Home, Settings, taste screen) for their sign-off (Phase 14 E4/E6 and Phase 16 E9), and the checks only they can do: a download and a stream with a source of their choosing, Phase 7 E7's VPN cut, 'Load a file' in the player (E2), the controller in the player (E3), E6's scan-to-Home time on a real folder, E7's first run end to end; plus the legal-posture question on the meaning-index release asset (derived from IMDb data, ADR-0044). Then docs/specs (player, subtitles in player, tv-layouts, freshness already), docs/learning/phase-16-notes.md, README and HOW_IT_WORKS, regression (eval all, tvlayouts, identify, import --from 600, taste, switch, modes, update), session log with retrospective, close.",
   "blockers": [
     {
       "id": "B15",
       "raised": "2026-11-08T09:22:20Z",
       "needs_user": false,
-      "description": "CI red on run 42464345446 (16.6 state commit): the Rust job's 'FFmpeg and libmpv' step got HTTP 504 Gateway Time-out from the libmpv download (tools/mpv/fetch.py), so the tests never ran. Infrastructure, not code; the failed job is rerun. Clear when CI is green."
+      "description": "CI red since run 42464345446: the libmpv release download (github.com, shinchiro/mpv-winbuild-cmake 20261021) answers HTTP 504 Gateway Time-out, from CI and from the dev machine alike (2026-11-08 ~09:20-09:40 UTC), so the Rust tests and the fresh-clone job cannot fetch the player. Not our code. Done: fetch.py retries 5xx (15/30/45 s), and CI now caches the checksum-pinned DLL (actions/cache, verified by fetch.py) so a host outage cannot turn CI red once one run has fetched it. Clear when a run is green."
     }
   ],
   "decisions_pending": [
