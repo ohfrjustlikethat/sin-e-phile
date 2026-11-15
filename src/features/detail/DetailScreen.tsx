@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button, EmptyState, Skeleton } from "@/design-system";
 import { commands, type PlayPlanView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
+import { openSettingsAt } from "@/lib/openSettings";
 import { clock } from "@/features/player/intents";
 import { languageName, qualityLabel, usePlaybackChoice } from "@/lib/playbackChoice";
 import { ChoiceRow, type Choice } from "./ChoiceRow";
@@ -61,18 +62,8 @@ export function DetailScreen() {
   const id = useUi((s) => s.detail);
   const closeDetail = useUi((s) => s.closeDetail);
   const play = useUi((s) => s.play);
-  const setSettingsOpen = useUi((s) => s.setSettingsOpen);
   // No source can play this: Settings, at the place to add one, with focus there for a pad.
-  const addSource = () => {
-    setSettingsOpen(true);
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        const at = document.querySelector<HTMLElement>('[aria-label="Add a source"]');
-        at?.scrollIntoView({ block: "start" });
-        at?.querySelector<HTMLElement>("input, button")?.focus();
-      }),
-    );
-  };
+  const addSource = () => openSettingsAt("Add a source");
   const [plan, setPlan] = useState<PlanState>({ phase: "finding" });
   const [offers, setOffers] = useState<Offers | null>(null);
   const { audio, quality, setAudio, setQuality, details } = usePlaybackChoice();

@@ -80,6 +80,11 @@ const FAKE = `(() => {
     player_pause_still: () => "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
     dev_autoplay: () => null,
     library_folders: () => [],
+    // Appendix F, I38: a fresh install, as the "Finish setting up" card reads it.
+    sources_overview: () => ({ sources: [{ id: "archive", name: "Internet Archive", blurb: "Public-domain films.",
+      addon_host: null, enabled: true, health: "Answering", last_error: null }], refused_addons: [] }),
+    torrent_settings: () => ({ download_limit_kib: null, upload_limit_kib: null, peer_limit: 200, keep_seeding: false,
+      bind_interface: null, adapters: [], engine_running: false }),
     // Phase 12 E5: twenty files waiting, answered by pad alone further down.
     library_review_count: () => window.__review.length,
     library_review: () => window.__review,
@@ -530,6 +535,9 @@ try {
   check(await evalJs(`!!document.querySelector('[aria-label="Jon: switch profile"]')`), "the masthead shows who is watching");
   await shoot("01-home");
   await layoutAtSizes("Home");
+  // Appendix F, I38: a fresh install is told what is left, and a line opens its setting.
+  check(await evalJs(`document.querySelector('section[aria-label="Finish setting up"]')?.textContent.includes("0 of 4 done")`),
+    "Home says what is left to set up (0 of 4 done)");
   // The control: the check must see a page that runs off the edge, or it measures nothing.
   await evalJs(`(() => { const d = document.createElement("p"); d.id = "too-wide"; d.textContent = "too wide";
     d.style.width = "3000px"; document.querySelector("main").appendChild(d); })()`);

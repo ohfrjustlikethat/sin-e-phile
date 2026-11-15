@@ -4,6 +4,7 @@ import { PosterCard, Rail, Skeleton } from "@/design-system";
 import { commands, type HomeCard, type RailView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
 import { onEvent } from "@/lib/events";
+import { SetupCard } from "./SetupCard";
 
 /**
  * Home, first version (SPEC.md Phase 14; Phase 18 overhauls it). Continue watching, where
@@ -59,6 +60,7 @@ export function HomeScreen() {
   }
   return (
     <div className="flex flex-col gap-12 pt-10 pb-24">
+      <SetupCard />
       {home.data.map((r, i) => (
         <HomeRail key={r.key} rail={r} lead={i === 0} />
       ))}

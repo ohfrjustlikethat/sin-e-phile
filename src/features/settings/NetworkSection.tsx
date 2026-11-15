@@ -133,7 +133,7 @@ function Form({ initial, onSaved }: { initial: TorrentSettingsView; onSaved: () 
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mb-9">
+    <section className="mb-9" aria-label={title}>
       <h2 className={SETTINGS_HEADING}>
         {title}
       </h2>
