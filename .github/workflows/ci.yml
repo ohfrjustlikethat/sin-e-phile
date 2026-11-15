@@ -126,6 +126,15 @@ jobs:
       - run: cargo fmt --all --check
         if: steps.detect.outputs.present == 'true'
 
+      # ort-sys's copy-dylibs links ONNX Runtime's DLLs into target/debug, then examples and
+      # deps. The runner may symlink, so it goes on to all three, and on a cold cache (rust-cache
+      # evicts after 7 idle days) clippy has never made examples/: the copy panics with "path not
+      # found" (2026-11-15, run 43737178611). Making them first is all it needs.
+      - name: Target folders ort-sys copies its DLLs into
+        if: steps.detect.outputs.present == 'true'
+        shell: bash
+        run: mkdir -p target/debug/examples target/debug/deps
+
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
         if: steps.detect.outputs.present == 'true'
 
