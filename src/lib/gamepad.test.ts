@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  BUTTON, heldDirections, navAction, nearest, nearestBox, nearestInRegion, newlyPressed, playerIntent,
-  scrollSpeed, SCROLL_MAX, shouldRepeat,
-  startGamepad, tiltFor, TILT_MAX, type Box, type PadFrame,
+  BUTTON, FOLLOW_GRACE_MS, followAfterScroll, heldDirections, moveFocus, navAction, nearest, nearestBox,
+  nearestInRegion, newlyPressed, onScreen, playerIntent, scrollByStick, scrollSpeed, SCROLL_MAX,
+  shouldRepeat, startGamepad, tiltFor, TILT_MAX, type Box, type PadFrame,
 } from "./gamepad";
 
 /** ADR-0041: an Xbox controller drives the app like a remote. */
@@ -213,5 +213,116 @@ describe("nearest, the beam (Phase 14)", () => {
     expect(nearest(back, [more, skip, next], "right")).toBe(1);
     // With nothing on the row, the general rule still finds the button off it.
     expect(nearest(back, [more], "right")).toBe(0);
+  });
+});
+
+/**
+ * jsdom lays nothing out, so each element is placed by hand: its box, and for a scroller its
+ * sizes and a scroll offset that moves what is inside it.
+ */
+function place(el: Element, x: number, y: number, width: number, height: number): void {
+  (el as HTMLElement).getBoundingClientRect = () =>
+    ({ x, y, width, height, left: x, top: y, right: x + width, bottom: y + height, toJSON: () => ({}) }) as DOMRect;
+}
+function scroller(el: HTMLElement, axis: "x" | "y", onScroll: (offset: number) => void): void {
+  let offset = 0;
+  const [pos, size, view] = axis === "x"
+    ? ["scrollLeft", "scrollWidth", "clientWidth"]
+    : ["scrollTop", "scrollHeight", "clientHeight"];
+  if (axis === "x") el.style.overflowX = "auto";
+  else el.style.overflowY = "auto";
+  Object.defineProperty(el, size, { value: 4000 });
+  Object.defineProperty(el, view, { value: 600 });
+  Object.defineProperty(el, pos, {
+    get: () => offset,
+    set: (v: number) => {
+      offset = Math.max(0, Math.min(3400, v));
+      onScroll(offset);
+    },
+  });
+}
+const byId = (id: string) => document.getElementById(id) as HTMLElement;
+
+describe("focus and the right stick, on a page (Phase 16)", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+  // jsdom has no scrollIntoView; moveFocus asks for it after every move.
+  Element.prototype.scrollIntoView = () => {};
+
+  it("a card clipped by its rail is not on screen, though it is inside the window", () => {
+    document.body.innerHTML =
+      '<main><div id="rail"><button id="seen">a</button><button id="clipped">b</button>' +
+      '<button id="away">c</button></div></main>';
+    byId("rail").style.overflowX = "auto";
+    place(byId("rail"), 300, 100, 600, 200);
+    place(byId("seen"), 320, 120, 200, 150);
+    place(byId("clipped"), 100, 120, 150, 150); // in the window, left of the rail
+    place(byId("away"), 1100, 120, 200, 150); // past the window's edge
+    expect(onScreen(byId("seen"))).toBe(true);
+    expect(onScreen(byId("clipped"))).toBe(false);
+    expect(onScreen(byId("away"))).toBe(false);
+  });
+
+  it("a dialog holds the D-pad: Down at its foot stays in it, where a plain group lets go", () => {
+    for (const role of ["dialog", "group"]) {
+      document.body.innerHTML =
+        `<main><div role="${role}"><button id="first">a</button><button id="last">b</button></div>` +
+        '<button id="bar">bar</button></main>';
+      place(byId("first"), 100, 100, 200, 40);
+      place(byId("last"), 100, 200, 200, 40);
+      place(byId("bar"), 100, 400, 600, 40);
+      byId("last").focus();
+      const moved = moveFocus("down");
+      if (role === "dialog") {
+        expect(moved).toBe(false);
+        expect(document.activeElement?.id).toBe("last");
+        expect(moveFocus("up")).toBe(true);
+        expect(document.activeElement?.id).toBe("first");
+      } else {
+        expect(document.activeElement?.id).toBe("bar");
+      }
+    }
+  });
+
+  it("a card unmounted under focus gives focus back to a card in view, only within the grace", () => {
+    document.body.innerHTML =
+      '<main><div id="rail"><button id="gone">a</button><button id="near">b</button>' +
+      '<button id="further">d</button><button id="clipped">c</button></div></main>';
+    const rail = byId("rail");
+    place(rail, 300, 100, 600, 200);
+    place(byId("gone"), 320, 120, 200, 150);
+    place(byId("near"), 600, 120, 150, 150);
+    place(byId("further"), 760, 120, 130, 150); // in view: somewhere focus could go
+    place(byId("clipped"), 130, 120, 150, 150); // nearer to where focus was, but cut off
+    scroller(rail, "x", () => {});
+    byId("gone").focus();
+    expect(scrollByStick(1, 0, 16)).toBe(true);
+    expect(rail.scrollLeft).toBeGreaterThan(0);
+    byId("gone").remove(); // the rail drops the card a frame later
+    expect(document.activeElement).toBe(document.body);
+    followAfterScroll(performance.now());
+    expect(document.activeElement?.id).toBe("near");
+
+    // Long after the stick last moved anything, a lost focus is left where it fell.
+    byId("near").remove();
+    followAfterScroll(performance.now() + FOLLOW_GRACE_MS + 1);
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("scrolling a dialog keeps focus inside it, though the bar beneath is nearer", () => {
+    document.body.innerHTML =
+      '<header><button id="bar">bar</button></header>' +
+      '<div role="dialog" id="panel"><button id="top">a</button><button id="low">b</button></div>';
+    const panel = byId("panel");
+    place(panel, 100, 50, 600, 600);
+    place(byId("bar"), 100, 0, 600, 40);
+    place(byId("top"), 120, 60, 200, 40);
+    place(byId("low"), 120, 500, 200, 40);
+    // Scrolling the panel carries its first control up out of the window.
+    scroller(panel, "y", (offset) => place(byId("top"), 120, 60 - offset * 10, 200, 40));
+    byId("top").focus();
+    expect(scrollByStick(0, 1, 16)).toBe(true);
+    expect(document.activeElement?.id).toBe("low");
   });
 });

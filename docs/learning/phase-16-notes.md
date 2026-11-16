@@ -19,6 +19,12 @@ test passed. Four sections per ADR-0016 (A4).
   align again, load a file.
 - **A first run that ends ready to watch**, and honest "no source yet" states.
 - **SETUP.md**, and a layout check at three window sizes.
+- **The improvement backlog's first seven** (SPEC.md Appendix F): Start over, mark watched (a film, an
+  episode, a season, a show), a working Watchlist page, a "Finish setting up" card on Home, and three
+  visual fixes. Also the picture's shape and zoom, and the bumpers moving by chapter in a film.
+- **Three controller bugs the audit found once it looked**: the right stick could not move a rail
+  (scroll snapping undid every step), focus was lost when a rail unmounted the focused card, and Down
+  at the foot of a dialog left it.
 
 ## 2. Why
 
@@ -27,6 +33,8 @@ test passed. Four sections per ADR-0016 (A4).
   films, a menu opening invisibly under the video, the masthead pushing the window buttons off screen).
 - **The folder names the show.** People organise TV by folder; a file called `01.mkv` means nothing alone.
   Reading the nearest naming folder first means an episode is never mistaken for a film.
+- **An audit only proves what it walks.** The pad flow passed for weeks while the right stick could not
+  move a single rail: no step had pushed the stick on one. Each new check was made to fail first.
 - **Measure before explaining.** The first theory for the dead pad in playback (the page loses focus
   behind the video) was wrong; a probe showed the page was focused and the faults were ours.
 - **Background work must never be felt.** The refresh only downloads when the publisher's validator
@@ -42,9 +50,9 @@ test passed. Four sections per ADR-0016 (A4).
 - **Window regions with holes** (`CombineRgn` with `RGN_DIFF`, `SetWindowRgn`) — `crates/player/src/host.rs:22`; holes from `data-cutout` — `src/features/player/PlayerScreen.tsx:261`.
 - **Dead-reckoning between reports, capped** — `src/features/player/intents.ts:199` `glide`, cap `:191`.
 - **A dead zone and a squared response curve** — `src/lib/gamepad.ts:54` `scrollSpeed`.
-- **Focus following scrolled content** — `src/lib/gamepad.ts:63` `nearestBox`, `:353` `scrollByStick`.
+- **Focus following scrolled content** — `src/lib/gamepad.ts:63` `nearestBox`, `:380` `scrollByStick`.
 - **Key repeat: delay, then rate** (hold to scrub) — `src/lib/gamepad.ts:272` `shouldRepeat`.
-- **Letting an open menu claim the buttons** — `src/lib/gamepad.ts:423` `claimButtons`.
+- **Letting an open menu claim the buttons** — `src/lib/gamepad.ts:510` `claimButtons`.
 - **One mapping table per device onto shared intents** — `src/lib/gamepad.ts:115` `playerIntent`.
 - **Reading meaning from the folder path** — `crates/library/src/folders.rs:96` `hint`, `:15` `season_of`, `:81` `is_extra`.
 - **HTTP validators (ETag / Last-Modified) to skip work** — `crates/catalogue/src/freshness.rs:74` `check`, `:254` `current_validator`.
@@ -53,6 +61,18 @@ test passed. Four sections per ADR-0016 (A4).
 - **Refetching on a backend event instead of polling** — `src/features/home/HomeScreen.tsx:43`.
 - **Measuring whether something fits, instead of a breakpoint** — `src/app/Masthead.tsx:68` (ResizeObserver at `:80`).
 - **A layout check with a control that must fail** — `src/lib/layoutCheck.ts:7`.
+- **mpv's picture properties: aspect override, panscan, zoom as a power of two** — `crates/player/src/player.rs:676` `framing`.
+- **Chapter navigation with a "restart this one first" threshold** — `src/features/player/intents.ts:217` `chapterTarget`.
+- **Focus trapped in a dialog, preferred in a region** — `src/lib/gamepad.ts:297` `moveFocus` (`trapped`, `:308`); the follow too, `:454`.
+- **CSS scroll snapping fighting a programmatic scroll, and suspending it** — `src/lib/gamepad.ts:362` `suspendSnap`, `:370` `releaseSnap`.
+- **Virtualisation unmounting the focused element; a grace period to recover** — `src/lib/gamepad.ts:469` `followAfterScroll`, `:418` `FOLLOW_GRACE_MS`.
+- **"Visible" meaning clipped by every scrolling ancestor, not just inside the window** — `src/lib/gamepad.ts:432` `onScreen`.
+- **One SQL statement per scope, chosen by an enum** — `crates/persistence/src/repositories/profiles.rs:523` `set_watched`, `:62` `WatchScope`.
+- **A transaction around a write and its cleanup** — `crates/persistence/src/repositories/profiles.rs:544` (`begin` / `commit`).
+- **Invalidating several cached queries after one change** — `src/features/detail/Watched.tsx:20` `useSetWatched`.
+- **Pure rules behind a component, tested without a page** — `src/features/home/setup.ts:35` `setupLines`, `setup.test.ts`.
+- **A fake backend that can send events** — `tools/uiaudit/controller.mjs:180` `__emit`, `:189` `transformCallback`.
+- **Testing focus without layout: placing elements by hand in jsdom** — `src/lib/gamepad.test.ts` `place`, `scroller`.
 
 ## 4. Five questions
 

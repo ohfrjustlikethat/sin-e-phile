@@ -301,8 +301,12 @@ export function moveFocus(direction: Direction): boolean {
     all[0]?.focus();
     return !!all[0];
   }
-  const others = all.filter((el) => el !== current);
   const mine = region(current);
+  // A dialog holds the D-pad (Phase 16): Down at the foot of the player's panel went to the
+  // bar beneath it, where A then opened a menu over the panel. Elsewhere a region is only
+  // preferred, so a page's edge still leads to the masthead.
+  const trapped = mine?.getAttribute("role") === "dialog";
+  const others = all.filter((el) => el !== current && (!trapped || region(el) === mine));
   const i = nearestInRegion(
     box(current),
     others.map(box),
@@ -336,7 +340,8 @@ function scrollTarget(vertical: boolean): Element | null {
   const dialogs = document.querySelectorAll('[role="dialog"]');
   const dialog = dialogs[dialogs.length - 1];
   if (dialog) {
-    const inside = [...dialog.querySelectorAll("*")].find((el) => scrolls(el, vertical));
+    // The dialog itself first: the player's panel is the dialog, and it is what scrolls.
+    const inside = [dialog, ...dialog.querySelectorAll("*")].find((el) => scrolls(el, vertical));
     if (inside) return inside;
   }
   if (!vertical) return null;
@@ -346,17 +351,45 @@ function scrollTarget(vertical: boolean): Element | null {
 }
 
 /**
+ * Scroll snapping, suspended while the stick drives an element. A rail snaps its cards
+ * (`scroll-snap-type: x proximity`), and the stick moves it a few pixels a frame, each of
+ * which snapped straight back to the card it started on: the stick could not move a rail
+ * at all. The inline value each element had is kept here and put back at rest, when the
+ * rail settles on the nearest card as a TV's does.
+ */
+const unsnapped = new Map<HTMLElement, string>();
+
+function suspendSnap(el: Element): void {
+  if (!(el instanceof HTMLElement) || unsnapped.has(el)) return;
+  if (getComputedStyle(el).scrollSnapType === "none") return;
+  unsnapped.set(el, el.style.scrollSnapType);
+  el.style.scrollSnapType = "none";
+}
+
+/** The stick is at rest: everything it scrolled snaps again. */
+export function releaseSnap(): void {
+  for (const [el, inline] of unsnapped) el.style.scrollSnapType = inline;
+  unsnapped.clear();
+}
+
+/**
  * Scroll by the right stick for `dtMs` (Phase 16, ADR-0045), then, if the focused element
  * has left the view, move focus to the visible control nearest where it was, so the next
  * D-pad press starts from what is on screen.
  */
 export function scrollByStick(x: number, y: number, dtMs: number): boolean {
+  const had = document.activeElement as HTMLElement | null;
+  if (had && had !== document.body && had.isConnected) {
+    lastFocusBox = box(had);
+    lastFocusRegion = region(had);
+  }
   const dy = (scrollSpeed(y) * dtMs) / 1000;
   const dx = (scrollSpeed(x) * dtMs) / 1000;
   let moved = false;
   if (dy !== 0) {
     const t = scrollTarget(true);
     if (t) {
+      suspendSnap(t);
       const before = t.scrollTop;
       t.scrollTop += dy;
       moved ||= t.scrollTop !== before;
@@ -365,23 +398,77 @@ export function scrollByStick(x: number, y: number, dtMs: number): boolean {
   if (dx !== 0) {
     const t = scrollTarget(false);
     if (t) {
+      suspendSnap(t);
       const before = t.scrollLeft;
       t.scrollLeft += dx;
       moved ||= t.scrollLeft !== before;
     }
   }
-  if (moved) {
-    const current = document.activeElement as HTMLElement | null;
-    const r = current?.getBoundingClientRect();
-    const inView = !!r && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
-    if (!inView) {
-      const all = visibleFocusables();
-      const from = r ? { x: r.x, y: r.y, width: r.width, height: r.height } : { x: innerWidth / 2, y: innerHeight / 2, width: 0, height: 0 };
-      const i = nearestBox(from, all.map(box));
-      all[i]?.focus({ preventScroll: true });
-    }
-  }
+  if (moved) lastScrollAt = performance.now();
+  if (moved || focusLost()) followFocus();
   return moved;
+}
+
+/** Where focus was when the stick last moved something, for when the element is gone. */
+let lastFocusBox: Box | null = null;
+let lastFocusRegion: Element | null = null;
+/** When the stick last moved something (ms, `performance.now`). */
+let lastScrollAt = -Infinity;
+/** How long after the stick stops a lost focus is still the stick's doing. */
+export const FOLLOW_GRACE_MS = 600;
+
+// A virtualised rail unmounts the card that held focus once it scrolls away, and focus
+// falls to the page itself: that is lost, not "in view" (Phase 16).
+function focusLost(): boolean {
+  const current = document.activeElement;
+  return !current || current === document.body || !current.isConnected;
+}
+
+/**
+ * Whether an element can be seen: inside the window and inside every scrolling box around
+ * it. A rail keeps a few cards mounted either side of what shows; they have a size and a
+ * place, but are clipped by the rail, and focus must not go to them.
+ */
+export function onScreen(el: Element): boolean {
+  const r = el.getBoundingClientRect();
+  if (!(r.width > 0 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth)) return false;
+  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    const s = getComputedStyle(p);
+    if (s.overflowX === "visible" && s.overflowY === "visible") continue;
+    const c = p.getBoundingClientRect();
+    // Half of it showing counts, so a card cut at the rail's edge is still a place to land.
+    const midX = r.left + r.width / 2;
+    const midY = r.top + r.height / 2;
+    if (midX < c.left || midX > c.right || midY < c.top || midY > c.bottom) return false;
+  }
+  return true;
+}
+
+/** If focus has left the view, or the page, put it on the visible control nearest where it was. */
+function followFocus(): void {
+  const current = document.activeElement as HTMLElement | null;
+  if (current && !focusLost() && onScreen(current)) return;
+  const r = focusLost() || !current ? null : current.getBoundingClientRect();
+  // Inside a dialog, focus follows within it, as the D-pad does (see `moveFocus`).
+  const fromRegion = r && current ? region(current) : lastFocusRegion;
+  const trapped = fromRegion?.getAttribute("role") === "dialog" && fromRegion.isConnected;
+  const all = visibleFocusables().filter((el) => onScreen(el) && (!trapped || region(el) === fromRegion));
+  const from: Box = r
+    ? { x: r.x, y: r.y, width: r.width, height: r.height }
+    : (lastFocusBox ?? { x: innerWidth / 2, y: innerHeight / 2, width: 0, height: 0 });
+  const i = nearestBox(from, all.map(box));
+  all[i]?.focus({ preventScroll: true });
+}
+
+/**
+ * The stick is at rest. A rail re-renders a frame or two after its last scroll and only
+ * then unmounts the card that had focus; within `FOLLOW_GRACE_MS` of the stick moving
+ * something, a focus lost that way is put back. Later, a lost focus is someone else's
+ * (a click on the page), and is left alone.
+ */
+export function followAfterScroll(now: number): void {
+  if (now - lastScrollAt > FOLLOW_GRACE_MS || !focusLost()) return;
+  followFocus();
 }
 
 /** Mark the document as driven by a pad (or not), for the ten-foot focus treatment. */
@@ -474,6 +561,10 @@ export function startGamepad(handlers: GamepadHandlers): () => void {
       // The right stick scrolls whatever holds focus (Phase 16). A frame's time, capped so
       // a stall does not throw the page.
       if (scrolling) scrollByStick(rx, ry, Math.min(50, lastTick ? now - lastTick : 16));
+      else {
+        releaseSnap();
+        followAfterScroll(now);
+      }
       for (const b of pressed) {
         // Something on screen may own a button outright: the on-screen keyboard's X, Y,
         // triggers, bumpers and Menu (ADR-0043).

@@ -134,7 +134,10 @@ const FAKE = `(() => {
     }),
     correct_taste: (a) => { window.__corrections[a.anchor] = a.correction; return null; },
     home: () => [{ key: "loved", title: "Widely loved", items: [{ id: 7, title: "Sunrise", year: 1927,
-      made_by: "F. W. Murnau", runtime_minutes: 94 }] }],
+      made_by: "F. W. Murnau", runtime_minutes: 94 }] },
+      // Phase 16 E3: a rail long enough to run off the screen, for the right stick.
+      { key: "taste", title: "For you", items: Array.from({ length: 24 }, (_, i) => ({ id: 300 + i,
+        title: "Rail film " + (i + 1), year: 1950 + i, made_by: "A Director", runtime_minutes: 100 })) }],
     // Phase 14: two profiles, so Who's watching? opens on launch; Jon's has a PIN.
     profiles: () => window.__profiles,
     switch_profile: (a) => {
@@ -544,6 +547,21 @@ try {
   // Appendix F, I38: a fresh install is told what is left, and a line opens its setting.
   check(await evalJs(`document.querySelector('section[aria-label="Finish setting up"]')?.textContent.includes("0 of 4 done")`),
     "Home says what is left to set up (0 of 4 done)");
+  // Phase 16 E3: the right stick scrolls a long rail sideways, and focus follows into view.
+  const inRail = () => evalJs(`!!document.activeElement?.closest('section[aria-label="For you"]')`);
+  for (let i = 0; i < 14 && !(await inRail()); i++) await press(B.DOWN);
+  check(await inRail(), "the D-pad reaches the long rail");
+  const railLeft = () => evalJs(`document.querySelector('section[aria-label="For you"] [data-rail-viewport]').scrollLeft`);
+  const leftBefore = await railLeft();
+  await evalJs(`__padAxis(2, 0.9)`);
+  await sleep(500);
+  await evalJs(`__padAxis(2, 0)`);
+  await sleep(200);
+  const leftAfter = await railLeft();
+  check(leftAfter > leftBefore + 300, `the right stick scrolls the rail sideways (${leftBefore} -> ${Math.round(leftAfter)})`);
+  check(await evalJs(`(() => { const r = document.activeElement.getBoundingClientRect();
+      return !!document.activeElement.closest('section[aria-label="For you"]') && r.right > 0 && r.left < innerWidth; })()`),
+    `focus follows along the rail, onto a card in view (${(await active())?.text})`);
   // The control: the check must see a page that runs off the edge, or it measures nothing.
   await evalJs(`(() => { const d = document.createElement("p"); d.id = "too-wide"; d.textContent = "too wide";
     d.style.width = "3000px"; document.querySelector("main").appendChild(d); })()`);
@@ -765,6 +783,16 @@ try {
     if ((await mark()) === before) break;
   }
   const unreached = await evalJs(`${PANEL_CONTROLS}.filter((e) => !e.dataset.padSeen).map((e) => e.getAttribute("aria-label") ?? e.textContent.trim())`);
+  // Phase 16 E3: the right stick scrolls the panel too. The walk left it at the bottom.
+  const panelTop = () => evalJs(`document.querySelector('[aria-label="Player menu"]').scrollTop`);
+  const topBefore = await panelTop();
+  await evalJs(`__padAxis(3, -0.9)`);
+  await sleep(400);
+  await evalJs(`__padAxis(3, 0)`);
+  await sleep(200);
+  const topAfter = await panelTop();
+  check(topBefore > 100 && topAfter < topBefore - 100,
+    `the right stick scrolls the player panel (${Math.round(topBefore)} -> ${Math.round(topAfter)})`);
   const total = await evalJs(`${PANEL_CONTROLS}.length`);
   check(total > 10 && unreached.length === 0, `the D-pad reaches every control in the player panel (${total - unreached.length}/${total}; missed: ${unreached.join(", ") || "none"})`);
   await press(B.B);

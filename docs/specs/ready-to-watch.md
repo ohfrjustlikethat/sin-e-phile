@@ -19,6 +19,11 @@ covers what it changed in the player, Home and the first run. TV folder layouts 
   runs on at the playback speed, at most `GLIDE_MAX_S` (0.5 s) past the last report and never past the end
   (`src/features/player/intents.ts` `glide`). A stall therefore still shows as a stall.
 - **Budget**: input to visible response under 100 ms. Measured at ~14 ms in the real window.
+- **Picture**: brightness, contrast and saturation (−100…100), and the **shape and zoom** the phase
+  specifies: Shape cycles as filmed, 16:9, 4:3, 2.35:1 and "fill the screen"; Zoom runs 50–300%.
+  `crates/player` `framing` turns them into mpv's `video-aspect-override` (a forced ratio, else `-1`,
+  so nothing unexpected is ever passed through), `panscan` (1 for fill: crop rather than stretch) and
+  `video-zoom` (a power of two, so a percentage becomes its base-2 logarithm).
 
 ## 2. Input: one intent list, two devices
 
@@ -31,7 +36,7 @@ different things. The pad map (`src/lib/gamepad.ts` `playerIntent`, ADR-0045's T
 | D-pad ← / → | seek 10 s (held: repeats, i.e. scrubs) |
 | D-pad ↑ / ↓ | volume ±5 |
 | LT / RT | seek 30 s |
-| LB / RB | previous / next episode |
+| LB / RB | previous / next episode; in a film, previous / next chapter |
 | Y | subtitles quick menu |
 | X | sound quick menu |
 | Menu | the full player panel |
@@ -39,7 +44,14 @@ different things. The pad map (`src/lib/gamepad.ts` `playerIntent`, ADR-0045's T
 | B | back (closes a menu first, then leaves the player) |
 
 While a quick menu is open, the D-pad moves inside it and does not reach the player (Down never turns the
-volume down under an open menu). `SHORTCUTS` is the single table shown by `?`; a test checks each row's
+volume down under an open menu). **A dialog holds the D-pad**: from a control inside a `role="dialog"`,
+focus only moves to another control in the same dialog (`moveFocus`); before, Down at the foot of the
+player's panel left it for the bar beneath.
+
+**Chapters** (`intents.ts` `chapterTarget`): with no episode either side, RB goes to the next chapter's
+start and LB to the start of the one playing, or to the one before when it began under
+`CHAPTER_BACK_S` (3 s) ago, as every player's "previous" does. Each jump is said on screen
+("Chapter: The city"); with nowhere to go it says so instead of doing nothing. `SHORTCUTS` is the single table shown by `?`; a test checks each row's
 sample key produces the row's intent.
 
 ## 3. The right stick scrolls everything
@@ -50,8 +62,17 @@ rail, the paused film's details — falling back to the nearest scrollable ances
 - **Speed by deflection**: nothing inside `SCROLL_FROM` (0.2); then speed rises with the **square** of the
   push past the dead zone, up to `SCROLL_MAX` (2,400 px/s). A gentle push reads a line at a time; a full
   push crosses a page in about a third of a second.
-- **Focus follows**: if the focused element scrolls out of view, focus moves to the nearest visible
-  focusable (`nearestBox`), so the next D-pad press starts from what the viewer can see.
+- **Focus follows**: if the focused element scrolls out of view, focus moves to the nearest focusable
+  that is really on screen (`onScreen`: inside the window and inside every scrolling box around it),
+  within the same dialog if it was in one, so the next D-pad press starts from what the viewer can see.
+- **Snapping is suspended while the stick drives**: a rail snaps to its cards, and the stick's few
+  pixels a frame each snapped back to where they started, so the stick could not move a rail at all.
+  The element's snap is switched off while the stick moves it and restored at rest, when the rail
+  settles on the nearest card.
+- **A card unmounted under focus**: a virtualised rail removes the card that held focus once it has
+  scrolled away, and it does so a frame or two after the stick's last movement. For `FOLLOW_GRACE_MS`
+  (600 ms) after the stick moved something, focus found on the page itself is put back near where it
+  was; after that, a lost focus is someone else's (a click) and is left alone.
 
 ## 4. Subtitles in the player
 
@@ -88,7 +109,24 @@ come from (add-ons **by address**, checked live; the app suggests none, `SPEC.md
 B goes back a step. Wherever play or download would be and no source is configured, the app says so in
 plain words instead of offering a button that does nothing.
 
-## 7. Layout at three sizes
+## 7. Watched, saved, and what is left to set up (Appendix F, ADR-0046)
+
+- **Start over** (I01) beside "Resume from …", only when there is a place to resume from.
+- **Mark watched** (I21): a film, an episode, a season or a whole show
+  (`ProfileRepository::set_watched`, scopes `WatchScope::{Title, Season, Series}`). Watched records one
+  completed viewing of each title not already finished, as an import does, so the taste model reads it
+  the same way; marking twice records nothing more. Not watched removes every viewing; a rating stays.
+  Either way the resume position goes, so the title leaves Continue watching and the film page's
+  "Resume from" is dropped at once. Episode rows show "Watched"; the series says "Seen N of M".
+- **Watchlist** (I39): "Add to watchlist" on a film's or a show's page; the Watchlist tab is a grid of
+  what was saved, newest first, with a designed empty state. Phase 20 deepens it.
+- **Finish setting up** (I38): a card at the top of Home while anything is left (library folders, an
+  add-on the viewer chose, an OpenSubtitles key, a VPN adapter for downloads); each line opens its
+  Settings section with focus on its first control (`src/lib/openSettings.ts`). A built-in source does
+  not count as one the viewer chose. The rules are pure (`src/features/home/setup.ts`); hidden per
+  profile once dismissed; it waits for every fact before showing, so it never flashes "0 of 4".
+
+## 8. Layout at three sizes
 
 `src/lib/layoutCheck.ts` (and the same rules in the pad-flow audit): the page never scrolls sideways, no
 text is cut off in its box, nothing sits off the right edge outside a deliberate scroller. Checked at
@@ -96,10 +134,13 @@ text is cut off in its box, nothing sits off the right edge outside a deliberate
 goes compact when it does not — a media query cannot, because TV mode zooms without changing what a media
 query sees.
 
-## 8. Testing it
+## 9. Testing it
 
 - `node tools/uiaudit/controller.mjs` — the pad flow against the built app with a fake backend: first run,
-  search, film page, player, quick menus, subtitles find/choose, right-stick scrolling, layout.
+  Home's setup card, search, film page (mark watched, watchlist), player (Y and X quick menus, the
+  bumpers by chapter, seek and hold-to-scrub, every panel control by D-pad), the right stick on a long
+  rail, the panel, the paused details and Settings, the Watchlist tab, layout. The fake backend can
+  send events (`__emit`), so the player's reports arrive as the real backend's do.
 - `npm run audit:ui` — frame budgets, focus rings, reduced motion.
 - The real window: debug build with `SINEPHILE_AUTOPLAY` and `SINEPHILE_PROBE` (timed intents as the pad
   sends them), video-window region read from Windows (`GetWindowRgn`). PrintWindow cannot see through the
