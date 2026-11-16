@@ -166,7 +166,9 @@ export function SearchScreen() {
       .catch(() => {});
     openDetail(id);
   };
-  const [query, setQuery] = useState("");
+  // Kept while away: search keeps its words and its trail like a tab (Phase 16).
+  const [query, setQuery] = useState(() => useUi.getState().searchQuery);
+  useEffect(() => useUi.getState().setSearchQuery(query), [query]);
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [searching, setSearching] = useState(false);
   const [focused, setFocused] = useState(-1);

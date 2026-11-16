@@ -1063,6 +1063,21 @@ try {
   await shoot("07e-watchlist");
   await layoutAtSizes("Watchlist");
 
+  // Phase 16 (the author): each tab keeps its page, and the way back says where it goes.
+  const titleShown = () => evalJs(`(document.querySelector('main article h1')?.textContent ?? "").includes("Sunrise")`);
+  await press(B.A);
+  await waitFor(titleShown, "the saved film's page", 25);
+  check(await evalJs(`!!document.querySelector('button[aria-label="Back to Watchlist"]')`),
+    "its page has a back arrow that says Watchlist");
+  await press(B.RB);
+  await waitFor(async () => !(await titleShown()), "the next tab", 25);
+  await press(B.LB);
+  await waitFor(titleShown, "the film's page again", 25);
+  check(true, "RB then LB comes back to the film's page: the Watchlist tab kept it");
+  await press(B.B);
+  await waitFor(onWatchlist, "the Watchlist again", 25);
+  check(!(await titleShown()), "B goes back from the film's page to the Watchlist");
+
   // ADR-0043 (Phase 11 E6): every text field, not just search. Menu opens Settings, the
   // D-pad walks down past the library's path field to the add-on catalogue's address, and
   // the pad types with upper case. (The OpenSubtitles key this used to type into is saved
@@ -1178,6 +1193,13 @@ try {
     "focus follows onto something in view",
   );
   await press(B.B); // leave Settings
+  // Phase 16: a page comes back where it was left, in real layout (Settings is long).
+  await press(B.MENU);
+  await waitFor(() => evalJs(`document.body.textContent.includes("OpenSubtitles")`), "Settings again", 25);
+  await sleep(150);
+  const again = await scrolled();
+  check(Math.abs(again - after) < 4, `Settings opens again where it was left (${Math.round(after)} -> ${Math.round(again)})`);
+  await press(B.B);
 
   // Reduced motion: every transform goes, the ring stops gliding.
   await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });

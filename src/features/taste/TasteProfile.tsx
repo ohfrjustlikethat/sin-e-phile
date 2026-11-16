@@ -45,13 +45,7 @@ export function TasteProfile() {
   const { active } = useProfiles();
   const profile = useQuery({ queryKey: TASTE_PROFILE, queryFn: () => ok(commands.tasteProfile()) });
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setTasteOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [setTasteOpen]);
+  // Escape is the app's one way back (App.tsx), with the labelled arrow above this page (BackBar).
 
   // A pad lands on the first mode's choice, once, rather than wherever focus fell.
   const list = useRef<HTMLOListElement>(null);
@@ -68,10 +62,7 @@ export function TasteProfile() {
   const modes = profile.data?.modes ?? [];
   const axes = profile.data?.axes ?? [];
   return (
-    <article className="max-w-[900px] px-16 pt-12 pb-24">
-      <button type="button" onClick={() => setTasteOpen(false)} className="label mb-10 hover:text-ink">
-        ← Back
-      </button>
+    <article className="max-w-[900px] px-16 pt-6 pb-24">
       <h1 className="font-serif text-[56px] leading-none tracking-[-0.015em] text-ink">
         {active ? `${active.name}'s taste` : "Your taste"}
       </h1>

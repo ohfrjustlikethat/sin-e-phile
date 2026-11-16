@@ -60,7 +60,6 @@ function unmetText(plan: PlayPlanView, audio: string | null, quality: string | n
 
 export function DetailScreen() {
   const id = useUi((s) => s.detail);
-  const closeDetail = useUi((s) => s.closeDetail);
   const play = useUi((s) => s.play);
   // No source can play this: Settings, at the place to add one, with focus there for a pad.
   const addSource = () => openSettingsAt("Add a source");
@@ -109,7 +108,7 @@ export function DetailScreen() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" || e.key === "Backspace") closeDetail();
+      // Escape and Backspace are the app's one way back (App.tsx, `back` in src/lib/store.ts).
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "s") {
         e.preventDefault();
         setPanel((p) => !(p ?? usePlaybackChoice.getState().details));
@@ -117,7 +116,7 @@ export function DetailScreen() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [closeDetail]);
+  }, []);
 
   if (id === null) return null;
   if (item.isPending) {
@@ -149,10 +148,7 @@ export function DetailScreen() {
   };
 
   return (
-    <article className="max-w-[1100px] px-16 pt-12 pb-24">
-      <button type="button" onClick={closeDetail} className="label mb-10 hover:text-ink">
-        ← Back
-      </button>
+    <article className="max-w-[1100px] px-16 pt-6 pb-24">
       <h1 className="font-serif text-[64px] leading-[0.98] tracking-[-0.015em] text-ink">{d.title}</h1>
       {byline && <p className="label mt-5">{byline}</p>}
 

@@ -123,15 +123,6 @@ describe("Downloads (SPEC.md Phase 13)", () => {
     expect(await screen.findByText("Saved.")).toBeInTheDocument();
   });
 
-  it("goes back with Escape, but not from inside a field", async () => {
-    renderIt();
-    const field = await screen.findByLabelText("Web UI address");
-    fireEvent.keyDown(field, { key: "Escape" });
-    expect(useUi.getState().downloadsOpen).toBe(true);
-    fireEvent.keyDown(window, { key: "Escape" });
-    expect(useUi.getState().downloadsOpen).toBe(false);
-  });
-
   it("says what to do when nothing is downloading", async () => {
     commands.downloads.mockImplementationOnce(() => ok([]));
     renderIt();

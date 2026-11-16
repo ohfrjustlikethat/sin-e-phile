@@ -37,21 +37,10 @@ const LIMITS = [
 ];
 
 export function DownloadsScreen() {
-  const setDownloadsOpen = useUi((s) => s.setDownloadsOpen);
   const list = useDownloads();
   const storage = useQuery({ queryKey: STORAGE, queryFn: () => ok(commands.downloadsStorage()) });
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      const t = e.target as HTMLElement | null;
-      // Escape in a field leaves the field first.
-      if (t && (t.tagName === "INPUT" || t.tagName === "SELECT")) return;
-      setDownloadsOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [setDownloadsOpen]);
+  // Escape is the app's one way back (App.tsx), with the labelled arrow above this page (BackBar).
 
   // Something just finished: the storage list changes too.
   const doneCount = list.data?.filter((r) => r.download.state === "done").length ?? 0;
@@ -72,10 +61,7 @@ export function DownloadsScreen() {
     .join(" · ");
 
   return (
-    <article className="max-w-[1100px] px-16 pt-12 pb-24">
-      <button type="button" onClick={() => setDownloadsOpen(false)} className="label mb-10 hover:text-ink">
-        ← Back
-      </button>
+    <article className="max-w-[1100px] px-16 pt-6 pb-24">
       <h1 className="font-serif text-[56px] leading-none tracking-[-0.015em] text-ink">Downloads</h1>
       {summary && (
         <p className="label mt-5" role="status">

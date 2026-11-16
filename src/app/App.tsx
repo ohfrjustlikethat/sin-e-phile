@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Masthead } from "@/app/Masthead";
 import { PlayerScreen } from "@/features/player/PlayerScreen";
 import { DetailScreen } from "@/features/detail/DetailScreen";
@@ -29,6 +29,9 @@ import { FocusLayer } from "@/design-system/focus/FocusLayer";
 import { play, rumble } from "@/design-system/focus/feedback";
 import { useControllerSettings } from "@/lib/controllerSettings";
 import { setWindowFullscreen } from "@/lib/fullscreen";
+import { useScrollMemory } from "@/lib/scrollMemory";
+import { BackBar } from "./BackBar";
+import { handleBack } from "./backKey";
 
 /** Full screen for the whole app window (ADR-0042: View, or picking the pad up), from any window state. */
 async function fullscreen(on?: boolean) {
@@ -87,16 +90,28 @@ export function App() {
   const detail = useUi((s) => s.detail);
   useDropToPlay();
   const [palette, setPalette] = useState(false);
-  const [searching, setSearching] = useState(false);
+  // Search keeps its own trail and words while away (Phase 16); see `Tab` in src/lib/store.ts.
+  const searching = useUi((s) => s.tab === "search");
   // Search opens from anywhere: over Settings and over a film's page, which would
   // otherwise take precedence and leave search switched on but invisible.
-  const openSearch = useCallback(() => {
-    const ui = useUi.getState();
-    ui.setSettingsOpen(false);
-    ui.setDownloadsOpen(false);
-    ui.closeDetail();
-    setSearching(true);
-  }, []);
+  const openSearch = useCallback(() => useUi.getState().searchNow(), []);
+  // What has its own Escape: the first run and the palette (the key handler reads this when a key comes).
+  const blocking = useRef(false);
+  blocking.current = Boolean(onboarding) || palette;
+  // One scroll area holds every page; each page's position is kept and put back (Phase 16).
+  const pageKey = useUi((s) =>
+    s.reviewOpen
+      ? "review"
+      : s.tasteOpen
+        ? "taste"
+        : s.settingsOpen
+          ? "settings"
+          : s.downloadsOpen
+            ? "downloads"
+            : `${s.tab}|${s.trails[s.tab].join(",")}`,
+  );
+  const navSeq = useUi((s) => s.navSeq);
+  const mainRef = useScrollMemory(pageKey, navSeq);
 
   // TV mode's scale must not apply while the player positions its native window.
   useEffect(() => {
@@ -144,8 +159,7 @@ export function App() {
                   (i + (action.next ? 1 : DESTINATIONS.length - 1)) %
                     DESTINATIONS.length
                 ];
-              if (next) ui.setDestination(next);
-              setSearching(false);
+              if (next) ui.goTab(next);
               break;
             }
             case "search":
@@ -193,10 +207,8 @@ export function App() {
         target?.tagName === "TEXTAREA" ||
         target?.isContentEditable;
 
-      if (event.key === "Escape" && searching) {
-        setSearching(false);
-        return;
-      }
+      // One step back (Phase 16): Escape, Backspace outside a field, and the pad's B. See backKey.ts.
+      if (handleBack(event, blocking.current)) return;
       if (typing) return;
       if (
         event.key === "/" ||
@@ -208,7 +220,7 @@ export function App() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [searching, openSearch]);
+  }, [openSearch]);
 
   // §3.1: the palette searches "media, actions, and settings". Phase 5 supplies
   // media; these are the actions and settings that exist today.
@@ -226,19 +238,13 @@ export function App() {
       id: "downloads",
       label: "Open downloads",
       group: "Navigate",
-      run: () => {
-        setSearching(false);
-        useUi.getState().setDownloadsOpen(true);
-      },
+      run: () => useUi.getState().setDownloadsOpen(true),
     },
     {
       id: "taste",
       label: "Your taste",
       group: "Navigate",
-      run: () => {
-        setSearching(false);
-        useUi.getState().setTasteOpen(true);
-      },
+      run: () => useUi.getState().setTasteOpen(true),
     },
     {
       id: "settings",
@@ -258,7 +264,7 @@ export function App() {
   if (DESIGN_ROUTE) {
     return (
       <div className="flex h-full flex-col bg-base text-ink">
-        <Masthead searching={false} onSearchChange={() => {}} />
+        <Masthead />
         <DesignGallery />
       </div>
     );
@@ -275,8 +281,9 @@ export function App() {
     <>
       {!full && (
         <div className="flex h-full flex-col bg-base text-ink">
-          <Masthead searching={searching} onSearchChange={setSearching} />
-          <main className="min-h-0 min-w-0 flex-1 overflow-auto">
+          <Masthead />
+          <main ref={mainRef} className="min-h-0 min-w-0 flex-1 overflow-auto">
+            <BackBar />
             {settingsOpen && reviewOpen ? (
               <ReviewScreen />
             ) : settingsOpen && tasteOpen ? (

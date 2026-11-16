@@ -37,32 +37,18 @@ function inTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
-export function Masthead({
-  searching,
-  onSearchChange,
-}: {
-  searching: boolean;
-  onSearchChange: (open: boolean) => void;
-}) {
-  const { destination, settingsOpen, setDestination, setSettingsOpen, downloadsOpen, setDownloadsOpen } =
-    useUi();
+export function Masthead() {
+  const { destination, settingsOpen, setSettingsOpen, downloadsOpen, setDownloadsOpen, goTab } = useUi();
+  const searching = useUi((s) => s.tab === "search");
   const controls = useWindowControls();
   const downloads = useDownloads();
   const busy = inProgress(downloads.data ?? []).length;
   const { active } = useProfiles();
   const setPickerOpen = useUi((s) => s.setPickerOpen);
-  const closeDetail = useUi((s) => s.closeDetail);
 
-  // Settings, Downloads and a title's page each take the main area over everything else,
-  // so going anywhere from the masthead closes them first (Phase 16: Search and Home did
-  // nothing from a film's page).
-  const go = (d: Destination) => {
-    setSettingsOpen(false);
-    setDownloadsOpen(false);
-    closeDetail();
-    onSearchChange(false);
-    setDestination(d);
-  };
+  // Each tab keeps its trail (Phase 16, the author): going to a tab shows the page it was left on, and
+  // pressing the tab already showing goes to its start. Settings and Downloads close on the way.
+  const go = (d: Destination) => goTab(d);
 
   // Compact when the full masthead does not fit (Phase 16: at 1280 wide on a 150% display,
   // and in TV mode's 125% zoom, "TV Shows" wrapped and the window buttons went off the
@@ -144,12 +130,7 @@ export function Masthead({
       <div className={`flex shrink-0 items-center pr-3 ${compact ? "gap-1.5" : "gap-2"}`}>
         <button
           type="button"
-          onClick={() => {
-            setSettingsOpen(false);
-            setDownloadsOpen(false);
-            closeDetail();
-            onSearchChange(true);
-          }}
+          onClick={() => goTab("search")}
           aria-pressed={searching}
           className={`flex h-8 items-center gap-2.5 rounded-sm border px-3 text-[13px] transition-colors duration-[var(--dur-standard)] ${
             searching
@@ -169,10 +150,7 @@ export function Masthead({
 
         <button
           type="button"
-          onClick={() => {
-            onSearchChange(false);
-            setDownloadsOpen(true);
-          }}
+          onClick={() => setDownloadsOpen(true)}
           aria-pressed={downloadsOpen}
           aria-label={busy > 0 ? `Downloads, ${busy} in progress` : "Downloads"}
           className={`flex h-8 items-center gap-2 whitespace-nowrap ${compact ? "px-2.5" : "px-3"} text-[13px] transition-colors duration-[var(--dur-standard)] ${
@@ -200,10 +178,7 @@ export function Masthead({
 
         <button
           type="button"
-          onClick={() => {
-            onSearchChange(false);
-            setSettingsOpen(true);
-          }}
+          onClick={() => setSettingsOpen(true)}
           aria-label="Settings"
           aria-pressed={settingsOpen}
           className={`grid h-8 w-8 place-items-center transition-colors duration-[var(--dur-standard)] ${
