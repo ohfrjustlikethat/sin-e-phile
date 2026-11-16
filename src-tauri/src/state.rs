@@ -25,7 +25,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use sinephile_metadata_api::HttpTransport;
 use sinephile_persistence::Db;
 use sinephile_search_engine::Engine;
-use source_protocol::Manifest;
+use source_protocol::AddonManifest;
 use url::Url;
 
 use crate::tiers::{self, HardwareProfile, Tier};
@@ -48,7 +48,7 @@ pub struct AppState {
     /// Manifests shown on the confirm screen and not yet installed, by the URL the user
     /// pasted. Install takes the manifest from HERE, so what is installed is exactly
     /// what was shown — not whatever the address serves a second time.
-    pending_addons: Mutex<HashMap<String, (Url, Manifest)>>,
+    pending_addons: Mutex<HashMap<String, (Url, AddonManifest)>>,
     /// Where `data/` is, once the startup task has found it.
     data_dir: RwLock<Option<PathBuf>>,
     /// The torrent engine and its streaming server, started the first time anything
@@ -206,7 +206,7 @@ impl AppState {
     }
 
     /// Remember a manifest the user is being asked to confirm.
-    pub fn hold_addon(&self, pasted: &str, url: Url, manifest: Manifest) {
+    pub fn hold_addon(&self, pasted: &str, url: Url, manifest: AddonManifest) {
         self.pending_addons
             .lock()
             .expect("pending lock poisoned")
@@ -214,7 +214,7 @@ impl AppState {
     }
 
     /// The manifest shown for this address, taken so it cannot be installed twice.
-    pub fn take_addon(&self, pasted: &str) -> Option<(Url, Manifest)> {
+    pub fn take_addon(&self, pasted: &str) -> Option<(Url, AddonManifest)> {
         self.pending_addons
             .lock()
             .expect("pending lock poisoned")

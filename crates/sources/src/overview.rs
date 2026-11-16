@@ -8,7 +8,7 @@ use std::sync::Arc;
 use sinephile_metadata_api::Transport;
 use sinephile_persistence::repositories::{BackendRow, DirectLinkRepository, SourceRepository};
 use sinephile_persistence::{Db, DbError};
-use source_protocol::{Manifest, SourceBackend};
+use source_protocol::{AddonManifest, SourceBackend};
 use url::Url;
 
 use crate::backends::{self, addon::backend_id, direct::DirectLink, Context};
@@ -48,14 +48,14 @@ fn built_in(id: &str) -> Option<(&'static str, &'static str)> {
 }
 
 /// What to call a backend in a sentence: "Found in Internet Archive".
-pub fn display_name(id: &str, addons: &[(Url, Manifest)]) -> String {
+pub fn display_name(id: &str, addons: &[(Url, AddonManifest)]) -> String {
     if let Some((name, _)) = built_in(id) {
         return name.to_string();
     }
     addons
         .iter()
         .find(|(_, m)| backend_id(m) == id)
-        .map(|(_, m)| m.name.clone())
+        .map(|(_, m)| m.name().to_string())
         .unwrap_or_else(|| id.to_string())
 }
 
@@ -100,7 +100,7 @@ fn human_ms(ms: f64) -> String {
 pub async fn overview(
     db: &Db,
     backends: &[Arc<dyn SourceBackend>],
-    addons: &[(Url, Manifest)],
+    addons: &[(Url, AddonManifest)],
 ) -> Result<Vec<SourceSummary>, DbError> {
     let repo = SourceRepository::new(db);
     let ids: Vec<&str> = backends.iter().map(|b| b.id()).collect();
@@ -120,8 +120,8 @@ pub async fn overview(
                     .find(|(_, m)| backend_id(m) == row.id)
                     .map(|(url, m)| {
                         (
-                            m.name.clone(),
-                            m.description.clone(),
+                            m.name().to_string(),
+                            m.description().to_string(),
                             url.host_str().map(String::from),
                         )
                     })

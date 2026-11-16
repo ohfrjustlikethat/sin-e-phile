@@ -26,6 +26,7 @@ What the repository contains instead is:
 
 - A **source addon protocol**: a documented, versioned interface that any source backend can implement.
 - A **declarative addon manifest format** (TOML/JSON, no executable code) so a source can be described as data rather than shipped as an implementation.
+- **Stremio's add-on protocol, spoken beside the app's own** (ADR-0047): a user can paste the address of a Stremio add-on they already use (or its `stremio://` link). It is asked by IMDb id, held to the same limits as any add-on, and named by the app as little as any other: not at all.
 - A **community addon catalogue browser** that fetches a catalogue from a URL the *user* supplies. No default URL ships.
 - Working reference backends against **unambiguously legal sources only**: the local filesystem, the Internet Archive's public-domain collection, and user-supplied M3U/direct HTTP.
 
@@ -1780,6 +1781,14 @@ Size: **S** one commit · **M** a subtask · **L** several subtasks.
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 4.2.0 — 2026-11-17 (Stremio add-ons)
+
+Minor: it adds a capability; no exit criterion changes. A decision ADR-0040 reserves, taken by the author.
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A37 | §2.1 | **Stremio's add-on protocol beside the app's own.** A pasted Stremio manifest (or `stremio://` link) installs like any add-on; it is asked by IMDb id; streams the player cannot open are left out; torrents it returns can be downloaded. The app still ships, suggests and names no add-on. | [0047](docs/adr/0047-stremio-addon-protocol.md) |
 
 ### spec_version 4.1.0 — 2026-11-16 (an improvement backlog)
 

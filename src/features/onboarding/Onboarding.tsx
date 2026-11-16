@@ -196,8 +196,9 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             <div className="flex flex-col gap-2">
               <p className="mb-6 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
                 sin·e·phile comes with no sources of its own: public-domain films from the Internet Archive play
-                already, and everything else comes from add-ons you choose. Paste the address of one you have; it is
-                checked, and you see what it offers, before it is added. Without one, a film you do not have here has
+                already, and everything else comes from add-ons you choose, including Stremio add-ons. Paste the
+                address of one you have (a stremio:// link works too); it is checked, and you see what it offers,
+                before it is added. Without one, a film you do not have here has
                 nothing to play or download from.
               </p>
               <SourcesSection />

@@ -13,14 +13,15 @@ use source_protocol::wire::{
     parse_find, parse_resolve, ResolveRequest, MAX_FIND_RESPONSE_BYTES, MAX_RESOLVE_RESPONSE_BYTES,
 };
 use source_protocol::{
-    async_trait, BackendCapabilities, Manifest, MediaQuery, PlayableStream, SourceBackend,
-    SourceCandidate, SourceError,
+    async_trait, AddonManifest, BackendCapabilities, Manifest, MediaQuery, PlayableStream,
+    SourceBackend, SourceCandidate, SourceError,
 };
 
 /// Addons share the registry with built-ins, so their ids are namespaced: an addon
-/// cannot install itself as `internet-archive` and take over its settings.
-pub fn backend_id(manifest: &Manifest) -> String {
-    format!("addon:{}", manifest.id)
+/// cannot install itself as `internet-archive` and take over its settings. The same for
+/// either protocol (ADR-0047).
+pub fn backend_id(manifest: &AddonManifest) -> String {
+    format!("addon:{}", manifest.id())
 }
 
 pub struct AddonBackend {
@@ -33,7 +34,7 @@ impl AddonBackend {
     /// `http` must be the UNTRUSTED transport (`HttpTransport::untrusted`).
     pub fn new(manifest: Manifest, http: Arc<dyn Transport>) -> Self {
         Self {
-            id: backend_id(&manifest),
+            id: format!("addon:{}", manifest.id),
             manifest,
             http,
         }

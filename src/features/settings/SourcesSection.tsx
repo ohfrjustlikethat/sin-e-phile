@@ -207,8 +207,9 @@ function AddSource({ onAdded }: { onAdded: () => void }) {
     <Section title="Add a source">
       <p className="mb-4 text-xs leading-relaxed text-ink-faint">
         A source is a service someone else runs that knows where films can be watched. Paste
-        the address its author gives you. You will see what it says it does before anything
-        is added, and it only ever receives what you search for.
+        the address its author gives you. Stremio add-ons work too: paste the add-on&apos;s
+        manifest address, or its stremio:// link. You will see what it says it does before
+        anything is added, and it only ever receives what you search for.
       </p>
       <form
         className="flex items-end gap-2"

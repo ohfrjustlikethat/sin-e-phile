@@ -10,13 +10,17 @@
 //! SINEPHILE_ADDON_QUERY="Nosferatu" \
 //!   cargo test -p sinephile-sources --test conformance -- --ignored --nocapture
 //! ```
+//!
+//! A Stremio add-on (ADR-0047) is asked by IMDb id: `SINEPHILE_ADDON_IMDB`, Nosferatu's
+//! (`tt0013442`) unless set; a series is asked for its season 1, episode 1.
 
 use std::sync::Arc;
 
 use sinephile_metadata_api::HttpTransport;
 use sinephile_sources::addons::{describe, fetch_manifest};
 use sinephile_sources::backends::addon::AddonBackend;
-use source_protocol::{MediaKind, MediaQuery, SourceBackend, SourceError};
+use sinephile_sources::backends::stremio::StremioBackend;
+use source_protocol::{AddonManifest, MediaKind, MediaQuery, SourceBackend, SourceError};
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore]
@@ -38,14 +42,22 @@ async fn conformance() {
         shown.delivers.join(" ")
     );
 
-    let backend = AddonBackend::new(manifest.clone(), http);
-    let kind = if manifest.media.contains(&MediaKind::Film) {
+    let backend: Box<dyn SourceBackend> = match &manifest {
+        AddonManifest::Native(m) => Box::new(AddonBackend::new(m.clone(), http)),
+        AddonManifest::Stremio(m) => Box::new(StremioBackend::new(m.clone(), http)),
+    };
+    let kind = if manifest.media().contains(&MediaKind::Film) {
         MediaKind::Film
     } else {
         MediaKind::Episode
     };
     let mut query = MediaQuery::film(title.clone(), None);
     query.kind = kind;
+    query.ids.imdb =
+        Some(std::env::var("SINEPHILE_ADDON_IMDB").unwrap_or_else(|_| "tt0013442".into()));
+    if kind == MediaKind::Episode {
+        (query.season, query.episode) = (Some(1), Some(1));
+    }
     let found = backend
         .find(&query)
         .await
@@ -62,6 +74,10 @@ async fn conformance() {
         .unwrap_or_else(|e| panic!("resolve failed: {e}"));
     println!("resolve ok: {stream:?}");
 
+    // A Stremio candidate's key IS its stream: there is no key to forge at the add-on.
+    if matches!(manifest, AddonManifest::Stremio(_)) {
+        return;
+    }
     let mut forged = found[0].clone();
     forged.key = "a key this addon never issued".into();
     match backend.resolve(&forged).await {

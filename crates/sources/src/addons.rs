@@ -10,7 +10,7 @@ use sinephile_persistence::repositories::{AddonRow, SourceRepository};
 use sinephile_persistence::{Db, DbError};
 use source_protocol::manifest::MAX_MANIFEST_BYTES;
 use source_protocol::{
-    parse_manifest_url, Catalogue, Manifest, ManifestError, MediaKind, Transport as Wire,
+    parse_manifest_url, AddonManifest, Catalogue, ManifestError, MediaKind, Transport as Wire,
 };
 use url::Url;
 
@@ -36,10 +36,10 @@ pub enum InstallError {
 pub async fn fetch_manifest(
     http: &dyn Transport,
     pasted: &str,
-) -> Result<(Url, Manifest), InstallError> {
+) -> Result<(Url, AddonManifest), InstallError> {
     let url = parse_manifest_url(pasted)?;
     let bytes = fetch(http, &url, MAX_MANIFEST_BYTES).await?;
-    let manifest = Manifest::parse(bytes.as_bytes(), &url)?;
+    let manifest = AddonManifest::parse(bytes.as_bytes(), &url)?;
     Ok((url, manifest))
 }
 
@@ -105,10 +105,10 @@ pub struct Description {
     pub replaces: bool,
 }
 
-pub fn describe(url: &Url, manifest: &Manifest, installed: &[AddonRow]) -> Description {
+pub fn describe(url: &Url, manifest: &AddonManifest, installed: &[AddonRow]) -> Description {
     let id = backend_id(manifest);
     let kinds: Vec<&str> = manifest
-        .media
+        .media()
         .iter()
         .filter_map(|k| match k {
             MediaKind::Film => Some("films"),
@@ -116,8 +116,8 @@ pub fn describe(url: &Url, manifest: &Manifest, installed: &[AddonRow]) -> Descr
             MediaKind::Unknown => None,
         })
         .collect();
-    let delivers = manifest
-        .transports
+    let mut delivers: Vec<String> = manifest
+        .transports()
         .iter()
         .filter_map(|t| match t {
             Wire::Http => Some("Streams over the web.".to_string()),
@@ -126,24 +126,31 @@ pub fn describe(url: &Url, manifest: &Manifest, installed: &[AddonRow]) -> Descr
             Wire::Unknown => None,
         })
         .collect();
+    if matches!(manifest, AddonManifest::Stremio(_)) {
+        delivers.insert(
+            0,
+            "A Stremio add-on: it is asked by IMDb id, and says title by title which way it streams."
+                .to_string(),
+        );
+    }
     Description {
         replaces: installed.iter().any(|a| a.backend_id == id),
         backend_id: id,
-        name: manifest.name.clone(),
-        version: manifest.version.clone(),
-        description: manifest.description.clone(),
+        name: manifest.name().to_string(),
+        version: manifest.version().to_string(),
+        description: manifest.description().to_string(),
         finds: format!("Finds {}.", kinds.join(" and ")),
         delivers,
         host: url.host_str().unwrap_or_default().to_string(),
-        homepage: manifest.homepage.clone(),
+        homepage: manifest.homepage().map(str::to_string),
     }
 }
 
 /// Store a manifest the user confirmed. It is re-serialised from the checked struct,
 /// never stored as the bytes that arrived, so what is kept is exactly what was checked.
-pub async fn install(db: &Db, url: &Url, manifest: &Manifest) -> Result<String, InstallError> {
+pub async fn install(db: &Db, url: &Url, manifest: &AddonManifest) -> Result<String, InstallError> {
     let id = backend_id(manifest);
-    let json = serde_json::to_string(manifest).expect("a manifest always serialises");
+    let json = manifest.to_json();
     SourceRepository::new(db)
         .install_addon(&id, url.as_str(), &json)
         .await?;
@@ -153,12 +160,12 @@ pub async fn install(db: &Db, url: &Url, manifest: &Manifest) -> Result<String, 
 /// Every installed manifest, checked again on the way out of the database. A row that
 /// no longer passes — edited by hand, or written by an older, laxer build — is left
 /// out and reported, not loaded.
-pub async fn installed(db: &Db) -> Result<(Vec<(Url, Manifest)>, Vec<String>), DbError> {
+pub async fn installed(db: &Db) -> Result<(Vec<(Url, AddonManifest)>, Vec<String>), DbError> {
     let rows = SourceRepository::new(db).addons().await?;
     let (mut ok, mut refused) = (Vec::new(), Vec::new());
     for row in rows {
         let checked = Url::parse(&row.manifest_url).ok().and_then(|url| {
-            Manifest::parse(row.manifest.as_bytes(), &url)
+            AddonManifest::parse(row.manifest.as_bytes(), &url)
                 .ok()
                 .map(|m| (url, m))
         });

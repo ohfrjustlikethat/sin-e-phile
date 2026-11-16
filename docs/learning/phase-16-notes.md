@@ -29,6 +29,8 @@ test passed. Four sections per ADR-0016 (A4).
   select (A "clicked" it, and a click from a script does not open its list) or any slider (Left and
   Right moved off it); a button that disabled itself once pressed dropped focus onto the page; and a
   long step's last fields sat half under the sticky footer, where Down could not leave them.
+- **Stremio add-ons work** (2026-11-17, ADR-0047): paste a Stremio add-on's address or `stremio://` link; it is
+  asked by IMDb id, and its torrents stream through the built-in engine and can be downloaded.
 - **The author's second library, read properly** (2026-11-16): `Ep. 01`, `Chapter 01`, year ranges,
   shelf-order prefixes and `Extra 1`; guesses kept off Home; a show's own files listed in order on its
   page; Films and TV Shows list what is on this PC. And in the player: click to pause, View for full
@@ -94,6 +96,9 @@ test passed. Four sections per ADR-0016 (A4).
 - **Sorting with "no number" last** (`None` as `u32::MAX` in the key) — `crates/library/src/shelf.rs:22` `in_order`.
 - **A pattern that means two things, told apart by context** ("Chapter 2" with a year is a title) — `crates/filename-parser/src/lib.rs` `parse`; a year range, `crates/filename-parser/src/tags.rs:597`.
 - **A prefix recognised by its punctuation, not its digits** — `crates/library/src/folders.rs:105` `without_shelf_order`.
+- **Two protocols behind one type, chosen by the data's shape** — `crates/source-protocol/src/addon.rs` `AddonManifest::parse`.
+- **Reading an untrusted JSON answer field by field, keeping what is safe and dropping the rest** — `crates/source-protocol/src/stremio.rs` `parse_streams`, `candidate`.
+- **A key that carries its own payload, so there is no second request** — `crates/source-protocol/src/stremio.rs` `Key`, `stream_of`.
 
 ## 4. Five questions
 

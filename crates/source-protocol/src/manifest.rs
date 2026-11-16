@@ -137,7 +137,13 @@ pub(crate) fn malformed(e: serde_json::Error) -> ManifestError {
 
 /// Check the address a user pasted before anything is fetched from it.
 pub fn parse_manifest_url(raw: &str) -> Result<Url, ManifestError> {
-    check_url(raw.trim())
+    let raw = raw.trim();
+    // Stremio's install links ("stremio://host/manifest.json") stand for the add-on's
+    // https address (ADR-0047).
+    match raw.strip_prefix("stremio://") {
+        Some(rest) => check_url(&format!("https://{rest}")),
+        None => check_url(raw),
+    }
 }
 
 /// Size, then UTF-8, then nesting depth: everything that can be refused before a
@@ -229,7 +235,7 @@ pub(crate) fn check_text(
     Ok(())
 }
 
-fn is_deceptive(c: char) -> bool {
+pub(crate) fn is_deceptive(c: char) -> bool {
     (c.is_control() && c != '\n')
         || matches!(c as u32,
             0x200B..=0x200F      // zero-width space/joiners, LRM, RLM
