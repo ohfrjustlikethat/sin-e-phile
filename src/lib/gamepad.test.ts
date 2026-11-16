@@ -32,6 +32,7 @@ describe("gamepad decisions", () => {
     expect(playerIntent(BUTTON.Y)).toEqual({ kind: "subtitles_menu" });
     expect(playerIntent(BUTTON.X)).toEqual({ kind: "audio_menu" });
     expect(playerIntent(BUTTON.MENU)).toEqual({ kind: "player_menu" });
+    expect(playerIntent(BUTTON.VIEW)).toEqual({ kind: "fullscreen" });
     expect(playerIntent(BUTTON.LEFT)).toEqual({ kind: "seek", seconds: -10 });
     expect(playerIntent(BUTTON.RIGHT)).toEqual({ kind: "seek", seconds: 10 });
     expect(playerIntent(BUTTON.UP)).toEqual({ kind: "volume", delta: 5 });
@@ -133,6 +134,33 @@ describe("startGamepad, with a simulated pad", () => {
     expect(nav).toHaveBeenCalledWith({ kind: "tab", next: true });
     stop();
     expect(document.documentElement.dataset.input).toBeUndefined();
+  });
+
+  it("View goes to the player's full screen while it plays, the window's otherwise, never both", () => {
+    let pad = { connected: true, buttons: Array(17).fill({ pressed: false, value: 0 }), axes: [0, 0] };
+    vi.stubGlobal("navigator", { getGamepads: () => [pad] });
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => frames.push(cb));
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+    const player = vi.fn(() => true);
+    const view = vi.fn();
+    const stop = startGamepad({ player, nav: vi.fn(), view });
+    const tap = (at: number) => {
+      const buttons = Array(17).fill({ pressed: false, value: 0 });
+      buttons[BUTTON.VIEW] = { pressed: true, value: 1 };
+      pad = { ...pad, buttons };
+      frames.shift()?.(at);
+      pad = { ...pad, buttons: Array(17).fill({ pressed: false, value: 0 }) };
+      frames.shift()?.(at + 16);
+    };
+    tap(16);
+    expect(player).toHaveBeenCalledWith({ kind: "fullscreen" });
+    expect(view).not.toHaveBeenCalled();
+
+    player.mockReturnValue(false); // the player is not on screen
+    tap(64);
+    expect(view).toHaveBeenCalledTimes(1);
+    stop();
   });
 
   it("reports pick-up once, A down and up for the press, View, and a resting tilt", () => {

@@ -162,6 +162,31 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
     // Real seconds pass: the count is of seconds played, so the test waits for them.
   }, 10_000);
 
+  it("a click on the picture pauses, and moving over it shows the controls (Phase 16)", async () => {
+    events.on = {};
+    const w = window as unknown as Record<string, unknown>;
+    w.__TAURI_INTERNALS__ = {};
+    try {
+      render(<PlayerScreen />);
+      await waitFor(() => expect(events.on["player-pointer"]).toBeDefined());
+      act(() =>
+        events.on["player-state"]?.({
+          payload: {
+            position: 60, duration: 5700, paused: false, buffered_until: null, volume: 100,
+            muted: false, speed: 1, hwdec: null, ended: false, started: true, tracks: [],
+          },
+        }),
+      );
+      act(() => events.on["player-pointer"]?.({ payload: "click" }));
+      await waitFor(() => expect(commands.playerPauseStill).toHaveBeenCalled());
+      act(() => events.on["player-pointer"]?.({ payload: "move" }));
+      expect(screen.getByRole("button", { name: "Mute" })).toBeInTheDocument();
+      expect(screen.queryByText(/^Volume \d/)).toBeNull();
+    } finally {
+      delete w.__TAURI_INTERNALS__;
+    }
+  });
+
   it("leaves on Escape and closes the player", async () => {
     const { unmount } = render(<PlayerScreen />);
     fireEvent.keyDown(window, { key: "Escape" });

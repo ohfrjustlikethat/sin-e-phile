@@ -50,6 +50,20 @@ describe("Masthead", () => {
     expect(onSearchChange).toHaveBeenCalledWith(true);
   });
 
+  it("Search and the destinations work from a film's page, Settings or Downloads (Phase 16)", () => {
+    const onSearchChange = vi.fn();
+    useUi.setState({ detail: 7, settingsOpen: true, downloadsOpen: true });
+    render(<Masthead searching={false} onSearchChange={onSearchChange} />);
+    fireEvent.click(screen.getByRole("button", { name: /Search/ }));
+    expect(onSearchChange).toHaveBeenLastCalledWith(true);
+    expect(useUi.getState()).toMatchObject({ detail: null, settingsOpen: false, downloadsOpen: false });
+
+    useUi.setState({ detail: 7, downloadsOpen: true });
+    const nav = screen.getByRole("navigation", { name: "Primary" });
+    fireEvent.click(within(nav).getByRole("button", { name: "Watchlist" }));
+    expect(useUi.getState()).toMatchObject({ detail: null, downloadsOpen: false, destination: "watchlist" });
+  });
+
   it("marks exactly the current destination", () => {
     useUi.setState({ destination: "films" });
     render(<Masthead searching={false} onSearchChange={() => {}} />);

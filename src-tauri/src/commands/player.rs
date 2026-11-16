@@ -47,6 +47,12 @@ fn runtime(app: &AppHandle, state: &AppState) -> Result<Arc<PlayerRuntime>, Stri
         cache_dir: Some(crate::logging::data_dir().join("cache").join("mpv")),
     };
     let player = Player::new(&sinephile_player::dll_path(), &options).map_err(err)?;
+    // Clicks and movement over the picture, which is mpv's window above the page: the
+    // page hears of them only through this event (Phase 16).
+    let pointer_app = app.clone();
+    player.on_pointer(Box::new(move |what| {
+        let _ = pointer_app.emit("player-pointer", what);
+    }));
     let rt = Arc::new(PlayerRuntime {
         player,
         host: Mutex::new(host),

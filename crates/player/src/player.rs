@@ -147,7 +147,20 @@ pub struct Player {
     mpv: Arc<Mpv>,
     seen: Arc<(Mutex<Seen>, Condvar)>,
     events: Option<JoinHandle<()>>,
+    pointer: Arc<Mutex<Option<PointerHandler>>>,
 }
+
+/// What the mouse did over the picture: `"click"`, `"double"` or `"move"`.
+pub type PointerHandler = Box<dyn Fn(&str) + Send + Sync>;
+
+/// The video is mpv's own window above the page, so the page never sees a click or a
+/// movement over the picture (Phase 16: "I can't click to pause"). mpv is told to report
+/// them as script messages, and nothing else: its own bindings stay off.
+const POINTER_SECTION: &str = concat!(
+    "MBTN_LEFT script-message sinephile click\n",
+    "MBTN_LEFT_DBL script-message sinephile double\n",
+    "MOUSE_MOVE script-message sinephile move",
+);
 
 impl Player {
     pub fn new(dll: &Path, options: &Options) -> Result<Self, PlayerError> {
@@ -187,21 +200,44 @@ impl Player {
         let level = std::env::var("SINEPHILE_MPV_LOG").unwrap_or_else(|_| "warn".into());
         mpv.request_log_messages(&level).map_err(PlayerError::Mpv)?;
         mpv.initialize().map_err(PlayerError::Mpv)?;
+        mpv.command(&[
+            "define-section",
+            "sinephile-pointer",
+            POINTER_SECTION,
+            "force",
+        ])
+        .and_then(|()| mpv.command(&["enable-section", "sinephile-pointer"]))
+        .map_err(PlayerError::Mpv)?;
 
         let mpv = Arc::new(mpv);
         let seen: Arc<(Mutex<Seen>, Condvar)> = Arc::default();
+        let pointer: Arc<Mutex<Option<PointerHandler>>> = Arc::default();
         let events = {
-            let (mpv, seen) = (mpv.clone(), seen.clone());
+            let (mpv, seen, pointer) = (mpv.clone(), seen.clone(), pointer.clone());
             std::thread::Builder::new()
                 .name("mpv-events".into())
-                .spawn(move || pump(&mpv, &seen))
+                .spawn(move || pump(&mpv, &seen, &pointer))
                 .map_err(|e| PlayerError::Mpv(e.to_string()))?
         };
         Ok(Self {
             mpv,
             seen,
             events: Some(events),
+            pointer,
         })
+    }
+
+    /// Press a key or button through mpv's own input, as the window would: for tests of
+    /// what mpv answers and what it reports.
+    #[doc(hidden)]
+    pub fn press_key(&self, key: &str) -> Result<(), PlayerError> {
+        self.cmd(&["keypress", key])
+    }
+
+    /// Who hears about clicks and movement over the picture (see `POINTER_SECTION`).
+    /// Called on mpv's event thread, so it must be quick.
+    pub fn on_pointer(&self, handler: PointerHandler) {
+        *self.pointer.lock().expect("pointer") = Some(handler);
     }
 
     fn cmd(&self, args: &[&str]) -> Result<(), PlayerError> {
@@ -582,10 +618,21 @@ impl Drop for Player {
 
 /// The one thread that calls `mpv_wait_event`. It records load, first frame and end of
 /// file, wakes anyone waiting, and passes mpv's warnings to the log.
-fn pump(mpv: &Mpv, seen: &(Mutex<Seen>, Condvar)) {
+fn pump(mpv: &Mpv, seen: &(Mutex<Seen>, Condvar), pointer: &Mutex<Option<PointerHandler>>) {
     loop {
-        let ffi::Event { id, log: text, end } = mpv.wait_event(0.25);
+        let ffi::Event {
+            id,
+            log: text,
+            end,
+            message,
+        } = mpv.wait_event(0.25);
         if id == ffi::MPV_EVENT_NONE {
+            continue;
+        }
+        if let Some(what) = pointer_message(message.as_deref()) {
+            if let Some(f) = pointer.lock().expect("pointer").as_ref() {
+                f(what);
+            }
             continue;
         }
         if let Some(t) = text {
@@ -611,6 +658,18 @@ fn pump(mpv: &Mpv, seen: &(Mutex<Seen>, Condvar)) {
             _ => {}
         }
         seen.1.notify_all();
+    }
+}
+
+/// The pointer event a client message carries, if it is one of ours.
+fn pointer_message(words: Option<&[String]>) -> Option<&str> {
+    match words? {
+        [who, what]
+            if who == "sinephile" && matches!(what.as_str(), "click" | "double" | "move") =>
+        {
+            Some(what.as_str())
+        }
+        _ => None,
     }
 }
 

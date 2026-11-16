@@ -32,6 +32,7 @@ pub const MPV_EVENT_SHUTDOWN: c_int = 1;
 pub const MPV_EVENT_LOG_MESSAGE: c_int = 2;
 pub const MPV_EVENT_END_FILE: c_int = 7;
 pub const MPV_EVENT_FILE_LOADED: c_int = 8;
+pub const MPV_EVENT_CLIENT_MESSAGE: c_int = 16;
 pub const MPV_EVENT_PLAYBACK_RESTART: c_int = 21;
 
 /// One event, as the player's event thread sees it.
@@ -41,6 +42,15 @@ pub(crate) struct Event {
     pub log: Option<String>,
     /// For END_FILE: the reason (4 = error) and mpv's error text.
     pub end: Option<(c_int, String)>,
+    /// For CLIENT_MESSAGE: its words ("script-message sinephile click" sends two).
+    pub message: Option<Vec<String>>,
+}
+
+/// `mpv_event_client_message`: what a `script-message` command sent.
+#[repr(C)]
+pub struct mpv_event_client_message {
+    pub num_args: c_int,
+    pub args: *const *const c_char,
 }
 
 /// `mpv_event_end_file`: why playback of a file ended.
@@ -217,6 +227,7 @@ impl Mpv {
                     id: MPV_EVENT_NONE,
                     log: None,
                     end: None,
+                    message: None,
                 };
             }
             let id = (*ev).event_id;
@@ -243,7 +254,27 @@ impl Mpv {
             } else {
                 None
             };
-            Event { id, log: text, end }
+            let message = if id == MPV_EVENT_CLIENT_MESSAGE && !(*ev).data.is_null() {
+                let m = (*ev).data as *const mpv_event_client_message;
+                let n = usize::try_from((*m).num_args).unwrap_or(0);
+                Some(
+                    (0..n)
+                        .map(|i| {
+                            CStr::from_ptr(*(*m).args.add(i))
+                                .to_string_lossy()
+                                .into_owned()
+                        })
+                        .collect(),
+                )
+            } else {
+                None
+            };
+            Event {
+                id,
+                log: text,
+                end,
+                message,
+            }
         }
     }
 }

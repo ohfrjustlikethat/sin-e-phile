@@ -5,6 +5,7 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use sinephile_player::{dll_path, Options, Player};
@@ -256,6 +257,33 @@ fn audio_delay_picture_and_stats_are_set_and_reported() {
     assert_eq!(get("Video").as_deref(), Some("h264"), "{stats:?}");
     assert_eq!(get("Size").as_deref(), Some("640×360"));
     assert_eq!(get("Audio delay").as_deref(), Some("+250 ms"));
+}
+
+#[test]
+fn a_click_on_the_picture_is_reported_and_mpv_does_nothing_itself() {
+    // Phase 16: the picture is mpv's window, so the page never saw a click to pause.
+    let dir = tempfile::tempdir().unwrap();
+    let p = player();
+    p.load(clip(dir.path()).to_str().unwrap(), None).unwrap();
+    p.wait_first_frame(Duration::from_secs(10)).unwrap();
+    let heard = Arc::new(Mutex::new(Vec::<String>::new()));
+    let h = heard.clone();
+    p.on_pointer(Box::new(move |what| {
+        h.lock().unwrap().push(what.to_string())
+    }));
+
+    p.press_key("MBTN_LEFT").unwrap();
+    wait_until("the click reported", || {
+        heard.lock().unwrap().iter().any(|w| w == "click")
+    });
+    p.press_key("MBTN_LEFT_DBL").unwrap();
+    wait_until("the double click reported", || {
+        heard.lock().unwrap().iter().any(|w| w == "double")
+    });
+    // mpv's own bindings stay off: it paused for neither, nor for its usual pause key.
+    p.press_key("SPACE").unwrap();
+    std::thread::sleep(Duration::from_millis(300));
+    assert!(!p.state().paused);
 }
 
 #[test]

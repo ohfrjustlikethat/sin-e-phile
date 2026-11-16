@@ -519,6 +519,15 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
     ],
   );
 
+  // A click on the picture pauses or plays, a double click goes full screen, and moving
+  // the mouse over it shows the controls. The picture is mpv's own window above the page,
+  // so the page hears of these only from mpv (Phase 16: "I can't click to pause").
+  useTauriEvent<string>("player-pointer", (what) => {
+    if (what === "click") run({ kind: "toggle_pause" });
+    else if (what === "double") run({ kind: "fullscreen" });
+    else wake();
+  });
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const intent = keyIntent(e);
@@ -791,7 +800,9 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
                 onToggle={() => run({ kind: "subtitles_menu" })}
                 onPick={(id) => { act({ kind: "subtitles", id }); setMenu(null); }} />
               <button type="button" onClick={() => run({ kind: "mute" })} className="px-2 py-1 text-ink-muted hover:text-ink">
-                {state?.muted ? "Unmute" : `Volume ${Math.round(state?.volume ?? 100)}`}
+                {/* What the button does. The level is said once, beside it, when it changes
+                    (Phase 16: two volume readouts side by side). */}
+                {state?.muted ? "Unmute" : "Mute"}
               </button>
               <button type="button" onClick={() => run({ kind: "fullscreen" })} className="px-2 py-1 text-ink-muted hover:text-ink">
                 {fullscreen ? "Exit full screen" : "Full screen"}
@@ -907,6 +918,7 @@ const PAD_HINTS: [string, string][] = [
   ["Y", "Subtitles"],
   ["X", "Sound"],
   ["≡", "More"],
+  ["⧉", "Full screen"],
   ["B", "Back"],
 ];
 

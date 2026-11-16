@@ -119,6 +119,9 @@ export function playerIntent(button: number): Intent | null {
     // The player menu: every control the keyboard has, reachable by D-pad (ADR-0041).
     case BUTTON.MENU:
       return { kind: "player_menu" };
+    // View: full screen, as ADR-0045's table says, through the player so it knows.
+    case BUTTON.VIEW:
+      return { kind: "fullscreen" };
     case BUTTON.B:
       return { kind: "back" };
     // ADR-0045's TV-standard mapping: Y the subtitles, X the sound, the bumpers the
@@ -621,7 +624,6 @@ export function startGamepad(handlers: GamepadHandlers): () => void {
       }
       const aNow = !!frame.pressed[BUTTON.A];
       if (aNow !== !!prev?.pressed[BUTTON.A] && (aNow || prev)) handlers.press?.(aNow);
-      if (pressed.includes(BUTTON.VIEW)) handlers.view?.();
       // The right stick scrolls whatever holds focus (Phase 16). A frame's time, capped so
       // a stall does not throw the page.
       if (scrolling) scrollByStick(rx, ry, Math.min(50, lastTick ? now - lastTick : 16));
@@ -636,6 +638,12 @@ export function startGamepad(handlers: GamepadHandlers): () => void {
         if (claim?.(b)) continue;
         const intent = playerIntent(b);
         if (intent && handlers.player(intent)) continue;
+        // View: the player's own full screen while it plays (so it knows, and says "Exit
+        // full screen"), the window's everywhere else. Never both.
+        if (b === BUTTON.VIEW) {
+          handlers.view?.();
+          continue;
+        }
         const action = navAction(b);
         if (action) handlers.nav(action);
       }

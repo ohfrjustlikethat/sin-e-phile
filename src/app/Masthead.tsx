@@ -51,9 +51,15 @@ export function Masthead({
   const busy = inProgress(downloads.data ?? []).length;
   const { active } = useProfiles();
   const setPickerOpen = useUi((s) => s.setPickerOpen);
+  const closeDetail = useUi((s) => s.closeDetail);
 
+  // Settings, Downloads and a title's page each take the main area over everything else,
+  // so going anywhere from the masthead closes them first (Phase 16: Search and Home did
+  // nothing from a film's page).
   const go = (d: Destination) => {
     setSettingsOpen(false);
+    setDownloadsOpen(false);
+    closeDetail();
     onSearchChange(false);
     setDestination(d);
   };
@@ -141,6 +147,7 @@ export function Masthead({
           onClick={() => {
             setSettingsOpen(false);
             setDownloadsOpen(false);
+            closeDetail();
             onSearchChange(true);
           }}
           aria-pressed={searching}
