@@ -2309,3 +2309,16 @@ E4/E6), a download and a stream with a source of the author's choosing, the Phas
 the player (E2), the first run with a real controller (E7 confirmation), and the embeddings-v3 decision (reserved:
 publishing a release, and the IMDb terms behind ADR-0044's "no pre-built catalogue"; default, not publishing).
 Also found and fixed today: choosing a found subtitle dropped focus out of the player panel (6334d7b).
+
+**The author's second report (2026-11-16, Opus).** "TV shows displayed as individual titles; can't click to
+pause; two volume readouts; Search won't click off Home; no way to try sources or downloads; no full-screen
+button on the controller." Investigated against their own database, read only. Fixed: episode numbering the
+parser did not know (`Ep. 01`, `Chapter 01`, year ranges, shelf prefixes, `Extra 1`), guesses below the
+accept line kept off Home and Play, waiting files re-identified at every scan (c00d4e5); clicks over the
+picture reported by mpv, View as the player's full screen, "Mute" instead of a second volume readout,
+Search and the destinations closing a title's page (1fcb1b7); a show's page marking what is on this PC and
+listing its own files in order; Films and TV Shows listing the library; a "try it" line in Sources (public-
+domain films stream from the Internet Archive; downloading needs a torrent source). Decisions taken: Films
+and TV Shows show the library now, ahead of Phase 19's catalogue browsing; files the catalogue cannot place
+keep their own numbering (ADR-0031). Open: downloads of web streams (the Archive) are not possible; asked
+the author which controller faults they meant.

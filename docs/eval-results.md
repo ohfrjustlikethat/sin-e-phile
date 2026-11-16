@@ -3008,3 +3008,19 @@ The real backend's checks behind "checked as saved" are the crates' tests (`a_ke
 `bound_to_one_adapter_traffic_never_leaves_by_another`); "no source yet" on the title page is
 `DetailScreen.test.tsx` "says why nothing can play". Frontend **203** tests. **E7 met**; a real controller in
 hand is in the author batch as confirmation.
+
+### The author's second library (2026-11-16)
+
+The author's report: TV shows not grouped, episodes as separate titles. Their database (read only):
+Samurai Champloo (`2a. Samurai Champloo (2004)/... - Ep. 01 - ...`) and Monster (`Monster [2004-2005]
+DVDRip .../Monster - Chapter 01 - ...`) were not read as episodes, so each of 100 files was searched for
+as a film and kept at confidence 0.00-0.41 ("Afro Samurai Champloo", "Entrapment", "The Fugitive"), and
+Home's library rail showed every guess. Fixed in c00d4e5 (reading) and the commit after it (the show's
+page, Films and TV Shows).
+
+`cargo run --release -p eval -- tvlayouts`, with the author's layouts added (groups replaced): **71/71
+episodes, 0 filed as films, 106/106 extras kept out**. The same rows on the old code: 62/71, 9 filed as
+films, 1 extra searched for. `-- identify` unchanged: tuning **99.05% / 0.39%**, held out **100% / 0%**.
+Space Dandy's `S01E14`-`S01E26` (IMDb's first season has 13) and Twin Peaks' `S03` (IMDb: a 2017 series)
+match the show itself and are kept as their names number them (ADR-0031), listed under "Also on this PC".
+Rust **803** tests, frontend **211**.
