@@ -12,6 +12,7 @@ import { EndCard, NextEpisodeCard } from "./WhatNext";
 import { moment } from "./endCard";
 import { previewLeft, tileAt } from "./scrubPreview";
 import { usePlaybackChoice } from "@/lib/playbackChoice";
+import { setWindowFullscreen } from "@/lib/fullscreen";
 
 /**
  * The player — SPEC.md Phase 8, ADR-0020 (solid chrome through cutouts) and ADR-0021
@@ -60,9 +61,8 @@ function usePlayerState(): PlayerStateView | null {
 }
 
 async function setFullscreen(on: boolean) {
-  if (!inTauri()) return;
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  await getCurrentWindow().setFullscreen(on);
+  // From any window state: a maximised window kept its old height in full screen (src/lib/fullscreen.ts).
+  await setWindowFullscreen(on);
 }
 
 export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {

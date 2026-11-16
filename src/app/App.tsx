@@ -28,17 +28,11 @@ import { DESTINATIONS, useUi, type Destination } from "@/lib/store";
 import { FocusLayer } from "@/design-system/focus/FocusLayer";
 import { play, rumble } from "@/design-system/focus/feedback";
 import { useControllerSettings } from "@/lib/controllerSettings";
+import { setWindowFullscreen } from "@/lib/fullscreen";
 
-function inTauri(): boolean {
-  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-}
-
-/** Full screen for the whole app window (ADR-0042: View, or picking the pad up). */
+/** Full screen for the whole app window (ADR-0042: View, or picking the pad up), from any window state. */
 async function fullscreen(on?: boolean) {
-  if (!inTauri()) return;
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  const w = getCurrentWindow();
-  await w.setFullscreen(on ?? !(await w.isFullscreen()));
+  await setWindowFullscreen(on);
 }
 
 /** The focused tile, if focus is on one (ADR-0042's tilt and press apply to tiles only). */

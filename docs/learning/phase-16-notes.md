@@ -46,6 +46,8 @@ test passed. Four sections per ADR-0016 (A4).
 - **Click to pause, for real** (2026-11-17): a click on the film pauses it, a click on the paused picture
   plays it, and a double click goes full screen. Checked with real clicks in the real window; the
   earlier test had only told mpv a key was pressed, and the click never reached mpv at all.
+- **Full screen from a maximised window** (2026-11-17): it kept the maximised height, so the player's bar
+  floated 80 px up with black beneath; the window is now un-maximised first and maximised again after.
 
 ## 2. Why
 
@@ -118,6 +120,7 @@ test passed. Four sections per ADR-0016 (A4).
 - **Failing open: a status that cannot be read counts as ready** — `src/features/onboarding/CatalogueBuild.tsx:48`.
 - **Slow, synchronous work kept off the async runtime** (`tokio::task::spawn_blocking`, and the `??` that unwraps the join and then the work) — `crates/catalogue/src/bootstrap.rs` `fetched`, `credits`.
 - **Finding which window a click really lands on** (`WindowFromPoint` under a real `mouse_event`), and answering it in that window's procedure — `crates/player/src/host.rs:101` `proc`, `:105`.
+- **Working around a platform quirk in one place, with the measurement that found it** (a maximised window's web view kept its height in full screen) — `src/lib/fullscreen.ts` `setWindowFullscreen`.
 - **A double click recognised from two clicks that arrive from different places** (the native window, then the page's still frame) — `src/features/player/PlayerScreen.tsx:531` `clickPicture`.
 
 ## 4. Five questions

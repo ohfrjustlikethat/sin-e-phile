@@ -48,7 +48,11 @@ vi.mock("@tauri-apps/api/event", () => ({
 }));
 const fullscreen = vi.hoisted(() => vi.fn((_on: boolean) => Promise.resolve()));
 vi.mock("@tauri-apps/api/window", () => ({
-  getCurrentWindow: () => ({ setFullscreen: fullscreen }),
+  getCurrentWindow: () => ({
+    setFullscreen: fullscreen,
+    isFullscreen: () => Promise.resolve(false),
+    isMaximized: () => Promise.resolve(false),
+  }),
 }));
 const { PlayerScreen: Bare } = await import("./PlayerScreen");
 /** The player inside the query client the app gives it. */
