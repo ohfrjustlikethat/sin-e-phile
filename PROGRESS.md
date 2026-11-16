@@ -53,7 +53,7 @@
 
 ## What's next
 
-Phase 16: build the author's 15-item plan in docs/design/author-brief-2026-11-17.md, in its order (their answers to 7 rounds of questions are there; do not re-ask). Item 1 (season packs) is done. Item 2 now: direct downloads of web streams (the Internet Archive; add-ons that answer with links) as a third backend in crates/downloads/src/ beside backend.rs (Rqbit) and qbittorrent.rs: an HTTP fetch with Range resume into the downloads folder, progress from Content-Length; src-tauri/src/commands/downloads.rs download_title stops refusing PlayableStream::Http. Item 3 is the critical one: a fresh install never builds the search index (search_index 0 rows), so search, identification and Films/TV are empty.
+Phase 16: build the author's 15-item plan in docs/design/author-brief-2026-11-17.md, in its order (their answers to 7 rounds of questions are there; do not re-ask). Item 1 (season packs) is done. Items 1 and 2 (season packs, direct downloads) are done. Item 3 now, the critical one: a fresh install never builds the search index (search_index 0 rows on the author's install), so search, identification and Films/TV are empty; find the first-run catalogue path (crates/catalogue/src/ and src-tauri/src/commands/catalogue.rs) and add the index build (tools/ingest's search-index step is what built the development copy), then alternate titles, AniList, the search model and embeddings-v3 (publish the release: the author decided 2026-11-17), the library scan waiting for the catalogue, and onboarding progress. Item 3 is the critical one: a fresh install never builds the search index (search_index 0 rows), so search, identification and Films/TV are empty.
 
 ---
 
