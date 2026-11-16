@@ -11,6 +11,7 @@
 
 pub mod advise;
 pub mod backend;
+pub mod direct;
 pub mod manager;
 pub mod measure;
 pub mod qbittorrent;
@@ -18,5 +19,6 @@ pub mod queue;
 pub mod storage;
 
 pub use backend::{Backend, BackendError, Progress, Rqbit};
+pub use direct::Direct;
 pub use manager::{now_iso, Manager, ManagerError, Tick};
 pub use queue::{plan, Step};

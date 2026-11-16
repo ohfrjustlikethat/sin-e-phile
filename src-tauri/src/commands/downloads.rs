@@ -13,7 +13,7 @@ use sinephile_downloads::advise::{advise, Choice, Inputs, Taste, PLAYER_BUFFER};
 use sinephile_downloads::backend::source_for;
 use sinephile_downloads::qbittorrent::Qbittorrent;
 use sinephile_downloads::{measure, storage};
-use sinephile_downloads::{now_iso, Backend, Manager, Rqbit};
+use sinephile_downloads::{now_iso, Backend, Direct, Manager, Rqbit};
 use sinephile_library::probe::ffprobe;
 use sinephile_library::scan::Prober;
 use sinephile_persistence::repositories::{
@@ -76,6 +76,9 @@ impl From<Download> for DownloadView {
     }
 }
 
+/// The direct-download backend, shared by every manager the app builds.
+static DIRECT: std::sync::OnceLock<Arc<Direct>> = std::sync::OnceLock::new();
+
 async fn manager(app: &AppHandle) -> Result<Arc<Manager>, String> {
     let mut held = MANAGER.lock().await;
     if let Some(m) = held.as_ref() {
@@ -112,6 +115,9 @@ async fn manager(app: &AppHandle) -> Result<Arc<Manager>, String> {
         )));
     }
     backends.push(Arc::new(Rqbit::new(runtime.engine.clone())));
+    // Web addresses (Phase 16). One for the app's life: a manager rebuilt when the
+    // qBittorrent settings change must not start a second writer on the same `.part`.
+    backends.push(DIRECT.get_or_init(|| Arc::new(Direct::new())).clone());
     let mut m = Manager::new((*db).clone(), backends, dir, ffprobe as Prober);
     if let Some(n) = setting(&db, MAX_ACTIVE).await.and_then(|v| v.parse().ok()) {
         m.max_active = n;
@@ -466,15 +472,21 @@ pub async fn download_title(
         return Ok(d.into());
     }
     let chosen = planned_for(id).ok_or("open the title's page again")?;
-    let Some(PlayableStream::Torrent {
-        info_hash,
-        trackers,
-        file_index,
-    }) = chosen.stream
-    else {
-        return Err("this copy is a web stream, which cannot be downloaded".into());
+    // A torrent goes to the torrent engine (only the source's chosen file); a web address
+    // is fetched directly (Phase 16: the Internet Archive, add-ons that answer with links).
+    let (source, backend, file_index) = match chosen.stream {
+        Some(PlayableStream::Torrent {
+            info_hash,
+            trackers,
+            file_index,
+        }) => (
+            source_for(&info_hash, &trackers),
+            "librqbit",
+            file_index.map(i64::from),
+        ),
+        Some(PlayableStream::Http { url, .. }) => (url, sinephile_downloads::direct::NAME, None),
+        _ => return Err("this copy cannot be downloaded".into()),
     };
-    let source = source_for(&info_hash, &trackers);
     let not_before = tonight.then(tonight_iso);
     let repo = DownloadRepository::new(&db);
     let new = repo
@@ -483,13 +495,13 @@ pub async fn download_title(
             title: &chosen.title,
             source: &source,
             torrent: None,
-            backend: "librqbit",
+            backend,
             priority: 0,
             limit_kib: None,
             not_before: not_before.as_deref(),
             reason: reason.as_deref(),
             // The source's one file (a season pack's episode): only that is fetched.
-            file_index: file_index.map(i64::from),
+            file_index,
         })
         .await
         .map_err(|e| e.to_string())?;

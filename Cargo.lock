@@ -5423,6 +5423,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "librqbit",
+ "reqwest 0.12.24",
  "serde",
  "serde_json",
  "sinephile-library",

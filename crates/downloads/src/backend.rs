@@ -153,6 +153,11 @@ impl Backend for Rqbit {
         "librqbit"
     }
 
+    /// Torrents only: a web address is `Direct`'s.
+    fn accepts(&self, d: &Download) -> bool {
+        !crate::direct::is_web(d)
+    }
+
     async fn available(&self) -> bool {
         true
     }
