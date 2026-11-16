@@ -469,7 +469,7 @@ pub async fn download_title(
     let Some(PlayableStream::Torrent {
         info_hash,
         trackers,
-        ..
+        file_index,
     }) = chosen.stream
     else {
         return Err("this copy is a web stream, which cannot be downloaded".into());
@@ -488,6 +488,8 @@ pub async fn download_title(
             limit_kib: None,
             not_before: not_before.as_deref(),
             reason: reason.as_deref(),
+            // The source's one file (a season pack's episode): only that is fetched.
+            file_index: file_index.map(i64::from),
         })
         .await
         .map_err(|e| e.to_string())?;

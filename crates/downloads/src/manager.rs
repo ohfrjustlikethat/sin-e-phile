@@ -77,6 +77,8 @@ pub struct Manager {
     probe: Prober,
     /// The last progress each running download reported: speed and peers for the page.
     live: Mutex<HashMap<i64, Progress>>,
+    /// Downloads whose one wanted file the backend has applied (`Backend::keep_only`).
+    kept: Mutex<std::collections::HashSet<i64>>,
 }
 
 impl Manager {
@@ -88,6 +90,7 @@ impl Manager {
             max_active: 3,
             probe,
             live: Mutex::new(HashMap::new()),
+            kept: Mutex::new(std::collections::HashSet::new()),
         }
     }
 
@@ -165,6 +168,26 @@ impl Manager {
                 }
                 continue;
             }
+            // A season pack's one episode: until the backend has applied it (qBittorrent can
+            // only once it knows the files), ask again each tick.
+            if let Some(file) = d.file_index.and_then(|i| usize::try_from(i).ok()) {
+                let done = self.kept.lock().is_ok_and(|k| k.contains(&d.id));
+                if !done {
+                    match backend.keep_only(id, file).await {
+                        Ok(true) => {
+                            if let Ok(mut k) = self.kept.lock() {
+                                k.insert(d.id);
+                            }
+                        }
+                        Ok(false) => {}
+                        Err(e) => {
+                            repo.fail(d.id, &e.to_string()).await?;
+                            out.failed.push(d.id);
+                            continue;
+                        }
+                    }
+                }
+            }
             let p = match backend.progress(id).await {
                 Ok(p) => p,
                 Err(e) => {
@@ -186,7 +209,8 @@ impl Manager {
                 repo.fail(d.id, &error).await?;
                 out.failed.push(d.id);
             } else if p.finished {
-                let file = backend.video_file(id).await?;
+                let wanted = d.file_index.and_then(|i| usize::try_from(i).ok());
+                let file = backend.video_file(id, wanted).await?;
                 self.file(&d, &file).await?;
                 out.finished.push(d.id);
             }

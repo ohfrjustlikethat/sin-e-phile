@@ -2133,11 +2133,15 @@ async fn download_repository_surface() {
             limit_kib: Some(2048),
             not_before: Some("2026-11-08T00:00:00Z"),
             reason: Some("A favourite, worth the disk."),
+            file_index: Some(3),
         })
         .await
         .expect("add");
     let d = repo.get(high).await.unwrap().expect("row");
     assert_eq!(d.state, DownloadState::Queued);
+    // The one file of the torrent it wants (a season pack's episode), kept.
+    assert_eq!(d.file_index, Some(3));
+    assert_eq!(repo.get(low).await.unwrap().unwrap().file_index, None);
     assert_eq!(
         (d.priority, d.limit_kib, d.torrent.as_deref()),
         (5, Some(2048), Some(&[1u8, 2, 3][..]))

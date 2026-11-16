@@ -37,6 +37,7 @@ fn download(source: &str) -> Download {
         file_path: None,
         added_at: String::new(),
         finished_at: None,
+        file_index: None,
     }
 }
 
@@ -159,6 +160,45 @@ async fn pause_tries_the_new_name_first_then_the_old() {
 }
 
 #[tokio::test]
+async fn one_episode_of_a_season_pack_is_all_that_is_fetched() {
+    // Phase 16: a source points at one episode inside a season pack, and the whole pack
+    // was downloaded. The other files are set to "do not download" once qBittorrent knows
+    // them, and the finished file is that episode.
+    let fake = Arc::new(FakeTransport::new());
+    let pack = r#"[{"name":"Show.S01/Show.S01E01.mkv","size":700},{"name":"Show.S01/Show.S01E02.mkv","size":700},{"name":"Show.S01/Show.S01E03.mkv","size":700}]"#;
+    // From a magnet link it lists no files until it has the metadata: nothing yet.
+    fake.push(Response::new(200, "[]"));
+    assert!(!client(&fake, false).keep_only(&hash(), 1).await.unwrap());
+
+    // Last pushed, first answered: the file list, then filePrio's answer.
+    fake.push(Response::new(200, ""));
+    fake.push(Response::new(200, pack));
+    assert!(client(&fake, false).keep_only(&hash(), 1).await.unwrap());
+    let set = fake.last_request().unwrap();
+    assert!(
+        set.url.ends_with("/api/v2/torrents/filePrio"),
+        "{}",
+        set.url
+    );
+    let body = set.body.clone().unwrap_or_default();
+    assert!(
+        body.contains("id=0%7C2") && body.contains("priority=0"),
+        "every file but the episode is left out: {body}"
+    );
+
+    fake.push(Response::new(200, pack));
+    fake.push(Response::new(
+        200,
+        r#"[{"progress":1,"state":"uploading","save_path":"D:\\TV"}]"#,
+    ));
+    let file = client(&fake, false)
+        .video_file(&hash(), Some(1))
+        .await
+        .unwrap();
+    assert_eq!(file, Path::new(r"D:\TV").join("Show.S01/Show.S01E02.mkv"));
+}
+
+#[tokio::test]
 async fn the_video_file_is_chosen_from_its_file_list() {
     let fake = Arc::new(FakeTransport::new());
     fake.push(Response::new(
@@ -169,7 +209,10 @@ async fn the_video_file_is_chosen_from_its_file_list() {
         200,
         r#"[{"progress":1,"state":"uploading","save_path":"D:\\Downloads"}]"#,
     ));
-    let file = client(&fake, false).video_file(&hash()).await.unwrap();
+    let file = client(&fake, false)
+        .video_file(&hash(), None)
+        .await
+        .unwrap();
     assert_eq!(
         file,
         Path::new(r"D:\Downloads").join("Heat.1995/Heat.1995.mkv")
