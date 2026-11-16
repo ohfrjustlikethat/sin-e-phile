@@ -13,6 +13,7 @@ pub mod identify;
 pub mod probe;
 pub mod review;
 pub mod scan;
+pub mod shelf;
 pub mod watch;
 
 pub use identify::{identify, Evidence, Identification, Scored, Signals, ACCEPT_AT};

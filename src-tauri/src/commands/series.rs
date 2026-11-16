@@ -11,7 +11,8 @@ use tauri::State;
 
 use sinephile_metadata_api::{AniList, Transport};
 use sinephile_persistence::repositories::{
-    EpisodeRepository, EpisodeRow, MediaRepository, ProfileRepository, WatchScope,
+    EpisodeRepository, EpisodeRow, LibraryRepository, MediaRepository, ProfileRepository,
+    WatchScope,
 };
 
 use crate::state::AppState;
@@ -33,10 +34,24 @@ pub struct AiringView {
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct SeriesView {
+    /// Episodes with a file on this PC (Phase 16).
+    pub on_this_pc: i32,
+    /// The show's own files the catalogue has no episode for, as their names number
+    /// them, in order (`sinephile_library::shelf`).
+    pub also_here: Vec<ShelvedView>,
     pub seasons: Vec<SeasonView>,
     pub next_airing: Option<AiringView>,
     /// How many of its episodes this profile has seen through (Appendix F, I21).
     pub watched: i32,
+}
+
+/// A file of the show's, placed by its own name rather than by the catalogue.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct ShelvedView {
+    pub path: String,
+    pub season: Option<i32>,
+    pub episode: Option<i32>,
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -48,6 +63,8 @@ pub struct EpisodeView {
     pub air_date: Option<String>,
     /// Seen through by this profile. Only a season's list fills it in.
     pub watched: bool,
+    /// A file of this episode is on this PC (Phase 16).
+    pub on_this_pc: bool,
 }
 
 impl From<EpisodeRow> for EpisodeView {
@@ -59,6 +76,7 @@ impl From<EpisodeRow> for EpisodeView {
             title: e.title,
             air_date: e.air_date,
             watched: false,
+            on_this_pc: false,
         }
     }
 }
@@ -123,7 +141,32 @@ pub async fn series_detail(state: State<'_, AppState>, id: i32) -> Result<Series
         }
     }
 
+    let library = LibraryRepository::new(&db);
+    let on_this_pc = library
+        .episodes_on_this_pc(series)
+        .await
+        .map_err(err)?
+        .len();
+    let own: Vec<(i64, String)> = library
+        .files_for_item(series)
+        .await
+        .map_err(err)?
+        .into_iter()
+        .map(|f| (f.id, f.path))
+        .collect();
+    let also_here = sinephile_library::shelf::in_order(&own)
+        .into_iter()
+        .map(|s| ShelvedView {
+            path: s.path,
+            season: s.season.map(|n| n as i32),
+            episode: s.episode.map(|n| n as i32),
+            title: s.title,
+        })
+        .collect();
+
     Ok(SeriesView {
+        on_this_pc: on_this_pc as i32,
+        also_here,
         watched: watched as i32,
         seasons: seasons
             .into_iter()
@@ -156,6 +199,10 @@ pub async fn season_episodes(
         .finished_in_season(profile, i64::from(id), season.map(i64::from))
         .await
         .map_err(err)?;
+    let here = LibraryRepository::new(&db)
+        .episodes_on_this_pc(i64::from(id))
+        .await
+        .map_err(err)?;
     Ok(EpisodeRepository::new(&db)
         .episodes_of(i64::from(id), season.map(i64::from))
         .await
@@ -163,8 +210,10 @@ pub async fn season_episodes(
         .into_iter()
         .map(|e| {
             let watched = seen.contains(&e.media_item_id);
+            let on_this_pc = here.contains(&e.media_item_id);
             EpisodeView {
                 watched,
+                on_this_pc,
                 ..EpisodeView::from(e)
             }
         })

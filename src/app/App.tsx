@@ -17,6 +17,7 @@ import { ProfilePicker } from "@/features/profiles/ProfilePicker";
 import { Onboarding } from "@/features/onboarding/Onboarding";
 import { HomeScreen } from "@/features/home/HomeScreen";
 import { WatchlistScreen } from "@/features/watchlist/WatchlistScreen";
+import { LibraryShelf } from "@/features/library/LibraryShelf";
 import { commands as ipc } from "@/lib/ipc";
 import { useProfileSync, useProfiles } from "@/features/profiles/useProfiles";
 import { SearchScreen } from "@/features/search/SearchScreen";
@@ -295,6 +296,8 @@ export function App() {
               <HomeScreen />
             ) : destination === "watchlist" ? (
               <WatchlistScreen />
+            ) : destination === "films" || destination === "tv" ? (
+              <LibraryShelf shows={destination === "tv"} />
             ) : (
               <Placeholder destination={destination} />
             )}

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use sinephile_persistence::repositories::{
-    CredentialRepository, MediaRepository, ProfileRepository,
+    CredentialRepository, LibraryRepository, MediaRepository, ProfileRepository,
 };
 
 use crate::state::AppState;
@@ -110,6 +110,22 @@ pub async fn watchlist(state: State<'_, AppState>) -> Result<Vec<HomeCard>, Stri
     let me = state.profile().await?;
     let ids = ProfileRepository::new(&db)
         .watchlist(me)
+        .await
+        .map_err(|e| e.to_string())?;
+    home_cards(&db, &ids).await
+}
+
+/// What is on this PC: its shows (`shows`), or its films, by title (Phase 16: the Films
+/// and TV Shows pages, before Phase 19 adds the catalogue around them).
+#[tauri::command]
+#[specta::specta]
+pub async fn library_titles(
+    state: State<'_, AppState>,
+    shows: bool,
+) -> Result<Vec<HomeCard>, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let ids = LibraryRepository::new(&db)
+        .library_titles(shows)
         .await
         .map_err(|e| e.to_string())?;
     home_cards(&db, &ids).await

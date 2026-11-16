@@ -1901,6 +1901,88 @@ async fn library_repository_surface() {
     // Out of the way of the review queue's counts below.
     repo.set_ignored(guessed, true).await.expect("set aside");
 
+    // episodes_on_this_pc — the series' episodes with a file the library stands behind:
+    // the guess (a 0.07 match) does not count, the accepted file does.
+    let show = media
+        .insert(&NewMediaItem::film("Monster", 2004))
+        .await
+        .expect("series");
+    let (ep1, ep8) = (
+        media
+            .insert(&NewMediaItem::film("Herr Dr. Tenma", 2004))
+            .await
+            .expect("ep1"),
+        media
+            .insert(&NewMediaItem::film("The Fugitive", 2004))
+            .await
+            .expect("ep8"),
+    );
+    let episodes = EpisodeRepository::new(&db);
+    episodes
+        .create_series(show, false)
+        .await
+        .expect("create_series");
+    episodes
+        .create_episode(ep1, show, None, Some(1), Some(1), None)
+        .await
+        .expect("ep1 row");
+    episodes
+        .create_episode(ep8, show, None, Some(1), Some(8), None)
+        .await
+        .expect("ep8 row");
+    let on_disk = |path: &'static str| NewLocalFile {
+        path,
+        size_bytes: 5000,
+        ..f.clone()
+    };
+    let Upserted::New(have) = repo
+        .upsert_file(&on_disk("D:/TV/Monster - Chapter 01.mkv"))
+        .await
+        .unwrap()
+    else {
+        panic!("new")
+    };
+    let Upserted::New(unsure) = repo
+        .upsert_file(&on_disk("D:/TV/Monster - Chapter 08.mkv"))
+        .await
+        .unwrap()
+    else {
+        panic!("new")
+    };
+    let accepted = |id: i64, conf: f64| FileMatch {
+        media_item_id: id,
+        confidence: conf,
+        method: MatchMethod::Filename,
+        covers: 1,
+        confirmed: false,
+    };
+    repo.set_match(have, &accepted(ep1, 0.95))
+        .await
+        .expect("accepted");
+    repo.set_match(unsure, &accepted(ep8, 0.07))
+        .await
+        .expect("a guess");
+    assert_eq!(
+        repo.episodes_on_this_pc(show)
+            .await
+            .expect("episodes_on_this_pc"),
+        vec![ep1]
+    );
+    // library_titles — the show once (through its episode), kept apart from the films; the
+    // guessed episode adds nothing. Its kind is a series for this.
+    sqlx::query("UPDATE media_items SET kind = 'anime_series' WHERE id = ?")
+        .bind(show)
+        .execute(db.pool())
+        .await
+        .unwrap();
+    assert_eq!(
+        repo.library_titles(true).await.expect("library_titles"),
+        vec![show]
+    );
+    assert_eq!(repo.library_titles(false).await.unwrap(), vec![heat]);
+    repo.set_ignored(have, true).await.expect("set aside");
+    repo.set_ignored(unsure, true).await.expect("set aside");
+
     // clear_match / set_candidates / candidates / review_queue / review_count
     repo.clear_match(id).await.expect("clear");
     assert_eq!(repo.match_of(id).await.unwrap(), None);

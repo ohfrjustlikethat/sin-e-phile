@@ -29,6 +29,10 @@ test passed. Four sections per ADR-0016 (A4).
   select (A "clicked" it, and a click from a script does not open its list) or any slider (Left and
   Right moved off it); a button that disabled itself once pressed dropped focus onto the page; and a
   long step's last fields sat half under the sticky footer, where Down could not leave them.
+- **The author's second library, read properly** (2026-11-16): `Ep. 01`, `Chapter 01`, year ranges,
+  shelf-order prefixes and `Extra 1`; guesses kept off Home; a show's own files listed in order on its
+  page; Films and TV Shows list what is on this PC. And in the player: click to pause, View for full
+  screen, one volume readout; Search from any page.
 - **How long a finished scan takes to show on Home** (E6): 38 ms for 200 films, measured in the real
   app on a copy of the catalogue.
 
@@ -85,6 +89,11 @@ test passed. Four sections per ADR-0016 (A4).
 - **Pure rules behind a component, tested without a page** — `src/features/home/setup.ts:35` `setupLines`, `setup.test.ts`.
 - **A fake backend that can send events** — `tools/uiaudit/controller.mjs:180` `__emit`, `:189` `transformCallback`.
 - **Testing focus without layout: placing elements by hand in jsdom** — `src/lib/gamepad.test.ts` `place`, `scroller`.
+- **Asking a native window to report input it would otherwise swallow** (an mpv input section of script messages, read as client-message events) — `crates/player/src/player.rs:159` `POINTER_SECTION`, `:665` `pointer_message`, `:239` `on_pointer`.
+- **One threshold, kept beside every query that must honour it** — `crates/persistence/src/lib.rs:23` `MATCH_ACCEPTED_AT`.
+- **Sorting with "no number" last** (`None` as `u32::MAX` in the key) — `crates/library/src/shelf.rs:22` `in_order`.
+- **A pattern that means two things, told apart by context** ("Chapter 2" with a year is a title) — `crates/filename-parser/src/lib.rs` `parse`; a year range, `crates/filename-parser/src/tags.rs:597`.
+- **A prefix recognised by its punctuation, not its digits** — `crates/library/src/folders.rs:105` `without_shelf_order`.
 
 ## 4. Five questions
 

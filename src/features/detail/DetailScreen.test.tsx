@@ -38,7 +38,7 @@ const commands = {
   preparePlay: vi.fn(() => new Promise((r) => (resolvePlan = r))),
   downloadAdvice: vi.fn(() => ok(null)),
   seriesDetail: vi.fn(() =>
-    ok({ seasons: [{ number: 0, episodes: 1 }, { number: 1, episodes: 2 }, { number: 2, episodes: 1 }], next_airing: { episode: 7, airs_at: 4102444800 }, watched: 1 }),
+    ok({ seasons: [{ number: 0, episodes: 1 }, { number: 1, episodes: 2 }, { number: 2, episodes: 1 }], next_airing: { episode: 7, airs_at: 4102444800 }, watched: 1, on_this_pc: 0, also_here: [] as { path: string; season: number | null; episode: number | null; title: string | null }[] }),
   ),
   titleWatched: vi.fn(() => ok(false)),
   titleWatchlisted: vi.fn(() => ok(saved)),
@@ -50,8 +50,8 @@ const commands = {
   seasonEpisodes: vi.fn((_id: number, season: number | null) =>
     ok(
       season === 1
-        ? [{ id: 71, season: 1, episode: 1, title: "Pilot", air_date: "1990-04-08", watched: true }, { id: 72, season: 1, episode: 2, title: "Traces to Nowhere", air_date: null, watched: false }]
-        : [{ id: 81, season: 2, episode: 1, title: "May the Giant Be with You", air_date: null, watched: false }],
+        ? [{ id: 71, season: 1, episode: 1, title: "Pilot", air_date: "1990-04-08", watched: true, on_this_pc: false }, { id: 72, season: 1, episode: 2, title: "Traces to Nowhere", air_date: null, watched: false, on_this_pc: true }]
+        : [{ id: 81, season: 2, episode: 1, title: "May the Giant Be with You", air_date: null, watched: false, on_this_pc: false }],
     ),
   ),
 };
@@ -209,6 +209,30 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
     expect(await screen.findByText("May the Giant Be with You")).toBeInTheDocument();
     fireEvent.click(screen.getByText("May the Giant Be with You"));
     expect(useUi.getState().detail).toBe(81);
+  });
+
+  it("a series says what is on this PC, and lists its own files the catalogue cannot place, in order", async () => {
+    // Phase 16: the author's Twin Peaks, whose third season IMDb lists as another series.
+    commands.itemDetail.mockImplementationOnce(() => ok({ ...DETAIL, title: "Twin Peaks", kind: "series" }));
+    commands.seriesDetail.mockImplementationOnce(() =>
+      ok({
+        seasons: [{ number: 1, episodes: 2 }], next_airing: null as never, watched: 0, on_this_pc: 1,
+        also_here: [
+          { path: "D:/TV/Twin Peaks/Season 3/Twin Peaks - S03E01 - Part 1.mkv", season: 3, episode: 1, title: "Part 1" },
+          { path: "D:/TV/Twin Peaks/Season 3/Twin Peaks - S03E02 - Part 2.mkv", season: 3, episode: 2, title: null },
+        ],
+      }),
+    );
+    renderIt();
+    expect(await screen.findByLabelText("On this PC")).toHaveTextContent("3 episodes on this PC");
+    const traces = (await screen.findByText("Traces to Nowhere")).closest("button") as HTMLElement;
+    expect(traces).toHaveTextContent("On this PC");
+    expect(screen.getByText("Pilot").closest("button")).not.toHaveTextContent("On this PC");
+    const also = screen.getByRole("region", { name: "Also on this PC" });
+    const rows = within(also).getAllByRole("button");
+    expect(rows.map((r) => r.textContent)).toEqual(["S3 · E1Part 1Play", "S3 · E2Twin Peaks - S03E02 - Part 2Play"]);
+    fireEvent.click(rows[1] as HTMLElement);
+    expect(useUi.getState().playing?.target).toBe("D:/TV/Twin Peaks/Season 3/Twin Peaks - S03E02 - Part 2.mkv");
   });
 
   it("marks a film watched, and Resume no longer offers a place that is gone (Appendix F, I21)", async () => {

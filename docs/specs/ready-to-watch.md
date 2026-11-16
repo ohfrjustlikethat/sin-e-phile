@@ -25,6 +25,13 @@ covers what it changed in the player, Home and the first run. TV folder layouts 
   so nothing unexpected is ever passed through), `panscan` (1 for fill: crop rather than stretch) and
   `video-zoom` (a power of two, so a percentage becomes its base-2 logarithm).
 
+**Clicks on the picture.** The picture is mpv's own window above the page, so the page never sees a
+click on it. mpv is given one input section (`POINTER_SECTION`, `crates/player/src/player.rs`) that
+reports a left click, a double click and mouse movement as script messages; its own bindings stay off.
+The app layer forwards them as `player-pointer`: a click pauses or plays, a double click toggles full
+screen, movement shows the controls. The bar's volume button says "Mute"; the level is said once, when
+it changes.
+
 ## 2. Input: one intent list, two devices
 
 Keys and pad buttons both map onto `Intent` (`src/features/player/intents.ts`), so they cannot offer
@@ -40,7 +47,7 @@ different things. The pad map (`src/lib/gamepad.ts` `playerIntent`, ADR-0045's T
 | Y | subtitles quick menu |
 | X | sound quick menu |
 | Menu | the full player panel |
-| View | full screen |
+| View | full screen (the player's own while it plays, so it knows; listed in the bar's hints) |
 | B | back (closes a menu first, then leaves the player) |
 
 While a quick menu is open, the D-pad moves inside it and does not reach the player (Down never turns the

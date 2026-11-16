@@ -84,6 +84,8 @@ const FAKE = `(() => {
     // Phase 16 E7: a fresh install, then what the first run sets up by pad, remembered for the
     // rest of the flow (and read by Appendix F I38's "Finish setting up" card).
     library_folders: () => window.__folders,
+    // The Films and TV Shows pages (Phase 16), passed through on the way to Watchlist.
+    library_titles: () => [],
     add_library_folder: (a) => {
       window.__folders.push({ id: window.__folders.length + 1, path: a.path, files: 0, scanned_at: null, scanning: true });
       return window.__folders.length;

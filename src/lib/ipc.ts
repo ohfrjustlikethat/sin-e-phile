@@ -348,6 +348,11 @@ export const commands = {
 	home: () => typedError<RailView[], string>(__TAURI_INVOKE("home")),
 	/**  The watchlist page (Appendix F, I39): what this profile saved, newest first. */
 	watchlist: () => typedError<HomeCard[], string>(__TAURI_INVOKE("watchlist")),
+	/**
+	 *  What is on this PC: its shows (`shows`), or its films, by title (Phase 16: the Films
+	 *  and TV Shows pages, before Phase 19 adds the catalogue around them).
+	 */
+	libraryTitles: (shows: boolean) => typedError<HomeCard[], string>(__TAURI_INVOKE("library_titles", { shows })),
 	/**  Whether a title is on this profile's watchlist. */
 	titleWatchlisted: (id: number) => typedError<boolean, string>(__TAURI_INVOKE("title_watchlisted", { id })),
 	/**  Save a title to the watchlist, or take it off. */
@@ -574,6 +579,8 @@ export type EpisodeView = {
 	air_date: string | null,
 	/**  Seen through by this profile. Only a season's list fills it in. */
 	watched: boolean,
+	/**  A file of this episode is on this PC (Phase 16). */
+	on_this_pc: boolean,
 };
 
 /**
@@ -865,6 +872,13 @@ export type SeasonView = {
 };
 
 export type SeriesView = {
+	/**  Episodes with a file on this PC (Phase 16). */
+	on_this_pc: number,
+	/**
+	 *  The show's own files the catalogue has no episode for, as their names number
+	 *  them, in order (`sinephile_library::shelf`).
+	 */
+	also_here: ShelvedView[],
 	seasons: SeasonView[],
 	next_airing: AiringView | null,
 	/**  How many of its episodes this profile has seen through (Appendix F, I21). */
@@ -878,6 +892,14 @@ export type SheetsView = {
 	tile_width: number,
 	tile_height: number,
 	count: number,
+};
+
+/**  A file of the show's, placed by its own name rather than by the catalogue. */
+export type ShelvedView = {
+	path: string,
+	season: number | null,
+	episode: number | null,
+	title: string | null,
 };
 
 /**  One row of the Sources list. */

@@ -63,6 +63,12 @@ export function SourcesSection() {
           and none of them waits for another. Out of the box that is your own files and the
           Internet Archive's public-domain films — nothing else is included.
         </p>
+        {/* Phase 16: the author could not tell how to try streaming or downloading. */}
+        <p className="mb-4 text-xs leading-relaxed text-ink-muted" aria-label="Try it">
+          To try it now, search for Nosferatu (1922) or The General (1926): both are in the public
+          domain and play at once from the Internet Archive. The Archive streams; downloading needs a
+          source of your own that offers torrents, added below by its address.
+        </p>
         {view.isPending && <p className="text-sm text-ink-muted">Reading sources…</p>}
         {view.isError && <p className="text-sm text-danger">{String(view.error.message)}</p>}
         <ol aria-label="Sources, in the order they are asked">

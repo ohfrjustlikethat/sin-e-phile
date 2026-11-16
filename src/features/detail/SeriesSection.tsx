@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { commands } from "@/lib/ipc";
+import { commands, type ShelvedView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
 import { airsLine } from "./airing";
 import { ChoiceRow } from "./ChoiceRow";
@@ -22,8 +22,16 @@ async function ok<T>(p: Promise<{ status: "ok"; data: T } | { status: "error"; e
 
 const seasonLabel = (n: number | null) => (n === null ? "Other" : n === 0 ? "Specials" : `Season ${n}`);
 
+/** "S1 · E14", or as much of it as the file's name gave. */
+export const shelfNumber = (f: ShelvedView) =>
+  [f.season !== null ? `S${f.season}` : null, f.episode !== null ? `E${f.episode}` : null].filter(Boolean).join(" · ");
+
+/** The file's own name, without its folders or extension: the fallback title. */
+const fileName = (path: string) => (path.split(/[\\/]/).pop() ?? path).replace(/\.[^.]+$/, "");
+
 export function SeriesSection({ id }: { id: number }) {
   const openDetail = useUi((s) => s.openDetail);
+  const play = useUi((s) => s.play);
   const series = useQuery({ queryKey: ["series", id], queryFn: () => ok(commands.seriesDetail(id)) });
   const seasons = series.data?.seasons ?? [];
   // The first real season, not the specials.
@@ -65,6 +73,11 @@ export function SeriesSection({ id }: { id: number }) {
           showTotal={seasons.reduce((n, s) => n + s.episodes, 0)}
         />
       )}
+      {series.data && series.data.on_this_pc + series.data.also_here.length > 0 && (
+        <p className="mb-4 text-[13px] text-ink-muted" aria-label="On this PC">
+          {plural(series.data.on_this_pc + series.data.also_here.length, "episode", "episodes")} on this PC
+        </p>
+      )}
       {seasons.length === 0 && !series.isPending && (
         <p className="text-sm text-ink-muted">The catalogue lists no episodes for this series yet.</p>
       )}
@@ -78,12 +91,37 @@ export function SeriesSection({ id }: { id: number }) {
             >
               <span className="w-8 shrink-0 text-right tabular-nums text-ink-faint">{e.episode ?? "·"}</span>
               <span className={`flex-1 text-[15px] ${e.watched ? "text-ink-muted" : "text-ink"}`}>{e.title}</span>
+              {e.on_this_pc && <span className="label text-ink-muted">On this PC</span>}
               {e.watched && <span className="label text-ink-faint">Watched</span>}
               {e.air_date && <span className="label text-ink-faint">{e.air_date}</span>}
             </button>
           </li>
         ))}
       </ol>
+      {(series.data?.also_here.length ?? 0) > 0 && (
+        // Files of this show the catalogue has no episode for (a season it lists as another
+        // series, a numbering past its season), in the order their names give (Phase 16).
+        <section aria-label="Also on this PC" className="mt-10">
+          <h3 className="label mb-2 text-ink">Also on this PC</h3>
+          <ol className="flex flex-col">
+            {series.data?.also_here.map((f) => (
+              <li key={f.path}>
+                <button
+                  type="button"
+                  onClick={() => play({ target: f.path, title: f.title ?? fileName(f.path), mediaItemId: null, start: null })}
+                  className="flex w-full items-baseline gap-5 border-t border-line-subtle py-3 text-left hover:bg-raised"
+                >
+                  <span className="w-20 shrink-0 text-right tabular-nums text-ink-faint">{shelfNumber(f) || "·"}</span>
+                  <span className="flex-1 text-[15px] text-ink">{f.title ?? fileName(f.path)}</span>
+                  <span className="label text-ink-muted">Play</span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
     </section>
   );
 }
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
