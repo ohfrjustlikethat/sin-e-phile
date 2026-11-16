@@ -69,7 +69,7 @@
       {
         "id": "16.10",
         "text": "The author batch: sign-off on a screenshot set (player, first run, Home, Settings, taste screen; Phase 14 E4/E6 with it), a download and a stream with a source of their choosing (Phase 7 E7's VPN cut with it); docs/specs, learning note, README and HOW_IT_WORKS, regression, close (E9).",
-        "status": "not_started",
+        "status": "in_progress",
         "commit": null
       }
     ],
@@ -77,8 +77,8 @@
       {
         "id": "E1",
         "text": "The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.",
-        "met": false,
-        "evidence": "REOPENED 2026-11-16: the panel lacks the aspect and zoom controls the phase specifies ('picture (aspect, zoom, brightness)'). Held so far: node tools/uiaudit/controller.mjs (2026-11-16) 'the D-pad reaches every control in the player panel (34/34; missed: none)', seen to fail with the Speed section inert (20/34); 16.5's real-window measurement (docs/eval-results.md 'The player, measured in its real window'): intent to video-region change ~14 ms (under 100 ms); video window hidden until the first frame (430 ms), so no black flash on open; hidden 7 ms after Back on close; the menu cut out of the video ('2 -> 3 holes', seen to fail without data-cutout); the bar glides between reports (src/features/player/intents.ts glide, unit-tested). Spec: docs/specs/ready-to-watch.md."
+        "met": true,
+        "evidence": "7776473, 2c1cd5b (2026-11-16), met again after the reopen. The panel now has the picture's shape (as filmed, 16:9, 4:3, 2.35:1, fill the screen) and zoom (50-300%) beside brightness, contrast and saturation: crates/player/src/player.rs framing_tests and crates/player/tests/playback.rs the_shape_and_zoom_reach_the_playing_film (seen to fail before set_framing existed). node tools/uiaudit/controller.mjs (2026-11-16, 2c1cd5b): 'the D-pad reaches every control in the player panel (40/40; missed: none)', the walk seen to fail with the Speed section inert (20/34). 16.5's real-window measurement (docs/eval-results.md 'The player, measured in its real window'): intent to video-region change ~14 ms (under 100 ms); the video window hidden until the first frame (430 ms), so no black flash on open; hidden 7 ms after Back on close; the menu cut out of the video ('2 -> 3 holes', seen to fail without data-cutout); the bar glides between reports (src/features/player/intents.ts glide, unit-tested). Spec: docs/specs/ready-to-watch.md section 1."
       },
       {
         "id": "E2",
@@ -89,8 +89,8 @@
       {
         "id": "E3",
         "text": "The controller works in the player as specified, and the right stick scrolls pages, rails, panels and the paused details, each covered by the pad-flow audit.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "2c1cd5b (2026-11-16): node tools/uiaudit/controller.mjs, 'the whole flow works with only a pad'. In the player: A pauses; Up raises the volume (105) and says so; Y opens the subtitles menu with focus on its first choice, cut out of the video (2 -> 3 holes), Down inside it does not change the volume, A picks and closes; X opens the sound menu, Down and A choose the second track (German); RB goes to the next chapter (10:00) and says which, LB restarts the one playing (0:00); Right seeks 10 s once per press; Left held 0.9 s scrubs back 5 steps; Menu opens the panel, every control reached (40/40); RT seeks 30 s; B leaves. The right stick scrolls: a 24-card rail sideways (0 -> 970) with focus following onto a card in view; the player panel (349 -> 0); the paused film's details (636); the Settings page (0 -> 1095) with focus following. Seen to fail: rail 0 -> 0 before snapping was suspended; panel 349 -> 349 before a dialog held the D-pad, 349 -> 318 before the follow was held in the dialog. Unit: src/lib/gamepad.test.ts 'focus and the right stick, on a page (Phase 16)', four tests, each seen to fail with its fix removed; 'maps the player buttons as ADR-0045's TV-standard table says'. Spec: docs/specs/ready-to-watch.md sections 2-3."
       },
       {
         "id": "E4",
@@ -1871,8 +1871,8 @@
         {
           "id": "E1",
           "text": "The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.",
-          "met": false,
-          "evidence": "REOPENED 2026-11-16: the panel lacks the aspect and zoom controls the phase specifies ('picture (aspect, zoom, brightness)'). Held so far: node tools/uiaudit/controller.mjs (2026-11-16) 'the D-pad reaches every control in the player panel (34/34; missed: none)', seen to fail with the Speed section inert (20/34); 16.5's real-window measurement (docs/eval-results.md 'The player, measured in its real window'): intent to video-region change ~14 ms (under 100 ms); video window hidden until the first frame (430 ms), so no black flash on open; hidden 7 ms after Back on close; the menu cut out of the video ('2 -> 3 holes', seen to fail without data-cutout); the bar glides between reports (src/features/player/intents.ts glide, unit-tested). Spec: docs/specs/ready-to-watch.md."
+          "met": true,
+          "evidence": "7776473, 2c1cd5b (2026-11-16), met again after the reopen. The panel now has the picture's shape (as filmed, 16:9, 4:3, 2.35:1, fill the screen) and zoom (50-300%) beside brightness, contrast and saturation: crates/player/src/player.rs framing_tests and crates/player/tests/playback.rs the_shape_and_zoom_reach_the_playing_film (seen to fail before set_framing existed). node tools/uiaudit/controller.mjs (2026-11-16, 2c1cd5b): 'the D-pad reaches every control in the player panel (40/40; missed: none)', the walk seen to fail with the Speed section inert (20/34). 16.5's real-window measurement (docs/eval-results.md 'The player, measured in its real window'): intent to video-region change ~14 ms (under 100 ms); the video window hidden until the first frame (430 ms), so no black flash on open; hidden 7 ms after Back on close; the menu cut out of the video ('2 -> 3 holes', seen to fail without data-cutout); the bar glides between reports (src/features/player/intents.ts glide, unit-tested). Spec: docs/specs/ready-to-watch.md section 1."
         },
         {
           "id": "E2",
@@ -1883,8 +1883,8 @@
         {
           "id": "E3",
           "text": "The controller works in the player as specified, and the right stick scrolls pages, rails, panels and the paused details, each covered by the pad-flow audit.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "2c1cd5b (2026-11-16): node tools/uiaudit/controller.mjs, 'the whole flow works with only a pad'. In the player: A pauses; Up raises the volume (105) and says so; Y opens the subtitles menu with focus on its first choice, cut out of the video (2 -> 3 holes), Down inside it does not change the volume, A picks and closes; X opens the sound menu, Down and A choose the second track (German); RB goes to the next chapter (10:00) and says which, LB restarts the one playing (0:00); Right seeks 10 s once per press; Left held 0.9 s scrubs back 5 steps; Menu opens the panel, every control reached (40/40); RT seeks 30 s; B leaves. The right stick scrolls: a 24-card rail sideways (0 -> 970) with focus following onto a card in view; the player panel (349 -> 0); the paused film's details (636); the Settings page (0 -> 1095) with focus following. Seen to fail: rail 0 -> 0 before snapping was suspended; panel 349 -> 349 before a dialog held the D-pad, 349 -> 318 before the follow was held in the dialog. Unit: src/lib/gamepad.test.ts 'focus and the right stick, on a page (Phase 16)', four tests, each seen to fail with its fix removed; 'maps the player buttons as ADR-0045's TV-standard table says'. Spec: docs/specs/ready-to-watch.md sections 2-3."
         },
         {
           "id": "E4",
@@ -1981,7 +1981,7 @@
         {
           "id": "16.10",
           "text": "The author batch: sign-off on a screenshot set (player, first run, Home, Settings, taste screen; Phase 14 E4/E6 with it), a download and a stream with a source of their choosing (Phase 7 E7's VPN cut with it); docs/specs, learning note, README and HOW_IT_WORKS, regression, close (E9).",
-          "status": "not_started",
+          "status": "in_progress",
           "commit": null
         }
       ],
@@ -2558,7 +2558,7 @@
       ]
     }
   ],
-  "next_action": "Phase 16, subtask 16.10. Six local commits since 592ccc2 are NOT pushed (5a374a1 spec 4.1.0 through the chapter-jump commit): run the full pre-push suite in CLAUDE.md, then push. Then bookkeeping: fill SPEC.md Appendix F's Done column for I01, I33, I71, I72 (7776473), I21 (643e750), I39 (2cd797f), I38 (6000ceb) and run python tools/phasedoc/generate.py --log 16; re-mark E1 met in BOTH current_phase and phases[16] (panel now has Shape and Zoom: crates/player framing tests, tests/playback.rs the_shape_and_zoom_reach_the_playing_film, pad flow 40/40 controls) and mark E3 met (pad flow: X sound menu, RB/LB chapter, Right seek, Left held scrubs, Y, Menu, A, B, right stick on Settings and paused details); record both in docs/eval-results.md; add the new pieces to docs/specs/ready-to-watch.md and docs/learning/phase-16-notes.md. Then npm run tauri build and send the author batch (sign-off screenshots E9, a download and a stream, Phase 7 E7 VPN cut, Load a file E2, scan-to-Home time E6, first run by pad E7, the embeddings-v3 release-asset decision), and /closephase.",
+  "next_action": "Phase 16, subtask 16.10. E1, E3, E4, E5, E8 met; E2, E6, E7, E9 open. Committed 2c1cd5b (right-stick fixes) and the state commit after it; push them once the full pre-push suite in CLAUDE.md has passed (it had, bar gitleaks, at 2c1cd5b). Then: (1) E6 'a finished library scan appears on Home within 2 s': measure it in the pad flow (fake backend emits the scan-finished event, time to the 'Your library' rail rendering) and in a debug run of the real app over fixtures/ (SINEPHILE_PROBE), record both in docs/eval-results.md; the rail order is crates/taste/src/home.rs's tests. (2) E7: extend the pad-flow first run so it ends with folders, an add-on by address, both keys and a download backend set and tested, and check the 'no source yet' wording wherever play or download would be. (3) E2: the pad flow already covers find, download and sync; add style applied live and saved per profile; 'Load a file' (Windows' picker) stays manual. (4) npm run tauri build, then send the author batch: sign-off screenshots (E9, Phase 14 E4/E6), a download and a stream with a source of their choosing, the Phase 7 E7 VPN cut, Load a file in the player (E2), first run by a real pad (E7), and the embeddings-v3 release-asset decision (reserved, ADR-0044/ADR-0014). (5) Phase 16 retrospective in SESSION_LOG, /closephase.",
   "blockers": [],
   "decisions_pending": [
     {

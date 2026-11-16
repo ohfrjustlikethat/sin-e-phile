@@ -1667,7 +1667,7 @@ Size: **S** one commit · **M** a subtask · **L** several subtasks.
 
 | ID | Improvement | Phase | Size | Done |
 |---|---|---|---|---|
-| I01 | "Start over" beside "Resume from 42:10", on the film page and on episode rows | 16 | S | |
+| I01 | "Start over" beside "Resume from 42:10", on the film page and on episode rows | 16 | S | 7776473 |
 | I02 | Sleep timer: stop in 30, 60 or 90 minutes, or at the end of this episode | 24 | S | |
 | I03 | "Still watching?" after three episodes played with no input | 24 | S | |
 | I04 | Night mode: the volume levelled so speech is audible and loud scenes are not, per profile | 24 | S | |
@@ -1692,7 +1692,7 @@ Size: **S** one commit · **M** a subtask · **L** several subtasks.
 
 | ID | Improvement | Phase | Size | Done |
 |---|---|---|---|---|
-| I21 | Mark watched and unwatched: a film, an episode, a season, a show | 16 | M | |
+| I21 | Mark watched and unwatched: a film, an episode, a season, a show | 16 | M | 643e750 |
 | I22 | A menu on every tile (hold A, right-click, or the Menu key): Play, Start over, Watchlist, Mark watched, Not interested, Show in Explorer, Fix the match | 19 | M | |
 | I23 | Fix a wrong match from the film's own page | 19 | S | |
 | I24 | Pictures without a key: `poster.jpg`, `folder.jpg` or `fanart.jpg` beside the file, cover art inside the file, else a frame from the film | 19 | M | |
@@ -1709,7 +1709,7 @@ Size: **S** one commit · **M** a subtask · **L** several subtasks.
 
 | ID | Improvement | Phase | Size | Done |
 |---|---|---|---|---|
-| I33 | Result rows: the number and the match label padded inside the focus ring | 16 | S | |
+| I33 | Result rows: the number and the match label padded inside the focus ring | 16 | S | 7776473 |
 | I34 | Filter chips under the search field: films, series, in my library, playable now, decade | 19 | M | |
 | I35 | Example searches in the empty search state | 19 | S | |
 | I36 | Typo tolerance that works: a weak keyword hit no longer blocks a good fuzzy one (D31), within the budget (D30) | 22 | M | |
@@ -1719,8 +1719,8 @@ Size: **S** one commit · **M** a subtask · **L** several subtasks.
 
 | ID | Improvement | Phase | Size | Done |
 |---|---|---|---|---|
-| I38 | A "Finish setting up" card on Home until it is done: library, a source, subtitles, downloads; each line opens its setting | 16 | M | |
-| I39 | A working Watchlist page now (a grid of what was saved); Phase 20 deepens it | 16 | S | |
+| I38 | A "Finish setting up" card on Home until it is done: library, a source, subtitles, downloads; each line opens its setting | 16 | M | 6000ceb |
+| I39 | A working Watchlist page now (a grid of what was saved); Phase 20 deepens it | 16 | S | 2cd797f |
 | I40 | Films and TV Shows show a simple working grid (the library first, then widely loved) until Phase 19 builds them | 17 | M | |
 | I41 | "Playable now": a rail of public-domain films from the built-in Internet Archive source, so a fresh install can play something at once | 17 | M | |
 | I42 | "I have 90 minutes": a length limit on Surprise me and on Home | 18 | S | |
@@ -1767,8 +1767,8 @@ Size: **S** one commit · **M** a subtask · **L** several subtasks.
 
 | ID | Improvement | Phase | Size | Done |
 |---|---|---|---|---|
-| I71 | One title face: the pause panel and the player use the display face, as the film page does | 16 | S | |
-| I72 | Home's rail descriptors on one line under the rail title | 16 | S | |
+| I71 | One title face: the pause panel and the player use the display face, as the film page does | 16 | S | 7776473 |
+| I72 | Home's rail descriptors on one line under the rail title | 16 | S | 7776473 |
 | I73 | The film page without artwork: a second column of facts (ratings, leading cast, genres, where it plays) so the page is not half empty | 19 | M | |
 | I74 | Every page's skeleton matches its final layout; nothing jumps when content arrives | 19 | S | |
 | I75 | Dates and numbers in the viewer's locale; tabular figures for every time | 19 | S | |

@@ -15,9 +15,9 @@ A person can install the app, set it up once, and watch anything they choose (fr
 
 ## Exit criteria
 
-- [ ] **E1** The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.
+- [x] **E1** The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.
 - [ ] **E2** Subtitles: the style editor applies live and persists per profile; find and download, sync in 0.1 s steps, and load from disk each work in the player, by pad.
-- [ ] **E3** The controller works in the player as specified, and the right stick scrolls pages, rails, panels and the paused details, each covered by the pad-flow audit.
+- [x] **E3** The controller works in the player as specified, and the right stick scrolls pages, rails, panels and the paused details, each covered by the pad-flow audit.
 - [x] **E4** A TV-layout corpus (season folders, flat, anime absolute, split across drives, including a real-world case like the author's) is identified with at least 98% of episodes right and no episode filed as a film.
 - [x] **E5** The catalogue refreshes daily in the background: titles and episodes released since the last refresh appear without the user doing anything, and a run on the real data adds the recent releases it lacked.
 - [ ] **E6** Home's rails are in the specified order, and a finished library scan appears on Home within 2 s.
@@ -42,13 +42,13 @@ A person can install the app, set it up once, and watch anything they choose (fr
 
 Deliverables, not exit criteria: each is done or carried by name at close (ADR-0046).
 
-- [ ] **I01** (S) "Start over" beside "Resume from 42:10", on the film page and on episode rows
-- [ ] **I21** (M) Mark watched and unwatched: a film, an episode, a season, a show
-- [ ] **I33** (S) Result rows: the number and the match label padded inside the focus ring
-- [ ] **I38** (M) A "Finish setting up" card on Home until it is done: library, a source, subtitles, downloads; each line opens its setting
-- [ ] **I39** (S) A working Watchlist page now (a grid of what was saved); Phase 20 deepens it
-- [ ] **I71** (S) One title face: the pause panel and the player use the display face, as the film page does
-- [ ] **I72** (S) Home's rail descriptors on one line under the rail title
+- [x] **I01** (S) "Start over" beside "Resume from 42:10", on the film page and on episode rows · `7776473`
+- [x] **I21** (M) Mark watched and unwatched: a film, an episode, a season, a show · `643e750`
+- [x] **I33** (S) Result rows: the number and the match label padded inside the focus ring · `7776473`
+- [x] **I38** (M) A "Finish setting up" card on Home until it is done: library, a source, subtitles, downloads; each line opens its setting · `6000ceb`
+- [x] **I39** (S) A working Watchlist page now (a grid of what was saved); Phase 20 deepens it · `2cd797f`
+- [x] **I71** (S) One title face: the pause panel and the player use the display face, as the film page does · `7776473`
+- [x] **I72** (S) Home's rail descriptors on one line under the rail title · `7776473`
 
 ## Learning note
 

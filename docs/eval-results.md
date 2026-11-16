@@ -2944,3 +2944,27 @@ not the navigation.
 `switch`, `modes`, `update`): identify **99.05% / 0.39%** (held out 100% / 0%); tvlayouts **59/59**, 0 as films,
 extras 105/105; import **E2 MET**, 0 new on re-import; taste **40.63%** against 35.64%; switch **32.3 / 37.3 ms**
 p95 (30.3 / 40.7 at 16.3: noise); modes purity **96.6%**; update slowest **131.9 ms**. No regression.
+
+### E1 again, and E3: the controller in the player and the right stick (16.10, 2026-11-16)
+
+E1 was reopened the same day: the phase names the picture's **shape and zoom**, and the panel had neither. Built in
+7776473 (Shape cycles as filmed, 16:9, 4:3, 2.35:1, fill; Zoom 50-300%; `crates/player` `framing`, its tests, and
+`tests/playback.rs` `the_shape_and_zoom_reach_the_playing_film`, seen to fail first). `node tools/uiaudit/controller.mjs`
+at 2c1cd5b: every control in the panel by D-pad, **40/40**, none missed. With 16.5's real-window numbers, **E1 met**.
+
+E3, same run: Y and X quick menus (focus on the first choice, cut out of the video, the D-pad kept inside, A chooses and
+closes), **RB/LB by chapter** in a film (10:00, then 0:00) and said on screen, Right seeks once per press, Left held
+0.9 s scrubs **5 steps**, RT 30 s, Menu, A, B. The right stick: a 24-card rail **0 -> 970 px** with focus following onto
+a card in view; the player panel **349 -> 0**; the paused film's details **636**; Settings **0 -> 1095**.
+
+Pushing the stick where nothing had found three faults, each seen in the audit before its fix:
+
+| Fault | Before | After |
+|---|---|---|
+| A snapping rail undid every step of the stick | rail 0 -> 0 | 0 -> 970 (snap suspended while driven) |
+| The virtualised rail unmounted the focused card; focus fell to the page | focus on `body` | a card in view (600 ms grace) |
+| Down at the foot of the panel left the dialog for the bar | panel 349 -> 349, then 349 -> 318 | 349 -> 0 (a dialog holds the D-pad and the follow) |
+
+`npx vitest run src/lib/gamepad.test.ts`: four new jsdom tests, each seen to fail with its fix removed (the clipping
+test also fails with `onScreen`'s ancestor check removed; the grace test with the grace removed). **E3 met.** Frontend
+**193** tests (189 before).

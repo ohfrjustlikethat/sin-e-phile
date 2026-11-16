@@ -2279,3 +2279,17 @@ the same code, as deliverables rather than exit criteria. Seven are built in Pha
 prints a phase's items in its doc; CLAUDE.md resynced in the same commit. **The review also found a gap in
 Phase 16 itself**: the picture panel has no aspect or zoom, which the phase specifies, so E1 was marked met
 too early this morning and is reopened until they exist.
+
+**Built the same day, then pushed after the full suite (162e994, CI run 43822192618 green):** picture shape
+(as filmed, 16:9, 4:3, 2.35:1, fill) and zoom 50–300% (7776473); Appendix F's seven Phase 16 items — I01 Start
+over, I33, I71, I72 (7776473), I21 mark watched for a film, episode, season or show (643e750), I39 a working
+Watchlist page and save button (2cd797f), I38 the "Finish setting up" card (6000ceb); the bumpers move by chapter
+in a film, and the pad flow now covers X, the bumpers, seek and hold-to-scrub (b3d2c70).
+
+**Three controller bugs, found by making the pad flow push the right stick on a rail and in the panel**
+(E3 names both; nothing had tested them): (1) the stick could not move a rail at all — the rail snaps to its
+cards and each frame's few pixels snapped back (0 → 0 px); snapping is now suspended while the stick drives an
+element and restored at rest; (2) the virtualised rail unmounted the focused card a frame after the stick's
+last movement, and focus fell to the page; within 600 ms of the stick moving something, a lost focus is put
+back near where it was, onto a control that is really on screen; (3) Down at the foot of the player's panel
+left the dialog for the bar, so the stick then scrolled nothing; a dialog now holds the D-pad and the follow.
