@@ -59,7 +59,7 @@ Phase 16: build the author's 15-item plan in docs/design/author-brief-2026-11-17
 
 ## Blockers
 
-None.
+- **B16** CI run 43916502166 failed on ProfilePicker.test.tsx (a digit typed right after a wrong PIN was swallowed on a slower runner). Fixed in the next commit (one state update); cleared when CI is green again.
 
 ---
 

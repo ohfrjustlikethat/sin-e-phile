@@ -2559,7 +2559,14 @@
     }
   ],
   "next_action": "Phase 16: build the author's 15-item plan in docs/design/author-brief-2026-11-17.md, in its order (their answers to 7 rounds of questions are there; do not re-ask). Item 1 now: download only the file a source chose (season packs): a `file_index` column on downloads (new migration in crates/persistence/migrations/, NewDownload, the surface test in crates/persistence/tests/repository_surface.rs), passed from src-tauri/src/commands/downloads.rs download_title (the plan's PlayableStream::Torrent file_index), honoured in crates/downloads/src/backend.rs (librqbit `only_files`, qBittorrent file priorities). Item 3 is the critical one: a fresh install never builds the search index (search_index 0 rows), so search, identification and Films/TV are empty.",
-  "blockers": [],
+  "blockers": [
+    {
+      "id": "B16",
+      "raised": "2026-11-17",
+      "needs_user": false,
+      "description": "CI run 43916502166 failed on ProfilePicker.test.tsx (a digit typed right after a wrong PIN was swallowed on a slower runner). Fixed in the next commit (one state update); cleared when CI is green again."
+    }
+  ],
   "decisions_pending": [
     {
       "id": "P1",
