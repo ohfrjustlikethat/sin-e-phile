@@ -329,9 +329,33 @@ describe("focus and the right stick, on a page (Phase 16)", () => {
 
       // While a film plays the player owns the buttons, and nothing is moved.
       document.documentElement.dataset.playing = "";
+      noteFocus();
       byId("path").blur();
       rescueFocus(performance.now() + FOLLOW_GRACE_MS * 10);
       expect(document.activeElement).toBe(document.body);
+    } finally {
+      delete document.documentElement.dataset.input;
+      delete document.documentElement.dataset.playing;
+    }
+  });
+
+  it("while a film plays, a focus lost inside the open panel is put back within it", () => {
+    document.body.innerHTML =
+      '<main><button id="bar">Play</button></main>' +
+      '<div role="dialog" aria-label="Player menu"><div id="found"><button id="offer">English</button></div>' +
+      '<button id="later">Subtitles later</button></div>';
+    place(byId("bar"), 100, 900, 100, 40);
+    place(byId("offer"), 600, 500, 300, 40);
+    place(byId("later"), 600, 300, 300, 40); // jsdom's window is 1024 wide
+    document.documentElement.dataset.input = "pad";
+    document.documentElement.dataset.playing = "";
+    try {
+      byId("offer").focus();
+      noteFocus();
+      byId("found").remove(); // choosing a found subtitle closes the list it was in
+      expect(document.activeElement).toBe(document.body);
+      rescueFocus(performance.now());
+      expect(document.activeElement?.id).toBe("later");
     } finally {
       delete document.documentElement.dataset.input;
       delete document.documentElement.dataset.playing;

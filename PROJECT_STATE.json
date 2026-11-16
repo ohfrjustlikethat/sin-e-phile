@@ -84,7 +84,7 @@
         "id": "E2",
         "text": "Subtitles: the style editor applies live and persists per profile; find and download, sync in 0.1 s steps, and load from disk each work in the player, by pad.",
         "met": false,
-        "evidence": null
+        "evidence": "NOT MET: 'Load a file' (Windows' file picker) needs the author's hands; asked in the author batch. Held so far (2026-11-16): node tools/uiaudit/controller.mjs, in the player by pad: Menu, the D-pad to 'Find subtitles', the first found, A downloads and shows it and says so; 'A on Subtitles later moves them 0.1 s, and says so (Subtitles +0.1 s)'; 'A on Larger subtitles sets the style for this profile (size 46 -> 50)' (seen to fail before rescueFocus kept focus in the open panel: 'no button Subtitles later (nothing has focus)'). Live: 16.6's real window read mpv back after the style changed (sub-color=#FFFFD400 sub-border-size=5.000000). Per profile: set_subtitle_settings stores it with CredentialRepository::set(profile, ...), crates/persistence/tests/credentials.rs keys_are_per_profile_and_do_not_leak_between_them; src/features/player/SubtitleTools.test.tsx 'changes the style live and keeps it for the profile'. Find and download: crates/subtitles/tests/chain.rs the_viewer_chooses_among_the_offers_and_only_a_download_spends_the_budget."
       },
       {
         "id": "E3",
@@ -1878,7 +1878,7 @@
           "id": "E2",
           "text": "Subtitles: the style editor applies live and persists per profile; find and download, sync in 0.1 s steps, and load from disk each work in the player, by pad.",
           "met": false,
-          "evidence": null
+          "evidence": "NOT MET: 'Load a file' (Windows' file picker) needs the author's hands; asked in the author batch. Held so far (2026-11-16): node tools/uiaudit/controller.mjs, in the player by pad: Menu, the D-pad to 'Find subtitles', the first found, A downloads and shows it and says so; 'A on Subtitles later moves them 0.1 s, and says so (Subtitles +0.1 s)'; 'A on Larger subtitles sets the style for this profile (size 46 -> 50)' (seen to fail before rescueFocus kept focus in the open panel: 'no button Subtitles later (nothing has focus)'). Live: 16.6's real window read mpv back after the style changed (sub-color=#FFFFD400 sub-border-size=5.000000). Per profile: set_subtitle_settings stores it with CredentialRepository::set(profile, ...), crates/persistence/tests/credentials.rs keys_are_per_profile_and_do_not_leak_between_them; src/features/player/SubtitleTools.test.tsx 'changes the style live and keeps it for the profile'. Find and download: crates/subtitles/tests/chain.rs the_viewer_chooses_among_the_offers_and_only_a_download_spends_the_budget."
         },
         {
           "id": "E3",
@@ -2558,7 +2558,7 @@
       ]
     }
   ],
-  "next_action": "Phase 16, subtask 16.10. E1, E3, E4, E5, E6, E7, E8 met; E2 and E9 open. Pushed up to the state commit after af1be92 (push it if git status says ahead). Then: (1) E2: the pad flow covers find, download and sync in the player; add the style applied live and saved per profile by pad (SubtitleTools' style buttons, set_subtitle_settings called with the change, and 16.6's real-window read-back already recorded); 'Load a file' (Windows' picker) stays manual. (2) npm run tauri build. (3) Send the author batch, one message: sign-off screenshots (E9, Phase 14 E4/E6: tools/uiaudit/out/*.png and the real app), a download and a stream with a source of their choosing, the Phase 7 E7 VPN cut, Load a file in the player (E2), the first run with a real controller (E7 confirmation), and the embeddings-v3 release-asset decision (reserved, ADR-0044/ADR-0014; default: do not publish, search-by-meaning stays off until decided). (4) Phase 16 retrospective in SESSION_LOG, regression numbers, /closephase once E2 and E9 are met.",
+  "next_action": "Phase 16, subtask 16.10. E1, E3, E4, E5, E6, E7, E8 met; E2 and E9 open. Pushed up to the state commit after af1be92 (push it if git status says ahead). Then: (1) E2 is held but for 'Load a file' (the author's). (2) npm run tauri build. (3) Send the author batch, one message: sign-off screenshots (E9, Phase 14 E4/E6: tools/uiaudit/out/*.png and the real app), a download and a stream with a source of their choosing, the Phase 7 E7 VPN cut, Load a file in the player (E2), the first run with a real controller (E7 confirmation), and the embeddings-v3 release-asset decision (reserved, ADR-0044/ADR-0014; default: do not publish, search-by-meaning stays off until decided). (4) Phase 16 retrospective in SESSION_LOG, regression numbers, /closephase once E2 and E9 are met.",
   "blockers": [],
   "decisions_pending": [
     {

@@ -166,6 +166,8 @@ const FAKE = `(() => {
       { file_id: "2", language: "en", hash_match: false, downloads: 10, release: "Sunrise.1927.WEB" },
     ],
     subtitle_choose: () => "aligned: offset +1200 ms",
+    // Phase 16 E2: the subtitles' delay, which the backend keeps and returns.
+    subtitle_nudge: (a) => (window.__subDelay = (window.__subDelay ?? 0) + a.deltaMs),
     set_subtitle_settings: () => null,
     tmdb_status: () => ({ has_key: !!window.__tmdbKey, fetched_on: null }),
     // Phase 16: the catalogue keeps itself current.
@@ -978,6 +980,18 @@ try {
   const chose = await waitFor(async () => (await calls("subtitle_choose"))[0], "a subtitle chosen", 25);
   check(chose.offer?.file_id === "3", "A downloads and shows the chosen subtitle");
   check(await evalJs(`document.body.textContent.includes("Showing the chosen subtitles")`), "and says so");
+  // Phase 16 E2: sync in 0.1 s steps, and the style, each by pad in the panel.
+  await steerToButton("Subtitles later");
+  await press(B.A);
+  await waitFor(async () => (await calls("subtitle_nudge")).length === 1, "the subtitles moved", 25);
+  check((await calls("subtitle_nudge"))[0].deltaMs === 100 &&
+    (await waitFor(() => evalJs(`document.body.textContent.includes("Subtitles +0.1 s")`), "the nudge said", 25), true),
+    "A on 'Subtitles later' moves them 0.1 s, and says so (Subtitles +0.1 s)");
+  await steerToButton("Larger subtitles");
+  await press(B.A);
+  await waitFor(async () => (await calls("set_subtitle_settings")).length > 0, "the style saved", 25);
+  const styled = (await calls("set_subtitle_settings")).at(-1);
+  check(styled.settings.size === 50, `A on 'Larger subtitles' sets the style for this profile (size 46 -> ${styled.settings.size})`);
   await press(B.B);
   await waitFor(() => evalJs(`!document.querySelector('[aria-label="Player menu"]')`), "the panel to close", 25);
 

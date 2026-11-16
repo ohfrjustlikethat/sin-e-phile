@@ -58,7 +58,7 @@ test passed. Four sections per ADR-0016 (A4).
 - **A dead zone and a squared response curve** — `src/lib/gamepad.ts:54` `scrollSpeed`.
 - **Focus following scrolled content** — `src/lib/gamepad.ts:63` `nearestBox`, `:413` `scrollByStick`.
 - **Key repeat: delay, then rate** (hold to scrub) — `src/lib/gamepad.ts:272` `shouldRepeat`.
-- **Letting an open menu claim the buttons** — `src/lib/gamepad.ts:571` `claimButtons`.
+- **Letting an open menu claim the buttons** — `src/lib/gamepad.ts:574` `claimButtons`.
 - **One mapping table per device onto shared intents** — `src/lib/gamepad.ts:115` `playerIntent`.
 - **Reading meaning from the folder path** — `crates/library/src/folders.rs:96` `hint`, `:15` `season_of`, `:81` `is_extra`.
 - **HTTP validators (ETag / Last-Modified) to skip work** — `crates/catalogue/src/freshness.rs:74` `check`, `:254` `current_validator`.
@@ -71,7 +71,7 @@ test passed. Four sections per ADR-0016 (A4).
 - **Chapter navigation with a "restart this one first" threshold** — `src/features/player/intents.ts:217` `chapterTarget`.
 - **Focus trapped in a dialog, preferred in a region** — `src/lib/gamepad.ts:297` `moveFocus` (`trapped`, `:308`); the follow too, `:508`.
 - **CSS scroll snapping fighting a programmatic scroll, and suspending it** — `src/lib/gamepad.ts:395` `suspendSnap`, `:403` `releaseSnap`.
-- **Focus that falls to the page, put back near where it was** (a card unmounted, a button disabled, a form replaced) — `src/lib/gamepad.ts:527` `rescueFocus`, `:448` `noteFocus`, `:472` `FOLLOW_GRACE_MS`.
+- **Focus that falls to the page, put back near where it was** (a card unmounted, a button disabled, a form replaced) — `src/lib/gamepad.ts:529` `rescueFocus`, `:448` `noteFocus`, `:472` `FOLLOW_GRACE_MS`.
 - **Telling a control that went from a screen that went** (the nearest surviving ancestor) — `src/lib/gamepad.ts:465` `wentWithItsScreen`.
 - **"Visible" meaning clipped by every scrolling ancestor, not just inside the window** — `src/lib/gamepad.ts:486` `onScreen`.
 - **Setting a React-controlled input from outside React** (the prototype's value setter, then the event) — `src/lib/gamepad.ts:331` `setControlValue`.

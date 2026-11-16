@@ -100,6 +100,9 @@ rail, the paused film's details — falling back to the nearest scrollable ances
 - **Sync**: 0.1 s steps, remembered; "align again" re-runs the aligner (`subtitle-alignment.md`) on an
   external track and says why it cannot for an embedded one.
 - **Load a file**: Windows' file picker.
+- **By pad**, in the panel: Find, a found subtitle, "Subtitles earlier/later" (0.1 s) and every style
+  button. Choosing a found subtitle closes the list it was in; focus is put back within the panel
+  (`rescueFocus` acts during playback only inside a dialog still open over the film).
 
 ## 5. Home, in the author's order
 

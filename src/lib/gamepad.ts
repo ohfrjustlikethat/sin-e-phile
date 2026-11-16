@@ -521,12 +521,15 @@ function followFocus(): void {
  * form gives way to what it saved ("Save key" becomes "Your key is saved"). With the pad
  * driving, focus on the page itself is never wanted: the D-pad has nowhere to start from.
  * Otherwise it is left alone (a click put it there), except within `FOLLOW_GRACE_MS` of
- * the stick moving something. Never while a film plays, where the player owns the buttons,
- * and never when a whole screen went (`wentWithItsScreen`).
+ * the stick moving something. While a film plays the player owns the buttons, so only a
+ * focus lost inside a dialog still open over it (the panel, a quick menu: choosing a found
+ * subtitle closes the list it was in) is put back, and only within it. Never when a whole
+ * screen went (`wentWithItsScreen`).
  */
 export function rescueFocus(now: number): void {
-  if (!focusLost() || document.documentElement.dataset["playing"] !== undefined) return;
-  if (wentWithItsScreen()) return;
+  if (!focusLost() || wentWithItsScreen()) return;
+  const inOpenDialog = lastFocusRegion?.getAttribute("role") === "dialog" && lastFocusRegion.isConnected;
+  if (document.documentElement.dataset["playing"] !== undefined && !inOpenDialog) return;
   const padDriving = document.documentElement.dataset["input"] === "pad";
   if (!padDriving && now - lastScrollAt > FOLLOW_GRACE_MS) return;
   followFocus();
