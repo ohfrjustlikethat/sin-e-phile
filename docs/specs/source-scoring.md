@@ -20,8 +20,20 @@ against points:
    a copy whose languages are not stated stays ahead of one that states the wrong ones.
 3. **This machine first.** Among the rest, a local file comes first. SPEC.md Phase 9
    says "a local file always wins", which is a rule, not a weight.
-4. **The weighted sum**, highest first: `total = Σ value × weight`, each value in −1..=1.
-5. **The key**, so equal totals order the same way on every run.
+4. **Starts smoothly first** (Phase 16, the author's "best stream"). A copy is *weak* when it would
+   not: a swarm under `HEALTHY_SEEDERS` (10), a 4K swarm under `STRONG_4K_SEEDERS` (50), or a picture
+   beyond what the machine plays. A web link, a file here, and a copy whose health nobody states are
+   not weak. `Score.weak` says why, and the streams panel shows it.
+5. **Nearest the preferred quality.** `Context.preferred` comes from Settings → Playback; with none,
+   this rule does nothing. Each step from it counts 2, the step above sorting before the step below
+   (a healthy higher quality also streams smoothly). Unknown quality comes after every stated one.
+   A title-page choice (`wanted`) is still rule 2 and outranks rules 4 and 5.
+6. **The weighted sum**, highest first: `total = Σ value × weight`, each value in −1..=1.
+7. **The key**, so equal totals order the same way on every run.
+
+So Play, and the round Download, take the healthiest copy at the preferred quality, then the nearest
+healthy one, and 4K only with a strong swarm (`crates/selection/tests/fixtures.rs`,
+`the_healthy_copy_at_the_preferred_quality_wins` and the five after it).
 
 `Score` keeps `sunk` and `unmet` as sentences. The UI shows them as they are: "carries en,
 not hi" is the honest answer to "why isn't this Hindi?" (Phase 9 E2).
@@ -108,8 +120,8 @@ and with the bytes.
   *honest* copy states. A fake's claims offer nothing, because choosing them could only
   play the fake. Languages are primary subtags (`hi`, not `hi-IN`), most widely carried
   first; qualities are best first.
-- **On the detail page** these are two rows of options under Play, Audio (Auto, then each
-  language) and Quality (Best, then each resolution). They are buttons, not a
+- **On the detail page** these are two rows of options at the top of the streams panel (Phase 16;
+  under Play before it), Audio (Auto, then each language) and Quality (Best, then each resolution). They are buttons, not a
   `<select>`: a native select opens a Windows popup the pad cannot drive (ADR-0041), and
   each option is a focus stop for the TV focus ring (ADR-0042).
 - **Original or dub.** Each language is labelled "original" or "dub" against the film's

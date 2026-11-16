@@ -304,3 +304,77 @@ fn a_quality_choice_round_trips_through_its_wire_name() {
     }
     assert_eq!(resolution_from_code("8k"), None);
 }
+
+/// A 140-minute film on a machine that plays 4K, with a preferred quality from Settings.
+fn preferring(r: source_protocol::Resolution) -> Context {
+    Context {
+        runtime_minutes: Some(140),
+        machine: Machine {
+            max_resolution: Uhd,
+            ..Machine::default()
+        },
+        preferred: Some(r),
+        ..Context::default()
+    }
+}
+
+#[test]
+fn the_healthy_copy_at_the_preferred_quality_wins() {
+    // Phase 16, the author's "best stream": the healthiest at the quality they prefer.
+    let uhd = swarm("uhd", 400).res(Uhd).done();
+    let fhd = swarm("fhd", 40).res(FullHd).done();
+    let hd = swarm("hd", 900).res(Hd).done();
+    assert_eq!(order(vec![uhd, hd, fhd], &preferring(FullHd))[0], "fhd");
+}
+
+#[test]
+fn a_thin_swarm_at_the_preferred_quality_gives_way_to_the_nearest_healthy_one() {
+    let thin = swarm("thin-1080p", 3).res(FullHd).done();
+    let hd = swarm("hd", 60).res(Hd).done();
+    let sd = swarm("sd", 500).res(Sd).done();
+    assert_eq!(
+        order(vec![thin, sd, hd], &preferring(FullHd)),
+        ["hd", "sd", "thin-1080p"]
+    );
+}
+
+#[test]
+fn the_step_above_wins_a_tie_with_the_step_below() {
+    let uhd = swarm("uhd", 200).res(Uhd).done();
+    let hd = swarm("hd", 200).res(Hd).done();
+    let thin = swarm("thin-1080p", 2).res(FullHd).done();
+    assert_eq!(order(vec![hd, thin, uhd], &preferring(FullHd))[0], "uhd");
+}
+
+#[test]
+fn four_k_needs_a_strong_swarm_even_when_preferred() {
+    let uhd = swarm("uhd", 30).res(Uhd).done();
+    let fhd = swarm("fhd", 30).res(FullHd).done();
+    let ranked = rank(vec![uhd, fhd], &preferring(Uhd));
+    assert_eq!(ranked[0].0.key, "fhd");
+    assert!(ranked[1]
+        .1
+        .weak
+        .as_deref()
+        .is_some_and(|w| w.contains("4K with 30 seeders")));
+}
+
+#[test]
+fn a_web_link_counts_as_healthy() {
+    let link = http("link").res(FullHd).done();
+    let thin = swarm("thin", 4).res(FullHd).done();
+    assert_eq!(
+        order(vec![thin, link], &preferring(FullHd)),
+        ["link", "thin"]
+    );
+}
+
+#[test]
+fn choosing_a_quality_for_the_title_still_outranks_health() {
+    // A choice on the title page is a rule (§5); the preference is not.
+    let mut ctx = preferring(FullHd);
+    ctx.wanted = Some(Uhd);
+    let uhd = swarm("uhd", 20).res(Uhd).done();
+    let fhd = swarm("fhd", 300).res(FullHd).done();
+    assert_eq!(order(vec![fhd, uhd], &ctx)[0], "uhd");
+}

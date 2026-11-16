@@ -61,8 +61,12 @@ pub struct Context {
     pub audio_language: Option<String>,
     /// The subtitle language they want, if any.
     pub subtitle_language: Option<String>,
-    /// The quality the viewer chose. `None`: the best this machine plays.
+    /// The quality the viewer chose for this title. `None`: no choice. A rule: a copy known
+    /// not to have it ranks after every copy that has it.
     pub wanted: Option<Resolution>,
+    /// The quality the viewer prefers in general, from Settings (Phase 16, the author's
+    /// "best stream"). Not a rule like `wanted`: the healthy copy nearest it wins.
+    pub preferred: Option<Resolution>,
     /// Measured download speed, bytes per second, if there is a measurement.
     pub throughput: Option<u64>,
 }
@@ -103,6 +107,56 @@ pub struct Score {
     pub unmet: Option<String>,
     /// On this machine.
     pub local: bool,
+    /// Why this copy would not start smoothly (a thin swarm, a 4K swarm that is not strong,
+    /// a picture beyond the machine); `None` when it would, or nobody says.
+    pub weak: Option<String>,
+    /// How far from the preferred quality, as an order key: 0 at it (or with no preference),
+    /// then each step away counts 2, the step above sorting before the step below.
+    pub off_preferred: u8,
+}
+
+/// A swarm this thin is slow to start: "enough seeders to start fast" (the author).
+pub const HEALTHY_SEEDERS: u32 = 10;
+/// 4K moves four times the data; only a strong swarm streams it smoothly (the author).
+pub const STRONG_4K_SEEDERS: u32 = 50;
+
+/// Why this copy would not start smoothly, if it would not.
+fn weakness(c: &SourceCandidate, ctx: &Context) -> Option<String> {
+    let res = c.quality.resolution;
+    if c.transport != Transport::Local && res.rank() > ctx.machine.max_resolution.rank() {
+        return Some(format!(
+            "{} is beyond what this machine plays smoothly",
+            resolution_label(res)
+        ));
+    }
+    match c.health {
+        Health::Swarm { seeders, .. } if res == Resolution::Uhd && seeders < STRONG_4K_SEEDERS => {
+            Some(format!(
+                "4K with {seeders} seeders: it needs {STRONG_4K_SEEDERS} to stream smoothly"
+            ))
+        }
+        Health::Swarm { seeders, .. } if seeders < HEALTHY_SEEDERS => {
+            Some(format!("{seeders} seeders: slow to start"))
+        }
+        _ => None,
+    }
+}
+
+/// The order key for distance from the preferred (or chosen) quality.
+fn off_preferred(c: &SourceCandidate, ctx: &Context) -> u8 {
+    let Some(target) = ctx.wanted.or(ctx.preferred) else {
+        return 0;
+    };
+    let (have, want) = (c.quality.resolution.rank(), target.rank());
+    if c.quality.resolution == Resolution::Unknown {
+        // Nobody says: after every stated quality near the preference.
+        return u8::MAX;
+    }
+    match have.cmp(&want) {
+        Ordering::Equal => 0,
+        Ordering::Greater => 2 * (have - want) - 1,
+        Ordering::Less => 2 * (want - have),
+    }
 }
 
 /// The weights. Each is justified in `docs/specs/source-scoring.md`; a change here
@@ -151,6 +205,8 @@ pub fn score(c: &SourceCandidate, ctx: &Context) -> Score {
         sunk,
         unmet,
         local: c.transport == Transport::Local,
+        weak: weakness(c, ctx),
+        off_preferred: off_preferred(c, ctx),
     }
 }
 
@@ -163,6 +219,10 @@ pub fn compare(a: (&SourceCandidate, &Score), b: (&SourceCandidate, &Score)) -> 
         .cmp(&sb.sunk.is_some())
         .then(sa.unmet.is_some().cmp(&sb.unmet.is_some()))
         .then(sb.local.cmp(&sa.local))
+        // Phase 16, the author's "best stream": a copy that starts smoothly first, then the
+        // one nearest the preferred quality, then the points.
+        .then(sa.weak.is_some().cmp(&sb.weak.is_some()))
+        .then(sa.off_preferred.cmp(&sb.off_preferred))
         .then(sb.total.total_cmp(&sa.total))
         .then(ca.key.cmp(&cb.key))
 }
