@@ -304,6 +304,16 @@ export function moveFocus(direction: Direction): boolean {
     all[0]?.focus();
     return !!all[0];
   }
+  // A page may name where a direction goes (`data-pad-down="<id>"`) when the nearest box is not what a person
+  // means: Down from the title page's wide Play is the first round button, not the one under Play's middle
+  // (Phase 16). Honoured only when that element is on screen to be focused.
+  const named = current.dataset[`pad${direction[0]!.toUpperCase()}${direction.slice(1)}`];
+  const hinted = named ? document.getElementById(named) : null;
+  if (hinted && all.includes(hinted)) {
+    hinted.focus({ preventScroll: true });
+    hinted.scrollIntoView({ block: "nearest", inline: "nearest" });
+    return true;
+  }
   const mine = region(current);
   // A dialog holds the D-pad (Phase 16): Down at the foot of the player's panel went to the
   // bar beneath it, where A then opened a menu over the panel. Elsewhere a region is only

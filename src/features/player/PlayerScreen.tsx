@@ -125,7 +125,7 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
   }, [now, finished]);
   const goTo = useCallback(
     async (id: number) => {
-      const r = await commands.preparePlay(id, audio, quality);
+      const r = await commands.preparePlay(id, audio, quality, usePlaybackChoice.getState().preferred);
       if (r.status === "ok") play({ target: r.data.open, title: r.data.title, mediaItemId: id, start: r.data.start });
       else setError(r.error);
     },

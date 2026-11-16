@@ -334,7 +334,7 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
     await waitFor(() => expect(commands.episodeNeighbours).toHaveBeenCalledWith(1));
     await waitFor(() => {
       fireEvent.keyDown(window, { key: "n" });
-      expect(commands.preparePlay).toHaveBeenCalledWith(42, null, null);
+      expect(commands.preparePlay).toHaveBeenCalledWith(42, null, null, null);
     });
     await waitFor(() => expect(useUi.getState().playing?.mediaItemId).toBe(42));
     commands.episodeNeighbours.mockImplementation(() => ok({ previous: null, next: null }));
@@ -374,7 +374,7 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
       expect(screen.getByRole("dialog", { name: "Next episode" })).toHaveTextContent("Play in 10");
       for (let i = 0; i < 10; i++) act(() => vi.advanceTimersByTime(1000));
       vi.useRealTimers();
-      await waitFor(() => expect(commands.preparePlay).toHaveBeenCalledWith(42, null, null));
+      await waitFor(() => expect(commands.preparePlay).toHaveBeenCalledWith(42, null, null, null));
     });
     commands.episodeNeighbours.mockImplementation(() => ok({ previous: null, next: null }));
   });

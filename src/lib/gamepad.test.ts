@@ -292,6 +292,24 @@ describe("focus and the right stick, on a page (Phase 16)", () => {
     expect(onScreen(byId("away"))).toBe(false);
   });
 
+  it("a page can name where a direction goes, when that element can take focus", () => {
+    // Down from the title page's wide Play is the first round button, not the one under its middle.
+    document.body.innerHTML =
+      '<main><button id="play" data-pad-down="first">Play</button>' +
+      '<button id="first">Download</button><button id="middle">Watched</button></main>';
+    place(byId("play"), 0, 0, 560, 64);
+    place(byId("first"), 0, 100, 96, 90);
+    place(byId("middle"), 240, 100, 96, 90);
+    byId("play").focus();
+    expect(moveFocus("down")).toBe(true);
+    expect(document.activeElement?.id).toBe("first");
+    // Not on screen: the nearest box, as ever.
+    byId("play").focus();
+    place(byId("first"), 0, 0, 0, 0);
+    moveFocus("down");
+    expect(document.activeElement?.id).toBe("middle");
+  });
+
   it("a dialog holds the D-pad: Down at its foot stays in it, where a plain group lets go", () => {
     for (const role of ["dialog", "group"]) {
       document.body.innerHTML =

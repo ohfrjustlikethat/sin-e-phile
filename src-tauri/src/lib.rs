@@ -78,6 +78,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::player::dev_player_prop,
             commands::playback::item_detail,
             commands::playback::prepare_play,
+            commands::playback::play_candidate,
             commands::playback::save_position,
             commands::playback::rate_title,
             commands::playback::title_rating,

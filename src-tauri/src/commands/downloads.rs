@@ -465,13 +465,20 @@ pub async fn download_title(
     id: i32,
     tonight: bool,
     reason: Option<String>,
+    candidate: Option<u32>,
 ) -> Result<DownloadView, String> {
     let db = state.db().ok_or("the library is still opening")?;
     let id = i64::from(id);
     if let Some(d) = existing(&db, id).await {
         return Ok(d.into());
     }
-    let chosen = planned_for(id).ok_or("open the title's page again")?;
+    let mut chosen = planned_for(id).ok_or("open the title's page again")?;
+    // One exact stream from the streams panel (Phase 16), rather than the plan's choice.
+    if let Some(index) = candidate {
+        let (stream, size) = crate::commands::playback::candidate_stream(&state, id, index).await?;
+        chosen.stream = Some(stream);
+        chosen.size = size;
+    }
     // A torrent goes to the torrent engine (only the source's chosen file); a web address
     // is fetched directly (Phase 16: the Internet Archive, add-ons that answer with links).
     let (source, backend, file_index) = match chosen.stream {

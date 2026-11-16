@@ -12,6 +12,12 @@ interface PlaybackChoice {
   audio: string | null;
   /** A wire name: `uhd`, `full_hd`, `hd`, `sd`. */
   quality: string | null;
+  /**
+   * The quality preferred in general (Settings → Playback, Phase 16): the healthy stream nearest it plays.
+   * `null`: the best this PC plays smoothly. Not a rule like `quality`, which is chosen per title.
+   */
+  preferred: string | null;
+  setPreferred: (preferred: string | null) => void;
   /** Show every candidate's score on film pages (the expert panel, Phase 9). */
   details: boolean;
   /** Play the next episode when the countdown ends (Phase 11). */
@@ -27,6 +33,8 @@ export const usePlaybackChoice = create<PlaybackChoice>()(
     (set) => ({
       audio: null,
       quality: null,
+      preferred: null,
+      setPreferred: (preferred) => set({ preferred }),
       details: false,
       autoplay: true,
       setAutoplay: (autoplay) => set({ autoplay }),

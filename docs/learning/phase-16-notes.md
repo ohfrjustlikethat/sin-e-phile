@@ -49,6 +49,10 @@ test passed. Four sections per ADR-0016 (A4).
 - **Each tab keeps its place** (2026-11-17): the page it was left on and where it was scrolled; pressing the tab
   again goes to its start; a large arrow top-left says where Back goes ("← Search results"); Escape, Backspace
   and B take that step. Specified in `docs/specs/navigation.md`.
+- **The title page** (2026-11-17): a wide Play; round Download, Watchlist, Watched and Streams; every stream in a
+  panel from the right, by add-on, each with its quality, size, seeders, release name and languages, to play or
+  download exactly that one; Play picks the healthiest stream at the preferred quality (a new Settings choice).
+  Specified in `docs/specs/title-page.md`.
 - **Full screen from a maximised window** (2026-11-17): it kept the maximised height, so the player's bar
   floated 80 px up with black beneath; the window is now un-maximised first and maximised again after.
 
@@ -127,6 +131,9 @@ test passed. Four sections per ADR-0016 (A4).
 - **A trail per tab, and one derived value kept so its readers need not change** (`detail` is the end of the current trail) — `src/lib/store.ts` `goTab`, `back`, `openDetail`.
 - **One handler for a key many screens used to handle, acting only on what no one else claimed** (`event.defaultPrevented`) — `src/app/backKey.ts` `handleBack`.
 - **A callback ref, because the element itself can be replaced** (a listener bound once stayed on the old `<main>`) — `src/lib/scrollMemory.ts` `useScrollMemory`.
+- **A rule added to a lexicographic order, not a weight** ("starts smoothly" before points) — `crates/selection/src/lib.rs` `compare`, `weakness`, `off_preferred`.
+- **Rendering into a slot elsewhere in the page** (`createPortal`), so a panel lives inside the app's frame — `src/features/detail/StreamsPanel.tsx`, `src/app/App.tsx` `#panel-slot`.
+- **A synthetic key event must be `cancelable` for `preventDefault` to mean anything** — `src/app/App.tsx` the pad's `back`.
 - **A double click recognised from two clicks that arrive from different places** (the native window, then the page's still frame) — `src/features/player/PlayerScreen.tsx:531` `clickPicture`.
 
 ## 4. Five questions

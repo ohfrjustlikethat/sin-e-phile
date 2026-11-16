@@ -137,6 +137,23 @@ pub struct CandidateView {
     /// The one that opens.
     pub chosen: bool,
     pub terms: Vec<TermView>,
+    /// Its place in the ranking: what `play_candidate` and `download_title` are given.
+    pub index: u32,
+    /// High dynamic range, when the source says so.
+    pub hdr: bool,
+    #[specta(type = Option<f64>)]
+    pub size_bytes: Option<u64>,
+    /// A swarm's seeders, when it is a swarm and they were counted.
+    pub seeders: Option<u32>,
+    /// Served directly (a web address or this PC): no swarm to count.
+    pub direct: bool,
+    /// Audio and subtitle languages it states, BCP 47.
+    pub audio: Vec<String>,
+    pub subtitles: Vec<String>,
+    /// Why it would not start smoothly, if it would not (the author's "best stream").
+    pub weak: Option<String>,
+    /// It can be downloaded: a torrent or a web address, not a file already here.
+    pub downloadable: bool,
 }
 
 /// A score term exactly as `sinephile_selection::Term` holds it.
@@ -154,6 +171,9 @@ pub(crate) struct Planned {
     pub open: String,
     pub backend: String,
     pub fallbacks: Vec<source_protocol::SourceCandidate>,
+    /// Every candidate in ranked order, and which are sunk: what the streams panel's rows
+    /// play and download by index (Phase 16).
+    pub ranked: Vec<(source_protocol::SourceCandidate, bool)>,
     /// For the download advisor and Download (Phase 13): which title, what the chosen
     /// copy resolved to, its size, whether it is already on this PC, and the runtime.
     pub media_item_id: i64,
@@ -193,6 +213,7 @@ pub async fn prepare_play(
     id: i32,
     language: Option<String>,
     quality: Option<String>,
+    preferred: Option<String>,
 ) -> Result<PlayPlanView, String> {
     let db = state.db().ok_or("the library is still opening")?;
     if !allowed(&state, &db, i64::from(id)).await? {
@@ -213,6 +234,10 @@ pub async fn prepare_play(
         wanted: quality
             .as_deref()
             .and_then(sinephile_selection::resolution_from_code),
+        // Settings → Playback (Phase 16): the healthy copy nearest it wins.
+        preferred: preferred
+            .as_deref()
+            .and_then(sinephile_selection::resolution_from_code),
         ..Default::default()
     };
     let profile = state.profile().await?;
@@ -231,6 +256,11 @@ pub async fn prepare_play(
         open: plan.open.clone(),
         backend: plan.backend.clone(),
         fallbacks: plan.fallbacks(),
+        ranked: plan
+            .ranked
+            .iter()
+            .map(|(c, s)| (c.clone(), s.sunk.is_some()))
+            .collect(),
         media_item_id: plan.media_item_id,
         title: plan.title.clone(),
         stream: plan.stream.clone(),
@@ -275,6 +305,18 @@ pub async fn prepare_play(
                 unmet: s.unmet.clone(),
                 local: s.local,
                 chosen: i == plan.chosen,
+                index: i as u32,
+                hdr: c.quality.hdr,
+                size_bytes: c.size_bytes,
+                seeders: match c.health {
+                    source_protocol::Health::Swarm { seeders, .. } => Some(seeders),
+                    _ => None,
+                },
+                direct: matches!(c.health, source_protocol::Health::Direct),
+                audio: c.languages.clone(),
+                subtitles: c.subtitles.clone(),
+                weak: s.weak.clone(),
+                downloadable: c.transport != source_protocol::Transport::Local,
                 terms: s
                     .terms
                     .iter()
@@ -289,6 +331,75 @@ pub async fn prepare_play(
             .collect(),
         unmet: plan.score.unmet,
     })
+}
+
+/// Play one candidate from the streams panel (Phase 16): it is resolved (a torrent starts
+/// streaming) and becomes what the plan chose, so the player's fallbacks are the honest
+/// copies ranked below it. Returns the address the player opens.
+#[tauri::command]
+#[specta::specta]
+pub async fn play_candidate(
+    state: State<'_, AppState>,
+    id: i32,
+    index: u32,
+) -> Result<String, String> {
+    let candidate = {
+        let held = PLANNED.lock().expect("planned");
+        let p = held
+            .as_ref()
+            .filter(|p| p.media_item_id == i64::from(id))
+            .ok_or("open the title's page again")?;
+        p.ranked
+            .get(index as usize)
+            .map(|(c, _)| c.clone())
+            .ok_or("that stream is no longer listed")?
+    };
+    let (resolver, ctx) = resolver(&state).await?;
+    let rt = state.torrent().await.ok();
+    let torrent = rt.as_ref().map(|r| (&r.engine, &r.server));
+    let (open, stream) = sinephile_playback::resolved(&resolver, torrent, &candidate).await?;
+    let mut held = PLANNED.lock().expect("planned");
+    if let Some(p) = held.as_mut().filter(|p| p.media_item_id == i64::from(id)) {
+        p.open = open.clone();
+        p.backend = overview::display_name(&candidate.provenance.backend, &ctx.addons);
+        p.stream = Some(stream);
+        p.size_bytes = candidate.size_bytes;
+        p.local = candidate.transport == source_protocol::Transport::Local;
+        p.fallbacks = p
+            .ranked
+            .iter()
+            .skip(index as usize + 1)
+            .filter(|(_, sunk)| !sunk)
+            .map(|(c, _)| c.clone())
+            .collect();
+    }
+    Ok(open)
+}
+
+/// What one candidate of the last plan for `id` resolves to, for a download of exactly that
+/// stream (the streams panel's download icon, Phase 16). Nothing starts streaming.
+pub(crate) async fn candidate_stream(
+    state: &AppState,
+    id: i64,
+    index: u32,
+) -> Result<(source_protocol::PlayableStream, Option<u64>), String> {
+    let candidate = {
+        let held = PLANNED.lock().expect("planned");
+        let p = held
+            .as_ref()
+            .filter(|p| p.media_item_id == id)
+            .ok_or("open the title's page again")?;
+        p.ranked
+            .get(index as usize)
+            .map(|(c, _)| c.clone())
+            .ok_or("that stream is no longer listed")?
+    };
+    let (resolver, _) = resolver(state).await?;
+    let stream = resolver
+        .resolve(&candidate)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok((stream, candidate.size_bytes))
 }
 
 /// Remember where the viewer is, for resume. Called periodically and on leaving.

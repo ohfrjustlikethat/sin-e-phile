@@ -178,7 +178,13 @@ export const commands = {
 	synopsis: string | null,
 	credits: CreditView[],
 } | null, string>(__TAURI_INVOKE("item_detail", { id })),
-	preparePlay: (id: number, language: string | null, quality: string | null) => typedError<PlayPlanView, string>(__TAURI_INVOKE("prepare_play", { id, language, quality })),
+	preparePlay: (id: number, language: string | null, quality: string | null, preferred: string | null) => typedError<PlayPlanView, string>(__TAURI_INVOKE("prepare_play", { id, language, quality, preferred })),
+	/**
+	 *  Play one candidate from the streams panel (Phase 16): it is resolved (a torrent starts
+	 *  streaming) and becomes what the plan chose, so the player's fallbacks are the honest
+	 *  copies ranked below it. Returns the address the player opens.
+	 */
+	playCandidate: (id: number, index: number) => typedError<string, string>(__TAURI_INVOKE("play_candidate", { id, index })),
 	/**  Remember where the viewer is, for resume. Called periodically and on leaving. */
 	savePosition: (id: number, position: number | null, duration: number | null) => typedError<null, string>(__TAURI_INVOKE("save_position", { id, position, duration })),
 	/**  The viewer's 1–5 rating, from the end card (Phase 11, ADR-0043). `None` clears it. */
@@ -271,7 +277,7 @@ export const commands = {
 	 *  advisor's sentence is kept as the reason. A title already downloading is not added
 	 *  twice.
 	 */
-	downloadTitle: (id: number, tonight: boolean, reason: string | null) => typedError<DownloadView, string>(__TAURI_INVOKE("download_title", { id, tonight, reason })),
+	downloadTitle: (id: number, tonight: boolean, reason: string | null, candidate: number | null) => typedError<DownloadView, string>(__TAURI_INVOKE("download_title", { id, tonight, reason, candidate })),
 	/**  Higher runs first. */
 	downloadPriority: (id: number, priority: number) => typedError<null, string>(__TAURI_INVOKE("download_priority", { id, priority })),
 	/**  This download's own speed limit, KiB/s; `None` for none. */
@@ -468,6 +474,22 @@ export type CandidateView = {
 	/**  The one that opens. */
 	chosen: boolean,
 	terms: TermView[],
+	/**  Its place in the ranking: what `play_candidate` and `download_title` are given. */
+	index: number,
+	/**  High dynamic range, when the source says so. */
+	hdr: boolean,
+	size_bytes: number | null,
+	/**  A swarm's seeders, when it is a swarm and they were counted. */
+	seeders: number | null,
+	/**  Served directly (a web address or this PC): no swarm to count. */
+	direct: boolean,
+	/**  Audio and subtitle languages it states, BCP 47. */
+	audio: string[],
+	subtitles: string[],
+	/**  Why it would not start smoothly, if it would not (the author's "best stream"). */
+	weak: string | null,
+	/**  It can be downloaded: a torrent or a web address, not a file already here. */
+	downloadable: boolean,
 };
 
 /**  What a tier permits. Features ask about a `Capability`, never about hardware. */

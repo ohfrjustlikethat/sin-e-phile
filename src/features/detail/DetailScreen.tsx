@@ -1,16 +1,20 @@
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, EmptyState, Skeleton } from "@/design-system";
-import { commands, type PlayPlanView } from "@/lib/ipc";
+import { commands, type CandidateView, type PlayPlanView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
 import { openSettingsAt } from "@/lib/openSettings";
 import { clock } from "@/features/player/intents";
 import { languageName, qualityLabel, usePlaybackChoice } from "@/lib/playbackChoice";
-import { ChoiceRow, type Choice } from "./ChoiceRow";
+import { type Choice } from "./ChoiceRow";
 import { SourcePanel } from "./SourcePanel";
-import { DownloadAdvice } from "./DownloadAdvice";
 import { SeriesSection } from "./SeriesSection";
-import { WatchedToggle, WatchlistToggle } from "./Watched";
+import { useSetWatched } from "./Watched";
+import { ICONS, RoundAction } from "./RoundAction";
+import { StreamsPanel } from "./StreamsPanel";
+import { DOWNLOADS, useDownloads } from "@/features/downloads/useDownloads";
+import { WATCHLIST } from "@/features/watchlist/WatchlistScreen";
+import { HOME } from "@/features/home/HomeScreen";
 
 /**
  * The minimal detail page — SPEC.md Phase 8: title, synopsis, cast, and a Play button
@@ -20,8 +24,11 @@ import { WatchedToggle, WatchlistToggle } from "./Watched";
  * It asks the sources **as soon as it opens** (`prepare_play`), so by the time Play is
  * pressed the source is chosen and a torrent is already finding peers (Phase 7 E1).
  *
- * Under Play: the audio languages and qualities the copies actually carry (SPEC.md
- * Phase 9). Choosing one plans again, and if no copy has it the page says so.
+ * Phase 16 (the author's answers): one wide Play, and under it big round buttons with a word under each:
+ * Download (the best stream), Watchlist and Watched (filled when on), and Streams, which slides every stream in
+ * from the right to play or download exactly one. Play and the round Download take the best stream: the
+ * healthiest at the preferred quality (Settings → Playback), then the nearest healthy one. The "stream or
+ * download" advice is gone. The audio and quality choices (SPEC.md Phase 9) are at the top of Streams.
  */
 
 async function ok<T>(p: Promise<{ status: "ok"; data: T } | { status: "error"; error: string }>) {
@@ -65,9 +72,28 @@ export function DetailScreen() {
   const addSource = () => openSettingsAt("Add a source");
   const [plan, setPlan] = useState<PlanState>({ phase: "finding" });
   const [offers, setOffers] = useState<Offers | null>(null);
-  const { audio, quality, setAudio, setQuality, details } = usePlaybackChoice();
+  const { audio, quality, preferred, setAudio, setQuality, details } = usePlaybackChoice();
+  const [streams, setStreams] = useState(false);
+  // The last list of streams: the panel keeps showing it while a new choice re-plans, rather than
+  // vanishing under the D-pad (found by the pad audit).
+  const [listed, setListed] = useState<PlayPlanView["candidates"]>([]);
+  const streamsButton = useRef<HTMLButtonElement>(null);
   // Ctrl+Shift+S shows or hides the expert panel on this page; the setting keeps it on.
   const [panel, setPanel] = useState<boolean | null>(null);
+  // The stream being resolved for Play or Download from the panel.
+  const [busy, setBusy] = useState<number | null>(null);
+  const client = useQueryClient();
+  const getOne = useMutation({
+    mutationFn: async (c: CandidateView) => {
+      setBusy(c.index);
+      try {
+        return await ok(commands.downloadTitle(id ?? 0, false, null, c.index));
+      } finally {
+        setBusy(null);
+      }
+    },
+    onSuccess: () => void client.invalidateQueries({ queryKey: DOWNLOADS }),
+  });
   const showPanel = panel ?? details;
 
   const item = useQuery({
@@ -85,18 +111,25 @@ export function DetailScreen() {
     if (id === null || kind === undefined || isSeries) return;
     let live = true;
     setPlan({ phase: "finding" });
-    void commands.preparePlay(id, audio, quality).then((r) => {
+    void commands.preparePlay(id, audio, quality, preferred).then((r) => {
       if (!live) return;
       setPlan(r.status === "ok" ? { phase: "ready", plan: r.data } : { phase: "none", reason: r.error });
-      if (r.status === "ok") setOffers(r.data);
+      if (r.status === "ok") {
+        setOffers(r.data);
+        setListed(r.data.candidates);
+      }
     });
     return () => {
       live = false;
     };
-  }, [id, audio, quality, kind, isSeries]);
+  }, [id, audio, quality, preferred, kind, isSeries]);
 
   // A different film offers different things.
-  useEffect(() => setOffers(null), [id]);
+  useEffect(() => {
+    setOffers(null);
+    setListed([]);
+    setStreams(false);
+  }, [id]);
 
   // Once there is something to play, Play takes focus unless something else has it —
   // so a controller or keyboard user can press it at once (ADR-0041).
@@ -141,6 +174,19 @@ export function DetailScreen() {
     .filter(Boolean)
     .join(" · ");
 
+  /** One stream from the panel: resolved (a torrent starts), then played from where it was left. */
+  const playOne = async (c: CandidateView) => {
+    setBusy(c.index);
+    const r = await commands.playCandidate(d.id, c.index);
+    setBusy(null);
+    if (r.status !== "ok") {
+      setPlan({ phase: "none", reason: r.error });
+      return;
+    }
+    setStreams(false);
+    play({ target: r.data, title: d.title, mediaItemId: d.id, start: plan.phase === "ready" ? plan.plan.start : null });
+  };
+
   /** Play from where it was left, or (Appendix F, I01) from the beginning. */
   const start = (over = false) => {
     if (plan.phase !== "ready") return;
@@ -154,34 +200,44 @@ export function DetailScreen() {
 
       {isSeries ? (
         <>
-          <div className="mt-6 flex">
-            <WatchlistToggle id={d.id} />
+          <div className="mt-8 flex">
+            <WatchlistAction id={d.id} />
           </div>
           <SeriesSection id={d.id} />
         </>
       ) : (
       <>
-      <div className="mt-10 flex items-center gap-5">
+      <div className="mt-10 max-w-[560px]">
         <Button
           id="detail-play"
+          // Down goes to the first round button, not the one under Play's middle (the nearest box).
+          data-pad-down="detail-download"
           variant="primary"
           size="lg"
+          className="h-16 w-full text-[17px]"
           onClick={() => start()}
           disabled={plan.phase !== "ready"}
           aria-describedby="play-status"
         >
           {plan.phase === "ready" && plan.plan.start ? `Resume from ${clock(plan.plan.start)}` : "Play"}
         </Button>
-        {plan.phase === "ready" && plan.plan.start ? (
-          <Button variant="secondary" size="lg" onClick={() => start(true)}>
-            Start over
-          </Button>
-        ) : null}
-        <p id="play-status" className="text-sm text-ink-muted" role="status">
-          {plan.phase === "finding" && "Asking your sources…"}
-          {plan.phase === "ready" && (unmetText(plan.plan, audio, quality) ?? `From ${plan.plan.from}`)}
-          {plan.phase === "none" && plan.reason}
-        </p>
+        <div className="mt-3 flex items-baseline gap-5">
+          <p id="play-status" className="flex-1 text-sm text-ink-muted" role="status">
+            {plan.phase === "finding" && "Asking your sources…"}
+            {plan.phase === "ready" && (unmetText(plan.plan, audio, quality) ?? `From ${plan.plan.from}`)}
+            {plan.phase === "none" && plan.reason}
+          </p>
+          {plan.phase === "ready" && plan.plan.start ? (
+            <button type="button" className="label hover:text-ink" onClick={() => start(true)}>
+              Start over
+            </button>
+          ) : null}
+        </div>
+        {plan.phase === "ready" && plan.plan.why && (
+          <p className="mt-1 text-[13px] text-ink-faint" aria-label="Why this source">
+            {plan.plan.why}
+          </p>
+        )}
       </div>
       {plan.phase === "none" && (
         // Phase 16: the author could not download or stream anything and nothing said why.
@@ -195,32 +251,46 @@ export function DetailScreen() {
           </Button>
         </div>
       )}
-      {plan.phase === "ready" && plan.plan.why && (
-        <p className="mt-3 text-[13px] text-ink-faint" aria-label="Why this source">
-          {plan.plan.why}
+
+      <TitleActions
+        id={d.id}
+        plan={plan.phase === "ready" ? plan.plan : null}
+        onStreams={() => setStreams(true)}
+        streamsButton={streamsButton}
+        onWatchedChange={() =>
+          // Marked either way, the place it was left at is gone: "Resume from" would lie.
+          setPlan((p) => (p.phase === "ready" ? { phase: "ready", plan: { ...p.plan, start: null } } : p))
+        }
+      />
+
+      {streams && listed.length > 0 && (
+        <StreamsPanel
+          title={d.title}
+          candidates={listed}
+          audioChoices={offers ? languageChoices(offers, audio) : []}
+          qualityChoices={offers ? qualityChoices(offers, quality) : []}
+          audio={audio}
+          quality={quality}
+          onAudio={setAudio}
+          onQuality={setQuality}
+          busy={busy}
+          onPlay={(c) => void playOne(c)}
+          onDownload={(c) => getOne.mutate(c)}
+          onClose={() => {
+            setStreams(false);
+            streamsButton.current?.focus();
+          }}
+        />
+      )}
+      {getOne.isError && (
+        <p className="mt-3 text-sm text-danger" role="alert">
+          {getOne.error.message}
         </p>
       )}
-      {plan.phase === "ready" && <DownloadAdvice id={d.id} plan={plan.plan.open} />}
-      <div className="mt-4 flex gap-8">
-        {/* Marked either way, the place it was left at is gone: "Resume from" would lie. */}
-        <WatchedToggle
-          id={d.id}
-          onChange={() =>
-            setPlan((p) => (p.phase === "ready" ? { phase: "ready", plan: { ...p.plan, start: null } } : p))
-          }
-        />
-        <WatchlistToggle id={d.id} />
-      </div>
-
-      {offers && (offers.languages.length > 0 || audio || offers.qualities.length > 1 || quality) && (
-        <div className="mt-8 flex flex-col gap-3">
-          {(offers.languages.length > 0 || audio) && (
-            <ChoiceRow label="Audio" choices={languageChoices(offers, audio)} value={audio} onChange={setAudio} />
-          )}
-          {(offers.qualities.length > 1 || quality) && (
-            <ChoiceRow label="Quality" choices={qualityChoices(offers, quality)} value={quality} onChange={setQuality} />
-          )}
-        </div>
+      {getOne.isSuccess && (
+        <p className="mt-3 text-sm text-ink-muted" role="status">
+          Downloading that stream. It is on the Downloads page.
+        </p>
       )}
 
       {showPanel && plan.phase === "ready" && <SourcePanel candidates={plan.plan.candidates} />}
@@ -245,5 +315,104 @@ export function DetailScreen() {
         </section>
       )}
     </article>
+  );
+}
+
+/** Download, Watchlist, Watched and Streams, as big round buttons (Phase 16). */
+function TitleActions({
+  id,
+  plan,
+  onStreams,
+  streamsButton,
+  onWatchedChange,
+}: {
+  id: number;
+  plan: PlayPlanView | null;
+  onStreams: () => void;
+  streamsButton: React.RefObject<HTMLButtonElement | null>;
+  onWatchedChange: () => void;
+}) {
+  const client = useQueryClient();
+  const setDownloadsOpen = useUi((s) => s.setDownloadsOpen);
+  const downloads = useDownloads();
+  const mine = (downloads.data ?? []).find((r) => r.download.media_item_id === id && r.download.state !== "cancelled");
+  const get = useMutation({
+    mutationFn: () => ok(commands.downloadTitle(id, false, null, null)),
+    onSuccess: () => void client.invalidateQueries({ queryKey: DOWNLOADS }),
+  });
+  const watched = useQuery({ queryKey: ["watched", id], queryFn: () => ok(commands.titleWatched(id)) });
+  const setWatched = useSetWatched(onWatchedChange);
+  const seen = watched.data === true;
+
+  const d = mine?.download;
+  const percent = d?.total_bytes ? Math.floor(((d.done_bytes ?? 0) / d.total_bytes) * 100) : null;
+  const downloadLabel = !d
+    ? "Download"
+    : d.state === "done"
+      ? "Downloaded"
+      : d.state === "paused"
+        ? "Download paused"
+        : percent !== null
+          ? `Downloading ${percent}%`
+          : "Downloading";
+  return (
+    <div className="mt-8 flex flex-wrap gap-6" aria-label="Actions">
+      <RoundAction
+        id="detail-download"
+        label={downloadLabel}
+        icon={ICONS.download}
+        on={d?.state === "done"}
+        // Already queued: the button goes to Downloads, where it can be watched or paused.
+        onClick={() => (d ? setDownloadsOpen(true) : get.mutate())}
+        disabled={!d && (plan === null || get.isPending)}
+      />
+      <WatchlistAction id={id} />
+      <RoundAction
+        label={seen ? "Watched" : "Mark watched"}
+        icon={ICONS.watched}
+        on={seen}
+        pressed={seen}
+        disabled={watched.data === undefined || setWatched.isPending}
+        onClick={() => setWatched.mutate({ scope: { kind: "title", id }, watched: !seen })}
+      />
+      <RoundAction
+        ref={streamsButton}
+        label={plan ? `Streams · ${plan.candidates.length}` : "Streams"}
+        icon={ICONS.streams}
+        disabled={plan === null || plan.candidates.length === 0}
+        aria-haspopup="dialog"
+        onClick={onStreams}
+      />
+      {get.isError && (
+        <p className="basis-full text-sm text-danger" role="alert">
+          {get.error.message}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Save a film or a show for later, or take it off the list (Appendix F, I39), as a round button. */
+function WatchlistAction({ id }: { id: number }) {
+  const client = useQueryClient();
+  const saved = useQuery({ queryKey: ["watchlisted", id], queryFn: () => ok(commands.titleWatchlisted(id)) });
+  const set = useMutation({
+    mutationFn: (on: boolean) => ok(commands.setWatchlisted(id, on)),
+    onSuccess: () => {
+      for (const key of [["watchlisted", id], WATCHLIST, HOME]) {
+        void client.invalidateQueries({ queryKey: key });
+      }
+    },
+  });
+  const on = saved.data === true;
+  return (
+    <RoundAction
+      label={on ? "On watchlist" : "Watchlist"}
+      icon={ICONS.watchlist(on)}
+      on={on}
+      pressed={on}
+      disabled={saved.data === undefined || set.isPending}
+      onClick={() => set.mutate(!on)}
+    />
   );
 }

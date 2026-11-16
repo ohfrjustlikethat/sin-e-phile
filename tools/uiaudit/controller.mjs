@@ -78,7 +78,14 @@ const FAKE = `(() => {
       part: "Part " + (i + 1) })), crew: [], ratings: [], more_like_this: [] }),
     prepare_play: () => ({ title: "Sunrise", open: "https://films.example/sunrise.mp4", start: null,
       from: "Internet Archive", offered: 2, languages: ["en", "de"], original_language: null,
-      qualities: ["full_hd", "hd"], unmet: null, why: "1080p · served directly", candidates: [] }),
+      qualities: ["full_hd", "hd"], unmet: null, why: "1080p · served directly",
+      // Phase 16: the streams panel lists these; Play, the round Download and each row use them.
+      candidates: [0, 1].map((index) => ({ title: index ? "Sunrise (1927) 720p" : "Sunrise (1927) 1080p",
+        from: "Internet Archive", transport: "http", quality: index ? "720p" : "1080p", codec: "h264", total: 5 - index,
+        sunk: null, unmet: null, local: false, chosen: index === 0, terms: [], index, hdr: false,
+        size_bytes: 4.2 * 1024 ** 3, seeders: null, direct: true, audio: ["en"], subtitles: [], weak: null,
+        downloadable: true })) }),
+    play_candidate: (a) => "https://films.example/sunrise-" + a.index + ".mp4",
     player_pause_still: () => "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
     dev_autoplay: () => null,
     // Phase 16 E7: a fresh install, then what the first run sets up by pad, remembered for the
@@ -810,29 +817,36 @@ try {
   check(stops.count >= 10 && stops.misses.length === 0, `the ring surrounds every focus stop on the film page (${stops.count} stops; missed: ${stops.misses.join(", ") || "none"})`);
   await sleep(300);
 
-  // Phase 9: the language choice is reachable with the pad, and choosing re-plans.
-  // Below Play: the advisor's Download (Phase 13), then the Audio row.
-  await waitFor(() => evalJs(`document.body.textContent.includes("so download it first")`), "the advisor's sentence", 25);
+  // Phase 16 (the author): under the wide Play, big round buttons with a word under each.
   await press(B.DOWN);
-  check((await active())?.text.startsWith("Download"), `D-pad down from Play reaches Download (${(await active())?.text})`);
-  // Appendix F, I21: below Download, the film is marked watched by hand, and back.
-  await press(B.DOWN);
-  check((await active())?.text === "Mark as watched", `D-pad down from Download reaches "Mark as watched" (${(await active())?.text})`);
+  check((await active())?.text === "Download", `D-pad down from Play reaches the round Download (${(await active())?.text})`);
+  // Appendix F, I39: the film is saved to the watchlist; the circle fills and the word says so.
+  await press(B.RIGHT);
+  check((await active())?.text === "Watchlist", `Right reaches Watchlist (${(await active())?.text})`);
   await press(B.A);
-  await waitFor(async () => (await active())?.text === "Watched · mark as not watched", "the mark to show", 25);
+  await waitFor(async () => (await active())?.text === "On watchlist", "the film to be saved", 25);
+  check((await calls("set_watchlisted")).at(-1).on === true &&
+    (await evalJs(`document.activeElement.getAttribute("aria-pressed")`)) === "true",
+    "A saves the film to the watchlist, and the button says it is on");
+  // Appendix F, I21: the film is marked watched by hand, and back.
+  await press(B.RIGHT);
+  check((await active())?.text === "Mark watched", `Right reaches "Mark watched" (${(await active())?.text})`);
+  await press(B.A);
+  await waitFor(async () => (await active())?.text === "Watched", "the mark to show", 25);
   const marked = (await calls("set_watched")).at(-1);
   check(marked.watched === true && marked.scope.kind === "title" && marked.scope.id === 7, "A marks the film watched, and the button says so");
   await press(B.A);
-  await waitFor(async () => (await active())?.text === "Mark as watched", "the mark to clear", 25);
+  await waitFor(async () => (await active())?.text === "Mark watched", "the mark to clear", 25);
   check((await calls("set_watched")).at(-1).watched === false, "A again marks it as not watched");
-  // Appendix F, I39: beside it, the film is saved to the watchlist.
+  // Streams: every stream, from the right; Phase 9's language choice is at its top.
   await press(B.RIGHT);
-  check((await active())?.text === "Add to watchlist", `Right reaches "Add to watchlist" (${(await active())?.text})`);
+  check(((await active())?.text ?? "").startsWith("Streams"), `Right reaches Streams (${(await active())?.text})`);
   await press(B.A);
-  await waitFor(async () => (await active())?.text === "On your watchlist · remove", "the film to be saved", 25);
-  check((await calls("set_watchlisted")).at(-1).on === true, "A saves the film to the watchlist");
-  await press(B.LEFT);
-  await press(B.DOWN);
+  await waitFor(() => evalJs(`!!document.querySelector('[role="dialog"][aria-label="Streams"]')`), "the streams panel", 25);
+  check(await evalJs(`document.querySelector('[role="dialog"][aria-label="Streams"]').contains(document.activeElement)`),
+    "A opens the streams panel, with the D-pad inside it");
+  await shoot("04a-streams");
+  for (let i = 0; i < 3 && (await active())?.text !== "Auto"; i++) await press(B.DOWN);
   await waitFor(async () => (await active())?.text === "Auto", "the Audio row", 25);
   await press(B.RIGHT);
   await press(B.RIGHT);
@@ -840,8 +854,15 @@ try {
   await press(B.A);
   const replanned = await waitFor(async () => (await calls("prepare_play"))[1], "a new plan", 25);
   check(replanned.language === "de" && replanned.quality === null, "A on a language plans again with it");
+  check(await evalJs(`!!document.querySelector('[role="dialog"][aria-label="Streams"]')`),
+    "the panel stays open while it plans again");
   await shoot("04b-language");
-  // Up past Download, to Play.
+  await press(B.B);
+  await waitFor(() => evalJs(`!document.querySelector('[role="dialog"][aria-label="Streams"]')`), "the panel to close", 25);
+  check(((await active())?.text ?? "").startsWith("Streams") &&
+    (await evalJs(`(document.querySelector("main article h1")?.textContent ?? "").includes("Sunrise")`)),
+    "B closes the panel, back on Streams, and the film's page stays");
+  // Up to Play.
   for (let i = 0; i < 3 && (await active())?.text !== "Play"; i++) await press(B.UP);
   await waitFor(async () => (await active())?.text === "Play", "Play again", 25);
 
@@ -1024,18 +1045,18 @@ try {
   // Phase 13: download from the film page, then pause it on the Downloads page, by pad.
   await waitFor(async () => (await active())?.text === "Play", "Play after the player", 25);
   await press(B.DOWN);
-  await waitFor(async () => (await active())?.text.startsWith("Download"), "Download", 25);
+  await waitFor(async () => (await active())?.text === "Download", "Download", 25);
   await press(B.A);
   const asked = await waitFor(async () => (await calls("download_title"))[0], "the download", 25);
-  check(asked.id === 7 && asked.tonight === false && /download it first/.test(asked.reason ?? ""),
-    "A on Download queues the film, with the advisor's sentence as its reason");
-  await waitFor(async () => (await active())?.text === "See downloads", "focus to follow to See downloads", 25);
-  check(true, "focus follows to 'See downloads' instead of falling to the page");
+  check(asked.id === 7 && asked.tonight === false && asked.candidate === null,
+    "A on the round Download queues the film's best stream");
+  await waitFor(async () => ((await active())?.text ?? "").startsWith("Downloading"), "the button to say so", 25);
+  check(true, `the round button stays focused and says how far it has got (${(await active())?.text})`);
   check(await evalJs(`!!document.querySelector('[aria-label="Downloads, 1 in progress"]')`),
     "the masthead counts the download");
   await press(B.A);
   await waitFor(() => evalJs(`document.body.textContent.includes("from 9 people")`), "the Downloads page", 25);
-  check(true, "A on See downloads opens the Downloads page, live: rate and people");
+  check(true, "A on it opens the Downloads page, live: rate and people");
   await shoot("07a-downloads");
   let onPause = false;
   for (let i = 0; i < 12 && !onPause; i++) {

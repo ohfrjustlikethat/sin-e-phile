@@ -147,8 +147,10 @@ export function App() {
             case "back":
               if (closePadPicker()) break;
               if (closePadKeyboard()) break;
+              // Cancelable, as a real key's is: a screen that handles B marks it so, and the app's
+              // Back then leaves it alone (Phase 16: B in the streams panel also left the title page).
               window.dispatchEvent(
-                new KeyboardEvent("keydown", { key: "Escape" }),
+                new KeyboardEvent("keydown", { key: "Escape", cancelable: true }),
               );
               break;
             case "tab": {
@@ -280,8 +282,11 @@ export function App() {
   return (
     <>
       {!full && (
-        <div className="flex h-full flex-col bg-base text-ink">
+        <div className="relative flex h-full flex-col bg-base text-ink">
           <Masthead />
+          {/* Panels that slide over the page (the streams panel) render here: inside the app's frame and under
+              the masthead, so TV mode's scale and safe margin apply to them too. */}
+          <div id="panel-slot" className="pointer-events-none absolute inset-x-0 top-14 bottom-0 z-40" />
           <main ref={mainRef} className="min-h-0 min-w-0 flex-1 overflow-auto">
             <BackBar />
             {settingsOpen && reviewOpen ? (

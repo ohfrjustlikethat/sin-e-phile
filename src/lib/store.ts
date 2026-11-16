@@ -44,6 +44,11 @@ interface UiState {
   setSearchQuery: (query: string) => void;
   /** Bumped by every move between pages (a page's scroll position is put back on each). */
   navSeq: number;
+  /**
+   * A panel open over the page (the streams panel), closed as the first step of `back`: one way back, so Escape,
+   * Backspace and the pad's B never both close it and leave the page (Phase 16, found by the pad audit).
+   */
+  panelBack: (() => void) | null;
   /** Go to a tab, as its masthead entry does: where it was left, or its start if it is already showing. */
   goTab: (tab: Tab) => void;
   /**
@@ -96,6 +101,7 @@ export const useUi = create<UiState>()(
       searchQuery: "",
       setSearchQuery: (searchQuery) => set({ searchQuery }),
       navSeq: 0,
+      panelBack: null,
       goTab: (tab) =>
         set((s) => {
           const overlay = s.settingsOpen || s.downloadsOpen || s.reviewOpen || s.tasteOpen;
@@ -129,7 +135,8 @@ export const useUi = create<UiState>()(
       back: () => {
         const s = get();
         const step = { navSeq: s.navSeq + 1 };
-        if (s.reviewOpen) set({ ...step, reviewOpen: false });
+        if (s.panelBack) s.panelBack();
+        else if (s.reviewOpen) set({ ...step, reviewOpen: false });
         else if (s.tasteOpen) set({ ...step, tasteOpen: false });
         else if (s.settingsOpen) set({ ...step, settingsOpen: false });
         else if (s.downloadsOpen) set({ ...step, downloadsOpen: false });

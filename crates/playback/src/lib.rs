@@ -142,8 +142,10 @@ pub(crate) async fn target_for(
         .map(|(open, _)| open)
 }
 
-/// [`target_for`], keeping what the candidate resolved to.
-async fn resolved(
+/// [`target_for`], keeping what the candidate resolved to: what Play opens (a torrent
+/// starts streaming), and the stream itself (what a download fetches). Public for the
+/// streams panel, where any candidate can be played or downloaded (Phase 16).
+pub async fn resolved(
     resolver: &Resolver,
     torrent: Option<(&Arc<Engine>, &StreamServer)>,
     candidate: &SourceCandidate,
