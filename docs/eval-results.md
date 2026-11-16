@@ -2987,3 +2987,24 @@ catalogue titles, and emptied before each launch so the launch rescan adds them.
 The page received `done` 0.4 ms after the backend logged the scan; half a second before, the rail was not there.
 Seen to fail: with Home's refetch on `done` disabled, "home library not shown within 10 s of the scan finishing".
 Budget 2 s; Tier 2 dev machine, debug build, so the ~50x margin is what Tier 0 has to spend. **E6 met.**
+
+### E7: the first run done only by pad (16.10, 2026-11-16)
+
+`node tools/uiaudit/controller.mjs` at af1be92, the first run with nothing but the pad: a library folder's
+path typed on the TV keyboard and added; an add-on's address typed, looked at, then added; the OpenSubtitles
+and TMDB keys typed and saved; the VPN's network adapter chosen from its list and saved. Each step says it
+took, and Home then has nothing left to set up. **104 checks**, all by pad. Filling it in found four faults
+the walk-through (Continue, Continue...) never touched, each seen in the flow before its fix:
+
+| Fault | Seen | Fix |
+|---|---|---|
+| No select could be changed by pad (A clicks; a script's click does not open a select) | timed out waiting for the adapter list | `PadPicker`: the options as a list the D-pad walks |
+| No slider could be changed by pad (Left and Right moved off it) | unit test | `adjustValue`: Left and Right step it |
+| "Add" disabled itself once pressed and dropped focus onto the page | "no button Continue" | `rescueFocus`: back near where it was, unless the screen went |
+| A long step's last fields sat half under the sticky footer; Down found nothing | "could not reach Start watching" | `scroll-pb-32` on the wizard's scroller |
+
+The real backend's checks behind "checked as saved" are the crates' tests (`a_key_is_checked_when_it_is_entered`,
+`a_key_is_checked_and_a_refused_one_says_so`, `paste_describe_install_find_resolve`,
+`bound_to_one_adapter_traffic_never_leaves_by_another`); "no source yet" on the title page is
+`DetailScreen.test.tsx` "says why nothing can play". Frontend **203** tests. **E7 met**; a real controller in
+hand is in the author batch as confirmation.

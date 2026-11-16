@@ -2293,3 +2293,13 @@ element and restored at rest; (2) the virtualised rail unmounted the focused car
 last movement, and focus fell to the page; within 600 ms of the stick moving something, a lost focus is put
 back near where it was, onto a control that is really on screen; (3) Down at the foot of the player's panel
 left the dialog for the bar, so the stick then scrolled nothing; a dialog now holds the D-pad and the follow.
+
+**E6 and E7, then four more controller faults (2026-11-16, Opus).** E6 measured in the real app on a copy of the
+catalogue database: a finished scan shows on Home 28 ms after (5 films) and 38 ms (200 films), seen to fail with
+Home's refetch removed (b4f3307). E7: the pad flow now fills the first run in by pad instead of pressing Continue
+through it, which found that no select and no slider could be changed by pad at all (ADR-0041 says anything a
+keyboard reaches a pad reaches), that a button disabling itself dropped focus onto the page, and that a long step's
+fields sat under the sticky footer. Fixed in af1be92: `PadPicker`, `adjustValue`, `rescueFocus` (with
+`wentWithItsScreen`, so opening another screen is left to that screen), `scroll-pb-32`. Decisions taken: the pad
+gets its own list for selects rather than replacing the native `<select>` (keyboard and mouse keep the platform's);
+Settings' typing check moved to a field that stays once the first run saves the OpenSubtitles key.
