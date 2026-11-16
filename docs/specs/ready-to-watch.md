@@ -144,6 +144,8 @@ query sees.
 - `npm run audit:ui` — frame budgets, focus rings, reduced motion.
 - The real window: debug build with `SINEPHILE_AUTOPLAY` and `SINEPHILE_PROBE` (timed intents as the pad
   sends them), video-window region read from Windows (`GetWindowRgn`). PrintWindow cannot see through the
-  holes, so the region is the evidence.
+  holes, so the region is the evidence. With any probe script the page also times a finished library scan
+  to the first card of "Your library" on Home (E6); run it with `SINEPHILE_DATA_DIR` on a copy of the
+  database, never the original.
 - Not automatable (`docs/MANUAL_TESTS.md`): a real controller in hand, Windows' file picker, a real
   download and stream from a source the author chose.

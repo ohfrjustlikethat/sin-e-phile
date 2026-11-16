@@ -2968,3 +2968,22 @@ Pushing the stick where nothing had found three faults, each seen in the audit b
 `npx vitest run src/lib/gamepad.test.ts`: four new jsdom tests, each seen to fail with its fix removed (the clipping
 test also fails with `onScreen`'s ancestor check removed; the grace test with the grace removed). **E3 met.** Frontend
 **193** tests (189 before).
+
+### E6: a finished scan on Home (16.10, 2026-11-16)
+
+Rail order: `crates/taste/tests/home.rs` `home_is_in_the_authors_order_with_new_episodes_the_library_and_new_releases`.
+
+Scan to Home, in the real app: the debug build on a **copy** of the 4 GB catalogue database (`SINEPHILE_DATA_DIR`, in
+scratch), its library folder pointed at films generated with FFmpeg (16x16, one frame a second) named and timed as real
+catalogue titles, and emptied before each launch so the launch rescan adds them. The probe (`SINEPHILE_PROBE`,
+`src/features/player/useDropToPlay.ts`) logs the scan's `done` event and checks every frame for the first card of the
+"Your library" rail, in the page's own clock.
+
+| Library | Scan | Identified | Shown on Home after the scan finished |
+|---|---|---|---|
+| 5 films | 103 ms | 5 of 5 | **28 ms** |
+| 200 films (the most voted) | 1,519 ms | 198, 2 to the review queue | **38 ms** |
+
+The page received `done` 0.4 ms after the backend logged the scan; half a second before, the rail was not there.
+Seen to fail: with Home's refetch on `done` disabled, "home library not shown within 10 s of the scan finishing".
+Budget 2 s; Tier 2 dev machine, debug build, so the ~50x margin is what Tier 0 has to spend. **E6 met.**

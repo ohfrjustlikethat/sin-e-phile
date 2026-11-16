@@ -1,6 +1,7 @@
 import { sendPlayerIntent } from "./intentBus";
 import type { Intent } from "./intents";
 import { useEffect } from "react";
+import { onEvent } from "@/lib/events";
 import { commands } from "@/lib/ipc";
 import { layoutProblems } from "@/lib/layoutCheck";
 import { useUi } from "@/lib/store";
@@ -72,6 +73,24 @@ function probe() {
     (e) => void commands.devLog(`probe key=${e.key} at=${performance.now().toFixed(0)}`),
     true,
   );
+  // Phase 16 E6: from a finished library scan to the library on Home, in the page's own clock.
+  onEvent<{ phase: string; files: number }>("library-scan", (e) => {
+    void commands.devLog(`probe library-scan phase=${e.phase} at=${performance.now().toFixed(0)}`);
+    if (e.phase !== "done") return;
+    const from = performance.now();
+    void commands.devLog(`probe scan done files=${e.files} at=${from.toFixed(0)}`);
+    const look = () => {
+      const waited = performance.now() - from;
+      if (document.querySelector('[role="list"][aria-label="Your library"] [data-rail-index]')) {
+        void commands.devLog(`probe home library shown ${waited.toFixed(0)} ms after the scan finished`);
+      } else if (waited > 10_000) {
+        void commands.devLog("probe home library not shown within 10 s of the scan finishing");
+      } else {
+        requestAnimationFrame(look);
+      }
+    };
+    requestAnimationFrame(look);
+  });
   // A timed script of player intents, sent as the pad sends them.
   void commands.devProbeScript().then((script) => {
     for (const step of (script ?? "").split(",").filter(Boolean)) {
@@ -108,8 +127,9 @@ function probe() {
   requestAnimationFrame(count);
   setInterval(() => {
     const pads = navigator.getGamepads?.().filter((p) => p && p.connected).length ?? 0;
+    const library = !!document.querySelector('[role="list"][aria-label="Your library"] [data-rail-index]');
     void commands.devLog(
-      `probe visibility=${document.visibilityState} focus=${document.hasFocus()} frames=${frames} pads=${pads}`,
+      `probe visibility=${document.visibilityState} focus=${document.hasFocus()} frames=${frames} pads=${pads} library=${library}`,
     );
     frames = 0;
   }, 500);

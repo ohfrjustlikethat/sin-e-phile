@@ -20,7 +20,7 @@ A person can install the app, set it up once, and watch anything they choose (fr
 - [x] **E3** The controller works in the player as specified, and the right stick scrolls pages, rails, panels and the paused details, each covered by the pad-flow audit.
 - [x] **E4** A TV-layout corpus (season folders, flat, anime absolute, split across drives, including a real-world case like the author's) is identified with at least 98% of episodes right and no episode filed as a film.
 - [x] **E5** The catalogue refreshes daily in the background: titles and episodes released since the last refresh appear without the user doing anything, and a run on the real data adds the recent releases it lacked.
-- [ ] **E6** Home's rails are in the specified order, and a finished library scan appears on Home within 2 s.
+- [x] **E6** Home's rails are in the specified order, and a finished library scan appears on Home within 2 s.
 - [ ] **E7** A first run done only by pad leaves library folders, an add-on the user chose, keys and a download backend configured and tested; with no source, the app says so wherever play or download would be.
 - [x] **E8** `SETUP.md` lists every prerequisite with its official link and how to add it, and passes the posture guard.
 - [ ] **E9** The author signs off a screenshot set of the player, first run, Home, Settings and the taste screen, and confirms a download and a stream work with a source of their choosing.
