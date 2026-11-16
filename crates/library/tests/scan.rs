@@ -68,6 +68,15 @@ fn fake_probe(_: &Path) -> Option<Probe> {
 
 fn quiet(_: Progress) {}
 
+/// The same answer as `fake_probe`, uncounted: tests run in parallel, and only
+/// `ffprobe_runs_only_when_the_name_was_not_enough` may move `PROBES`.
+fn uncounted_probe(_: &Path) -> Option<Probe> {
+    Some(Probe {
+        duration_seconds: Some(91 * 60),
+        ..Default::default()
+    })
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn a_scan_finds_identifies_and_keeps_a_renamed_file() {
     let db = Db::in_memory().await.unwrap();
@@ -116,6 +125,38 @@ async fn a_scan_finds_identifies_and_keeps_a_renamed_file() {
     let r = scan(&db, folder, root, fake_probe, &quiet).await.unwrap();
     assert_eq!((r.files, r.removed), (0, 1));
     assert!(repo.files_in_folder(folder).await.unwrap().is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_file_waiting_for_review_is_tried_again_at_the_next_scan() {
+    let db = Db::in_memory().await.unwrap();
+    // Only a weak candidate at first: the file is asked about, its best guess kept for the
+    // review queue.
+    item(&db, MediaKind::Film, "Kwaidan Nights", 2019, 80, 50).await;
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    file(root, "Kwaidan (1964).mkv", 4000);
+    let repo = LibraryRepository::new(&db);
+    let folder = repo.add_folder(&root.to_string_lossy()).await.unwrap();
+    let r = scan(&db, folder, root, uncounted_probe, &quiet)
+        .await
+        .unwrap();
+    assert_eq!((r.accepted, r.asked), (0, 1), "{r:?}");
+    let id = repo.files_in_folder(folder).await.unwrap()[0].id;
+    let guess = repo.match_of(id).await.unwrap().expect("the guess is kept");
+    assert!(guess.confidence < sinephile_library::ACCEPT_AT);
+
+    // The catalogue learns the film (a refresh), or names are read better (Phase 16: the
+    // author's "Ep. 01" episodes): the next scan looks again rather than keeping the guess.
+    let kwaidan = item(&db, MediaKind::Film, "Kwaidan", 1964, 91, 30_000).await;
+    let r = scan(&db, folder, root, uncounted_probe, &quiet)
+        .await
+        .unwrap();
+    assert_eq!((r.unchanged, r.accepted), (1, 1), "{r:?}");
+    assert_eq!(
+        repo.match_of(id).await.unwrap().unwrap().media_item_id,
+        kwaidan
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

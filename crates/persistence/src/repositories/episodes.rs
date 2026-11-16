@@ -241,6 +241,7 @@ impl<'a> EpisodeRepository<'a> {
             "WITH followed(series_id) AS (
                  SELECT COALESCE(e.series_id, l.media_item_id) FROM local_file_matches l
                    LEFT JOIN episodes e ON e.media_item_id = l.media_item_id
+                  WHERE l.is_confirmed = 1 OR l.confidence >= ?5
                  UNION SELECT media_item_id FROM watchlist_items WHERE profile_id = ?1
                  UNION SELECT e.series_id FROM watch_events w
                    JOIN episodes e ON e.media_item_id = w.media_item_id WHERE w.profile_id = ?1),
@@ -264,6 +265,7 @@ impl<'a> EpisodeRepository<'a> {
         .bind(days)
         .bind(from_year)
         .bind(limit)
+        .bind(crate::MATCH_ACCEPTED_AT)
         .fetch_all(self.db.pool())
         .await?)
     }

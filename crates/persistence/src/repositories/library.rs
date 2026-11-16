@@ -194,10 +194,12 @@ impl<'a> LibraryRepository<'a> {
                    JOIN local_files f ON f.id = m.local_file_id
                    LEFT JOIN episodes e ON e.media_item_id = m.media_item_id
                   WHERE f.missing_since IS NULL AND f.ignored_at IS NULL
+                    AND (m.is_confirmed = 1 OR m.confidence >= ?2)
                   GROUP BY item)
-             ORDER BY at DESC, item LIMIT ?",
+             ORDER BY at DESC, item LIMIT ?1",
         )
         .bind(limit)
+        .bind(crate::MATCH_ACCEPTED_AT)
         .fetch_all(self.db.pool())
         .await?)
     }
@@ -611,15 +613,18 @@ impl<'a> LibraryRepository<'a> {
         Ok(())
     }
 
-    /// Present files matched to this item: the copies a film's page can play.
+    /// Present files matched to this item: the copies a film's page can play. Only matches
+    /// accepted or confirmed: a guess waiting in the review queue plays nothing.
     pub async fn files_for_item(&self, media_item_id: i64) -> Result<Vec<LocalFile>, DbError> {
         let rows = sqlx::query(&format!(
             "SELECT {FILE_COLUMNS} FROM local_files l
              WHERE l.missing_since IS NULL AND l.id IN (
-                 SELECT local_file_id FROM local_file_matches WHERE media_item_id = ?1)
+                 SELECT local_file_id FROM local_file_matches
+                  WHERE media_item_id = ?1 AND (is_confirmed = 1 OR confidence >= ?2))
              ORDER BY l.size_bytes DESC"
         ))
         .bind(media_item_id)
+        .bind(crate::MATCH_ACCEPTED_AT)
         .fetch_all(self.db.pool())
         .await?;
         Ok(rows.iter().map(file).collect::<Result<_, _>>()?)

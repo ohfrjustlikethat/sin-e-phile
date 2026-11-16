@@ -204,13 +204,23 @@ fn specs() -> &'static [Spec] {
             spec(r"(?:s|season[ ._-]?|saison[ ._-]?)(\d{1,2})", |c, _| {
                 Some(Kind::Season(num(c, 1)?))
             }),
-            // Episode 5, Ep05, E05: numbered without a season.
-            spec(r"(?:episode[ ._-]?|ep[ ._-]?|e)(\d{1,4})", |c, _| {
+            // Episode 5, Ep05, Ep. 05, E05: numbered without a season.
+            spec(r"(?:episode[ ._-]?|ep\.?[ _-]?|e)(\d{1,4})", |c, _| {
                 let whole = c.get(0)?.as_str();
                 // A bare "E" needs two digits ("E05"); one is too often a word.
                 if whole.len() == 2 && whole.as_bytes()[0].eq_ignore_ascii_case(&b'e') {
                     return None;
                 }
+                Some(Kind::Episode {
+                    season: None,
+                    episodes: vec![num(c, 1)?],
+                    absolute: true,
+                })
+            }),
+            // "Chapter 01": some series number their episodes so ("Monster - Chapter 01 -
+            // Herr Dr. Tenma"). A film's sequel does too ("John Wick Chapter 2 2017"), so
+            // `parse` drops it when the name carries a year.
+            spec(r"chapter[ ._-]?(\d{1,3})", |c, _| {
                 Some(Kind::Episode {
                     season: None,
                     episodes: vec![num(c, 1)?],
@@ -583,18 +593,27 @@ fn choose_year(s: &str, kept: &mut Vec<Found>) {
         .collect();
     let bracketed =
         |t: &Found| s[..t.start].ends_with(['(', '[']) || s[t.end..].starts_with([')', ']']);
-    let chosen = candidates
-        .iter()
-        .rev()
-        .find(|&&i| bracketed(&kept[i]))
+    // A range ("Monster [2004-2005]", a show's run) is dated by its first year.
+    let range = candidates.windows(2).find_map(|w| {
+        let between = s[kept[w[0]].end..kept[w[1]].start].trim();
+        matches!(between, "-" | "–").then_some(w[0])
+    });
+    let chosen = range
+        .or_else(|| {
+            candidates
+                .iter()
+                .rev()
+                .find(|&&i| bracketed(&kept[i]))
+                .copied()
+        })
         .or_else(|| {
             candidates
                 .iter()
                 .rev()
                 .find(|&&i| kept[i].start < first_other)
+                .copied()
         })
-        .or_else(|| candidates.last())
-        .copied();
+        .or_else(|| candidates.last().copied());
     let mut i = 0;
     kept.retain(|t| {
         let keep = !matches!(t.kind, Kind::Year(_)) || Some(i) == chosen;

@@ -15,6 +15,13 @@ pub mod paths;
 pub mod repositories;
 pub mod secrets;
 
+/// At or above this confidence a file's match is accepted without asking; below it the
+/// match is the best guess the review queue shows, and the library, Home and a title's
+/// Play never use it (Phase 16: the author's episodes, misread as films at 0.02, filled
+/// Home with "Entrapment" and "The Fugitive"). Set from `eval identify` (Phase 12); the
+/// library's `ACCEPT_AT` is this.
+pub const MATCH_ACCEPTED_AT: f64 = 0.75;
+
 pub use archive::{ArchiveError, Archiver, ImportSummary, ProfileArchive};
 pub use db::{Compacted, Db, DbError, SqlitePool};
 pub use model::{

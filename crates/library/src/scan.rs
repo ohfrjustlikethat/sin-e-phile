@@ -336,9 +336,13 @@ pub async fn scan(
             }
             (Upserted::Unchanged(id), _) => {
                 report.unchanged += 1;
-                // Never identified (or forgotten): try again, e.g. after a catalogue update.
-                if repo.match_of(id).await?.is_none() {
-                    to_identify.push(id);
+                // Never identified (or forgotten), or still waiting in the review queue: try
+                // again, after a catalogue update or a better reading of names (Phase 16:
+                // the author's "Ep. 01" episodes, guessed as films, stayed guessed).
+                match repo.match_of(id).await? {
+                    None => to_identify.push(id),
+                    Some(m) if !m.confirmed && m.confidence < ACCEPT_AT => to_identify.push(id),
+                    Some(_) => {}
                 }
             }
         }

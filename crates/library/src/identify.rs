@@ -44,8 +44,9 @@ pub const DECISIVE_LEAD: f64 = 0.12;
 /// At or above this confidence a match is accepted without asking; below it, the file
 /// goes to the review queue. Set from `eval identify` (docs/eval-results.md, Phase 12):
 /// the lowest threshold under 1% wrong among accepted was 0.615, at 0.97% — too close to
-/// the line — so it sits where the tuning set measured 0.39%.
-pub const ACCEPT_AT: f64 = 0.75;
+/// the line — so it sits where the tuning set measured 0.39%. It lives with the queries
+/// that must honour it (the library, Home, a title's Play), in `sinephile_persistence`.
+pub const ACCEPT_AT: f64 = sinephile_persistence::MATCH_ACCEPTED_AT;
 
 /// A best score this high is fully plausible; at `IMPLAUSIBLE` or below, not at all.
 pub const PLAUSIBLE: f64 = 0.80;

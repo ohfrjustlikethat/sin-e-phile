@@ -1870,6 +1870,37 @@ async fn library_repository_surface() {
         vec![heat]
     );
 
+    // A guess below the threshold is the review queue's, not the library's: neither
+    // recently_added nor files_for_item use it (Phase 16, the author's misread episodes).
+    let guessed = repo
+        .upsert_file(&NewLocalFile {
+            path: "C:/films/Monster - Chapter 08 - The Fugitive.mkv",
+            size_bytes: 3000,
+            ..f.clone()
+        })
+        .await
+        .expect("guessed file");
+    let guessed = match guessed {
+        Upserted::New(g) => g,
+        other => panic!("{other:?}"),
+    };
+    repo.set_match(
+        guessed,
+        &FileMatch {
+            media_item_id: other,
+            confidence: 0.07,
+            method: MatchMethod::Metadata,
+            covers: 1,
+            confirmed: false,
+        },
+    )
+    .await
+    .expect("a guess");
+    assert_eq!(repo.recently_added(10).await.unwrap(), vec![heat]);
+    assert!(repo.files_for_item(other).await.unwrap().is_empty());
+    // Out of the way of the review queue's counts below.
+    repo.set_ignored(guessed, true).await.expect("set aside");
+
     // clear_match / set_candidates / candidates / review_queue / review_count
     repo.clear_match(id).await.expect("clear");
     assert_eq!(repo.match_of(id).await.unwrap(), None);

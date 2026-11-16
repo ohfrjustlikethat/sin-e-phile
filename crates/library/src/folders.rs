@@ -87,7 +87,35 @@ pub fn is_extra(folders: &[String], name: &str) -> bool {
     }
     let stem = name.rsplit_once('.').map_or(name, |(s, _)| s);
     let c = format!(" {} ", comparable(stem));
-    EXTRAS_WORDS.iter().any(|w| c.contains(&format!(" {w} ")))
+    if EXTRAS_WORDS.iter().any(|w| c.contains(&format!(" {w} "))) {
+        return true;
+    }
+    // "Monster - Extra 1 - Origin": "extra" numbered is a release's extra. Alone it is not
+    // ("Extra Ordinary", a film; "Extras", a series).
+    let words: Vec<&str> = c.split_whitespace().collect();
+    words
+        .windows(2)
+        .any(|w| w[0] == "extra" && w[1].chars().all(|ch| ch.is_ascii_digit()))
+}
+
+/// A prefix someone put on a folder to order their shelf: "2a. Samurai Champloo (2004)",
+/// "01. Twin Peaks", "3) Monster". One to three digits, perhaps a letter, then "." or ")"
+/// and a space: a title that starts with a number ("2001 A Space Odyssey", "12 Angry
+/// Men", "1917") has no such punctuation after it.
+fn without_shelf_order(name: &str) -> &str {
+    let b = name.as_bytes();
+    let digits = b.iter().take(3).take_while(|c| c.is_ascii_digit()).count();
+    if digits == 0 {
+        return name;
+    }
+    let mut i = digits;
+    if b.get(i).is_some_and(u8::is_ascii_alphabetic) {
+        i += 1;
+    }
+    match (b.get(i), b.get(i + 1)) {
+        (Some(b'.' | b')'), Some(b' ')) => name[i + 2..].trim_start(),
+        _ => name,
+    }
 }
 
 /// Read `folders` (outermost first, the library root itself excluded): the season from
@@ -100,7 +128,7 @@ pub fn hint(folders: &[String]) -> FolderHint {
             out.season = season_of(name);
         }
         if !organises(name) {
-            let p = parse(name);
+            let p = parse(without_shelf_order(name));
             if !p.title.is_empty() {
                 out.title = p.title;
                 out.year = p.year;
@@ -124,6 +152,35 @@ mod tests {
 
     fn v(f: &[&str]) -> Vec<String> {
         f.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn a_shelf_order_prefix_is_not_part_of_the_show() {
+        // The author's library (2026-11-16).
+        let champloo = h(&["2a. Samurai Champloo (2004)"]);
+        assert_eq!(champloo.title, "Samurai Champloo");
+        assert_eq!(champloo.year, Some(2004));
+        assert_eq!(h(&["01. Twin Peaks"]).title, "Twin Peaks");
+        // A title that starts with a number keeps it.
+        assert_eq!(
+            h(&["2001 A Space Odyssey (1968)"]).title,
+            "2001 A Space Odyssey"
+        );
+        assert_eq!(h(&["12 Angry Men (1957)"]).title, "12 Angry Men");
+    }
+
+    #[test]
+    fn an_extra_is_known_by_its_number_too() {
+        let monster = "Monster [2004-2005] DVDRip x265 AC-3 DD 2.0 GRPX [GRPY]";
+        assert!(is_extra(
+            &v(&[monster]),
+            "Monster - Extra 1 - Origin DVDRip x265 GRPX [GRPY].mkv"
+        ));
+        assert!(!is_extra(&v(&[]), "Extra Ordinary (2019) 1080p.mkv"));
+        assert!(!is_extra(
+            &v(&[monster]),
+            "Monster - Chapter 01 - Herr Dr. Tenma DVDRip x265 GRPX [GRPY].mkv"
+        ));
     }
 
     #[test]
