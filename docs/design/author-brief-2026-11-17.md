@@ -160,3 +160,19 @@ phase deepens it (recorded in `SPEC.md` for that phase).
     folders after item 3.
 14. Downloads page: finished files can be played, opened in their folder, and found in the library.
 15. Controller focus: Home rails, the title page, Settings, and after anything closes.
+
+## Item 3 in detail: the first run's catalogue (decided 2026-11-17)
+
+The development copy was built by hand with `ingest imdb, credits, akas, normalise, anime, episodes,
+movielens, search-index, embed`; a fresh install ran only the hourly refresh (titles, ratings, episodes),
+so its search index was empty. The first run becomes a pipeline in two stages, its steps moved out of
+`tools/ingest/src/main.rs` into `crates/catalogue` (a `bootstrap` module) so the app and the CLI share them
+(ADR-0022):
+
+- **Stage A, what search and identification need** (onboarding shows its progress; Home waits for it):
+  titles and ratings, episodes, normalised titles, alternate titles (akas), the FTS5 index and the core
+  trigram index. The library scan waits for stage A, then every waiting file is identified again.
+- **Stage B, enrichment, in the background after Home opens**: credits (directors on cards), AniList's anime,
+  MovieLens (taste), and search by meaning (the published `embeddings-v3`, the model, the vector index).
+- Each step is a resumable job (they already are); a restart carries on. Progress goes to the page as an
+  event, and Settings shows what is done and what is still coming.
