@@ -13,6 +13,7 @@ import { NetworkSection } from "@/features/settings/NetworkSection";
 import { TmdbSection } from "@/features/settings/TmdbSection";
 import { Settings as DownloadsSettings } from "@/features/downloads/DownloadsScreen";
 import { TitleCards } from "./TitleCards";
+import { BuildStrip, useCatalogueBuild } from "./CatalogueBuild";
 
 /**
  * First run (SPEC.md Phase 14; Phase 16 makes it leave the viewer ready to watch): who this
@@ -52,6 +53,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const [colour, setColour] = useState<AvatarColour>("sage");
   const [way, setWay] = useState<Way>("cards");
   const first = useRef<HTMLDivElement>(null);
+  // The catalogue builds while the viewer sets up (Phase 16): its progress is in the footer.
+  const build = useCatalogueBuild();
 
   // The profile made on install is "You": its name is the first question.
   useEffect(() => {
@@ -242,7 +245,9 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
               Back
             </Button>
           )}
-          <span className="flex-1" />
+          <div className="min-w-0 flex-1 px-4">
+            <BuildStrip build={build} />
+          </div>
           <Button variant="ghost" onClick={() => (step === STEPS.length - 1 ? finish.mutate() : setStep(step + 1))}>
             {step === STEPS.length - 1 ? "Skip, and start" : "Skip"}
           </Button>

@@ -27,6 +27,19 @@ describe("The catalogue keeps itself current (Phase 16)", () => {
     expect(screen.getByRole("button", { name: "Refresh now" })).toBeDisabled();
   });
 
+  it("says when the first build is running, and how far it has come", async () => {
+    commands.catalogueStatus.mockImplementationOnce(() =>
+      ok({ refreshed_at: null, titles_added: null, episodes_added: null, running: true, ready: false, building: "Building search", percent: 64 } as never),
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <CatalogueSection />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText(/Building the catalogue for the first time: Building search, 64%\./)).toBeInTheDocument();
+  });
+
   it("puts a time in words", () => {
     const now = new Date("2026-11-08T12:00:00Z");
     expect(when("2026-11-07T12:00:00Z", now)).toBe("yesterday");

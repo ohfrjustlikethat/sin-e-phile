@@ -40,6 +40,8 @@ export function scanLine(e: LibraryScanEvent | undefined): string | null {
       return `Identifying ${e.done.toLocaleString()} of ${e.total.toLocaleString()}`;
     case "failed":
       return "The scan stopped. Rescan to try again.";
+    case "waiting":
+      return "Waiting for the catalogue: its films are matched as soon as it is ready.";
     default:
       return null;
   }

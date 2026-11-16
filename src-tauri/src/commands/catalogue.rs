@@ -20,6 +20,19 @@ use crate::state::AppState;
 /// One refresh at a time: the timer's and "refresh now" never overlap.
 static RUNNING: AtomicBool = AtomicBool::new(false);
 
+/// What stage A is doing while the first run's catalogue is built ("Building search").
+static BUILDING: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// A refresh is running on a catalogue that is not ready yet: the first run's build.
+/// Library scans wait for it (there is nothing to identify against, and they would fight
+/// it for the database); it scans every folder when it ends, however it ends.
+static FIRST_BUILD: AtomicBool = AtomicBool::new(false);
+
+/// Whether the first run's catalogue is being built right now.
+pub fn first_build_running() -> bool {
+    FIRST_BUILD.load(Ordering::SeqCst)
+}
+
 /// How often the publisher is asked. Each ask is one HEAD request; the download happens
 /// only when IMDb has republished, which it does about once a day.
 const CHECK_EVERY: Duration = Duration::from_secs(60 * 60);
@@ -33,6 +46,13 @@ pub struct CatalogueStatus {
     pub titles_added: Option<i32>,
     pub episodes_added: Option<i32>,
     pub running: bool,
+    /// Search and identification can work: titles loaded and the first run's stage A
+    /// done (Phase 16). Until then onboarding shows `building`, and Home waits.
+    pub ready: bool,
+    /// While the first run's catalogue is built: what it is doing ("Building search"),
+    /// and how far the whole build has come, 0 to 100.
+    pub building: Option<String>,
+    pub percent: i32,
 }
 
 #[tauri::command]
@@ -43,10 +63,26 @@ pub async fn catalogue_status(state: State<'_, AppState>) -> Result<CatalogueSta
         .setting(sinephile_catalogue::freshness::LAST_REFRESH)
         .await
         .map_err(|e| e.to_string())?;
+    let ready = sinephile_catalogue::bootstrap::ready(&db)
+        .await
+        .map_err(|e| e.to_string())?;
     let mut out = CatalogueStatus {
         running: RUNNING.load(Ordering::SeqCst),
+        ready,
+        percent: 100,
         ..Default::default()
     };
+    if !ready {
+        out.percent = sinephile_catalogue::bootstrap::percent(&db)
+            .await
+            .map_err(|e| e.to_string())?;
+        let step = BUILDING.lock().expect("building").clone();
+        out.building = match step {
+            Some(label) => Some(label),
+            None if out.running => Some(sinephile_catalogue::bootstrap::label("load").into()),
+            None => None,
+        };
+    }
     if let Some(v) = raw.and_then(|r| serde_json::from_str::<serde_json::Value>(&r).ok()) {
         out.refreshed_at = v["at"].as_str().map(str::to_string);
         out.titles_added = v["titles_added"].as_i64().map(|n| n as i32);
@@ -62,6 +98,17 @@ pub async fn refresh_catalogue(app: AppHandle) -> Result<bool, String> {
     Ok(start(app, true))
 }
 
+/// The library's scans that waited for the first build: started once search works, or
+/// when the build stops without it (a machine offline at first run still lists its files).
+fn release_waiting_scans(app: &AppHandle) {
+    if FIRST_BUILD.swap(false, Ordering::SeqCst) {
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            crate::commands::library::scan_all(&app).await;
+        });
+    }
+}
+
 /// Start a refresh unless one is running; `false` if one was.
 fn start(app: AppHandle, force: bool) -> bool {
     if RUNNING.swap(true, Ordering::SeqCst) {
@@ -70,6 +117,10 @@ fn start(app: AppHandle, force: bool) -> bool {
     tauri::async_runtime::spawn(async move {
         let state = app.state::<AppState>();
         if let (Some(db), Some(dir)) = (state.db(), state.data_dir()) {
+            let first = !sinephile_catalogue::bootstrap::ready(&db)
+                .await
+                .unwrap_or(true);
+            FIRST_BUILD.store(first, Ordering::SeqCst);
             let _ = app.emit("catalogue-refreshing", true);
             let transport = state.http.clone();
             let outcome = sinephile_catalogue::freshness::refresh(
@@ -80,11 +131,39 @@ fn start(app: AppHandle, force: bool) -> bool {
             )
             .await;
             tracing::info!(?outcome, "catalogue freshness");
-            if matches!(
+            let refreshed = matches!(
                 outcome,
                 sinephile_catalogue::freshness::Outcome::Refreshed { .. }
-            ) {
-                let _ = app.emit("catalogue-refreshed", ());
+            );
+            // Phase 16: a fresh install's stage A (search), then alternate titles, then the
+            // catch-up that makes whatever arrived searchable.
+            let progress = app.clone();
+            let report = sinephile_catalogue::bootstrap::run(&db, &dir.join("datasets"), |step| {
+                use sinephile_catalogue::bootstrap::{label, AKAS, CATCH_UP};
+                if step == AKAS || step == CATCH_UP {
+                    // Stage A is behind it: search works, and the library can be matched.
+                    release_waiting_scans(&progress);
+                }
+                *BUILDING.lock().expect("building") = Some(label(step).to_string());
+                let _ = progress.emit("catalogue-building", step);
+            })
+            .await;
+            *BUILDING.lock().expect("building") = None;
+            release_waiting_scans(&app);
+            match &report {
+                Ok(r) => {
+                    tracing::info!(?r, "catalogue built");
+                    if r.akas {
+                        // Files named by their romaji or English titles are worth another look.
+                        crate::commands::library::scan_all(&app).await;
+                    }
+                    if refreshed || r.built || r.akas || r.indexed > 0 {
+                        let _ = app.emit("catalogue-refreshed", ());
+                    }
+                }
+                Err(error) => {
+                    tracing::error!(%error, "catalogue build stopped; it resumes on the next check")
+                }
             }
         }
         RUNNING.store(false, Ordering::SeqCst);

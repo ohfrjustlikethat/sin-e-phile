@@ -15,6 +15,7 @@ import { TasteProfile } from "@/features/taste/TasteProfile";
 import { DownloadNotices } from "@/features/downloads/DownloadNotices";
 import { ProfilePicker } from "@/features/profiles/ProfilePicker";
 import { Onboarding } from "@/features/onboarding/Onboarding";
+import { GettingReady, useCatalogueBuild } from "@/features/onboarding/CatalogueBuild";
 import { HomeScreen } from "@/features/home/HomeScreen";
 import { WatchlistScreen } from "@/features/watchlist/WatchlistScreen";
 import { LibraryShelf } from "@/features/library/LibraryShelf";
@@ -74,6 +75,8 @@ export function App() {
   useProfileSync();
   // First run (Phase 14): the wizard, once. `null` until asked.
   const [onboarding, setOnboarding] = useState<boolean | null>(null);
+  // A fresh install's catalogue (Phase 16): Home, Films, TV and search wait until it is built.
+  const build = useCatalogueBuild();
   useEffect(() => {
     // Inside a promise: outside the Tauri shell (the UI audit's browser) the call throws at
     // once, and that is "no wizard", not a crashed page.
@@ -290,6 +293,8 @@ export function App() {
               <DownloadsScreen />
             ) : detail !== null ? (
               <DetailScreen />
+            ) : !build.ready && (searching || ["home", "films", "tv"].includes(destination)) ? (
+              <GettingReady build={build} />
             ) : searching ? (
               <SearchScreen />
             ) : destination === "home" ? (

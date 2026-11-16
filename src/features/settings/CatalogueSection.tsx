@@ -61,7 +61,11 @@ export function CatalogueSection() {
     <section aria-label="Catalogue" className="mb-12">
       <h2 className={SETTINGS_HEADING}>Catalogue</h2>
       <p className="text-[14px] text-ink" role="status">
-        {running ? "Updating the catalogue now. This runs in the background." : line}
+        {s?.ready === false
+          ? `Building the catalogue for the first time: ${s.building ?? "starting"}, ${s.percent}%. Search and your library are matched when it is done.`
+          : running
+            ? "Updating the catalogue now. This runs in the background."
+            : line}
       </p>
       <p className="mt-1 text-[13px] text-ink-muted">
         New films and new episodes arrive on their own: the catalogue is checked every hour and updated

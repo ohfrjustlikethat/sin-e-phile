@@ -174,7 +174,7 @@ const FAKE = `(() => {
     tmdb_status: () => ({ has_key: !!window.__tmdbKey, fetched_on: null }),
     // Phase 16: the catalogue keeps itself current.
     catalogue_status: () => ({ refreshed_at: "2026-11-08T06:21:10Z", titles_added: 885, episodes_added: 7951,
-      running: false }),
+      running: false, ready: true, building: null, percent: 100 }),
     refresh_catalogue: () => true,
     subtitle_settings: () => ({ settings: { languages: ["en"], always: false, font: "Segoe UI", size: 46,
       position: 95, background: false }, has_key: !!window.__osKey, used_today: 0, budget: 5, server_remaining: null }),

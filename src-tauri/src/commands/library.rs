@@ -185,6 +185,26 @@ pub fn start_scan(app: AppHandle, id: i64, root: PathBuf) {
             return; // already scanning
         }
     }
+    // A folder added while the first run's catalogue is built (onboarding) waits for it:
+    // the build scans every folder when it ends.
+    if crate::commands::catalogue::first_build_running() {
+        if let Some(s) = SCANNING.lock().expect("scanning").as_mut() {
+            s.remove(&id);
+        }
+        emit(
+            &app,
+            LibraryScanEvent {
+                folder_id: id as i32,
+                phase: "waiting".into(),
+                done: 0,
+                total: 0,
+                files: 0,
+                accepted: 0,
+                asked: 0,
+            },
+        );
+        return;
+    }
     tauri::async_runtime::spawn(async move {
         let Some(db) = app.state::<AppState>().db() else {
             return;
@@ -251,6 +271,18 @@ fn ensure_watched(id: i64, root: &Path) {
     }
 }
 
+/// Scan every library folder: at launch, and when the first run's catalogue is ready.
+pub async fn scan_all(app: &AppHandle) {
+    let Some(db) = app.state::<AppState>().db() else {
+        return;
+    };
+    if let Ok(folders) = LibraryRepository::new(&db).folders().await {
+        for f in folders {
+            start_scan(app.clone(), f.id, PathBuf::from(f.path));
+        }
+    }
+}
+
 /// At launch: scan every folder (catching what changed while the app was closed), then
 /// watch it; and apply what the watchers report, once each path has been quiet for two
 /// seconds.
@@ -265,10 +297,14 @@ pub async fn library_loop(app: AppHandle) {
         }
         tokio::time::sleep(Duration::from_millis(500)).await;
     };
-    if let Ok(folders) = LibraryRepository::new(&db).folders().await {
-        for f in folders {
-            start_scan(app.clone(), f.id, PathBuf::from(f.path));
-        }
+    // A fresh install's catalogue is not built yet: scanning now would identify nothing
+    // (there is no index to search) and fight the build for the database. The catalogue's
+    // first refresh scans every folder when it ends (catalogue.rs `start`).
+    if sinephile_catalogue::bootstrap::ready(&db)
+        .await
+        .unwrap_or(true)
+    {
+        scan_all(&app).await;
     }
 
     let mut pending: HashMap<i64, Quieten> = HashMap::new();

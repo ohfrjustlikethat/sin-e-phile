@@ -510,6 +510,17 @@ export type CatalogueStatus = {
 	titles_added: number | null,
 	episodes_added: number | null,
 	running: boolean,
+	/**
+	 *  Search and identification can work: titles loaded and the first run's stage A
+	 *  done (Phase 16). Until then onboarding shows `building`, and Home waits.
+	 */
+	ready: boolean,
+	/**
+	 *  While the first run's catalogue is built: what it is doing ("Building search"),
+	 *  and how far the whole build has come, 0 to 100.
+	 */
+	building: string | null,
+	percent: number,
 };
 
 export type CatalogueView = {

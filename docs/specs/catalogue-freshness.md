@@ -193,3 +193,35 @@ separate IMDb series (its 18 parts are that series' season 1), so files named `S
 show are placed on the 1990 series without an episode row. Mapping one numbering onto another needs a
 source that publishes it (D85).
 
+
+## Phase 16 — the first run's build, and the catch-up (2026-11-17)
+
+The author's install had 2.7 million titles and an empty search index. The refresh is the only
+thing a fresh install ran, and it loads titles, ratings and episodes; the steps that make them
+searchable were run by hand on the development copy (`ingest akas`, `normalise`,
+`search-index`) and never by the app. Search found nothing, the library identified nothing
+(identification searches the same index), and Films and TV Shows were empty.
+
+`crates/catalogue/src/bootstrap.rs` owns the fix, run after every refresh (`run`, called from
+`src-tauri/src/commands/catalogue.rs` `start`):
+
+- **Ready** means a load job (`refresh`, or `ingest imdb`) has completed *and* stage A's two jobs
+  have: `titles-normalise`, then `search-index` (the word index, plus the typo index over the core
+  tier). Not "there are titles": an interrupted load leaves titles behind.
+- **Alternate titles** (`imdb-akas`) load after stage A, in the background. They were 862 of the
+  2,519 seconds the build took on a copy of the author's install (docs/eval-results.md), and first
+  they kept Home closed fourteen minutes longer.
+- **The catch-up** (`catalogue-catch-up`) normalises the titles with no normalised form
+  (`normalise::fill_missing`) and indexes what the index lacks. The index skips what it holds, so it
+  first un-marks every title that has gained a name not yet normalised; that is how alternate titles
+  and the refresh's new titles reach the index. It is due when a load or an alternate-titles run
+  finished after the last catch-up, or a catch-up stopped part-way. Before it, the titles the weekly
+  refresh added were never searchable.
+- **The library waits** while a first build runs (`first_build_running`): the launch scan and a
+  folder added in onboarding report `waiting`. The scans start as soon as stage A is done, or when
+  the build stops without it (a machine offline at first run still lists its files), and every
+  folder is looked at again once alternate titles have loaded.
+- **The page**: `catalogue_status` carries `ready`, `building` (the step's label) and `percent`, each
+  part of the wait weighted by its measured time, normalising and indexing counted by rows.
+  Onboarding shows it in its footer; Home, Films, TV and search show "Getting ready… N%" until it is
+  ready. An unreadable status counts as ready.

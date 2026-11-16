@@ -18,20 +18,40 @@ const BATCH: i64 = 50_000;
 
 /// Backfill every title's normalised form.
 pub async fn backfill(job: &mut Job<'_>) -> Result<(), JobError> {
-    job.run_step("titles.normalised", move |tx, cursor| {
+    run(
+        job,
+        "titles.normalised",
+        "SELECT id, title FROM titles WHERE id > ? ORDER BY id LIMIT ?",
+    )
+    .await
+}
+
+/// Only the titles without one: what a refresh just added (Phase 16). The hourly
+/// refresh inserts titles with no normalised form, and re-normalising all six million
+/// for a few hundred new ones would cost a minute every hour.
+pub async fn fill_missing(job: &mut Job<'_>) -> Result<(), JobError> {
+    run(
+        job,
+        "titles.normalised.missing",
+        "SELECT id, title FROM titles WHERE id > ? AND normalised IS NULL ORDER BY id LIMIT ?",
+    )
+    .await
+}
+
+async fn run(job: &mut Job<'_>, step: &'static str, select: &'static str) -> Result<(), JobError> {
+    job.run_step(step, move |tx, cursor| {
         Box::pin(async move {
             // The cursor is the last id processed. `titles.id` is the primary key,
             // so this is an index scan rather than an offset, and resuming near the
             // end costs a seek instead of re-reading six million rows.
             let after: i64 = cursor.as_deref().and_then(|c| c.parse().ok()).unwrap_or(0);
 
-            let rows: Vec<(i64, String)> =
-                sqlx::query_as("SELECT id, title FROM titles WHERE id > ? ORDER BY id LIMIT ?")
-                    .bind(after)
-                    .bind(BATCH)
-                    .fetch_all(&mut **tx)
-                    .await
-                    .map_err(|e| JobError::step("titles.normalised", e.to_string()))?;
+            let rows: Vec<(i64, String)> = sqlx::query_as(select)
+                .bind(after)
+                .bind(BATCH)
+                .fetch_all(&mut **tx)
+                .await
+                .map_err(|e| JobError::step(step, e.to_string()))?;
 
             if rows.is_empty() {
                 return Ok(Batch::finished(0));

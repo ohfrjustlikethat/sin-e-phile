@@ -10,6 +10,7 @@
 pub mod akas;
 pub mod anime;
 pub mod assets;
+pub mod bootstrap;
 pub mod credits;
 pub mod download;
 pub mod embed;

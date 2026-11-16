@@ -3024,3 +3024,26 @@ films, 1 extra searched for. `-- identify` unchanged: tuning **99.05% / 0.39%**,
 Space Dandy's `S01E14`-`S01E26` (IMDb's first season has 13) and Twin Peaks' `S03` (IMDb: a 2017 series)
 match the show itself and are kept as their names number them (ADR-0031), listed under "Also on this PC".
 Rust **803** tests, frontend **211**.
+
+### First-run catalogue build (Phase 16, brief item 3) — 2026-11-17, on 5841b0b + working tree
+
+A copy of the author's installed database (2,735,153 non-episode titles, no index, nothing normalised),
+built with the release `ingest` binary and `--no-compact`, as the app's first run will build it.
+Command: `ingest <step> --data-dir <scratch copy> --no-compact`, each step timed with `date +%s`.
+
+| Step | Time | Result |
+|---|---|---|
+| Load (the app's refresh, from the copy's `ingest_jobs`) | 1,065 s titles + 342 s episodes | 3,167,536 items |
+| `akas` (523 MB download included) | 862 s | 6,456,057 title rows (+3.55 M) |
+| `normalise` | 123 s | 6,456,057 normalised, 0 left |
+| `search-index --trigram-core` | 127 s | 2,735,153 indexed, 881,027 in the typo index |
+
+After it: `search_index MATCH 'nosferatu'` 84 rows, `MATCH 'kyojin'` 62 (romaji, from the alternate titles).
+Database 1,392 MB → 2,440 MB. Alternate titles are 862 of the 2,519 s, so they move after search works
+(Home opens ~14 minutes sooner); the titles they touch are re-indexed by the catch-up.
+
+The same build in the real app (release, on a fresh copy of the author's install, 2026-11-17): the refresh
+ended at 19:17:27; stage A ran with the library held back; the scan was released at 19:21:11 (3 min 44 s).
+Files in the author's library folder matched at or above `MATCH_ACCEPTED_AT`: **0 of 200** in the installed
+database (no index), **199 of 200** after stage A. Command: `SELECT COUNT(DISTINCT local_file_id) FROM
+local_file_matches WHERE confidence >= 0.75` on each.
