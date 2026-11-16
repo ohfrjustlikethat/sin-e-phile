@@ -2303,3 +2303,9 @@ fields sat under the sticky footer. Fixed in af1be92: `PadPicker`, `adjustValue`
 `wentWithItsScreen`, so opening another screen is left to that screen), `scroll-pb-32`. Decisions taken: the pad
 gets its own list for selects rather than replacing the native `<select>` (keyboard and mouse keep the platform's);
 Settings' typing check moved to a field that stays once the first run saves the OpenSubtitles key.
+
+**Author batch sent (2026-11-16).** The release build from 6334d7b, then: sign-off screenshots (E9, with Phase 14
+E4/E6), a download and a stream with a source of the author's choosing, the Phase 7 E7 VPN cut, "Load a file" in
+the player (E2), the first run with a real controller (E7 confirmation), and the embeddings-v3 decision (reserved:
+publishing a release, and the IMDb terms behind ADR-0044's "no pre-built catalogue"; default, not publishing).
+Also found and fixed today: choosing a found subtitle dropped focus out of the player panel (6334d7b).

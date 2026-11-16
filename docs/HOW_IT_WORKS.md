@@ -422,7 +422,10 @@ The phase that made the release build usable. TV folders are read by their neare
 changed and refreshes only then, with AniList airing and TMDB "showing now" beside it
 (`crates/catalogue/src/freshness.rs`); Home's rails follow the author's order; the player answers the pad
 like a TV, the right stick scrolls whatever is under focus, and subtitles are styled, found, synced and
-loaded from inside playback. How it all fits: `docs/specs/ready-to-watch.md`.
+loaded from inside playback. Everything is reachable by pad: a select opens as a list the D-pad walks
+(`src/app/PadPicker.tsx`), a slider steps with Left and Right, and focus that falls to the page when its
+control goes is put back near where it was (`src/lib/gamepad.ts`). How it all fits:
+`docs/specs/ready-to-watch.md`.
 
 ### Profiles ✅ `Phase 14`
 
