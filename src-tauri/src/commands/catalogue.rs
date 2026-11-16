@@ -138,16 +138,18 @@ fn start(app: AppHandle, force: bool) -> bool {
             // Phase 16: a fresh install's stage A (search), then alternate titles, then the
             // catch-up that makes whatever arrived searchable.
             let progress = app.clone();
-            let report = sinephile_catalogue::bootstrap::run(&db, &dir.join("datasets"), |step| {
-                use sinephile_catalogue::bootstrap::{label, AKAS, CATCH_UP};
-                if step == AKAS || step == CATCH_UP {
-                    // Stage A is behind it: search works, and the library can be matched.
-                    release_waiting_scans(&progress);
-                }
-                *BUILDING.lock().expect("building") = Some(label(step).to_string());
-                let _ = progress.emit("catalogue-building", step);
-            })
-            .await;
+            let anilist: Arc<dyn sinephile_metadata_api::Transport> = state.http.clone();
+            let report =
+                sinephile_catalogue::bootstrap::run(&db, &dir.join("datasets"), anilist, |step| {
+                    use sinephile_catalogue::bootstrap::{label, STAGE_A};
+                    if !STAGE_A.contains(&step) {
+                        // Stage A is behind it: search works, and the library can be matched.
+                        release_waiting_scans(&progress);
+                    }
+                    *BUILDING.lock().expect("building") = Some(label(step).to_string());
+                    let _ = progress.emit("catalogue-building", step);
+                })
+                .await;
             *BUILDING.lock().expect("building") = None;
             release_waiting_scans(&app);
             match &report {

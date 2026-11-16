@@ -217,6 +217,14 @@ searchable were run by hand on the development copy (`ingest akas`, `normalise`,
   and the refresh's new titles reach the index. It is due when a load or an alternate-titles run
   finished after the last catch-up, or a catch-up stopped part-way. Before it, the titles the weekly
   refresh added were never searchable.
+- **Enrichment** follows alternate titles, each step done once: cast and crew (`imdb-credits`; 2,655 s on
+  the development copy) and AniList's anime (`anilist`; 785 s). People's names are in the word index, so
+  credits un-mark every credited title before the job finishes, and the catch-up after it re-indexes them;
+  AniList's titles reach the index the same way. MovieLens is not fetched: nothing in the app reads it.
+  Once a step's job has finished, its archive is deleted (`tidy`: alternate titles, principals and names,
+  1.5 GB); the refresh's own files stay. Every half-gigabyte decompression runs on a blocking thread.
+- **The meaning index** is offered in onboarding's taste step with its size, and fetched only when asked
+  (ADR-0014); `embeddings-v3` is published for it.
 - **The library waits** while a first build runs (`first_build_running`): the launch scan and a
   folder added in onboarding report `waiting`. The scans start as soon as stage A is done, or when
   the build stops without it (a machine offline at first run still lists its files), and every

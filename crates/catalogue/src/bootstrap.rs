@@ -17,15 +17,23 @@
 //!   searchable. Before it, the titles the weekly refresh added were never searchable at
 //!   all (the author: "catalogues are not updated").
 //!
+//! - **Enrichment** follows, also in the background: cast and crew (title pages, the pause
+//!   panel, a person's films; 44 minutes on the development copy) and AniList's anime (what
+//!   is anime, and when the next episode airs; 13 minutes). Both change what the index should
+//!   say (people's names are indexed; AniList adds titles), so each is followed by a
+//!   catch-up. MovieLens is not fetched: nothing in the app reads it.
+//!
 //! Each step is a resumable job, done once, and skipped where it is already complete; the
-//! `ingest` CLI's `akas`, `normalise` and `search-index --trigram-core` run the same calls
-//! under the same job names, so a copy built with it is already ready.
+//! `ingest` CLI's `akas`, `credits`, `anime`, `normalise` and `search-index --trigram-core`
+//! run the same calls under the same job names, so a copy built with it is already ready.
 
 use std::path::Path;
 use std::sync::Arc;
 
+use sinephile_metadata_api::Transport;
 use sinephile_persistence::Db;
 
+use crate::imdb::Dataset;
 use crate::{Downloader, Job, JobError};
 
 /// Stage A's steps, by job name, in the order they run.
@@ -36,6 +44,12 @@ pub const AKAS: &str = "imdb-akas";
 
 /// The catch-up's job.
 pub const CATCH_UP: &str = "catalogue-catch-up";
+
+/// Cast and crew's job: after alternate titles, in the background.
+pub const CREDITS: &str = "imdb-credits";
+
+/// AniList's anime: last, in the background.
+pub const ANIME: &str = "anilist";
 
 /// The jobs that load titles: the app's refresh, or `ingest imdb` for a development copy.
 pub const LOAD: [&str; 2] = ["refresh", "imdb"];
@@ -57,6 +71,8 @@ pub fn label(step: &str) -> &'static str {
         "search-index" => "Building search",
         AKAS => "Adding alternate titles",
         CATCH_UP => "Making new titles searchable",
+        CREDITS => "Adding cast and crew",
+        ANIME => "Adding anime from AniList",
         _ => "Getting ready",
     }
 }
@@ -124,7 +140,7 @@ pub async fn catch_up_due(db: &Db) -> Result<bool, JobError> {
         return Ok(true);
     }
     let last = last_done(db, CATCH_UP).await?.unwrap_or(0);
-    for job in LOAD.into_iter().chain([AKAS]) {
+    for job in LOAD.into_iter().chain([AKAS, CREDITS, ANIME]) {
         if last_done(db, job).await?.unwrap_or(0) > last {
             return Ok(true);
         }
@@ -175,15 +191,24 @@ async fn share_of(db: &Db, part: &str, whole: &str) -> Result<f64, JobError> {
     })
 }
 
-/// Alternate titles (romaji, native, English) for the core tier: how anime and foreign
-/// films are found under the names people use. Searchable after the next catch-up.
-pub async fn akas(db: &Db, datasets: &Path) -> Result<(), JobError> {
-    let dataset = &crate::imdb::TITLE_AKAS;
+/// A dataset on disk and whole: downloaded unless it is already there, then decompressed
+/// end to end, on a blocking thread (half a gigabyte would stall the app's async workers).
+async fn fetched(datasets: &Path, dataset: &Dataset) -> Result<std::path::PathBuf, JobError> {
     let path = datasets.join(dataset.filename);
     Downloader::new()
         .fetch(&dataset.url(), &path, |_| {})
         .await?;
-    crate::download::verify_gzip(&path)?;
+    let check = path.clone();
+    tokio::task::spawn_blocking(move || crate::download::verify_gzip(&check))
+        .await
+        .map_err(|e| JobError::step(dataset.name, e.to_string()))??;
+    Ok(path)
+}
+
+/// Alternate titles (romaji, native, English) for the core tier: how anime and foreign
+/// films are found under the names people use. Searchable after the next catch-up.
+pub async fn akas(db: &Db, datasets: &Path) -> Result<(), JobError> {
+    let path = fetched(datasets, &crate::imdb::TITLE_AKAS).await?;
     let core = Arc::new(crate::credits::core_title_ids(db).await?);
     let mut job = Job::begin(db, AKAS).await?;
     if !core.is_empty() {
@@ -191,6 +216,75 @@ pub async fn akas(db: &Db, datasets: &Path) -> Result<(), JobError> {
     }
     job.finish().await?;
     Ok(())
+}
+
+/// Cast and crew for the core tier. People's names are part of the word index, so every
+/// title that gained a credit is un-marked before the job finishes, and the catch-up that
+/// follows indexes it again (a stop in between leaves the job, or the catch-up, owed).
+pub async fn credits(db: &Db, datasets: &Path) -> Result<(), JobError> {
+    let principals = fetched(datasets, &crate::imdb::TITLE_PRINCIPALS).await?;
+    let names = fetched(datasets, &crate::imdb::NAME_BASICS).await?;
+    let core = Arc::new(crate::credits::core_title_ids(db).await?);
+    let mut job = Job::begin(db, CREDITS).await?;
+    if !core.is_empty() {
+        let (path, ids) = (principals.clone(), core.clone());
+        let needed =
+            tokio::task::spawn_blocking(move || crate::credits::scan_needed_people(&path, &ids))
+                .await
+                .map_err(|e| JobError::step(CREDITS, e.to_string()))??;
+        crate::credits::load_people(&mut job, names, Arc::new(needed)).await?;
+        let people = Arc::new(crate::credits::loaded_people(db).await?);
+        crate::credits::load_credits(&mut job, principals, core, people).await?;
+    }
+    unmark_credited(db).await?;
+    job.finish().await?;
+    Ok(())
+}
+
+/// Take every title with a credit out of the word index's "done" list, so the next
+/// catch-up indexes its people's names.
+pub async fn unmark_credited(db: &Db) -> Result<u64, JobError> {
+    Ok(sqlx::query(
+        "DELETE FROM search_indexed WHERE media_item_id IN (SELECT media_item_id FROM credits)",
+    )
+    .execute(db.pool())
+    .await?
+    .rows_affected())
+}
+
+/// AniList's catalogue matched onto ours: what is anime, and the AniList ids that airing
+/// schedules need. Needs every title normalised, which stage A and the catch-up see to.
+pub async fn anime(db: &Db, transport: Arc<dyn Transport>) -> Result<(), JobError> {
+    let client = Arc::new(sinephile_metadata_api::AniList::owned(transport).await);
+    let mut job = Job::begin(db, ANIME).await?;
+    crate::anime::ingest(&mut job, client, None, None).await?;
+    job.finish().await?;
+    Ok(())
+}
+
+/// The enrichment archives and the job that must have finished before each is spare:
+/// 1.5 GB read once. A file whose loader never finished is kept, or a resumable run would
+/// become a fresh download. The refresh's own files (titles, ratings, episodes) stay.
+const SPARE: [(&str, &str); 3] = [
+    ("title.akas.tsv.gz", AKAS),
+    ("title.principals.tsv.gz", CREDITS),
+    ("name.basics.tsv.gz", CREDITS),
+];
+
+/// Delete the enrichment archives whose loaders have finished; returns the bytes freed.
+pub async fn tidy(db: &Db, datasets: &Path) -> Result<u64, JobError> {
+    let mut freed = 0;
+    for (file, job) in SPARE {
+        let path = datasets.join(file);
+        let Ok(meta) = std::fs::metadata(&path) else {
+            continue;
+        };
+        if done(db, job).await? {
+            std::fs::remove_file(&path)?;
+            freed += meta.len();
+        }
+    }
+    Ok(freed)
 }
 
 /// The normalised form of every title, which exact-title search and anime matching need.
@@ -255,14 +349,24 @@ pub struct Report {
     pub built: bool,
     /// Alternate titles loaded: the library's unmatched files are worth another look.
     pub akas: bool,
-    /// Titles that reached the word index in the catch-up.
+    /// Cast and crew loaded.
+    pub credits: bool,
+    /// AniList's anime matched.
+    pub anime: bool,
+    /// Titles that reached the word index in the catch-ups.
     pub indexed: i64,
 }
 
-/// After every refresh: whatever is left of stage A, then alternate titles if they never
-/// loaded, then the catch-up if one is due. `on_step` hears each step's name as it starts.
-/// Nothing happens until a catalogue has loaded: the refresh loads it first.
-pub async fn run(db: &Db, datasets: &Path, on_step: impl Fn(&str)) -> Result<Report, JobError> {
+/// After every refresh: whatever is left of stage A; then, each only if it never finished,
+/// alternate titles, cast and crew, and AniList's anime, each followed by the catch-up it
+/// owes. `on_step` hears each step's name as it starts. Nothing happens until a catalogue
+/// has loaded: the refresh loads it first.
+pub async fn run(
+    db: &Db,
+    datasets: &Path,
+    transport: Arc<dyn Transport>,
+    on_step: impl Fn(&str),
+) -> Result<Report, JobError> {
     let mut report = Report::default();
     if !loaded(db).await? {
         return Ok(report);
@@ -277,14 +381,26 @@ pub async fn run(db: &Db, datasets: &Path, on_step: impl Fn(&str)) -> Result<Rep
         }
         report.built = true;
     }
-    if !done(db, AKAS).await? {
-        on_step(AKAS);
-        akas(db, datasets).await?;
-        report.akas = true;
-    }
-    if catch_up_due(db).await? {
-        on_step(CATCH_UP);
-        report.indexed = catch_up(db).await?;
+    for step in [AKAS, CREDITS, ANIME] {
+        if !done(db, step).await? {
+            on_step(step);
+            match step {
+                AKAS => akas(db, datasets).await?,
+                CREDITS => credits(db, datasets).await?,
+                _ => anime(db, transport.clone()).await?,
+            }
+            match step {
+                AKAS => report.akas = true,
+                CREDITS => report.credits = true,
+                _ => report.anime = true,
+            }
+        }
+        // Each step's titles (or names) searchable before the next, longer, one starts.
+        if catch_up_due(db).await? {
+            on_step(CATCH_UP);
+            report.indexed += catch_up(db).await?;
+        }
+        tidy(db, datasets).await?;
     }
     Ok(report)
 }
@@ -331,7 +447,8 @@ mod tests {
         assert!(!loaded(&db).await.unwrap());
         assert!(!needs_stage_a(&db).await.unwrap());
         assert_eq!(percent(&db).await.unwrap(), 0);
-        let nothing = run(&db, dir.path(), |_| {}).await.unwrap();
+        let offline: Arc<dyn Transport> = Arc::new(sinephile_metadata_api::HttpTransport::new());
+        let nothing = run(&db, dir.path(), offline, |_| {}).await.unwrap();
         assert_eq!(nothing, Report::default());
 
         finish_job(&db, "refresh").await;
@@ -386,6 +503,68 @@ mod tests {
             catch_up(&db).await.unwrap(),
             0,
             "nothing new, nothing redone"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_archive_is_deleted_only_once_its_loader_has_finished() {
+        let (dir, db) = fresh().await;
+        for (file, _) in SPARE {
+            std::fs::write(dir.path().join(file), b"gz").unwrap();
+        }
+        std::fs::write(dir.path().join("title.basics.tsv.gz"), b"gz").unwrap();
+        assert_eq!(
+            tidy(&db, dir.path()).await.unwrap(),
+            0,
+            "nothing has loaded"
+        );
+        finish_job(&db, AKAS).await;
+        assert_eq!(tidy(&db, dir.path()).await.unwrap(), 2);
+        assert!(!dir.path().join("title.akas.tsv.gz").exists());
+        assert!(
+            dir.path().join("name.basics.tsv.gz").exists(),
+            "credits never finished"
+        );
+        assert!(
+            dir.path().join("title.basics.tsv.gz").exists(),
+            "the refresh's own"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_person_credited_after_the_index_becomes_searchable() {
+        let (_dir, db) = fresh().await;
+        let id = film(&db, "Paths of Glory", 1957).await;
+        finish_job(&db, "refresh").await;
+        normalise(&db).await.unwrap();
+        search_index(&db, true, true).await.unwrap();
+        catch_up(&db).await.unwrap();
+        assert_eq!(hits(&db, "kubrick").await, 0);
+
+        // What `credits` does to a title already in the index: a person, credited.
+        let person: i64 = sqlx::query_scalar(
+            "INSERT INTO people (id, name) VALUES (1, 'Stanley Kubrick') RETURNING id",
+        )
+        .fetch_one(db.pool())
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO credits (media_item_id, person_id, role, billing) VALUES (?, ?, 'director', 1)")
+            .bind(id)
+            .bind(person)
+            .execute(db.pool())
+            .await
+            .unwrap();
+        assert_eq!(unmark_credited(&db).await.unwrap(), 1);
+        finish_job(&db, CREDITS).await;
+        assert!(
+            catch_up_due(&db).await.unwrap(),
+            "cast and crew owe a catch-up"
+        );
+        assert_eq!(catch_up(&db).await.unwrap(), 1);
+        assert_eq!(
+            hits(&db, "kubrick").await,
+            1,
+            "found by its director's name"
         );
     }
 

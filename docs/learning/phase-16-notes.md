@@ -116,6 +116,7 @@ test passed. Four sections per ADR-0016 (A4).
 - **Work held back by a flag and released exactly once** (`swap(false)`) — `src-tauri/src/commands/catalogue.rs:103` `release_waiting_scans`.
 - **Polling only while something is in progress** (`refetchInterval` as a function) — `src/features/onboarding/CatalogueBuild.tsx:38`.
 - **Failing open: a status that cannot be read counts as ready** — `src/features/onboarding/CatalogueBuild.tsx:48`.
+- **Slow, synchronous work kept off the async runtime** (`tokio::task::spawn_blocking`, and the `??` that unwraps the join and then the work) — `crates/catalogue/src/bootstrap.rs` `fetched`, `credits`.
 - **Finding which window a click really lands on** (`WindowFromPoint` under a real `mouse_event`), and answering it in that window's procedure — `crates/player/src/host.rs:101` `proc`, `:105`.
 - **A double click recognised from two clicks that arrive from different places** (the native window, then the page's still frame) — `src/features/player/PlayerScreen.tsx:531` `clickPicture`.
 

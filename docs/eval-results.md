@@ -3047,3 +3047,7 @@ ended at 19:17:27; stage A ran with the library held back; the scan was released
 Files in the author's library folder matched at or above `MATCH_ACCEPTED_AT`: **0 of 200** in the installed
 database (no index), **199 of 200** after stage A. Command: `SELECT COUNT(DISTINCT local_file_id) FROM
 local_file_matches WHERE confidence >= 0.75` on each.
+The rest of that run, on 6c8d015's code: alternate titles and the catch-up finished at 19:38:34, 17 min 23 s
+after search opened; the catch-up re-indexed 880,187 titles. Afterwards `MATCH 'kyojin'` gives 62, the same
+as building alternate titles first, and no title is left without a normalised form. Job order in the copy:
+refresh, refresh-episodes, titles-normalise, search-index, imdb-akas, catalogue-catch-up, all complete.

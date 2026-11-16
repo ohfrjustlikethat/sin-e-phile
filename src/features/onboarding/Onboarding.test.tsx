@@ -18,6 +18,15 @@ const commands = {
   libraryFolders: vi.fn(() => ok([])),
   libraryReviewCount: vi.fn(() => ok(0)),
   sources: vi.fn(() => ok([])),
+  // Not a Result: the plan is pinned values, so the command cannot fail.
+  optionalAssets: vi.fn(() =>
+    Promise.resolve({
+      assets: [{ name: "Meaning index", purpose: "Describe a film.", bytes: 329_537_568, state: "absent", unusable_reason: null }],
+      outstanding_bytes: 329_537_568,
+      complete: false,
+    }),
+  ),
+  downloadOptionalAssets: vi.fn(() => ok(null)),
 };
 vi.mock("@/lib/ipc", () => ({ commands }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(() => Promise.resolve(() => undefined)) }));
@@ -50,6 +59,10 @@ describe("First run (Phase 14)", () => {
     await waitFor(() => expect(commands.updateProfile).toHaveBeenCalledWith(1, "Ada", "plum", false));
 
     expect(await screen.findByText("What do you like?")).toBeInTheDocument();
+    // The search model is offered during setup, with its size, and fetched only when asked (ADR-0014).
+    expect(await screen.findByText("Search by meaning")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Download 314 MB" })).toBeInTheDocument();
+    expect(commands.downloadOptionalAssets).not.toHaveBeenCalled();
     fireEvent.click(await screen.findByRole("button", { name: /Film 3/ }));
     await waitFor(() => expect(commands.rateTitle).toHaveBeenCalledWith(3, 4));
     // A second round asks for films not yet shown.

@@ -13,6 +13,7 @@ import { NetworkSection } from "@/features/settings/NetworkSection";
 import { TmdbSection } from "@/features/settings/TmdbSection";
 import { Settings as DownloadsSettings } from "@/features/downloads/DownloadsScreen";
 import { TitleCards } from "./TitleCards";
+import { MeaningDownload } from "@/features/search/MeaningDownload";
 import { BuildStrip, useCatalogueBuild } from "./CatalogueBuild";
 
 /**
@@ -183,6 +184,9 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
               {way === "cards" && <TitleCards />}
               {way === "words" && <TasteInput />}
               {way === "import" && <ImportHistory />}
+              {/* The author: the search model is downloaded during setup. Offered here, with its size, and
+                  started only by its button (ADR-0014); it is what "Where your taste points" ranks with. */}
+              <MeaningDownload />
             </div>
           )}
 

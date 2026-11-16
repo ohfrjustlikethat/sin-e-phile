@@ -59,7 +59,7 @@ const FAKE = `(() => {
   const answers = {
     search: (a) => searchResponse(a.query),
     search_backfill: () => ({ found: 0, added: [] }),
-    optional_assets: () => ({ missing: [], total_bytes: 0 }),
+    optional_assets: () => ({ assets: [{ name: "Meaning index", purpose: "Lets you search by describing a film.", bytes: 329537568, state: "absent", unusable_reason: null }], outstanding_bytes: 329537568, complete: false }),
     // Appendix F, I21: marked by hand, and remembered for the rest of the flow.
     // Phase 16 E3: a film with chapters, for the bumpers.
     player_chapters: () => [{ time: 0, title: "Opening" }, { time: 600, title: "The city" }, { time: 1500, title: null }],
