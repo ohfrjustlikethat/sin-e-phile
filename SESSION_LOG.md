@@ -2322,3 +2322,10 @@ domain films stream from the Internet Archive; downloading needs a torrent sourc
 and TV Shows show the library now, ahead of Phase 19's catalogue browsing; files the catalogue cannot place
 keep their own numbering (ADR-0031). Open: downloads of web streams (the Archive) are not possible; asked
 the author which controller faults they meant.
+
+**A mistake to record.** Regenerating the IPC bindings launches the debug app; run directly it opens the
+repository's `data/` folder, which is the author's own database. Twice this evening it ran for a few seconds
+there and rescanned their library with the new reading (13:10 UTC). The result is what their next launch
+would have done (Monster 74 and Samurai Champloo 26 episodes, every film placed but one, which waits for
+review), but their data was changed unasked. From now on the debug app runs with `SINEPHILE_DATA_DIR` on a
+scratch folder, and tests use a copy. Verified on a copy afterwards: a rescan leaves 0 files misfiled.
