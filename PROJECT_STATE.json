@@ -2558,7 +2558,7 @@
       ]
     }
   ],
-  "next_action": "Phase 16: build the author's 15-item plan in docs/design/author-brief-2026-11-17.md, in its order (their answers to 7 rounds of questions are there; do not re-ask). Item 1 (season packs) is done. Items 1 and 2 (season packs, direct downloads) are done. Item 3 now (the critical one): the first run's catalogue pipeline, two stages, as written in docs/design/author-brief-2026-11-17.md 'Item 3 in detail'. Start by moving the step functions from tools/ingest/src/main.rs (imdb, credits, akas, normalise, anime, episodes, movielens, search_index) into crates/catalogue/src/bootstrap.rs, the CLI calling them; then run stage A from src-tauri/src/commands/catalogue.rs keep_current when the search index is empty, with a progress event; then the library scan waiting for it. ",
+  "next_action": "Phase 16: build the author's 15-item plan in docs/design/author-brief-2026-11-17.md, in its order (their answers to 7 rounds of questions are there; do not re-ask). Item 1 (season packs) is done. Items 1 and 2 (season packs, direct downloads) are done. Items 1-4 are done: season packs (248baa9), direct downloads (15781a5), the fresh-install search index (24b545d: stage A, alternate titles after it, the catch-up; 0 -> 199 of 200 of the author's files matched) with embeddings-v3 published, and click to pause in the real window (6c8d015). Item 3's rest now: stage B enrichment after Home opens, in crates/catalogue/src/bootstrap.rs `run` after the catch-up: credits (ingest's `credits` step, for directors on cards), AniList anime (ingest's `anime`), MovieLens (ingest's `movielens`, ml-latest-small if ml-25m cannot be served), each a done-once job; and the meaning index offered during onboarding (the author: downloaded during setup) through src-tauri/src/commands/assets.rs download_optional_assets. Then item 5: full screen and maximised controls (docs/design/author-brief-2026-11-17.md). ",
   "blockers": [
     {
       "id": "B16",
@@ -3291,6 +3291,11 @@
       "id": "D87",
       "phase_raised": 16,
       "text": "Two episodes of ONE season pack downloaded at the same time share one torrent in librqbit (one info hash): the second download's Rqbit::add moves the torrent to its own folder with its own only_files, taking over the first. One at a time works (crates/downloads/tests/queue.rs one_episode_of_a_season_pack_is_all_that_is_downloaded). Fix: widen the running torrent's only_files instead (librqbit can update the selection of a managed torrent), and file each finished episode separately."
+    },
+    {
+      "id": "D88",
+      "phase_raised": 16,
+      "text": "src-tauri/src/logging.rs data_dir() is always data/ beside the exe and ignores SINEPHILE_DATA_DIR, and src-tauri/src/commands/downloads.rs puts Downloads there too; a run on a scratch data folder still logs and downloads beside the exe (seen 2026-11-17 in the end-to-end catalogue run). Logging should follow the data folder the app actually opened. Small; carried to Phase 16's close or 22."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."
