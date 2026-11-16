@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  BUTTON, FOLLOW_GRACE_MS, followAfterScroll, heldDirections, moveFocus, navAction, nearest, nearestBox,
+  adjustValue, BUTTON, FOLLOW_GRACE_MS, noteFocus, rescueFocus, heldDirections, moveFocus, navAction, nearest, nearestBox,
   nearestInRegion, newlyPressed, onScreen, playerIntent, scrollByStick, scrollSpeed, SCROLL_MAX,
   shouldRepeat, startGamepad, tiltFor, TILT_MAX, type Box, type PadFrame,
 } from "./gamepad";
@@ -301,13 +301,61 @@ describe("focus and the right stick, on a page (Phase 16)", () => {
     expect(rail.scrollLeft).toBeGreaterThan(0);
     byId("gone").remove(); // the rail drops the card a frame later
     expect(document.activeElement).toBe(document.body);
-    followAfterScroll(performance.now());
+    rescueFocus(performance.now());
     expect(document.activeElement?.id).toBe("near");
 
     // Long after the stick last moved anything, a lost focus is left where it fell.
     byId("near").remove();
-    followAfterScroll(performance.now() + FOLLOW_GRACE_MS + 1);
+    rescueFocus(performance.now() + FOLLOW_GRACE_MS + 1);
     expect(document.activeElement).toBe(document.body);
+  });
+
+  it("with the pad driving, a button that disables itself under focus hands it to its neighbour", () => {
+    document.body.innerHTML =
+      '<main><input id="path"><button id="add">Add</button><button id="far">Continue</button></main>';
+    place(byId("path"), 100, 100, 300, 40);
+    place(byId("add"), 420, 100, 80, 40);
+    place(byId("far"), 100, 600, 200, 40);
+    document.documentElement.dataset.input = "pad";
+    try {
+      byId("add").focus();
+      noteFocus();
+      // Pressed, its field cleared: it disables itself and the browser drops its focus.
+      byId("add").blur();
+      (byId("add") as HTMLButtonElement).disabled = true;
+      expect(document.activeElement).toBe(document.body);
+      rescueFocus(performance.now() + FOLLOW_GRACE_MS * 10); // long after any scrolling
+      expect(document.activeElement?.id).toBe("path");
+
+      // While a film plays the player owns the buttons, and nothing is moved.
+      document.documentElement.dataset.playing = "";
+      byId("path").blur();
+      rescueFocus(performance.now() + FOLLOW_GRACE_MS * 10);
+      expect(document.activeElement).toBe(document.body);
+    } finally {
+      delete document.documentElement.dataset.input;
+      delete document.documentElement.dataset.playing;
+    }
+  });
+
+  it("a screen that goes takes focus with it: the next screen decides where focus starts", () => {
+    document.body.innerHTML = '<main><div id="film"><button id="see">See downloads</button></div></main>';
+    place(byId("see"), 100, 800, 200, 40);
+    document.documentElement.dataset.input = "pad";
+    try {
+      byId("see").focus();
+      noteFocus();
+      // A opened the Downloads page: the film page is gone, and a select sits where the button was.
+      byId("film").remove();
+      document.querySelector("main")!.innerHTML =
+        '<div id="downloads"><button id="pause">Pause</button><select id="at-once"></select></div>';
+      place(byId("pause"), 100, 200, 100, 40);
+      place(byId("at-once"), 100, 800, 200, 40);
+      rescueFocus(performance.now());
+      expect(document.activeElement).toBe(document.body);
+    } finally {
+      delete document.documentElement.dataset.input;
+    }
   });
 
   it("scrolling a dialog keeps focus inside it, though the bar beneath is nearer", () => {
@@ -324,5 +372,44 @@ describe("focus and the right stick, on a page (Phase 16)", () => {
     byId("top").focus();
     expect(scrollByStick(0, 1, 16)).toBe(true);
     expect(document.activeElement?.id).toBe("low");
+  });
+});
+
+describe("a slider by pad (Phase 16, ADR-0041)", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("Left and Right step a focused slider and say so; Up and Down are left to move focus", () => {
+    document.body.innerHTML = '<input id="size" type="range" min="30" max="80" step="2" value="46">';
+    const size = byId("size") as HTMLInputElement;
+    const seen: string[] = [];
+    size.addEventListener("input", () => seen.push(size.value));
+    size.focus();
+    expect(adjustValue("right")).toBe("changed");
+    expect(adjustValue("right")).toBe("changed");
+    expect(adjustValue("left")).toBe("changed");
+    expect(seen).toEqual(["48", "50", "48"]);
+    expect(adjustValue("up")).toBeNull();
+    expect(adjustValue("down")).toBeNull();
+  });
+
+  it("at either end the slider holds focus and changes nothing", () => {
+    document.body.innerHTML = '<input id="h" type="range" min="0" max="10" value="10">';
+    const h = byId("h") as HTMLInputElement;
+    const changed = vi.fn();
+    h.addEventListener("input", changed);
+    h.focus();
+    expect(adjustValue("right")).toBe("end");
+    expect(changed).not.toHaveBeenCalled();
+    expect(h.value).toBe("10");
+  });
+
+  it("anything that is not a slider is left to moveFocus", () => {
+    document.body.innerHTML = '<button id="b">a</button><input id="t" type="text">';
+    byId("b").focus();
+    expect(adjustValue("right")).toBeNull();
+    byId("t").focus();
+    expect(adjustValue("left")).toBeNull();
   });
 });

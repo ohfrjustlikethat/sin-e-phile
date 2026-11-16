@@ -4,9 +4,10 @@ import { PlayerScreen } from "@/features/player/PlayerScreen";
 import { DetailScreen } from "@/features/detail/DetailScreen";
 import { useDropToPlay } from "@/features/player/useDropToPlay";
 import { sendPlayerIntent } from "@/features/player/intentBus";
-import { moveFocus, startGamepad } from "@/lib/gamepad";
+import { adjustValue, moveFocus, startGamepad } from "@/lib/gamepad";
 import { Placeholder } from "@/app/Placeholder";
 import { PadKeyboard, closePadKeyboard } from "@/app/PadKeyboard";
+import { PadPicker, closePadPicker, openPadPicker } from "@/app/PadPicker";
 import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { ReviewScreen } from "@/features/library/ReviewScreen";
 import { DownloadsScreen } from "@/features/downloads/DownloadsScreen";
@@ -114,15 +115,24 @@ export function App() {
         player: sendPlayerIntent,
         nav: (action) => {
           switch (action.kind) {
-            case "move":
-              play(moveFocus(action.direction) ? "move" : "edge");
+            case "move": {
+              // Left and Right set a focused slider rather than leave it (Phase 16).
+              const adjusted = adjustValue(action.direction);
+              if (adjusted) play(adjusted === "changed" ? "move" : "edge");
+              else play(moveFocus(action.direction) ? "move" : "edge");
               break;
-            case "activate":
+            }
+            case "activate": {
               play("select");
               rumble();
-              (document.activeElement as HTMLElement | null)?.click();
+              const el = document.activeElement;
+              // A select's own list cannot be opened from a script; the pad gets its own.
+              if (el instanceof HTMLSelectElement && openPadPicker(el)) break;
+              (el as HTMLElement | null)?.click();
               break;
+            }
             case "back":
+              if (closePadPicker()) break;
               if (closePadKeyboard()) break;
               window.dispatchEvent(
                 new KeyboardEvent("keydown", { key: "Escape" }),
@@ -295,6 +305,7 @@ export function App() {
             onOpenChange={setPalette}
           />
           <PadKeyboard />
+          <PadPicker />
           <FocusLayer />
         </div>
       )}

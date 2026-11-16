@@ -25,6 +25,12 @@ test passed. Four sections per ADR-0016 (A4).
 - **Three controller bugs the audit found once it looked**: the right stick could not move a rail
   (scroll snapping undid every step), focus was lost when a rail unmounted the focused card, and Down
   at the foot of a dialog left it.
+- **A first run filled in by pad alone** (E7), which found four more: a pad could not change any
+  select (A "clicked" it, and a click from a script does not open its list) or any slider (Left and
+  Right moved off it); a button that disabled itself once pressed dropped focus onto the page; and a
+  long step's last fields sat half under the sticky footer, where Down could not leave them.
+- **How long a finished scan takes to show on Home** (E6): 38 ms for 200 films, measured in the real
+  app on a copy of the catalogue.
 
 ## 2. Why
 
@@ -50,9 +56,9 @@ test passed. Four sections per ADR-0016 (A4).
 - **Window regions with holes** (`CombineRgn` with `RGN_DIFF`, `SetWindowRgn`) — `crates/player/src/host.rs:22`; holes from `data-cutout` — `src/features/player/PlayerScreen.tsx:261`.
 - **Dead-reckoning between reports, capped** — `src/features/player/intents.ts:199` `glide`, cap `:191`.
 - **A dead zone and a squared response curve** — `src/lib/gamepad.ts:54` `scrollSpeed`.
-- **Focus following scrolled content** — `src/lib/gamepad.ts:63` `nearestBox`, `:380` `scrollByStick`.
+- **Focus following scrolled content** — `src/lib/gamepad.ts:63` `nearestBox`, `:413` `scrollByStick`.
 - **Key repeat: delay, then rate** (hold to scrub) — `src/lib/gamepad.ts:272` `shouldRepeat`.
-- **Letting an open menu claim the buttons** — `src/lib/gamepad.ts:510` `claimButtons`.
+- **Letting an open menu claim the buttons** — `src/lib/gamepad.ts:571` `claimButtons`.
 - **One mapping table per device onto shared intents** — `src/lib/gamepad.ts:115` `playerIntent`.
 - **Reading meaning from the folder path** — `crates/library/src/folders.rs:96` `hint`, `:15` `season_of`, `:81` `is_extra`.
 - **HTTP validators (ETag / Last-Modified) to skip work** — `crates/catalogue/src/freshness.rs:74` `check`, `:254` `current_validator`.
@@ -63,10 +69,16 @@ test passed. Four sections per ADR-0016 (A4).
 - **A layout check with a control that must fail** — `src/lib/layoutCheck.ts:7`.
 - **mpv's picture properties: aspect override, panscan, zoom as a power of two** — `crates/player/src/player.rs:676` `framing`.
 - **Chapter navigation with a "restart this one first" threshold** — `src/features/player/intents.ts:217` `chapterTarget`.
-- **Focus trapped in a dialog, preferred in a region** — `src/lib/gamepad.ts:297` `moveFocus` (`trapped`, `:308`); the follow too, `:454`.
-- **CSS scroll snapping fighting a programmatic scroll, and suspending it** — `src/lib/gamepad.ts:362` `suspendSnap`, `:370` `releaseSnap`.
-- **Virtualisation unmounting the focused element; a grace period to recover** — `src/lib/gamepad.ts:469` `followAfterScroll`, `:418` `FOLLOW_GRACE_MS`.
-- **"Visible" meaning clipped by every scrolling ancestor, not just inside the window** — `src/lib/gamepad.ts:432` `onScreen`.
+- **Focus trapped in a dialog, preferred in a region** — `src/lib/gamepad.ts:297` `moveFocus` (`trapped`, `:308`); the follow too, `:508`.
+- **CSS scroll snapping fighting a programmatic scroll, and suspending it** — `src/lib/gamepad.ts:395` `suspendSnap`, `:403` `releaseSnap`.
+- **Focus that falls to the page, put back near where it was** (a card unmounted, a button disabled, a form replaced) — `src/lib/gamepad.ts:527` `rescueFocus`, `:448` `noteFocus`, `:472` `FOLLOW_GRACE_MS`.
+- **Telling a control that went from a screen that went** (the nearest surviving ancestor) — `src/lib/gamepad.ts:465` `wentWithItsScreen`.
+- **"Visible" meaning clipped by every scrolling ancestor, not just inside the window** — `src/lib/gamepad.ts:486` `onScreen`.
+- **Setting a React-controlled input from outside React** (the prototype's value setter, then the event) — `src/lib/gamepad.ts:331` `setControlValue`.
+- **A native select a pad cannot open, and a list that stands in for it** — `src/app/PadPicker.tsx:36` `PadPicker`, opened from `src/app/App.tsx:130`.
+- **A slider stepped by Left and Right instead of being left** — `src/lib/gamepad.ts:344` `adjustValue`, `src/app/App.tsx:120`.
+- **`scroll-padding` keeping focus clear of a sticky footer** (`scrollIntoView` honours it) — `src/features/onboarding/Onboarding.tsx:111`.
+- **Timing across an event in the page's own clock** (scan done to the rail drawn) — `src/features/player/useDropToPlay.ts` `probe`.
 - **One SQL statement per scope, chosen by an enum** — `crates/persistence/src/repositories/profiles.rs:523` `set_watched`, `:62` `WatchScope`.
 - **A transaction around a write and its cleanup** — `crates/persistence/src/repositories/profiles.rs:544` (`begin` / `commit`).
 - **Invalidating several cached queries after one change** — `src/features/detail/Watched.tsx:20` `useSetWatched`.

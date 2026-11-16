@@ -322,6 +322,39 @@ export function moveFocus(direction: Direction): boolean {
   return true;
 }
 
+/**
+ * Set a form control's value as a person would, so React's `onChange` runs: through the
+ * prototype's setter, because React tracks an input's value through the element's own setter
+ * and ignores an event when that says nothing changed; then the event React listens for
+ * (`input` for a slider, `change` for a select).
+ */
+export function setControlValue(el: HTMLInputElement | HTMLSelectElement, value: string): void {
+  const proto = el instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, value);
+  el.dispatchEvent(new Event(el instanceof HTMLSelectElement ? "change" : "input", { bubbles: true }));
+}
+
+/**
+ * Left and Right on a focused slider change its value by one step, as the arrow keys do
+ * (Phase 16, ADR-0041): the D-pad moved focus off it instead, so a slider could not be set
+ * by pad at all. Up and Down still move between controls. Returns `"changed"`, `"end"` (at
+ * its minimum or maximum: focus stays, nothing changes), or `null` when there is no slider
+ * to adjust and focus should move.
+ */
+export function adjustValue(direction: Direction): "changed" | "end" | null {
+  const el = document.activeElement;
+  if (!(el instanceof HTMLInputElement) || el.type !== "range") return null;
+  if (direction !== "left" && direction !== "right") return null;
+  const step = Number(el.step) || 1;
+  const min = el.min === "" ? 0 : Number(el.min);
+  const max = el.max === "" ? 100 : Number(el.max);
+  const now = Number(el.value);
+  const next = Math.min(max, Math.max(min, now + (direction === "right" ? step : -step)));
+  if (next === now) return "end";
+  setControlValue(el, String(next));
+  return "changed";
+}
+
 /** Whether `el` scrolls along an axis: it overflows, and its style lets it. */
 function scrolls(el: Element, vertical: boolean): boolean {
   const style = getComputedStyle(el);
@@ -378,11 +411,7 @@ export function releaseSnap(): void {
  * D-pad press starts from what is on screen.
  */
 export function scrollByStick(x: number, y: number, dtMs: number): boolean {
-  const had = document.activeElement as HTMLElement | null;
-  if (had && had !== document.body && had.isConnected) {
-    lastFocusBox = box(had);
-    lastFocusRegion = region(had);
-  }
+  noteFocus();
   const dy = (scrollSpeed(y) * dtMs) / 1000;
   const dx = (scrollSpeed(x) * dtMs) / 1000;
   let moved = false;
@@ -409,12 +438,37 @@ export function scrollByStick(x: number, y: number, dtMs: number): boolean {
   return moved;
 }
 
-/** Where focus was when the stick last moved something, for when the element is gone. */
+/** Where focus last was, for when the element holding it is gone. */
 let lastFocusBox: Box | null = null;
 let lastFocusRegion: Element | null = null;
+/** The element that last held focus, and everything it sat in, nearest first. */
+let lastFocusChain: Element[] = [];
+
+/** Remember where focus is, while it is somewhere. */
+export function noteFocus(): void {
+  const el = document.activeElement;
+  if (!el || el === document.body || !el.isConnected) return;
+  lastFocusBox = box(el);
+  lastFocusRegion = region(el);
+  if (lastFocusChain[0] !== el) {
+    lastFocusChain = [];
+    for (let p: Element | null = el; p; p = p.parentElement) lastFocusChain.push(p);
+  }
+}
+
+/**
+ * Whether what held focus went with its whole screen: nothing it sat in is left on the page
+ * below the main area or the masthead. A button that disabled itself, a form replaced by
+ * what it saved, a card a rail dropped: each leaves its section behind. Opening another
+ * screen does not, and that screen decides where focus starts.
+ */
+function wentWithItsScreen(): boolean {
+  const left = lastFocusChain.find((el) => el.isConnected);
+  return !left || left.matches("main, header, body, html");
+}
 /** When the stick last moved something (ms, `performance.now`). */
 let lastScrollAt = -Infinity;
-/** How long after the stick stops a lost focus is still the stick's doing. */
+/** With the mouse, how long after the stick stops a lost focus is still the stick's doing. */
 export const FOLLOW_GRACE_MS = 600;
 
 // A virtualised rail unmounts the card that held focus once it scrolls away, and focus
@@ -461,13 +515,20 @@ function followFocus(): void {
 }
 
 /**
- * The stick is at rest. A rail re-renders a frame or two after its last scroll and only
- * then unmounts the card that had focus; within `FOLLOW_GRACE_MS` of the stick moving
- * something, a focus lost that way is put back. Later, a lost focus is someone else's
- * (a click on the page), and is left alone.
+ * Focus that fell to the page is put back near where it was (Phase 16). It falls when the
+ * element holding it goes: a virtualised rail drops a card a frame or two after the stick
+ * scrolled it away; a button disables itself once pressed ("Add", its field cleared); a
+ * form gives way to what it saved ("Save key" becomes "Your key is saved"). With the pad
+ * driving, focus on the page itself is never wanted: the D-pad has nowhere to start from.
+ * Otherwise it is left alone (a click put it there), except within `FOLLOW_GRACE_MS` of
+ * the stick moving something. Never while a film plays, where the player owns the buttons,
+ * and never when a whole screen went (`wentWithItsScreen`).
  */
-export function followAfterScroll(now: number): void {
-  if (now - lastScrollAt > FOLLOW_GRACE_MS || !focusLost()) return;
+export function rescueFocus(now: number): void {
+  if (!focusLost() || document.documentElement.dataset["playing"] !== undefined) return;
+  if (wentWithItsScreen()) return;
+  const padDriving = document.documentElement.dataset["input"] === "pad";
+  if (!padDriving && now - lastScrollAt > FOLLOW_GRACE_MS) return;
   followFocus();
 }
 
@@ -563,7 +624,8 @@ export function startGamepad(handlers: GamepadHandlers): () => void {
       if (scrolling) scrollByStick(rx, ry, Math.min(50, lastTick ? now - lastTick : 16));
       else {
         releaseSnap();
-        followAfterScroll(now);
+        rescueFocus(now);
+        noteFocus();
       }
       for (const b of pressed) {
         // Something on screen may own a button outright: the on-screen keyboard's X, Y,

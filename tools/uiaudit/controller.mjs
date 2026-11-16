@@ -81,12 +81,27 @@ const FAKE = `(() => {
       qualities: ["full_hd", "hd"], unmet: null, why: "1080p · served directly", candidates: [] }),
     player_pause_still: () => "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
     dev_autoplay: () => null,
-    library_folders: () => [],
-    // Appendix F, I38: a fresh install, as the "Finish setting up" card reads it.
+    // Phase 16 E7: a fresh install, then what the first run sets up by pad, remembered for the
+    // rest of the flow (and read by Appendix F I38's "Finish setting up" card).
+    library_folders: () => window.__folders,
+    add_library_folder: (a) => {
+      window.__folders.push({ id: window.__folders.length + 1, path: a.path, files: 0, scanned_at: null, scanning: true });
+      return window.__folders.length;
+    },
+    addon_preview: (a) => ({ pasted: a.url, backend_id: "example-films", name: "Example Films", version: "1.0.0",
+      description: "Films from an example source.", finds: "Finds films and episodes.", delivers: ["Streams"],
+      host: "a.example", homepage: null, replaces: false }),
+    addon_install: (a) => { window.__addon = a.pasted; return "example-films"; },
     sources_overview: () => ({ sources: [{ id: "archive", name: "Internet Archive", blurb: "Public-domain films.",
-      addon_host: null, enabled: true, health: "Answering", last_error: null }], refused_addons: [] }),
+      addon_host: null, enabled: true, health: "Answering", last_error: null },
+      ...(window.__addon ? [{ id: "example-films", name: "Example Films", blurb: "Films from an example source.",
+        addon_host: "a.example", enabled: true, health: "Answering", last_error: null }] : [])], refused_addons: [] }),
     torrent_settings: () => ({ download_limit_kib: null, upload_limit_kib: null, peer_limit: 200, keep_seeding: false,
-      bind_interface: null, adapters: [], engine_running: false }),
+      bind_interface: window.__adapter ?? null, adapters: [{ name: "Ethernet", connected: true },
+        { name: "VPN tunnel", connected: true }], engine_running: false }),
+    set_torrent_settings: (a) => { window.__adapter = a.bindInterface; return null; },
+    set_opensubtitles_key: (a) => { window.__osKey = a.key; return null; },
+    set_tmdb_key: (a) => { window.__tmdbKey = a.key; return null; },
     // Phase 12 E5: twenty files waiting, answered by pad alone further down.
     library_review_count: () => window.__review.length,
     library_review: () => window.__review,
@@ -152,18 +167,19 @@ const FAKE = `(() => {
     ],
     subtitle_choose: () => "aligned: offset +1200 ms",
     set_subtitle_settings: () => null,
-    tmdb_status: () => ({ has_key: false, fetched_on: null }),
+    tmdb_status: () => ({ has_key: !!window.__tmdbKey, fetched_on: null }),
     // Phase 16: the catalogue keeps itself current.
     catalogue_status: () => ({ refreshed_at: "2026-11-08T06:21:10Z", titles_added: 885, episodes_added: 7951,
       running: false }),
     refresh_catalogue: () => true,
     subtitle_settings: () => ({ settings: { languages: ["en"], always: false, font: "Segoe UI", size: 46,
-      position: 95, background: false }, has_key: false, used_today: 0, budget: 5, server_remaining: null }),
+      position: 95, background: false }, has_key: !!window.__osKey, used_today: 0, budget: 5, server_remaining: null }),
   };
   let nextId = 1;
   window.__calls = [];
   window.__downloads = [];
   window.__onboarded = false;
+  window.__folders = [];
   window.__corrections = {};
   window.__profiles = [
     { id: 1, name: "Jon", is_default: true, avatar_colour: "slate", is_kids: false, has_pin: true, active: true },
@@ -465,21 +481,99 @@ const steerTo = async (label) => {
   throw new Error(`the D-pad could not reach ${label}`);
 };
 
+/**
+ * One press toward a goal, as a thumb would: up or down while it lies above or below, else
+ * across. And across when the last vertical press found nothing that way, or came back to
+ * somewhere already passed: Down from the right of a row takes the nearest thing below
+ * there (the footer), Up comes back, and a goal at the far left is never reached that way.
+ */
+const towards = async (dx, dy, state) => {
+  const vertical = Math.abs(dy) > 8 && !(state.stuck && Math.abs(dx) > 8);
+  await evalJs(`void (window.__before = document.activeElement)`);
+  const b = vertical ? (dy > 0 ? B.DOWN : B.UP) : (dx > 0 ? B.RIGHT : B.LEFT);
+  await press(b);
+  state.stuck = vertical && (await evalJs(`(() => { const a = document.activeElement;
+    const again = a === window.__before || window.__passed.has(a); window.__passed.add(a); return again; })()`));
+  // STEER=1 traces every press, for when a step cannot reach its goal.
+  if (process.env.STEER) console.log(`    steer ${Object.keys(B).find((k) => B[k] === b)} (dx ${Math.round(dx)}, dy ${Math.round(dy)})`
+    + ` -> ${JSON.stringify(await active())}${state.stuck ? " (stuck)" : ""}`);
+};
+
 /** Steer the D-pad to the button labelled `label` (its aria-label or text). */
 const steerToButton = async (label) => {
+  const state = { stuck: false };
+  await evalJs(`void (window.__passed = new Set([document.activeElement]))`);
   for (let i = 0; i < 24; i++) {
     const a = await active();
     if (a?.text === label) return;
     const goal = await evalJs(`(() => { const b = [...document.querySelectorAll('button')].find((x) =>
       (x.getAttribute("aria-label") || x.textContent || "").trim() === ${JSON.stringify(label)}); if (!b) return null;
       const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
-    if (!goal || !a) throw new Error(`no button ${label}`);
-    const dx = goal.x - a.x;
-    const dy = goal.y - a.y;
-    if (Math.abs(dy) > 8) await press(dy > 0 ? B.DOWN : B.UP);
-    else await press(dx > 0 ? B.RIGHT : B.LEFT);
+    if (!goal || !a) throw new Error(`no button ${label}${a ? "" : " (nothing has focus)"}`);
+    await towards(goal.x - a.x, goal.y - a.y, state);
   }
-  throw new Error(`the D-pad could not reach ${label}`);
+  const where = await evalJs(`(() => { const a = document.activeElement; const r = a.getBoundingClientRect();
+    const l = a.id && document.querySelector('label[for="' + a.id + '"]');
+    const b = [...document.querySelectorAll('button')].find((x) => (x.getAttribute("aria-label") || x.textContent || "").trim()
+      === ${JSON.stringify(label)}); const g = b?.getBoundingClientRect();
+    return a.tagName + ' "' + ((l && l.textContent.trim()) || a.textContent.trim()) + '" at ' + Math.round(r.x) + "," + Math.round(r.y)
+      + " " + Math.round(r.width) + "x" + Math.round(r.height) + "; the goal at " + (g ? Math.round(g.x) + "," + Math.round(g.y) : "none")
+      + " in a window " + innerWidth + "x" + innerHeight; })()`);
+  throw new Error(`the D-pad could not reach ${label}; focus stayed on ${where}`);
+};
+
+/** A page expression for the form control whose <label> reads `label`. */
+const fieldByLabel = (label) => `(() => { const l = [...document.querySelectorAll("label")]
+  .find((x) => x.textContent.trim() === ${JSON.stringify(label)}); return l ? document.getElementById(l.htmlFor) : null; })`;
+
+/** Steer the D-pad to whatever the page expression `find` returns. */
+const steerToEl = async (find, what) => {
+  const state = { stuck: false };
+  await evalJs(`void (window.__passed = new Set([document.activeElement]))`);
+  for (let i = 0; i < 40; i++) {
+    const at = await evalJs(`(() => { const el = ${find}(); if (!el) return null; const a = document.activeElement;
+      const r = el.getBoundingClientRect(); const f = a && a !== document.body ? a.getBoundingClientRect() : null;
+      return { here: a === el, gx: r.x + r.width / 2, gy: r.y + r.height / 2,
+        ax: f ? f.x + f.width / 2 : 0, ay: f ? f.y + f.height / 2 : 0 }; })()`);
+    if (!at) throw new Error(`no ${what}`);
+    if (at.here) return;
+    await towards(at.gx - at.ax, at.gy - at.ay, state);
+  }
+  const where = await evalJs(`(() => { const a = document.activeElement; const r = a.getBoundingClientRect();
+    const g = ${find}()?.getBoundingClientRect(); return a.tagName + ' "' + (a.getAttribute("aria-label") || a.textContent).trim()
+      .slice(0, 40) + '" at ' + Math.round(r.x) + "," + Math.round(r.y) + "; the goal at " + (g ? Math.round(g.x) + ","
+      + Math.round(g.y) + " " + Math.round(g.width) + "x" + Math.round(g.height) : "none") + " in " + innerWidth + "x" + innerHeight; })()`);
+  throw new Error(`the D-pad could not reach ${what}; focus stayed on ${where}`);
+};
+
+/** The on-screen keyboard's pages (src/app/keyboardText.ts), and the one showing now. */
+const KEY_PAGES = ["abcdefghijklmnopqrstuvwxyz1234567890", "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+  ".,-_@:/'!?&+#()*=%$\"~;[]{}<>|\\^`"];
+const keyPage = async () => {
+  // The page key is labelled with the page it leads to.
+  const next = await evalJs(`document.querySelector('[aria-label^="Keys: "]')?.getAttribute("aria-label").slice(6)`);
+  return (["abc", "ABC", "#+="].indexOf(next) + 2) % 3;
+};
+
+/** Type `text` on the open on-screen keyboard as a thumb would: RB for the page, the D-pad, A. */
+const typeOnPad = async (text) => {
+  for (const ch of text) {
+    const want = KEY_PAGES.findIndex((p) => p.includes(ch));
+    for (let i = 0; i < 3 && (await keyPage()) !== want; i++) await press(B.RB);
+    await steerTo(ch);
+    await press(B.A);
+  }
+};
+
+/** Phase 16 E7: a field filled by pad: the D-pad to it, A for the keyboard, the keys, Menu. */
+const fillByPad = async (label, text) => {
+  await steerToEl(fieldByLabel(label), `the "${label}" field`);
+  await press(B.A);
+  await waitFor(() => evalJs(`!!document.querySelector('[aria-label="On-screen keyboard"]')`), "the keyboard", 20);
+  await typeOnPad(text);
+  await press(B.MENU);
+  await waitFor(() => evalJs(`!document.querySelector('[aria-label="On-screen keyboard"]')`), "the keyboard to close", 20);
+  return evalJs(`${fieldByLabel(label)}()?.value`);
 };
 
 // ── the flow ────────────────────────────────────────────────────────────────
@@ -499,6 +593,68 @@ try {
   await shoot("00b-title-cards");
   await steerToButton("Continue");
   await press(B.A);
+  // Phase 16 E7: each step filled in by pad alone, and each says it took: a folder typed in,
+  // an add-on chosen by its address (checked, then added), both keys checked as they are
+  // saved, and downloads bound to the VPN's adapter from its list.
+  const PATH = "d:\\films";
+  const ADDRESS = "https://a.example/m.json";
+  const ADAPTER = fieldByLabel("Use only this network adapter");
+  const FILLED_BY_PAD = {
+    "Your films on this PC": async () => {
+      const typed = await fillByPad("Or type its path", PATH);
+      await steerToButton("Add");
+      await press(B.A);
+      await waitFor(async () => (await calls("add_library_folder")).length === 1, "the folder to be added", 25);
+      await waitFor(() => evalJs(`[...document.querySelectorAll("p")].some((p) => p.title === ${JSON.stringify(PATH)})`),
+        "the folder in the list", 25);
+      check(typed === PATH && (await calls("add_library_folder"))[0].path === PATH,
+        `first run, by pad: a library folder typed and added (${typed})`);
+    },
+    "Where films come from": async () => {
+      const typed = await fillByPad("Source address", ADDRESS);
+      await steerToButton("Look at it");
+      await press(B.A);
+      await waitFor(() => evalJs(`!!document.querySelector('[aria-label="About Example Films"]')`), "what the add-on declares", 25);
+      await steerToButton("Add source");
+      await press(B.A);
+      await waitFor(() => evalJs(`document.body.textContent.includes("Example Films was added and is on.")`), "the add-on added", 25);
+      check(typed === ADDRESS && (await calls("addon_install"))[0]?.pasted === ADDRESS,
+        `first run, by pad: an add-on chosen by its address, looked at, then added (${typed})`);
+    },
+    Subtitles: async () => {
+      await fillByPad("API key", "k3y");
+      await steerToButton("Save key");
+      await press(B.A);
+      await waitFor(() => evalJs(`document.body.textContent.includes("Your key is saved.")`), "the OpenSubtitles key saved", 25);
+      check((await calls("set_opensubtitles_key"))[0]?.key === "k3y", "first run, by pad: an OpenSubtitles key typed, checked and saved");
+    },
+    "What's showing now": async () => {
+      await fillByPad("TMDB API key", "t9");
+      await steerToButton("Save key");
+      await press(B.A);
+      await waitFor(() => evalJs(`document.querySelector('section[aria-label="TMDB"]')?.textContent.includes("Your key is saved.")`),
+        "the TMDB key saved", 25);
+      check((await calls("set_tmdb_key"))[0]?.key === "t9", "first run, by pad: a TMDB key typed, checked and saved");
+    },
+    Downloads: async () => {
+      await steerToEl(ADAPTER, "the network adapter");
+      await press(B.A);
+      const list = `document.querySelector('[role="dialog"][aria-label="Use only this network adapter"]')`;
+      await waitFor(() => evalJs(`!!${list}`), "the adapter list", 20);
+      check((await active())?.text.startsWith("Any connection"), "A on a list (the network adapter) opens it by pad, focus on the current choice");
+      await steerToButton("VPN tunnel");
+      await press(B.A);
+      check((await evalJs(`${ADAPTER}().value`)) === "VPN tunnel" && !(await evalJs(`!!${list}`)) &&
+        (await evalJs(`document.activeElement === ${ADAPTER}()`)), "A chooses the VPN's adapter; the list closes, focus back on it");
+      await steerToEl(`(() => [...document.querySelectorAll('section[aria-label="Network"] button')]
+        .find((b) => b.textContent.trim() === "Save"))`, "Network's Save");
+      await press(B.A);
+      await waitFor(async () => (await calls("set_torrent_settings")).length === 1, "the network settings saved", 25);
+      check((await calls("set_torrent_settings"))[0].bindInterface === "VPN tunnel" &&
+        (await evalJs(`document.querySelector('section[aria-label="Network"]').textContent.includes("Saved.")`)),
+        "first run, by pad: downloads bound to the VPN's adapter, and saved");
+    },
+  };
   // Phase 16: four steps that leave the viewer ready to watch, each moved through by pad.
   for (const [title, check_] of [
     ["Your films on this PC", "Add a folder"],
@@ -510,6 +666,7 @@ try {
     await waitFor(() => evalJs(`[...document.querySelectorAll("h1")].some((h) => h.textContent === ${JSON.stringify(title)})`), title, 25);
     check(await evalJs(`document.body.textContent.includes(${JSON.stringify(check_)})`), `first run: "${title}" says what it is for`);
     await layoutAtSizes(`first run, "${title}"`);
+    await (FILLED_BY_PAD[title] ?? (async () => {}))();
     if (title !== "Downloads") {
       await steerToButton("Continue");
       await press(B.A);
@@ -544,9 +701,11 @@ try {
   check(await evalJs(`!!document.querySelector('[aria-label="Jon: switch profile"]')`), "the masthead shows who is watching");
   await shoot("01-home");
   await layoutAtSizes("Home");
-  // Appendix F, I38: a fresh install is told what is left, and a line opens its setting.
-  check(await evalJs(`document.querySelector('section[aria-label="Finish setting up"]')?.textContent.includes("0 of 4 done")`),
-    "Home says what is left to set up (0 of 4 done)");
+  // Appendix F, I38, after E7: the first run set everything up by pad, so Home has nothing
+  // left to ask for. (A fresh install's card, "0 of 4 done", is src/features/home tests'.)
+  check(!(await evalJs(`!!document.querySelector('section[aria-label="Finish setting up"]')`)) &&
+    (await calls("library_folders")).length > 0 && (await calls("torrent_settings")).length > 0,
+    "after a first run that set everything up by pad, Home has nothing left to set up");
   // Phase 16 E3: the right stick scrolls a long rail sideways, and focus follows into view.
   const inRail = () => evalJs(`!!document.activeElement?.closest('section[aria-label="For you"]')`);
   for (let i = 0; i < 14 && !(await inRail()); i++) await press(B.DOWN);
@@ -866,6 +1025,7 @@ try {
   for (let i = 0; i < 12 && !onPause; i++) {
     await press(B.DOWN);
     onPause = (await active())?.text === "Pause";
+    if (process.env.STEER) console.log(`    down -> ${JSON.stringify(await active())}`);
   }
   check(onPause, "the D-pad reaches Pause");
   await press(B.A);
@@ -888,12 +1048,13 @@ try {
   await layoutAtSizes("Watchlist");
 
   // ADR-0043 (Phase 11 E6): every text field, not just search. Menu opens Settings, the
-  // D-pad walks down to the OpenSubtitles key, and the pad types a key with upper case.
+  // D-pad walks down past the library's path field to the add-on catalogue's address, and
+  // the pad types with upper case. (The OpenSubtitles key this used to type into is saved
+  // by the first run now, so its field has gone: Phase 16 E7.)
+  const FIELD = "Or browse a catalogue";
   await press(B.MENU);
   await waitFor(() => evalJs(`document.body.textContent.includes("OpenSubtitles")`), "Settings", 25);
-  const onKeyField = () =>
-    evalJs(`(() => { const l = [...document.querySelectorAll("label")].find((x) => x.textContent.trim() === "API key");
-      return !!l && document.activeElement === document.getElementById(l.htmlFor); })()`);
+  const onKeyField = () => evalJs(`document.activeElement === ${fieldByLabel(FIELD)}()`);
   let onField = false;
   let popped = false;
   for (let i = 0; i < 80 && !onField; i++) {
@@ -901,7 +1062,7 @@ try {
     popped ||= await evalJs(`!!document.querySelector('[aria-label="On-screen keyboard"]')`);
     onField = await onKeyField();
   }
-  check(onField && !popped, "the D-pad walks Settings to the API key field without a keyboard popping up on the way");
+  check(onField && !popped, "the D-pad walks Settings to a text field below others without a keyboard popping up on the way");
   await press(B.A);
   await waitFor(() => evalJs(`!!document.querySelector('[aria-label="On-screen keyboard"]')`), "the keyboard", 20);
   check(true, "A on the field opens the keyboard");
@@ -915,9 +1076,8 @@ try {
   await press(B.A);
   await press(B.A); // "99"
   await press(B.X); // X deletes
-  const key = await evalJs(`(() => { const l = [...document.querySelectorAll("label")].find((x) => x.textContent.trim() === "API key");
-    return document.getElementById(l.htmlFor).value; })()`);
-  check(key === "Ab9", `typed a key with case using the bumpers, and X deleted: "${key}"`);
+  const key = await evalJs(`${fieldByLabel(FIELD)}().value`);
+  check(key === "Ab9", `typed with case using the bumpers, and X deleted: "${key}"`);
   await shoot("07b-api-key");
   await press(B.MENU); // Menu is Done
   await waitFor(() => evalJs(`!document.querySelector('[aria-label="On-screen keyboard"]')`), "the keyboard to close", 20);

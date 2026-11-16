@@ -48,6 +48,14 @@ volume down under an open menu). **A dialog holds the D-pad**: from a control in
 focus only moves to another control in the same dialog (`moveFocus`); before, Down at the foot of the
 player's panel left it for the bar beneath.
 
+**Selects and sliders by pad** (ADR-0041). The app's selects are native `<select>`s; a pad's A clicks
+the focused element, and a click from a script does not open a select's list, so no select could be
+changed by pad. With a pad, A on a select opens `PadPicker` (`src/app/PadPicker.tsx`): its options as a
+list in a dialog, focus on the current one, the D-pad moves, A chooses, B leaves unchanged; the select is
+then set as a person choosing would set it (`setControlValue`), so its own `onChange` runs, and focus
+returns to it. Left and Right on a focused slider step its value (`adjustValue`), as the arrow keys do;
+at either end focus stays and nothing changes. Up and Down still move between controls.
+
 **Chapters** (`intents.ts` `chapterTarget`): with no episode either side, RB goes to the next chapter's
 start and LB to the start of the one playing, or to the one before when it began under
 `CHAPTER_BACK_S` (3 s) ago, as every player's "previous" does. Each jump is said on screen
@@ -69,10 +77,15 @@ rail, the paused film's details — falling back to the nearest scrollable ances
   pixels a frame each snapped back to where they started, so the stick could not move a rail at all.
   The element's snap is switched off while the stick moves it and restored at rest, when the rail
   settles on the nearest card.
-- **A card unmounted under focus**: a virtualised rail removes the card that held focus once it has
-  scrolled away, and it does so a frame or two after the stick's last movement. For `FOLLOW_GRACE_MS`
-  (600 ms) after the stick moved something, focus found on the page itself is put back near where it
-  was; after that, a lost focus is someone else's (a click) and is left alone.
+- **Focus that falls to the page** (`rescueFocus`): it falls when the element holding it goes — a
+  virtualised rail drops the focused card a frame or two after the stick scrolled it away; a button
+  disables itself once pressed ("Add", its field cleared); a form gives way to what it saved ("Save
+  key" becomes "Your key is saved"). With the pad driving, focus is put back on the control on screen
+  nearest where it was (within its dialog, if it was in one), because the D-pad has nowhere to start
+  from the page itself. With the mouse it is left alone (a click put it there), except within
+  `FOLLOW_GRACE_MS` (600 ms) of the stick moving something. Never while a film plays (the player owns
+  the buttons), and never when the whole screen went (`wentWithItsScreen`: nothing the element sat in
+  survives below `main` or the masthead), since the next screen decides where focus starts.
 
 ## 4. Subtitles in the player
 
@@ -106,7 +119,10 @@ dead end: who it is for → what you like → your films on this PC (the scan st
 come from (add-ons **by address**, checked live; the app suggests none, `SPEC.md` §2.1) → subtitles
 (OpenSubtitles key, link and live test) → what's showing now (TMDB key, link and live test) → downloads
 (built-in engine or the user's own qBittorrent, with the VPN adapter check). Pad: D-pad moves, A chooses,
-B goes back a step. Wherever play or download would be and no source is configured, the app says so in
+B goes back a step. Every field is filled by the TV keyboard and the adapter chosen from `PadPicker`.
+The footer stays on screen as a step scrolls, so the wizard's scroller carries `scroll-padding-bottom`
+(`scroll-pb-32`): `scrollIntoView` then keeps the focused control clear of it. Without it a long step's
+last fields sat half under the footer, and Down from them found nothing below. Wherever play or download would be and no source is configured, the app says so in
 plain words instead of offering a button that does nothing.
 
 ## 7. Watched, saved, and what is left to set up (Appendix F, ADR-0046)
@@ -136,8 +152,9 @@ query sees.
 
 ## 9. Testing it
 
-- `node tools/uiaudit/controller.mjs` — the pad flow against the built app with a fake backend: first run,
-  Home's setup card, search, film page (mark watched, watchlist), player (Y and X quick menus, the
+- `node tools/uiaudit/controller.mjs` — the pad flow against the built app with a fake backend: first run
+  filled in by pad (a folder path, an add-on address, both keys typed on the TV keyboard; the VPN's adapter
+  from its list; each step saying it took), then Home with nothing left to set up, search, film page (mark watched, watchlist), player (Y and X quick menus, the
   bumpers by chapter, seek and hold-to-scrub, every panel control by D-pad), the right stick on a long
   rail, the panel, the paused details and Settings, the Watchlist tab, layout. The fake backend can
   send events (`__emit`), so the player's reports arrive as the real backend's do.

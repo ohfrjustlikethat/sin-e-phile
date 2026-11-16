@@ -105,7 +105,10 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       role="dialog"
       aria-modal="true"
       aria-label="Setting up sin·e·phile"
-      className="fixed inset-0 z-50 overflow-auto bg-base text-ink"
+      // The footer stays on screen as the step scrolls, so whatever takes focus is kept clear
+      // of it (Phase 16): without this a long step put its last fields half under the footer,
+      // and the D-pad, finding nothing below them, could not reach Continue.
+      className="fixed inset-0 z-50 scroll-pb-32 overflow-auto bg-base text-ink"
     >
       <div className="mx-auto flex min-h-full max-w-[880px] flex-col px-10 py-14">
         <p className="label" aria-label={`Step ${step + 1} of ${STEPS.length}`}>
