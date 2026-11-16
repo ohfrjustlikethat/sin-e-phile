@@ -46,8 +46,9 @@ vi.mock("@tauri-apps/api/event", () => ({
     return Promise.resolve(() => {});
   }),
 }));
+const fullscreen = vi.hoisted(() => vi.fn((_on: boolean) => Promise.resolve()));
 vi.mock("@tauri-apps/api/window", () => ({
-  getCurrentWindow: () => ({ setFullscreen: () => Promise.resolve() }),
+  getCurrentWindow: () => ({ setFullscreen: fullscreen }),
 }));
 const { PlayerScreen: Bare } = await import("./PlayerScreen");
 /** The player inside the query client the app gives it. */
@@ -183,6 +184,43 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
       expect(screen.getByRole("button", { name: "Mute" })).toBeInTheDocument();
       expect(screen.queryByText(/^Volume \d/)).toBeNull();
     } finally {
+      delete w.__TAURI_INTERNALS__;
+    }
+  });
+
+  it("a click on the still picture plays again; two quick clicks also go full screen (Phase 16)", async () => {
+    events.on = {};
+    const w = window as unknown as Record<string, unknown>;
+    w.__TAURI_INTERNALS__ = {};
+    let clock = 1000;
+    const now = vi.spyOn(performance, "now").mockImplementation(() => clock);
+    const playing = {
+      position: 60, duration: 5700, paused: false, buffered_until: null, volume: 100,
+      muted: false, speed: 1, hwdec: null, ended: false, started: true, tracks: [],
+    };
+    try {
+      render(<PlayerScreen />);
+      await waitFor(() => expect(events.on["player-pointer"]).toBeDefined());
+      act(() => events.on["player-state"]?.({ payload: playing }));
+
+      // One click on the film pauses it; a click on the still, a second later, plays it.
+      act(() => events.on["player-pointer"]?.({ payload: "click" }));
+      await waitFor(() => expect(commands.playerPauseStill).toHaveBeenCalledTimes(1));
+      clock += 1000;
+      fireEvent.click(await screen.findByTestId("pause-picture"));
+      await waitFor(() => expect(commands.playerResumeVideo).toHaveBeenCalledTimes(1));
+      expect(fullscreen).not.toHaveBeenCalled();
+
+      // Two clicks 200 ms apart: paused and played again, and full screen.
+      clock += 2000;
+      act(() => events.on["player-pointer"]?.({ payload: "click" }));
+      await waitFor(() => expect(commands.playerPauseStill).toHaveBeenCalledTimes(2));
+      clock += 200;
+      fireEvent.click(await screen.findByTestId("pause-picture"));
+      await waitFor(() => expect(commands.playerResumeVideo).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(fullscreen).toHaveBeenCalledWith(true));
+    } finally {
+      now.mockRestore();
       delete w.__TAURI_INTERNALS__;
     }
   });

@@ -47,12 +47,19 @@ fn runtime(app: &AppHandle, state: &AppState) -> Result<Arc<PlayerRuntime>, Stri
         cache_dir: Some(crate::logging::data_dir().join("cache").join("mpv")),
     };
     let player = Player::new(&sinephile_player::dll_path(), &options).map_err(err)?;
-    // Clicks and movement over the picture, which is mpv's window above the page: the
-    // page hears of them only through this event (Phase 16).
+    // Clicks and movement over the picture, a native window above the page: the page
+    // hears of them only through this event (Phase 16). The host window reports them (it
+    // is what a click lands on, measured in the real window); mpv, should it ever be the
+    // one to receive them, reports them the same way.
     let pointer_app = app.clone();
-    player.on_pointer(Box::new(move |what| {
+    let tell: sinephile_player::host::PointerListener = Arc::new(move |what: &str| {
+        if what != "move" {
+            tracing::debug!(what, "pointer over the picture");
+        }
         let _ = pointer_app.emit("player-pointer", what);
-    }));
+    });
+    sinephile_player::host::on_pointer(tell.clone());
+    player.on_pointer(Box::new(move |what| tell(what)));
     let rt = Arc::new(PlayerRuntime {
         player,
         host: Mutex::new(host),
@@ -283,6 +290,7 @@ pub enum PlayerAction {
 pub async fn player_action(state: State<'_, AppState>, action: PlayerAction) -> Result<(), String> {
     let rt = state.player().ok_or("nothing is playing")?;
     let p = &rt.player;
+    tracing::debug!(?action, "player action");
     match action {
         PlayerAction::Pause { paused } => p.set_paused(paused),
         PlayerAction::SeekTo { seconds } => p.seek_to(seconds),

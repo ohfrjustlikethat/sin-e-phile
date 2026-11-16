@@ -28,10 +28,12 @@ interface Props {
   chapter: string | null;
   details: PauseDetails | undefined;
   onResume: () => void;
+  /** A click on the still picture: as a click on the playing film, it plays (Phase 16). */
+  onPicture?: () => void;
   onOpen: (id: number) => void;
 }
 
-export function PauseOverlay({ title, still, position, duration, chapter, details, onResume, onOpen }: Props) {
+export function PauseOverlay({ title, still, position, duration, chapter, details, onResume, onPicture, onOpen }: Props) {
   const resume = useRef<HTMLButtonElement>(null);
   const [person, setPerson] = useState<PersonView | null>(null);
   const [films, setFilms] = useState<TitleView[] | null>(null);
@@ -67,7 +69,7 @@ export function PauseOverlay({ title, still, position, duration, chapter, detail
   return (
     <div className="absolute inset-0" role="dialog" aria-label="Paused">
       {still && <img src={still} alt="" className="absolute inset-0 h-full w-full object-contain transition-opacity duration-200" />}
-      <div className="absolute inset-0 bg-black/60" />
+      <div className="absolute inset-0 bg-black/60" data-testid="pause-picture" onClick={onPicture} />
 
       <div className="absolute top-[30%] left-[6%] flex max-w-[44%] flex-col gap-4">
         <p className="label text-ink-muted">

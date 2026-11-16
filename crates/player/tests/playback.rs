@@ -276,10 +276,10 @@ fn a_click_on_the_picture_is_reported_and_mpv_does_nothing_itself() {
     wait_until("the click reported", || {
         heard.lock().unwrap().iter().any(|w| w == "click")
     });
+    // A double click is the page's to recognise from two clicks: mpv does not report one.
     p.press_key("MBTN_LEFT_DBL").unwrap();
-    wait_until("the double click reported", || {
-        heard.lock().unwrap().iter().any(|w| w == "double")
-    });
+    std::thread::sleep(Duration::from_millis(300));
+    assert!(!heard.lock().unwrap().iter().any(|w| w == "double"));
     // mpv's own bindings stay off: it paused for neither, nor for its usual pause key.
     p.press_key("SPACE").unwrap();
     std::thread::sleep(Duration::from_millis(300));

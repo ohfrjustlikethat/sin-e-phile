@@ -37,6 +37,15 @@ test passed. Four sections per ADR-0016 (A4).
   screen, one volume readout; Search from any page.
 - **How long a finished scan takes to show on Home** (E6): 38 ms for 200 films, measured in the real
   app on a copy of the catalogue.
+- **Web addresses download directly** (2026-11-17): the Internet Archive and add-ons that answer with
+  links, beside the two torrent backends; a pause or a restart carries on from the bytes on disk.
+- **A fresh install builds its own search** (2026-11-17): after the first catalogue load, every title is
+  normalised and indexed (stage A) while onboarding shows the progress and Home says "Getting ready… N%";
+  alternate titles follow in the background; and every refresh's new titles are now made searchable,
+  which they never were. The meaning index (`embeddings-v3`) is published for the app to download.
+- **Click to pause, for real** (2026-11-17): a click on the film pauses it, a click on the paused picture
+  plays it, and a double click goes full screen. Checked with real clicks in the real window; the
+  earlier test had only told mpv a key was pressed, and the click never reached mpv at all.
 
 ## 2. Why
 
@@ -99,6 +108,16 @@ test passed. Four sections per ADR-0016 (A4).
 - **Two protocols behind one type, chosen by the data's shape** — `crates/source-protocol/src/addon.rs` `AddonManifest::parse`.
 - **Reading an untrusted JSON answer field by field, keeping what is safe and dropping the rest** — `crates/source-protocol/src/stremio.rs` `parse_streams`, `candidate`.
 - **A key that carries its own payload, so there is no second request** — `crates/source-protocol/src/stremio.rs` `Key`, `stream_of`.
+- **Resuming a download with an HTTP `Range` request, and a `.part` file renamed only when complete** — `crates/downloads/src/direct.rs:140` `fetch_inner`, `:86` `part_of`.
+- **One instance shared by everything that is rebuilt around it** (`OnceLock`) — `src-tauri/src/commands/downloads.rs` `DIRECT`.
+- **"Done" decided by finished jobs, not by data being present** (a stopped load leaves rows behind) — `crates/catalogue/src/bootstrap.rs:83` `loaded`.
+- **Making an incremental index take a row again by removing its "already indexed" mark** — `crates/catalogue/src/bootstrap.rs:240`.
+- **Knowing what is owed from the order jobs finished in** — `crates/catalogue/src/bootstrap.rs:116` `catch_up_due`.
+- **Work held back by a flag and released exactly once** (`swap(false)`) — `src-tauri/src/commands/catalogue.rs:103` `release_waiting_scans`.
+- **Polling only while something is in progress** (`refetchInterval` as a function) — `src/features/onboarding/CatalogueBuild.tsx:38`.
+- **Failing open: a status that cannot be read counts as ready** — `src/features/onboarding/CatalogueBuild.tsx:48`.
+- **Finding which window a click really lands on** (`WindowFromPoint` under a real `mouse_event`), and answering it in that window's procedure — `crates/player/src/host.rs:101` `proc`, `:105`.
+- **A double click recognised from two clicks that arrive from different places** (the native window, then the page's still frame) — `src/features/player/PlayerScreen.tsx:531` `clickPicture`.
 
 ## 4. Five questions
 

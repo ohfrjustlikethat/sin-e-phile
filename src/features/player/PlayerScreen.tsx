@@ -26,6 +26,8 @@ import { usePlaybackChoice } from "@/lib/playbackChoice";
  */
 
 const HIDE_AFTER_MS = 2500;
+// Two clicks on the picture this close together are a double click (Windows' default is 500 ms).
+const DOUBLE_CLICK_MS = 500;
 
 function inTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -522,9 +524,19 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
   // A click on the picture pauses or plays, a double click goes full screen, and moving
   // the mouse over it shows the controls. The picture is mpv's own window above the page,
   // so the page hears of these only from mpv (Phase 16: "I can't click to pause").
+  // A click on the picture plays or pauses; a second within DOUBLE_CLICK_MS also toggles full
+  // screen (the author's answer). Clicks come from the native window while it plays and from the
+  // still frame while paused, so the double click is recognised here, across both.
+  const lastClick = useRef(0);
+  const clickPicture = useCallback(() => {
+    const now = performance.now();
+    const double = now - lastClick.current < DOUBLE_CLICK_MS;
+    lastClick.current = double ? 0 : now;
+    run({ kind: "toggle_pause" });
+    if (double) run({ kind: "fullscreen" });
+  }, [run]);
   useTauriEvent<string>("player-pointer", (what) => {
-    if (what === "click") run({ kind: "toggle_pause" });
-    else if (what === "double") run({ kind: "fullscreen" });
+    if (what === "click") clickPicture();
     else wake();
   });
 
@@ -617,6 +629,7 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
           chapter={chapterTitle}
           details={details.data}
           onResume={() => void resume()}
+          onPicture={clickPicture}
           onOpen={(id) => {
             stopPlaying();
             openDetail(id);

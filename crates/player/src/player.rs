@@ -150,15 +150,17 @@ pub struct Player {
     pointer: Arc<Mutex<Option<PointerHandler>>>,
 }
 
-/// What the mouse did over the picture: `"click"`, `"double"` or `"move"`.
+/// What the mouse did over the picture: `"click"` or `"move"`.
 pub type PointerHandler = Box<dyn Fn(&str) + Send + Sync>;
 
-/// The video is mpv's own window above the page, so the page never sees a click or a
-/// movement over the picture (Phase 16: "I can't click to pause"). mpv is told to report
-/// them as script messages, and nothing else: its own bindings stay off.
+/// The video is a native window above the page, so the page never sees a click or a
+/// movement over the picture (Phase 16: "I can't click to pause"). In the app those reach
+/// the host window (`host::on_pointer`, measured in the real window); should mpv's own
+/// window ever take them, it reports them the same way, as script messages, and does
+/// nothing else: its own bindings stay off. A double click is the page's to recognise
+/// from two clicks, so it is not reported here, or it would count twice.
 const POINTER_SECTION: &str = concat!(
     "MBTN_LEFT script-message sinephile click\n",
-    "MBTN_LEFT_DBL script-message sinephile double\n",
     "MOUSE_MOVE script-message sinephile move",
 );
 
@@ -664,9 +666,7 @@ fn pump(mpv: &Mpv, seen: &(Mutex<Seen>, Condvar), pointer: &Mutex<Option<Pointer
 /// The pointer event a client message carries, if it is one of ours.
 fn pointer_message(words: Option<&[String]>) -> Option<&str> {
     match words? {
-        [who, what]
-            if who == "sinephile" && matches!(what.as_str(), "click" | "double" | "move") =>
-        {
+        [who, what] if who == "sinephile" && matches!(what.as_str(), "click" | "move") => {
             Some(what.as_str())
         }
         _ => None,

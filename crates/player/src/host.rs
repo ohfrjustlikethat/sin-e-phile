@@ -15,6 +15,11 @@
 //!   newly exposed area before mpv repaints it.
 //! - On pause the window is **hidden**, and the page shows a still frame instead, so the
 //!   pause overlay can dim and blur with ordinary HTML (ADR-0021).
+//! - **The mouse over the picture reaches this window, not mpv's.** Measured in the real
+//!   app on 2026-11-17: `WindowFromPoint` over the playing picture is `SinephileVideoHost`,
+//!   and a real click logged nothing from mpv's input section (the headless test had only
+//!   injected the key into mpv). So this window reports presses and movement itself
+//!   (`on_pointer`), which is how a click on the film pauses it.
 
 use windows::core::w;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
@@ -26,8 +31,45 @@ use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindowThreadProcessId, RegisterClassW,
     SetWindowPos, ShowWindow, HWND_TOP, SWP_NOACTIVATE, SW_HIDE, SW_SHOWNA, WINDOW_EX_STYLE,
-    WM_ERASEBKGND, WNDCLASSW, WS_CHILD, WS_CLIPSIBLINGS,
+    WM_ERASEBKGND, WM_LBUTTONDOWN, WM_MOUSEMOVE, WNDCLASSW, WS_CHILD, WS_CLIPSIBLINGS,
 };
+
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
+/// Who hears about the mouse over the picture: `"click"` for each press of the left button
+/// (the page decides what two in quick succession mean), `"move"` at most every
+/// [`MOVE_EVERY`]. One player at a time, so one listener for the process.
+pub type PointerListener = Arc<dyn Fn(&str) + Send + Sync>;
+
+static POINTER: Mutex<Option<PointerListener>> = Mutex::new(None);
+static LAST_MOVE: Mutex<Option<Instant>> = Mutex::new(None);
+
+/// Movement is reported this often at most: it only wakes the controls, and a report per
+/// `WM_MOUSEMOVE` would be a hundred events a second across the IPC bridge.
+pub const MOVE_EVERY: Duration = Duration::from_millis(100);
+
+/// Listen to the mouse over the picture (replacing any earlier listener).
+pub fn on_pointer(listener: PointerListener) {
+    *POINTER.lock().expect("pointer") = Some(listener);
+}
+
+fn tell(what: &str) {
+    // Cloned out first: the listener may take a while, and must not hold the lock.
+    let listener = POINTER.lock().expect("pointer").clone();
+    if let Some(l) = listener {
+        l(what);
+    }
+}
+
+fn moved_now() -> bool {
+    let mut last = LAST_MOVE.lock().expect("move");
+    let due = last.is_none_or(|t| t.elapsed() >= MOVE_EVERY);
+    if due {
+        *last = Some(Instant::now());
+    }
+    due
+}
 
 /// A chrome panel's silhouette, in physical pixels relative to the host's top-left.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -57,9 +99,20 @@ unsafe impl Sync for VideoHost {}
 const CLASS: windows::core::PCWSTR = w!("SinephileVideoHost");
 
 unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
-    if msg == WM_ERASEBKGND {
+    match msg {
         // Claim it was erased; mpv paints every pixel itself.
-        return LRESULT(1);
+        WM_ERASEBKGND => return LRESULT(1),
+        WM_LBUTTONDOWN => {
+            tell("click");
+            return LRESULT(0);
+        }
+        WM_MOUSEMOVE => {
+            if moved_now() {
+                tell("move");
+            }
+            return LRESULT(0);
+        }
+        _ => {}
     }
     DefWindowProcW(hwnd, msg, wp, lp)
 }
@@ -343,6 +396,37 @@ mod tests {
         let here = VideoHost::new(raw).expect("the owning thread may create it");
         drop(here);
         assert!(VideoHost::new(0).is_err(), "no parent, no window");
+        unsafe {
+            let _ = DestroyWindow(parent);
+        }
+    }
+
+    #[test]
+    fn a_press_on_the_picture_is_reported_and_movement_is_thinned() {
+        // Phase 16, measured in the real app: the click lands on this window, not mpv's.
+        use windows::Win32::UI::WindowsAndMessaging::SendMessageW;
+        let parent = parent_window();
+        let host = VideoHost::new(parent.0 as isize).unwrap();
+        let heard = Arc::new(Mutex::new(Vec::<String>::new()));
+        let h = heard.clone();
+        on_pointer(Arc::new(move |what| {
+            h.lock().unwrap().push(what.to_string())
+        }));
+        let send = |msg: u32| unsafe {
+            SendMessageW(host.hwnd, msg, Some(WPARAM(0)), Some(LPARAM(0)));
+        };
+        send(WM_LBUTTONDOWN);
+        send(WM_MOUSEMOVE);
+        send(WM_MOUSEMOVE); // within MOVE_EVERY of the last: not reported
+        send(WM_LBUTTONDOWN); // a second press: the page decides it is a double click
+        assert_eq!(*heard.lock().unwrap(), ["click", "move", "click"]);
+        std::thread::sleep(MOVE_EVERY);
+        send(WM_MOUSEMOVE);
+        assert_eq!(
+            heard.lock().unwrap().last().map(String::as_str),
+            Some("move")
+        );
+        drop(host);
         unsafe {
             let _ = DestroyWindow(parent);
         }
