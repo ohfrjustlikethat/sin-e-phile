@@ -2558,7 +2558,7 @@
       ]
     }
   ],
-  "next_action": "Phase 16: build the author's 15-item plan in docs/design/author-brief-2026-11-17.md, in its order (their answers to 7 rounds of questions are there; do not re-ask). Item 1 now: download only the file a source chose (season packs): a `file_index` column on downloads (new migration in crates/persistence/migrations/, NewDownload, the surface test in crates/persistence/tests/repository_surface.rs), passed from src-tauri/src/commands/downloads.rs download_title (the plan's PlayableStream::Torrent file_index), honoured in crates/downloads/src/backend.rs (librqbit `only_files`, qBittorrent file priorities). Item 3 is the critical one: a fresh install never builds the search index (search_index 0 rows), so search, identification and Films/TV are empty.",
+  "next_action": "Phase 16: build the author's 15-item plan in docs/design/author-brief-2026-11-17.md, in its order (their answers to 7 rounds of questions are there; do not re-ask). Item 1 (season packs) is done. Item 2 now: direct downloads of web streams (the Internet Archive; add-ons that answer with links) as a third backend in crates/downloads/src/ beside backend.rs (Rqbit) and qbittorrent.rs: an HTTP fetch with Range resume into the downloads folder, progress from Content-Length; src-tauri/src/commands/downloads.rs download_title stops refusing PlayableStream::Http. Item 3 is the critical one: a fresh install never builds the search index (search_index 0 rows), so search, identification and Films/TV are empty.",
   "blockers": [
     {
       "id": "B16",
@@ -3286,6 +3286,11 @@
       "id": "D86",
       "phase_raised": 16,
       "text": "The Rust toolchain is pinned to 1.98.0 (rust-toolchain.toml) because Rust 1.100 changed cargo's build-dir layout and ort-sys 2.0.0-rc.13's copy-dylibs finds the target folder by counting up from OUT_DIR, so on 1.100 it copies ONNX Runtime's DLLs into target/debug/build and panics (CI run 43739589636). Before moving past 1.98: an ort release that handles the new layout, checked with a cold `cargo clippy --all-targets --all-features` (ORT_CACHE_DIR and CARGO_TARGET_DIR fresh)."
+    },
+    {
+      "id": "D87",
+      "phase_raised": 16,
+      "text": "Two episodes of ONE season pack downloaded at the same time share one torrent in librqbit (one info hash): the second download's Rqbit::add moves the torrent to its own folder with its own only_files, taking over the first. One at a time works (crates/downloads/tests/queue.rs one_episode_of_a_season_pack_is_all_that_is_downloaded). Fix: widen the running torrent's only_files instead (librqbit can update the selection of a managed torrent), and file each finished episode separately."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."
