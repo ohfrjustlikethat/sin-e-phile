@@ -134,12 +134,16 @@ export function PinPad({
   useEffect(() => {
     if (pin.length !== 4) return;
     setBusy(true);
-    onEnter(pin)
-      .catch((e: Error) => {
+    // The error, the cleared digits and the pad taking keys again land in ONE update: as
+    // separate ones, a digit pressed between them was swallowed (CI found it, 2026-11-17).
+    onEnter(pin).then(
+      () => setBusy(false),
+      (e: Error) => {
         setWrong(e.message);
         setPin("");
-      })
-      .finally(() => setBusy(false));
+        setBusy(false);
+      },
+    );
   }, [pin]);
 
   useEffect(() => {
