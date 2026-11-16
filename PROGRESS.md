@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 4.1.0** · 21 session(s) completed · last updated 2026-11-16
+**Spec version 4.2.0** · 21 session(s) completed · last updated 2026-11-17
 
 ---
 
@@ -53,7 +53,7 @@
 
 ## What's next
 
-Phase 16, subtask 16.10. The author's second report (2026-11-16) is fixed and pushed: library reading (c00d4e5), player clicks/View/Mute and masthead (1fcb1b7), the show page's 'On this PC' and 'Also on this PC', Films and TV Shows from the library, the Sources 'try it' line (the commit after 1fcb1b7). Their next launch re-identifies their waiting files by itself. STILL WAITING ON THE AUTHOR: which controller faults they meant ('buggy'), and the batch sent before (E9 sign-off, a download and a stream with their own source, the Phase 7 E7 VPN cut, Load a file for E2, embeddings-v3; default: not published). NEXT BUILD CANDIDATE if the author wants to try downloading without an add-on: direct HTTP downloads of web streams (the Internet Archive's public-domain files) as a third download backend beside librqbit and qBittorrent, in crates/downloads/src/lib.rs (resume with Range; the Downloads page unchanged; src-tauri/src/commands/downloads.rs download_title stops refusing web streams). What was fixed: docs/specs/library.md 'The author's second library', docs/eval-results.md. Then the Phase 16 retrospective and /closephase once E2 and E9 are met.
+Phase 16, subtask 16.10. Stremio add-ons work (ADR-0047, spec 4.2.0, pushed). NEXT, build: download only the file a source chose. A Stremio torrent often points at one episode inside a season pack (fileIdx), and a download today fetches the whole torrent: add a `file_index` column to downloads (a migration in crates/persistence/migrations/, NewDownload and its surface test in crates/persistence/tests/repository_surface.rs), pass it from src-tauri/src/commands/downloads.rs download_title (the plan's PlayableStream::Torrent file_index), and honour it in crates/downloads/src/backend.rs: librqbit through `only_files` (crates/torrent/src/engine.rs), qBittorrent by setting the other files' priority to 0. Then direct downloads of web streams (the Internet Archive, Stremio add-ons that answer with web addresses) as a third backend. Still waiting on the author: E9 sign-off, a download and a stream with their own source, the Phase 7 E7 VPN cut, Load a file for E2, the embeddings-v3 decision (default: not published).
 
 ---
 

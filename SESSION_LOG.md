@@ -2329,3 +2329,11 @@ there and rescanned their library with the new reading (13:10 UTC). The result i
 would have done (Monster 74 and Samurai Champloo 26 episodes, every film placed but one, which waits for
 review), but their data was changed unasked. From now on the debug app runs with `SINEPHILE_DATA_DIR` on a
 scratch folder, and tests use a copy. Verified on a copy afterwards: a rescan leaves 0 files misfiled.
+
+**Stremio add-ons (2026-11-17, Opus).** The author asked for a list of sources that stream "everything" to give
+users at onboarding; declined (unlicensed sources, and §2.1), and a Word file of free, legal sources was made
+instead (outside the repository). The author then chose, as ADR-0040 reserves to them, for the app to speak
+Stremio's add-on protocol: ADR-0047, spec 4.2.0 (A37). `source_protocol::stremio` and `AddonManifest`,
+`sinephile_sources::backends::stremio::StremioBackend`; asked by IMDb id; unplayable streams left out; the same
+limits as any add-on. Tested against a loopback Stremio add-on end to end, each new path seen to fail. The app
+still ships, suggests and names no add-on.
