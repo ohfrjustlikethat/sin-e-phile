@@ -2337,3 +2337,40 @@ Stremio's add-on protocol: ADR-0047, spec 4.2.0 (A37). `source_protocol::stremio
 `sinephile_sources::backends::stremio::StremioBackend`; asked by IMDb id; unplayable streams left out; the same
 limits as any add-on. Tested against a loopback Stremio add-on end to end, each new path seen to fail. The app
 still ships, suggests and names no add-on.
+
+**The author's fix list, items 1–7 (2026-11-17, Opus).** The author tested the installed app and answered seven
+rounds of questions (`docs/design/author-brief-2026-11-17.md`, the 15-item plan). Done, each pushed with the full
+pre-push suite and CI green:
+1. Season packs fetch only the chosen episode (248baa9). 2. Web addresses download directly and resume (15781a5).
+3. **The root cause of "no shows or movies, search not working, library broken"**: a fresh install never built
+   its search index. The installed database matched 0 of the author's 200 files; a copy after the new first-run
+   build matched 199 (24b545d). Stage A (normalise, index) runs after the first load while onboarding shows its
+   progress and Home says "Getting ready… N%"; alternate titles, cast and crew, and AniList follow in the
+   background, each followed by a catch-up that makes what it added searchable (a4df39a); the weekly refresh's
+   new titles were never searchable before, and now are. `embeddings-v3` published (the author's decision);
+   the published file matches the local one byte for byte. Timings in `docs/eval-results.md`.
+4. Click to pause, in the real window (6c8d015): a real `mouse_event` click showed the click lands on the app's
+   own `SinephileVideoHost` window, never on mpv's, so the earlier fix (tested by injecting a key into mpv)
+   could not have worked. The host window now reports clicks; a click on the paused still plays; a double
+   click goes full screen. Checked with screenshots of the real window.
+5. Full screen from a maximised window kept the maximised height (bar 80 px up); it un-maximises first now
+   (08b6b90), checked in the real window.
+6. Each tab keeps its trail and scroll; a large labelled Back top-left; Escape, Backspace and B take one step
+   (5058717). The pad audit found the scroll memory dead after any film had played (a listener bound to a
+   `<main>` that the full-screen player replaces); fixed with a callback ref.
+7. The title page (0ad50c7, 56215ed): a wide Play; round Download, Watchlist, Watched, Streams; the advice
+   removed; a streams panel by add-on with per-row Play and Download; "best" is the healthiest stream at the
+   preferred quality (a new Settings choice), then the nearest healthy one, 4K only with 50+ seeders. The pad
+   audit found B in the panel also left the film's page: the pad's synthetic Escape was not cancelable, so no
+   screen could ever mark B handled. Fixed at the source.
+
+**Decisions taken (ADR-0040, none reserved):** stage A before Home and enrichment after it; MovieLens not fetched
+(nothing in the app reads it); library scans wait only while a first build runs; Y, "/" and Ctrl+F go to the
+search box while the masthead's Search returns to where search was left; a weak stream is under 10 seeders, or a
+4K one under 50; the step above the preferred quality wins a tie; the streams panel renders inside the app frame.
+No SPEC.md amendment. Known debt D88 (logs and Downloads ignore `SINEPHILE_DATA_DIR`).
+
+**Two mistakes to record.** A bindings run was stopped with `taskkill /IM sin-e-phile.exe`, which would also
+close the author's installed app (same image name); runs are stopped by PID now (memory updated). A commit
+subject of 73 characters was rejected by the hook and the next commit swept its files in; caught before
+pushing, split again with `git reset --soft`.
