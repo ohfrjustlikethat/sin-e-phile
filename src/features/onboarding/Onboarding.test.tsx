@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, within, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -73,6 +73,10 @@ describe("First run (Phase 14)", () => {
     // subtitles, downloads.
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(await screen.findByText("Your films on this PC")).toBeInTheDocument();
+    // Phase 16: the film picked comes back as imagery in the steps after the picking.
+    const picks = screen.getByLabelText("Your picks");
+    expect(picks).toHaveTextContent("Your picks · 1");
+    expect(within(picks).getByRole("img", { name: /^Film 3/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(await screen.findByText("Where films come from")).toBeInTheDocument();
     expect(screen.getByText(/comes with no sources of its own/)).toBeInTheDocument();

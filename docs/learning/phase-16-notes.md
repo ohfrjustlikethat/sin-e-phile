@@ -62,6 +62,8 @@ test passed. Four sections per ADR-0016 (A4).
   poster images by IMDb id, said plainly); fetched once, kept as WebP, shown as titles come into view.
 - **A profile picture** (2026-11-17): any picture file, squared automatically (a little high in a portrait), adjusted
   by drag and zoom, kept as a 256 px WebP; shown next to Downloads, in the profile picker and in Settings.
+- **The first run, polished** (2026-11-17): a bar of seven segments, larger titles, each step rising in (not under
+  reduced motion), the films picked shown back as you go, and the add-on step said in plain words.
 - **Full screen from a maximised window** (2026-11-17): it kept the maximised height, so the player's bar
   floated 80 px up with black beneath; the window is now un-maximised first and maximised again after.
 

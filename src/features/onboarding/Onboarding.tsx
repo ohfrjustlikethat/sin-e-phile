@@ -14,6 +14,8 @@ import { TmdbSection } from "@/features/settings/TmdbSection";
 import { ArtworkSection } from "@/features/settings/ArtworkSection";
 import { Settings as DownloadsSettings } from "@/features/downloads/DownloadsScreen";
 import { TitleCards } from "./TitleCards";
+import { PickStrip } from "./PickStrip";
+import type { TastePick } from "@/lib/ipc";
 import { ChoosePicture } from "@/features/profiles/ChoosePicture";
 import { PICTURE } from "@/features/profiles/ProfileAvatar";
 import { MeaningDownload } from "@/features/search/MeaningDownload";
@@ -56,6 +58,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState("");
   const [colour, setColour] = useState<AvatarColour>("sage");
   const [way, setWay] = useState<Way>("cards");
+  // The films picked in "What do you like?", shown back in the steps after it (Phase 16: imagery from the picks).
+  const [picks, setPicks] = useState<TastePick[]>([]);
   const first = useRef<HTMLDivElement>(null);
   // The profile's picture, if one is chosen here (Phase 16): the large avatar shows it.
   const picture = useQuery({
@@ -128,14 +132,25 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       className="fixed inset-0 z-50 scroll-pb-32 overflow-auto bg-base text-ink"
     >
       <div className="mx-auto flex min-h-full max-w-[880px] flex-col px-10 py-14">
-        <p className="label" aria-label={`Step ${step + 1} of ${STEPS.length}`}>
-          {step + 1} of {STEPS.length}
-        </p>
-        <h1 className="mt-3 font-display text-[44px] font-extrabold leading-none tracking-[-0.03em]">
-          {STEPS[step]}
-        </h1>
+        {/* Where the first run is, at a glance: one segment a step, the done ones in oxblood. */}
+        <div aria-hidden className="flex gap-1.5">
+          {STEPS.map((s, i) => (
+            <span key={s} className={`h-[3px] flex-1 ${i <= step ? "bg-oxblood-bright" : "bg-line"}`} />
+          ))}
+        </div>
+        <div className="mt-6 flex items-end justify-between gap-8">
+          <div>
+            <p className="label" aria-label={`Step ${step + 1} of ${STEPS.length}`}>
+              {step + 1} of {STEPS.length}
+            </p>
+            <h1 className="mt-3 font-display text-[56px] font-extrabold leading-none tracking-[-0.03em]">
+              {STEPS[step]}
+            </h1>
+          </div>
+          {step >= 2 && <PickStrip picks={picks} />}
+        </div>
 
-        <div ref={first} className="mt-10 flex-1">
+        <div ref={first} key={step} className="mt-10 flex-1" style={{ animation: "step-in 240ms var(--ease-standard)" }}>
           {step === 0 && (
             <div className="flex flex-col gap-6">
               <div className="flex items-end gap-5">
@@ -195,7 +210,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                   </Button>
                 ))}
               </div>
-              {way === "cards" && <TitleCards />}
+              {way === "cards" && <TitleCards onChosen={setPicks} />}
               {way === "words" && <TasteInput />}
               {way === "import" && <ImportHistory />}
               {/* The author: the search model is downloaded during setup. Offered here, with its size, and
@@ -215,12 +230,15 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           )}
           {step === 3 && (
             <div className="flex flex-col gap-2">
-              <p className="mb-6 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
+              <p className="mb-3 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
                 sin·e·phile comes with no sources of its own: public-domain films from the Internet Archive play
-                already, and everything else comes from add-ons you choose, including Stremio add-ons. Paste the
-                address of one you have (a stremio:// link works too); it is checked, and you see what it offers,
-                before it is added. Without one, a film you do not have here has
-                nothing to play or download from.
+                already, and everything else comes from add-ons you choose. An add-on is a small service someone
+                else runs that knows where films can be watched; Stremio add-ons work here.
+              </p>
+              <p className="mb-6 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
+                Paste each one&apos;s address (or its stremio:// link), one at a time: it is checked, you see what it
+                offers, and once added it joins the list below. Add as many as you like. The app suggests none.
+                Without one, a film you do not have here has nothing to play or download from.
               </p>
               <SourcesSection />
             </div>
