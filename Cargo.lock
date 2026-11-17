@@ -5470,6 +5470,7 @@ dependencies = [
  "sinephile-embedding",
  "sinephile-metadata-api",
  "sinephile-persistence",
+ "sinephile-recommend",
  "sinephile-vector-index",
  "sqlx",
  "tempfile",

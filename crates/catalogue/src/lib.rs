@@ -24,6 +24,7 @@ pub mod load;
 pub mod matching;
 pub mod measure;
 pub mod movielens;
+pub mod neighbours;
 pub mod normalise;
 pub mod now;
 pub mod refresh;

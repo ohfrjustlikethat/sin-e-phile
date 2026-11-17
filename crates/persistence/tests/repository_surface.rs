@@ -2268,3 +2268,61 @@ async fn download_repository_surface() {
     repo.remove(low).await.unwrap();
     assert_eq!(repo.get(low).await.unwrap(), None);
 }
+
+#[tokio::test]
+async fn neighbour_repository_surface() {
+    use sinephile_persistence::repositories::NeighbourRepository;
+    let db = Db::in_memory().await.expect("open");
+    let media = MediaRepository::new(&db);
+    let mut films = Vec::new();
+    for k in 0..30 {
+        let title = format!("Film {k}");
+        films.push(
+            media
+                .insert(&NewMediaItem::film(&title, 1950 + k))
+                .await
+                .unwrap(),
+        );
+    }
+    let repo = NeighbourRepository::new(&db);
+
+    // titles: nothing until the matrix is built
+    assert_eq!(repo.titles().await.unwrap(), 0);
+
+    // replace_all: every film with every other, 870 rows, more than one INSERT's worth
+    let every: Vec<(i64, i64, f32)> = films
+        .iter()
+        .flat_map(|&a| {
+            films
+                .iter()
+                .filter(move |&&b| b != a)
+                .map(move |&b| (a, b, 1.0 / (1.0 + (b - a).abs() as f32)))
+        })
+        .collect();
+    assert_eq!(repo.replace_all(&every).await.unwrap(), 870);
+    assert_eq!(repo.titles().await.unwrap(), 30);
+
+    // of: best first, limited; the nearest film ids score highest
+    let (first, second, third) = (films[0], films[1], films[2]);
+    assert_eq!(
+        repo.of(first, 2).await.unwrap(),
+        vec![(second, 0.5), (third, 1.0 / 3.0)]
+    );
+
+    // of_many: every row of each title asked for
+    assert_eq!(repo.of_many(&[first, second]).await.unwrap().len(), 58);
+
+    // replace_all again: the old matrix is gone whole
+    assert_eq!(repo.replace_all(&[(third, first, 0.8)]).await.unwrap(), 1);
+    assert_eq!(repo.titles().await.unwrap(), 1);
+    assert!(repo.of(first, 10).await.unwrap().is_empty());
+    assert_eq!(repo.of(third, 10).await.unwrap(), vec![(first, 0.8)]);
+
+    // a title that goes takes its rows with it
+    sqlx::query("DELETE FROM media_items WHERE id = ?")
+        .bind(first)
+        .execute(db.pool())
+        .await
+        .unwrap();
+    assert_eq!(repo.titles().await.unwrap(), 0);
+}

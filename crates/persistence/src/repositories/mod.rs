@@ -11,6 +11,7 @@ pub mod downloads;
 pub mod episodes;
 pub mod library;
 pub mod media;
+pub mod neighbours;
 pub mod profiles;
 pub mod search;
 pub mod sources;
@@ -29,6 +30,7 @@ pub use library::{
     NewLocalFile, Probe, Upserted,
 };
 pub use media::{Appearance, Credit, MediaRepository};
+pub use neighbours::NeighbourRepository;
 pub use profiles::{NewProfile, Profile, ProfileRepository, Viewing, WatchScope};
 pub use search::{Hit, HitDetail, MatchReason, SearchRepository};
 pub use sources::{

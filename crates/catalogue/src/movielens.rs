@@ -316,6 +316,20 @@ pub fn ratings(path: &Path, mut each: impl FnMut(u32, u32, f32)) -> Result<u64, 
     Ok(read)
 }
 
+/// Catalogue items by their MovieLens id: the join [`load`] wrote. What the item-item matrix
+/// is built over (Phase 17).
+pub async fn by_movielens_id(db: &Db) -> Result<HashMap<u32, i64>, JobError> {
+    let rows: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT external_id, media_item_id FROM external_ids WHERE source = 'movielens'",
+    )
+    .fetch_all(db.pool())
+    .await?;
+    Ok(rows
+        .into_iter()
+        .filter_map(|(movie, id)| movie.parse::<u32>().ok().map(|m| (m, id)))
+        .collect())
+}
+
 /// Catalogue items by the numeric part of their IMDb id.
 pub async fn catalogue_by_imdb(db: &Db) -> Result<HashMap<u32, i64>, JobError> {
     let rows: Vec<(String, i64)> =

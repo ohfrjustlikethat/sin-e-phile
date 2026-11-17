@@ -286,3 +286,53 @@ not,a,rating,3
     assert_eq!(read, 3);
     assert_eq!(seen, vec![(1, 10, 4.5), (1, 20, 3.0), (2, 10, 5.0)]);
 }
+
+#[tokio::test]
+async fn the_matrix_is_built_over_the_films_we_hold_and_stored() {
+    // Phase 17, 17.1: ratings -> likes over catalogue titles -> neighbours, stored.
+    use sinephile_persistence::repositories::NeighbourRepository;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let db = Db::open_in(dir.path()).await.expect("open");
+    let toy = film(&db, "tt0114709", "Toy Story").await;
+    let jumanji = film(&db, "tt0113497", "Jumanji").await;
+
+    // Six people like both films we hold; they also like movie 3, which we do not hold, and
+    // movie 4's IMDb id is not in the catalogue. Three-star ratings are not likes.
+    let mut csv = String::from(
+        "userId,movieId,rating,timestamp
+",
+    );
+    for user in 1..=6 {
+        csv.push_str(&format!(
+            "{user},1,4.5,1
+{user},2,4.0,2
+{user},3,5.0,3
+{user},4,3.0,4
+"
+        ));
+    }
+    let path = archive(dir.path(), &links_csv(), &csv);
+    let links = ml::links(&path).expect("links");
+    let catalogue = ml::catalogue_by_imdb(&db).await.expect("catalogue");
+    let pairs: Vec<(i64, i64)> = links
+        .iter()
+        .filter_map(|l| catalogue.get(&l.imdb_id).map(|id| (*id, l.movielens_id)))
+        .collect();
+    let mut job = Job::begin(&db, "movielens").await.expect("begin");
+    ml::load(&mut job, Arc::new(pairs)).await.expect("load");
+    job.finish().await.expect("finish");
+
+    let built = sinephile_catalogue::neighbours::build(&db, &path)
+        .await
+        .expect("build");
+    assert_eq!(built.ratings, 24);
+    assert_eq!(built.likes, 12, "six people x the two films we hold");
+    assert_eq!((built.people, built.titles, built.rows), (6, 2, 2));
+
+    let repo = NeighbourRepository::new(&db);
+    let toy_row = repo.of(toy, 10).await.expect("of");
+    assert_eq!(toy_row.len(), 1);
+    assert_eq!(toy_row[0].0, jumanji);
+    assert!(toy_row[0].1 > 0.0);
+    assert_eq!(repo.of(jumanji, 10).await.expect("of")[0].0, toy);
+}

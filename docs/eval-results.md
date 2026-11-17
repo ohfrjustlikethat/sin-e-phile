@@ -3144,3 +3144,10 @@ only marginally where it helped at all, and always cost coverage. The harness re
 **Test users** (15,641 judged), alpha 0.65, shrink 0: **Recall@20 0.2855 against popularity 0.1640, +74.1%**
 (E1 asks more than +40%); **coverage 16.4%** (E2 asks more than 15%). This is the matrix alone; E1 and E2 are measured
 again on the whole recommender in 17.4.
+
+**On the development copy** (`target/release/ingest neighbours`, 2026-11-18, every user, the films the catalogue holds):
+25,000,095 ratings, 12,402,053 likes by 162,342 people over 19,792 titles; 989,600 rows stored; **10.4 s end to end**,
+database +22.6 MB, peak working set 199 MB. Neighbours, read back: *Tokyo Story* — Late Spring, Early Summer, Ugetsu,
+Sansho the Bailiff, Floating Weeds, Sunrise, Ordet, A Man Escaped; *Stalker* — Solaris, The Mirror, Andrei Rublev,
+Nostalgia, The Sacrifice, Ivan's Childhood, Persona, Come and See; *Spirited Away* — seven Ghibli films and Grave of the
+Fireflies.
