@@ -280,6 +280,42 @@ pub fn scan_ratings(path: &Path) -> Result<(i64, f64), JobError> {
     Ok(((lines - 1).max(0), started.elapsed().as_secs_f64()))
 }
 
+/// Every rating in the archive's `ratings.csv`, in the file's order (by user), handed to
+/// `each` as (user, movie, stars) and never stored (ADR-0019; 25 million would not fit, and
+/// need not). Phase 17 builds the item-item matrix from this stream. A malformed line is
+/// skipped. Returns how many ratings were read.
+pub fn ratings(path: &Path, mut each: impl FnMut(u32, u32, f32)) -> Result<u64, JobError> {
+    let mut zip = archive(path)?;
+    let entry = open_entry(&mut zip, "ratings.csv")?;
+    let mut reader = BufReader::with_capacity(1 << 20, entry);
+    let mut line = String::new();
+    let mut read = 0;
+    let mut header = true;
+    loop {
+        line.clear();
+        let got = reader
+            .read_line(&mut line)
+            .map_err(|e| JobError::step("movielens", e.to_string()))?;
+        if got == 0 {
+            break;
+        }
+        if std::mem::take(&mut header) {
+            continue;
+        }
+        let mut field = line.trim_end().split(',');
+        let (Some(user), Some(movie), Some(stars)) = (field.next(), field.next(), field.next())
+        else {
+            continue;
+        };
+        let (Ok(user), Ok(movie), Ok(stars)) = (user.parse(), movie.parse(), stars.parse()) else {
+            continue;
+        };
+        each(user, movie, stars);
+        read += 1;
+    }
+    Ok(read)
+}
+
 /// Catalogue items by the numeric part of their IMDb id.
 pub async fn catalogue_by_imdb(db: &Db) -> Result<HashMap<u32, i64>, JobError> {
     let rows: Vec<(String, i64)> =

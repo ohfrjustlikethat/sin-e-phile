@@ -3108,3 +3108,39 @@ rounds, one default profile each time (seen to fail before the fix: "round 0: â€
 profiles.name"; it passed before the fix too until the pool was warmed to eight open connections);
 `an_install_left_without_a_default_gets_its_first_profile_back` and
 `a_new_default_that_cannot_be_made_leaves_the_old_one_the_default`, each seen to fail.
+
+## Phase 17 â€” Recommendation Engine
+
+### The item-item matrix (17.1, 2026-11-18)
+
+`cargo run --release -p eval -- recommend [--tune]` over the local `ml-25m.zip` (25,000,095 ratings). Users split by a
+hash of their id (`crates/recommend/src/split.rs`): 80% build the matrix, 10% tune, 10% judge; a fifth of each judged
+user's likes (4.0 stars and up) held out. Recall@20 = hits / min(20, held out), averaged over users; popularity gets the
+same 20 slots with the most-liked titles the user has not liked. Coverage = the share of the matrix's titles that reach
+at least one judged user's 20.
+
+Built from 9,944,040 likes by 129,892 people over 18,503 titles (5 likes or more). Reading the ratings 2.5 s, indexing
+0.2 s, the matrix 0.4 s on 24 threads (Tier 2 dev machine), peak working set 137 MB. The first version held about 1 GB:
+each row kept the room of everything its item touched (`truncate` keeps capacity); one reused buffer per thread fixed it
+with identical results.
+
+**Tuning users** (15,672 judged; popularity 0.1665), score `c / (mass_i^(1-alpha) * mass_j^alpha) * c / (c + shrink)`:
+
+| alpha | shrink | Recall@20 | against popularity | coverage |
+|---|---|---|---|---|
+| 0.3 | 0 | 0.2668 | +60.3% | 4.0% |
+| 0.5 (cosine) | 0 | 0.2932 | +76.1% | 9.9% |
+| 0.55 | 3 | 0.2970 | +78.4% | 9.3% |
+| 0.6 | 0 | 0.2959 | +77.8% | 14.3% |
+| **0.65** | **0** | **0.2864** | **+72.1%** | **16.6%** |
+| 0.7 | 2 | 0.2719 | +63.3% | 15.4% |
+| 0.75 | 3 | 0.2467 | +48.2% | 16.5% |
+| 0.9 | 0 | 0.0690 | -58.6% | 25.1% |
+
+Rule, fixed before looking at the test users: the best recall whose coverage clears E2's 15%. Shrinkage helped recall
+only marginally where it helped at all, and always cost coverage. The harness reports a loss when there is one
+(alpha 0.9, -58.6%).
+
+**Test users** (15,641 judged), alpha 0.65, shrink 0: **Recall@20 0.2855 against popularity 0.1640, +74.1%**
+(E1 asks more than +40%); **coverage 16.4%** (E2 asks more than 15%). This is the matrix alone; E1 and E2 are measured
+again on the whole recommender in 17.4.

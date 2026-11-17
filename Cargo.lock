@@ -1453,6 +1453,7 @@ dependencies = [
  "sinephile-imports",
  "sinephile-library",
  "sinephile-persistence",
+ "sinephile-recommend",
  "sinephile-search-engine",
  "sinephile-taste",
  "sinephile-torrent",
@@ -5627,6 +5628,10 @@ dependencies = [
  "tracing",
  "windows 0.61.3",
 ]
+
+[[package]]
+name = "sinephile-recommend"
+version = "0.1.0"
 
 [[package]]
 name = "sinephile-search-engine"

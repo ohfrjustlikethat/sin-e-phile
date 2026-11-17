@@ -45,5 +45,23 @@ Collaborative versus content-based filtering; the item-item matrix and why it wo
 
 <!-- subtask log: appended during the phase -->
 
+## Plan (2026-11-18, ADR-0040)
+
+**17.1, the item-item matrix:**
+- `crates/recommend` (new, no Tauri, std only): likes from a ratings stream. MovieLens' `ratings.csv` is sorted by user,
+  so one pass builds each user's list; a rating of 4.0 or more is a like. Each user is weighted 1/ln(e + likes), so one
+  person with 5,000 likes does not outweigh fifty people with fifty.
+- Co-occurrence computed item by item over a by-item and a by-user index, with a dense accumulator per thread
+  (`std::thread::scope`, no new dependency). Items with fewer than 5 likes are left out of the matrix.
+- One score family, tuned rather than picked by taste: asymmetric cosine `c_ij / (n_i^(1-a) * n_j^a)` times shrinkage
+  `c_ij / (c_ij + l)`. a = 0.5 is cosine; a towards 1 is lift, which favours the obscure. a and l are chosen on tuning
+  users; E1 is measured on users never used for tuning or building (a test pins that the split cannot leak).
+- The top 50 neighbours per title, in catalogue ids through the `external_ids` join (61,912 MovieLens films on the dev
+  copy), stored by migration 0029 `item_neighbours` with a repository whose every method has a surface line.
+- Built on the user's machine: the first run's enrichment fetches `ml-25m.zip` (ADR-0019: never redistributed), joins
+  it, and builds the matrix; `ingest neighbours` runs the same call for a copy built by hand. Time and memory measured.
+- Cold start (a title with no ratings gets content neighbours) lands with the ranker's candidate generation in 17.2,
+  where the vector index already is.
+
 ## Work log
 

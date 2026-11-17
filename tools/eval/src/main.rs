@@ -16,6 +16,7 @@ mod error;
 mod identify;
 mod imports;
 mod modes;
+mod recommend;
 mod relevance;
 mod scan;
 mod search;
@@ -113,6 +114,22 @@ async fn main() {
                 args.iter().any(|a| a == "--report"),
             )
             .await
+        }
+        "recommend" => {
+            // `--alpha 0.6,0.7 --shrink 0,2` narrows the tuning grid.
+            let list = |flag: &str, default: &[f32]| -> Vec<f32> {
+                args.iter()
+                    .position(|a| a == flag)
+                    .and_then(|i| args.get(i + 1))
+                    .map(|v| v.split(',').filter_map(|x| x.parse().ok()).collect())
+                    .unwrap_or_else(|| default.to_vec())
+            };
+            recommend::run(
+                Path::new(&data_dir),
+                args.iter().any(|a| a == "--tune"),
+                &list("--alpha", &[0.3, 0.5, 0.7, 0.9]),
+                &list("--shrink", &[0.0, 2.0, 5.0, 10.0]),
+            )
         }
         "modes" => modes::run(Path::new(&data_dir), args.iter().any(|a| a == "--prove")).await,
         "import" => {

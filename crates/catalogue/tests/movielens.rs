@@ -268,3 +268,21 @@ async fn films_filed_under_children_get_a_children_genre_and_no_others_do() {
         "same IMDb genres, not a children's film"
     );
 }
+
+#[test]
+fn ratings_are_streamed_in_order_and_a_bad_line_is_skipped() {
+    // Phase 17 builds the item-item matrix from this stream.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let csv = "userId,movieId,rating,timestamp
+1,10,4.5,1
+1,20,3.0,2
+not,a,rating,3
+2,10,5.0,4
+";
+    let path = archive(dir.path(), &links_csv(), csv);
+    let mut seen = Vec::new();
+    let read =
+        ml::ratings(&path, |user, movie, stars| seen.push((user, movie, stars))).expect("read");
+    assert_eq!(read, 3);
+    assert_eq!(seen, vec![(1, 10, 4.5), (1, 20, 3.0), (2, 10, 5.0)]);
+}
