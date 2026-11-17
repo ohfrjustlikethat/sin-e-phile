@@ -203,3 +203,25 @@ What later phases deepen is in `SPEC.md` Appendix F, I79–I86 (ADR-0049).
 builds its search in about four minutes after the catalogue's ~23-minute download; onboarding shows it); clicking and
 double-clicking the film; choosing a profile picture from your Pictures folder (Windows' own dialog); Show in folder on
 a finished download; switching posters on; the whole app with a real Xbox controller.
+
+## Round 8 (2026-11-17, after testing the new installer)
+
+**Reported:** "Manage profiles" opens Settings at About, not Profile (uploading a picture works). The interface broke
+("something in the interface broke") every time Streams was opened, on every title; the other time it appeared was
+also opening Streams. Continue watching shows a show's single episode ("Episode #1.1" for Twin Peaks) and opens that
+episode, not the show. The pause screen does not say which show or episode is playing. In full screen the bars never
+hide. Continue watching should also be on Films and TV Shows, each filtered to its own kind. Search by meaning does not
+work (found: the install never downloaded it; setup was finished before it was offered). Downloading works.
+
+**Answers:**
+- **Continue watching, a show:** one card per show, titled with the show ("Twin Peaks"), with the episode to watch
+  under it ("S1 E2 · next", or the unfinished one) and a thin bar for how far into that episode; pressing it opens the
+  show's page with that episode ready to resume.
+- **Pause screen, an episode:** the show's name large; "Season 1 · Episode 2 — Traces to Nowhere" and the time left;
+  the side panel shows the show's cast; a line "Next: S1 E3".
+- **The bars:** hide everywhere (window and full screen) after 3 seconds without mouse movement or a controller press,
+  the mouse cursor with them; back at once on either; while paused they stay.
+- **Search by meaning:** downloaded automatically on new installs, during setup; an existing install (like the author's)
+  gets a clear offer instead (the search page and Settings), with its size.
+- **Continue watching on Films and TV Shows:** a rail at the very top of each, films only on Films, shows only on TV
+  Shows, above "On this PC"; hidden when there is nothing to continue.

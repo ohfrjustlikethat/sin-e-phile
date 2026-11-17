@@ -632,6 +632,11 @@ fn pump(mpv: &Mpv, seen: &(Mutex<Seen>, Condvar), pointer: &Mutex<Option<Pointer
             continue;
         }
         if let Some(what) = pointer_message(message.as_deref()) {
+            // A still pointer over a window that changed shape is not a movement (host.rs).
+            #[cfg(windows)]
+            if what == "move" && !crate::host::pointer_moved() {
+                continue;
+            }
             if let Some(f) = pointer.lock().expect("pointer").as_ref() {
                 f(what);
             }

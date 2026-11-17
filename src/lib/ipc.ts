@@ -130,6 +130,16 @@ export const commands = {
 	/**  Open something to play: an `http(s)` address or a file path. `start` resumes. */
 	playerOpen: (target: string, start: number | null) => typedError<null, string>(__TAURI_INVOKE("player_open", { target, start })),
 	/**
+	 *  Hide or show the pointer over the picture, with the player's bars (Phase 16: they hide
+	 *  after three seconds without movement, in a window and in full screen).
+	 * 
+	 *  **Async on purpose.** A command that is not async runs on the UI thread, and the host's
+	 *  lock can be held by a thread that is itself waiting for the UI thread (moving the video
+	 *  window is answered there): the first version of this froze the app, seen in the real
+	 *  window. Async, it waits on a worker, and the UI thread stays free to answer.
+	 */
+	playerCursor: (hidden: boolean) => typedError<null, string>(__TAURI_INVOKE("player_cursor", { hidden })),
+	/**
 	 *  Place the video and cut the chrome out of it. Coordinates are CSS pixels within the
 	 *  window's client area; `scale` is the page's `devicePixelRatio`.
 	 */

@@ -26,7 +26,17 @@ import { setWindowFullscreen } from "@/lib/fullscreen";
  * pause overlay can dim it like any HTML.
  */
 
-const HIDE_AFTER_MS = 2500;
+/** Hide or show the pointer over the picture; outside the app's window (the UI audit's browser) there is none. */
+function tellPointer(hidden: boolean): void {
+  try {
+    void commands.playerCursor(hidden).catch(() => {});
+  } catch {
+    // Not inside Tauri.
+  }
+}
+
+// The author's answer (Phase 16): three seconds without the mouse or the pad, in a window and in full screen.
+const HIDE_AFTER_MS = 3000;
 // Two clicks on the picture this close together are a double click (Windows' default is 500 ms).
 const DOUBLE_CLICK_MS = 500;
 
@@ -539,6 +549,18 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
     if (what === "click") clickPicture();
     else wake();
   });
+  // Over the page's own parts (the bars, the panels), a movement is one only if the pointer is somewhere new: the
+  // content under a still pointer changes as the bars hide, and must not count (crates/player/src/host.rs).
+  const pointerAt = useRef<{ x: number; y: number } | null>(null);
+  const pointerMove = useCallback(
+    (e: React.MouseEvent) => {
+      const at = pointerAt.current;
+      if (at && at.x === e.screenX && at.y === e.screenY) return;
+      pointerAt.current = { x: e.screenX, y: e.screenY };
+      wake();
+    },
+    [wake],
+  );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -579,6 +601,10 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
   }, [gliding]);
   const position = gliding ? glide(reported.current, frameAt) : (state?.position ?? 0);
   const pad = usePadMode();
+  // The pointer goes with the bars, over the picture too (a native window: the host hides it there).
+  const pointerHidden = !!playing && !mini && !(chrome || paused || !!menu || !!panel);
+  useEffect(() => tellPointer(pointerHidden), [pointerHidden]);
+  useEffect(() => () => tellPointer(false), []);
   if (!playing) return null;
   const duration = state?.duration ?? 0;
   const tracks = state?.tracks ?? [];
@@ -615,7 +641,7 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
   return (
     <div
       ref={stage}
-      onMouseMove={wake}
+      onMouseMove={pointerMove}
       className="relative h-full w-full overflow-hidden bg-black text-ink"
       style={{ cursor: showChrome ? "default" : "none" }}
       aria-label={`Playing ${playing.title}`}

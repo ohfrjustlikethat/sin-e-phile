@@ -68,6 +68,22 @@ fn runtime(app: &AppHandle, state: &AppState) -> Result<Arc<PlayerRuntime>, Stri
     Ok(rt)
 }
 
+/// Hide or show the pointer over the picture, with the player's bars (Phase 16: they hide
+/// after three seconds without movement, in a window and in full screen).
+///
+/// **Async on purpose.** A command that is not async runs on the UI thread, and the host's
+/// lock can be held by a thread that is itself waiting for the UI thread (moving the video
+/// window is answered there): the first version of this froze the app, seen in the real
+/// window. Async, it waits on a worker, and the UI thread stays free to answer.
+#[tauri::command]
+#[specta::specta]
+pub async fn player_cursor(state: State<'_, AppState>, hidden: bool) -> Result<(), String> {
+    if let Some(rt) = state.player() {
+        rt.host.lock().expect("host").set_cursor_hidden(hidden);
+    }
+    Ok(())
+}
+
 /// Open something to play: an `http(s)` address or a file path. `start` resumes.
 #[tauri::command]
 #[specta::specta]

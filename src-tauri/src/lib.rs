@@ -69,6 +69,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::torrent::torrent_resume,
             commands::torrent::torrent_remove,
             commands::player::player_open,
+            commands::player::player_cursor,
             commands::player::player_layout,
             commands::player::player_action,
             commands::player::player_pause_still,

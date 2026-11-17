@@ -12,6 +12,7 @@ const commands = {
   playerClose: vi.fn(() => ok(null)),
   playerLayout: vi.fn(() => ok(null)),
   playerAction: vi.fn(() => ok(null)),
+  playerCursor: vi.fn((_hidden: boolean) => ok(null)),
   playerPauseStill: vi.fn(() => ok("data:image/jpeg;base64,AAAA")),
   playerResumeVideo: vi.fn(() => ok(null)),
   savePosition: vi.fn(() => ok(null)),
@@ -189,6 +190,30 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
       expect(screen.queryByText(/^Volume \d/)).toBeNull();
     } finally {
       delete w.__TAURI_INTERNALS__;
+    }
+  });
+
+  it("the bars and the pointer hide after 3 s still; only a real movement brings them back (Phase 16)", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<PlayerScreen />);
+      act(() => vi.advanceTimersByTime(100));
+      const stage = screen.getByLabelText("Playing Nosferatu");
+      fireEvent.mouseMove(stage, { screenX: 400, screenY: 300 });
+      expect(screen.getByRole("button", { name: "Mute" })).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(2900));
+      expect(screen.getByRole("button", { name: "Mute" })).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(200));
+      expect(screen.queryByRole("button", { name: "Mute" })).toBeNull();
+      expect(commands.playerCursor).toHaveBeenLastCalledWith(true);
+      // What the page hears as the bars go from under a still pointer: not a movement.
+      fireEvent.mouseMove(stage, { screenX: 400, screenY: 300 });
+      expect(screen.queryByRole("button", { name: "Mute" })).toBeNull();
+      fireEvent.mouseMove(stage, { screenX: 420, screenY: 300 });
+      expect(screen.getByRole("button", { name: "Mute" })).toBeInTheDocument();
+      expect(commands.playerCursor).toHaveBeenLastCalledWith(false);
+    } finally {
+      vi.useRealTimers();
     }
   });
 
