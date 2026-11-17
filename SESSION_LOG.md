@@ -2466,3 +2466,43 @@ corrupt or was modified".
 without the files, for development, and CI does not bundle); the launch-time build never downloads, so an existing
 install without the files is still only offered them; a corrupt download found at launch is removed so the offer states
 the real cost. **Spec amendments:** 4.6.0, A42.
+
+## 2026-11-18 — Phase 16, round 10, and the close
+
+The author installed the round 9 installer: search by meaning works, everything else is good, and one thing before
+Phase 17: the profile icon opened Who's watching? with no way back to the page it was clicked from.
+
+- **The way back** (f2dd945): opened from the avatar, Who's watching? carries the same link as every page, naming the
+  page it covers; it keeps whoever is watching and returns focus to the avatar. Launch's question has none. The arrow is
+  one design-system piece, `BackLink`. Seen to fail: three unit tests, and the pad audit on the old build ("has a way
+  back (null)"); 123 checks pass on the new one.
+- **E2 closed in the real window** (1863bcb): a generated clip, "Load a file…" clicked, Windows' picker answered with a
+  typed path: the cue on the picture. Two rough edges found there and fixed: the picker listed every file (it opened on
+  a pictures folder), and the track read "sin-e-phile". Now subtitle files first, the track named for its file.
+- **A first launch could leave no default profile** (803a1c4), found on the second launch of that scratch folder: two
+  simultaneous first asks, one demoting what the other made, then failing on the name; every later launch failed the
+  same way, and everything kept per profile with it. One statement per step now, and an install in that state mends
+  itself (seen: `(1, 'You', 0)` became `(1, 'You', 1)` on the next launch). The race test passed before the fix until
+  the pool was warmed; only then did it fail as the app had.
+- **Regression:** `cargo test --workspace` 862 passed (858 at round 9), `npm test` 273 (269), the pad audit 123 (120).
+
+**Decisions taken (none reserved):** E9 is met by the author's sign-off on the live app after ten rounds rather than a
+separate screenshot set; Phase 14 E4 (no-key state good-looking) and E6 (onboarding beautiful) are carried to Phase 19,
+because that sign-off was on an install with a TMDB key and an existing setup, and Phase 19's overhaul redesigns those
+screens and ends with a screenshot sign-off; Phase 7 E7 (the VPN cut) goes to that same batch. "Load a file" counts as
+met by pad as far as the app goes: the pad reaches and presses it, and Windows' own picker takes the keyboard or mouse
+(D91). Debt at the close: D87 to Phase 24, D88 to 22, D89 and D91 to 19. **Spec amendments:** none.
+
+#### Phase 16 retrospective
+
+**Went well.** Judging by the release build as a person uses it found what every test had missed: a fresh install
+that never built its search index, a meaning file corrupt mid-download and kept, a profile race on a first launch.
+Real-window runs (the probe, the window driver, a scratch data folder) became routine, and every fix was seen to fail
+first, including the pad audit against the old build.
+
+**Went badly.** The phase ran ten days and ten rounds. Most of its defects lived on paths only a fresh install, a
+resumed download or a second launch take, and fixtures start from states the real first run never produces. One race
+test passed before its fix, which a check that has never been seen to fail would have hidden.
+
+**Carry forward.** Before giving the author an installer: a fresh install and a second launch on a scratch folder, in
+the real window, as a standing step. To Phase 19's author batch: Phase 7 E7, Phase 14 E4 and E6, D89, D91.

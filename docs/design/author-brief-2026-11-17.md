@@ -283,3 +283,20 @@ the author's database (its write-ahead log was 3.7 GB at the time).
 **For the author to try:** install the new installer over the old one (about 350 MB larger). At the next start the
 index builds by itself in about half a minute, with nothing downloaded and no button; your corrupt download is removed.
 Then search "a heist where the plan goes wrong" or "anime about loneliness in a big city".
+
+## Round 10 (2026-11-18, after installing the round 9 installer)
+
+**Report:** search by meaning works; everything else is good. One thing before Phase 16 closes: the profile icon opens
+Who's watching? with no arrow back to the page it was clicked from.
+
+**Fix:** opened from the avatar, Who's watching? has the same way back as every other page, top left, saying where it
+goes ("← Home", "← Settings", or the title that was open). It keeps whoever is watching, and focus returns to the
+avatar so a pad carries on from there. Launch's question has no way back, because its only way forward is an answer
+(Escape still keeps the last profile, as before). The arrow and its label are now one design-system piece,
+`BackLink`, shared by the back bar and this page.
+
+**Found while closing E2 ("Load a file", 2026-11-18, real window):** the picker offered every file (it opened on a
+pictures folder) and a loaded track was listed as "sin-e-phile". It now offers subtitle files first, and the track is
+named for its file. On the way, a first launch could leave no profile the default (two first asks at once), which broke
+everything kept per profile on every later launch; fixed, and an install in that state mends itself. Not seen on the
+author's install.

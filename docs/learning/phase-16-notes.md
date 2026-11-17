@@ -82,6 +82,11 @@ test passed. Four sections per ADR-0016 (A4).
 - **Search by meaning inside the installer** (round 9, ADR-0053): the author's download was corrupt mid-file (a resume
   answered from the wrong byte), kept, and judged by its header, so the build failed forever without a log line. The
   installer now carries the files; downloads check where a resume starts, delete what fails, and are read in full.
+- **A way back from Who's watching?** (round 10): opened from the avatar it says where back goes, as every page does;
+  launch's question has none. The arrow and its label are one design-system piece, `BackLink`.
+- **Load a file, in the real window** (round 10): the picker offers subtitle files first and a loaded track is named for
+  its file. On the way, a first launch's race that could leave no profile the default, and with it break everything kept
+  per profile on every later launch, was found and fixed; an install already in that state mends itself.
 
 ## 2. Why
 
@@ -198,6 +203,16 @@ test passed. Four sections per ADR-0016 (A4).
   `src-tauri/tauri.release.conf.json`, `crates/catalogue/src/assets.rs` `MeaningFiles`.
 - **A test HTTP server on a plain thread** (`std::net::TcpListener`), honest or not on purpose —
   `crates/catalogue/tests/download.rs` `serve`.
+- **Check-then-act is a race**: two callers both read "none" and both act. One statement (`INSERT … SELECT … WHERE NOT
+  EXISTS`) or one transaction makes it a single step — `crates/persistence/src/repositories/profiles.rs`
+  `ensure_default`, `create`.
+- **A race test must be able to lose**: it passed before the fix until the pool was warmed to eight open connections, so
+  the asks really ran side by side — `crates/persistence/tests/profiles.rs`
+  `many_first_asks_at_once_leave_one_default_profile`.
+- **Focus back to the opener** when a full-screen layer closes, captured before the layer moves focus —
+  `src/features/profiles/ProfilePicker.tsx`.
+- **A Windows file-type filter** (`COMDLG_FILTERSPEC`), its strings kept alive across the call —
+  `src-tauri/src/commands/library.rs` `picker::file`.
 
 ## 4. Five questions
 

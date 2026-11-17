@@ -3083,3 +3083,28 @@ Commit: c4c1fcc. Copy of the author's install made read-only with sqlite's backu
 | Debug build: press Download | downloaded, checked, 119,833 titles indexed, hybrid in 54 s | same run |
 | Release build with the installed copy (`npm run release`), the copy in the author's state | at launch: 364,263,390 bytes of superseded downloads removed, index built from the installed copy in 23 s (119,833 titles, 63.8 MB), hybrid, no button | `target/release/sin-e-phile.exe`, `SINEPHILE_DATA_DIR` = copy, `target/release/data/logs` |
 | `tools/bundle/check_meaning.py` | refuses the author's copy (exit 1), passes the published files (exit 0) | `python tools/bundle/check_meaning.py <dir>` |
+
+### Load a file, in the real window (Phase 16 E2, round 10, 2026-11-18)
+
+Debug build of this round's code, a scratch data folder, a generated 2-minute 1280x720 clip (ffmpeg `testsrc2`) and a
+one-cue `.srt`. The probe opened the panel (`SINEPHILE_PROBE=6000:player_menu`), "Load a file…" was clicked, and
+Windows' picker opened over the player, titled "Load subtitles". The path was typed and Enter pressed: the cue was on
+the picture, the track was listed as now showing, and the panel said "Showing the file (not aligned (no speech found in
+the audio); loaded as it is)". Before this round's fix the picker listed every file in the folder (it opened on a
+pictures folder) and the track read "sin-e-phile"; after it, the picker offers "Subtitles
+(*.srt;*.ass;*.ssa;*.vtt;*.sub)" and the track reads "clip-test". Unit: `src/features/player/SubtitleTools.test.tsx`
+"loads a file from disk…" (seen to fail with the button disconnected); `crates/subtitles` `files::tests::
+the_picker_offers_every_subtitle_kind_and_a_loaded_file_keeps_its_name` (seen to fail naming the track with its
+extension).
+
+**Found on the way: a first launch could leave no default profile.** The second launch on that folder logged
+"subtitles could not be prepared … UNIQUE constraint failed: profiles.name", and the panel had no Style section. The
+first launch's simultaneous `ensure_default` calls had each seen no default: one made "You", the other demoted it and
+failed on the name, leaving `(1, 'You', 0)`; every later ask failed the same way, and everything kept per profile with
+it. Fixed in `crates/persistence/src/repositories/profiles.rs`: each step is one statement, and an install with
+profiles but no default gives the first one the flag back. The same folder then launched with `(1, 'You', 1)`, no
+warning, and the Style section back. `cargo test -p sinephile-persistence --test profiles`: eight asks at once, ten
+rounds, one default profile each time (seen to fail before the fix: "round 0: … UNIQUE constraint failed:
+profiles.name"; it passed before the fix too until the pool was warmed to eight open connections);
+`an_install_left_without_a_default_gets_its_first_profile_back` and
+`a_new_default_that_cannot_be_made_leaves_the_old_one_the_default`, each seen to fail.

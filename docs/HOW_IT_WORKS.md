@@ -424,7 +424,9 @@ changed and refreshes only then, with AniList airing and TMDB "showing now" besi
 like a TV, the right stick scrolls whatever is under focus, and subtitles are styled, found, synced and
 loaded from inside playback. Everything is reachable by pad: a select opens as a list the D-pad walks
 (`src/app/PadPicker.tsx`), a slider steps with Left and Right, and focus that falls to the page when its
-control goes is put back near where it was (`src/lib/gamepad.ts`). How it all fits:
+control goes is put back near where it was (`src/lib/gamepad.ts`). The author's ten rounds of fixes after
+using it added a poster grid for search, a title's backdrop and poster (ADR-0052), search by meaning carried
+in the installer (ADR-0053), and one way back on every screen. How it all fits:
 `docs/specs/ready-to-watch.md`.
 
 ### Profiles ✅ `Phase 14`

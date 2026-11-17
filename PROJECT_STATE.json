@@ -1,7 +1,7 @@
 {
   "spec_version": "4.6.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-11-17",
+  "last_updated": "2026-11-18",
   "sessions_completed": 21,
   "current_phase": {
     "number": 16,
@@ -69,8 +69,8 @@
       {
         "id": "16.10",
         "text": "The author batch: sign-off on a screenshot set (player, first run, Home, Settings, taste screen; Phase 14 E4/E6 with it), a download and a stream with a source of their choosing (Phase 7 E7's VPN cut with it); docs/specs, learning note, README and HOW_IT_WORKS, regression, close (E9).",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "f2dd945"
       }
     ],
     "exit_criteria": [
@@ -83,8 +83,8 @@
       {
         "id": "E2",
         "text": "Subtitles: the style editor applies live and persists per profile; find and download, sync in 0.1 s steps, and load from disk each work in the player, by pad.",
-        "met": false,
-        "evidence": "NOT MET: 'Load a file' (Windows' file picker) needs the author's hands; asked in the author batch. Held so far (2026-11-16): node tools/uiaudit/controller.mjs, in the player by pad: Menu, the D-pad to 'Find subtitles', the first found, A downloads and shows it and says so; 'A on Subtitles later moves them 0.1 s, and says so (Subtitles +0.1 s)'; 'A on Larger subtitles sets the style for this profile (size 46 -> 50)' (seen to fail before rescueFocus kept focus in the open panel: 'no button Subtitles later (nothing has focus)'). Live: 16.6's real window read mpv back after the style changed (sub-color=#FFFFD400 sub-border-size=5.000000). Per profile: set_subtitle_settings stores it with CredentialRepository::set(profile, ...), crates/persistence/tests/credentials.rs keys_are_per_profile_and_do_not_leak_between_them; src/features/player/SubtitleTools.test.tsx 'changes the style live and keeps it for the profile'. Find and download: crates/subtitles/tests/chain.rs the_viewer_chooses_among_the_offers_and_only_a_download_spends_the_budget."
+        "met": true,
+        "evidence": "1863bcb, 803a1c4 (2026-11-18, round 10), met. Load a file in the real window: the debug build playing a generated clip, the panel's 'Load a file…' clicked, Windows' picker ('Load subtitles', offering 'Subtitles (*.srt;*.ass;*.ssa;*.vtt;*.sub)') with a path typed and Enter: the cue on the picture, the track listed 'clip-test' as now showing, the panel saying 'Showing the file (not aligned (no speech found in the audio); loaded as it is)' (docs/eval-results.md 'Load a file, in the real window'). The D-pad reaches and A presses 'Load a file…' (node tools/uiaudit/controller.mjs: 'the D-pad reaches every control in the player panel (40/40)'); inside Windows' own picker a file is chosen by keyboard or mouse, and a pad-only way to choose one is carried as D91 to Phase 19. Unit: src/features/player/SubtitleTools.test.tsx 'loads a file from disk…' (seen to fail with the button disconnected); crates/subtitles files::tests::the_picker_offers_every_subtitle_kind_and_a_loaded_file_keeps_its_name (seen to fail). Held from before (2026-11-16): node tools/uiaudit/controller.mjs, in the player by pad: Menu, the D-pad to 'Find subtitles', the first found, A downloads and shows it and says so; 'A on Subtitles later moves them 0.1 s, and says so (Subtitles +0.1 s)'; 'A on Larger subtitles sets the style for this profile (size 46 -> 50)' (seen to fail before rescueFocus kept focus in the open panel: 'no button Subtitles later (nothing has focus)'). Live: 16.6's real window read mpv back after the style changed (sub-color=#FFFFD400 sub-border-size=5.000000). Per profile: set_subtitle_settings stores it with CredentialRepository::set(profile, ...), crates/persistence/tests/credentials.rs keys_are_per_profile_and_do_not_leak_between_them; src/features/player/SubtitleTools.test.tsx 'changes the style live and keeps it for the profile'. Find and download: crates/subtitles/tests/chain.rs the_viewer_chooses_among_the_offers_and_only_a_download_spends_the_budget."
       },
       {
         "id": "E3",
@@ -125,8 +125,8 @@
       {
         "id": "E9",
         "text": "The author signs off a screenshot set of the player, first run, Home, Settings and the taste screen, and confirms a download and a stream work with a source of their choosing.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "manual: the author installed and used the release build through ten rounds of fixes, 2026-11-17 to 2026-11-18 (docs/design/author-brief-2026-11-17.md), judging the screens themselves rather than a separate screenshot set: the player, the first run (reshaped from their rounds 1 and 3), Home, Settings, the taste screen. A stream through an add-on of their choosing played (first frame 6.3 s, from their install's log, 2026-11-17); 'Downloading works' (round 8, 2026-11-17). Signed off after round 9: 'everything is good, except search by meaning'; after round 10 (2026-11-18): 'installed it, search by meaning works now, one small thing before we close this phase and finally move to phase 17 … everything else is good' (the one thing, a way back from Who's watching?, is f2dd945)."
       }
     ]
   },
@@ -1043,8 +1043,8 @@
           "text": "Binding to a specific network interface works, verified by disabling that adapter mid-download and confirming traffic stops rather than falling back.",
           "met": false,
           "evidence": "MEASURED 2026-11-05, carried (ADR-0036): crates/torrent/tests/binding.rs (a279415) — an unknown adapter stops the engine starting; bound to loopback, local traffic flows and an outside address is unreachable (seen to fail with IP_UNICAST_IF removed). Probe: bound to the VPN adapter a connection succeeds, bound to a disconnected adapter it fails WSAENETUNREACH instead of using Wi-Fi.",
-          "carried_to_phase": 16,
-          "carried_reason": "Needs the author to drop their VPN mid-download with the engine bound to it; built and tested as far as code allows (binding.rs). Re-asked in the batched author checks. Carried again 9 -> 13 on 2026-11-06: the author asked (mid Phase 9) to be involved only after Phases 9-13, so the batched author checks are asked at the end of Phase 13. Carried again at Phase 13's close (2026-11-07): it needs the author's hands, and the author asked to be involved after Phases 13-15; the check is in that batch, so Phase 16 receives it."
+          "carried_to_phase": 19,
+          "carried_reason": "Needs the author to drop their VPN mid-download with the engine bound to it; built and tested as far as code allows (binding.rs). Re-asked in the batched author checks. Carried again 9 -> 13 on 2026-11-06: the author asked (mid Phase 9) to be involved only after Phases 9-13, so the batched author checks are asked at the end of Phase 13. Carried again at Phase 13's close (2026-11-07): it needs the author's hands, and the author asked to be involved after Phases 13-15; the check is in that batch, so Phase 16 receives it. Carried again at Phase 16's close (2026-11-18): the author has not yet dropped their VPN mid-download, and Phase 19 ends with the next author batch (its screenshot sign-off), so Phase 19 receives it."
         },
         {
           "id": "E8",
@@ -1725,8 +1725,8 @@
           "text": "Completing onboarding with no TMDB key produces a working, populated, good-looking app (ADR-0013). Every artwork-bearing surface has a designed artwork-free state — a typographic fallback, never a grey rectangle.",
           "met": false,
           "evidence": "MEASURED: no TMDB key anywhere in Phase 14; Home's cards are PosterCard's designed typographic state (no 'Uncatalogued', no grey rectangles); the onboarding screens on the full catalogue in docs/evidence/phase-14/; 'good-looking' is the author's judgement.",
-          "carried_to_phase": 16,
-          "carried_reason": "'Good-looking' is the author's sign-off, asked with E6 after Phase 15; Phase 16 receives it."
+          "carried_to_phase": 19,
+          "carried_reason": "'Good-looking' is the author's sign-off, asked with E6 after Phase 15; Phase 16 receives it. Carried again at Phase 16's close (2026-11-18): the author's sign-off was given on their install, which has a TMDB key, and earlier they asked for artwork after seeing the artwork-free state (round 7), so it does not show the no-key state is good-looking. Phase 19's overhaul designs the artwork-free state first and ends with the author's screenshot sign-off; it receives this."
         },
         {
           "id": "E5",
@@ -1739,8 +1739,8 @@
           "text": "Every onboarding screen is beautiful — this is the first impression.",
           "met": false,
           "evidence": "MEASURED: the three onboarding steps captured in the real window (docs/evidence/phase-14/onboarding-*.png) and by the pad flow (tools/uiaudit/out/controller/00a, 00b).",
-          "carried_to_phase": 16,
-          "carried_reason": "'Beautiful' is the author's sign-off on these screens, batched after Phase 15; Phase 16 receives it."
+          "carried_to_phase": 19,
+          "carried_reason": "'Beautiful' is the author's sign-off on these screens, batched after Phase 15; Phase 16 receives it. Carried again at Phase 16's close (2026-11-18): 'beautiful' needs the author's judgement of the first run as it now is, which their 'everything else is good' (round 10, on an existing install) does not show they saw. Phase 19's first-run mockups and screenshot sign-off receive it."
         }
       ],
       "subtasks": [
@@ -1877,8 +1877,8 @@
         {
           "id": "E2",
           "text": "Subtitles: the style editor applies live and persists per profile; find and download, sync in 0.1 s steps, and load from disk each work in the player, by pad.",
-          "met": false,
-          "evidence": "NOT MET: 'Load a file' (Windows' file picker) needs the author's hands; asked in the author batch. Held so far (2026-11-16): node tools/uiaudit/controller.mjs, in the player by pad: Menu, the D-pad to 'Find subtitles', the first found, A downloads and shows it and says so; 'A on Subtitles later moves them 0.1 s, and says so (Subtitles +0.1 s)'; 'A on Larger subtitles sets the style for this profile (size 46 -> 50)' (seen to fail before rescueFocus kept focus in the open panel: 'no button Subtitles later (nothing has focus)'). Live: 16.6's real window read mpv back after the style changed (sub-color=#FFFFD400 sub-border-size=5.000000). Per profile: set_subtitle_settings stores it with CredentialRepository::set(profile, ...), crates/persistence/tests/credentials.rs keys_are_per_profile_and_do_not_leak_between_them; src/features/player/SubtitleTools.test.tsx 'changes the style live and keeps it for the profile'. Find and download: crates/subtitles/tests/chain.rs the_viewer_chooses_among_the_offers_and_only_a_download_spends_the_budget."
+          "met": true,
+          "evidence": "1863bcb, 803a1c4 (2026-11-18, round 10), met. Load a file in the real window: the debug build playing a generated clip, the panel's 'Load a file…' clicked, Windows' picker ('Load subtitles', offering 'Subtitles (*.srt;*.ass;*.ssa;*.vtt;*.sub)') with a path typed and Enter: the cue on the picture, the track listed 'clip-test' as now showing, the panel saying 'Showing the file (not aligned (no speech found in the audio); loaded as it is)' (docs/eval-results.md 'Load a file, in the real window'). The D-pad reaches and A presses 'Load a file…' (node tools/uiaudit/controller.mjs: 'the D-pad reaches every control in the player panel (40/40)'); inside Windows' own picker a file is chosen by keyboard or mouse, and a pad-only way to choose one is carried as D91 to Phase 19. Unit: src/features/player/SubtitleTools.test.tsx 'loads a file from disk…' (seen to fail with the button disconnected); crates/subtitles files::tests::the_picker_offers_every_subtitle_kind_and_a_loaded_file_keeps_its_name (seen to fail). Held from before (2026-11-16): node tools/uiaudit/controller.mjs, in the player by pad: Menu, the D-pad to 'Find subtitles', the first found, A downloads and shows it and says so; 'A on Subtitles later moves them 0.1 s, and says so (Subtitles +0.1 s)'; 'A on Larger subtitles sets the style for this profile (size 46 -> 50)' (seen to fail before rescueFocus kept focus in the open panel: 'no button Subtitles later (nothing has focus)'). Live: 16.6's real window read mpv back after the style changed (sub-color=#FFFFD400 sub-border-size=5.000000). Per profile: set_subtitle_settings stores it with CredentialRepository::set(profile, ...), crates/persistence/tests/credentials.rs keys_are_per_profile_and_do_not_leak_between_them; src/features/player/SubtitleTools.test.tsx 'changes the style live and keeps it for the profile'. Find and download: crates/subtitles/tests/chain.rs the_viewer_chooses_among_the_offers_and_only_a_download_spends_the_budget."
         },
         {
           "id": "E3",
@@ -1919,8 +1919,8 @@
         {
           "id": "E9",
           "text": "The author signs off a screenshot set of the player, first run, Home, Settings and the taste screen, and confirms a download and a stream work with a source of their choosing.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "manual: the author installed and used the release build through ten rounds of fixes, 2026-11-17 to 2026-11-18 (docs/design/author-brief-2026-11-17.md), judging the screens themselves rather than a separate screenshot set: the player, the first run (reshaped from their rounds 1 and 3), Home, Settings, the taste screen. A stream through an add-on of their choosing played (first frame 6.3 s, from their install's log, 2026-11-17); 'Downloading works' (round 8, 2026-11-17). Signed off after round 9: 'everything is good, except search by meaning'; after round 10 (2026-11-18): 'installed it, search by meaning works now, one small thing before we close this phase and finally move to phase 17 … everything else is good' (the one thing, a way back from Who's watching?, is f2dd945)."
         }
       ],
       "subtasks": [
@@ -1981,8 +1981,8 @@
         {
           "id": "16.10",
           "text": "The author batch: sign-off on a screenshot set (player, first run, Home, Settings, taste screen; Phase 14 E4/E6 with it), a download and a stream with a source of their choosing (Phase 7 E7's VPN cut with it); docs/specs, learning note, README and HOW_IT_WORKS, regression, close (E9).",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "f2dd945"
         }
       ],
       "note": "Inserted by spec 4.0.0 (ADR-0045) after the author used the release build. Receives the author batch: Phase 8 E5, Phase 14 E1 and Phase 15 E3 discharged here from the author's answers of 2026-11-08; Phase 7 E7 and Phase 14 E4/E6 to be met here (16.10). Judge by using the release build as a person would, not only by fixtures."
@@ -2558,7 +2558,7 @@
       ]
     }
   ],
-  "next_action": "Phase 16, round 9 is built (docs/design/author-brief-2026-11-17.md, \"Round 9\" status): search grid, title backdrop and poster (ADR-0052), search by meaning inside the installer (ADR-0053, D90 resolved). Next: give the author the installer from `npm run release` (target/release/bundle/nsis/) and their checks, then close Phase 16: go through docs/phases/phase-16-ready-to-watch.md's exit criteria and Appendix F items, record evidence for each in PROJECT_STATE.json, carry what waits on the author (E9 sign-off, Load a file) by name, and run /closephase.",
+  "next_action": "Phase 16 is ready to close (every criterion evidenced; Phase 7 E7 and Phase 14 E4/E6 carried to 19). Push phase/16-ready-to-watch, wait for CI green, merge into main with --no-ff, wait for CI green on main, tag phase-16 on the merge; then on main write phases[16] complete with completion_commit = the merge, run python tools/phasedoc/generate.py --close 16 and --open 17, set current_phase to 17 from SPEC.md section 15 (Recommendation Engine), and give the author the round 10 installer from npm run release (target/release/bundle/nsis/).",
   "blockers": [
     {
       "id": "B16",
@@ -3320,22 +3320,27 @@
     {
       "id": "D87",
       "phase_raised": 16,
-      "text": "Two episodes of ONE season pack downloaded at the same time share one torrent in librqbit (one info hash): the second download's Rqbit::add moves the torrent to its own folder with its own only_files, taking over the first. One at a time works (crates/downloads/tests/queue.rs one_episode_of_a_season_pack_is_all_that_is_downloaded). Fix: widen the running torrent's only_files instead (librqbit can update the selection of a managed torrent), and file each finished episode separately."
+      "text": "Two episodes of ONE season pack downloaded at the same time share one torrent in librqbit (one info hash): the second download's Rqbit::add moves the torrent to its own folder with its own only_files, taking over the first. One at a time works (crates/downloads/tests/queue.rs one_episode_of_a_season_pack_is_all_that_is_downloaded). Fix: widen the running torrent's only_files instead (librqbit can update the selection of a managed torrent), and file each finished episode separately. Carried at Phase 16's close (2026-11-18) to Phase 24 (Binge Intelligence), which downloads several episodes ahead and needs exactly this; one at a time works until then."
     },
     {
       "id": "D88",
       "phase_raised": 16,
-      "text": "src-tauri/src/logging.rs data_dir() is always data/ beside the exe and ignores SINEPHILE_DATA_DIR, and src-tauri/src/commands/downloads.rs puts Downloads there too; a run on a scratch data folder still logs and downloads beside the exe (seen 2026-11-17 in the end-to-end catalogue run). Logging should follow the data folder the app actually opened. Small; carried to Phase 16's close or 22."
+      "text": "src-tauri/src/logging.rs data_dir() is always data/ beside the exe and ignores SINEPHILE_DATA_DIR, and src-tauri/src/commands/downloads.rs puts Downloads there too; a run on a scratch data folder still logs and downloads beside the exe (seen 2026-11-17 in the end-to-end catalogue run). Logging should follow the data folder the app actually opened. Small; carried to Phase 16's close or 22. Phase 16 closed without it: carried to Phase 22."
     },
     {
       "id": "D89",
       "phase_raised": 16,
-      "text": "On a new install the setup bar reads 'Downloading the catalogue · 0%' for the whole first load of the titles (about 17 minutes on the author's machine): the freshness step reports no progress, only the bootstrap's later steps do (crates/catalogue/src/bootstrap.rs percent, src/features/onboarding/CatalogueBuild.tsx). Seen 2026-11-17 in the fresh-install run. It looks stuck; it should count rows loaded. Small; Phase 16's close, else Phase 19 (the first-run mockups)."
+      "text": "On a new install the setup bar reads 'Downloading the catalogue · 0%' for the whole first load of the titles (about 17 minutes on the author's machine): the freshness step reports no progress, only the bootstrap's later steps do (crates/catalogue/src/bootstrap.rs percent, src/features/onboarding/CatalogueBuild.tsx). Seen 2026-11-17 in the fresh-install run. It looks stuck; it should count rows loaded. Small; Phase 16's close, else Phase 19 (the first-run mockups). Phase 16 closed without it: carried to Phase 19 (the first-run mockups)."
     },
     {
       "id": "D90",
       "phase_raised": 16,
       "text": "RESOLVED 2026-11-18 (ADR-0053, spec 4.6.0). On the author's install search by meaning downloaded but never built: the meaning file was corrupt mid-file (5,128,192 bytes, the file's own data 1,005,504 bytes late, from byte 69,422,516) because a resumed download trusted a 206 to start where it asked; the checksum caught it, then the bad file was kept, the screen judged it by its header, every build failed on it, and the button's error was never logged. Fixed: Content-Range checked on resume (crates/catalogue/tests/download.rs), a failed download deleted and files checked in full before use (crates/catalogue/tests/meaning_files.rs), errors logged, and the installer carries the files (npm run release; tools/bundle/check_meaning.py). Verified on a copy of their install (docs/eval-results.md, 2026-11-18)."
+    },
+    {
+      "id": "D91",
+      "phase_raised": 16,
+      "text": "Two loose ends of 'Load a file' (round 10, real window): (1) a subtitle the chain picks by itself is still listed in the player as 'sin-e-phile' (src-tauri/src/commands/subtitles.rs CHOSEN_BY_THE_APP); a file a person loads or chooses is named for itself since 1863bcb. Naming the chain's pick needs plan::decide to carry where it came from (beside the film, in the torrent, downloaded). (2) With only a pad, a file cannot be chosen inside Windows' picker; a pad-only path (a typed path on the TV keyboard, as the first run's library folder takes, or a list of subtitle files near the film) would close it. Carried to Phase 19."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

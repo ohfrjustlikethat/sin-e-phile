@@ -106,7 +106,10 @@ rail, the paused film's details — falling back to the nearest scrollable ances
   budget; only choosing an offer does, and a refused download returns its reservation.
 - **Sync**: 0.1 s steps, remembered; "align again" re-runs the aligner (`subtitle-alignment.md`) on an
   external track and says why it cannot for an embedded one.
-- **Load a file**: Windows' file picker.
+- **Load a file**: Windows' file picker, offering subtitle files first (the subtitle crate's own list,
+  `files::picker_pattern`: `*.srt;*.ass;*.ssa;*.vtt;*.sub`) with All files beside; the track is named for its file
+  (`files::track_title`), not "sin-e-phile". The pad reaches and presses it; inside Windows' picker a file is chosen by
+  keyboard or mouse (D91). Seen in the real window, round 10 (`docs/eval-results.md`).
 - **By pad**, in the panel: Find, a found subtitle, "Subtitles earlier/later" (0.1 s) and every style
   button. Choosing a found subtitle closes the list it was in; focus is put back within the panel
   (`rescueFocus` acts during playback only inside a dialog still open over the film).

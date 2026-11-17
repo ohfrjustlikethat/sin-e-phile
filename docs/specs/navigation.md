@@ -28,6 +28,11 @@ exited".*
   first, except the search box, whose Escape leaves search.
 - The screens' own "← Back" buttons and Escape handlers (title page, Downloads, taste profile) are gone: one way back.
   Settings keeps its "Done" until item 8 redesigns it.
+- Who's watching?, opened from the masthead's avatar, covers the masthead and this bar, so it carries the same link
+  (`BackLink`, `src/design-system/primitives/BackLink.tsx`) to the page under it (`hereLabel`: the title open, the tab,
+  Settings, Downloads, the review queue, the taste screen). It keeps whoever is watching, and focus goes back to the
+  avatar. Launch's question has none (`pickerAtLaunch` in the store): its only way on is an answer, or Escape as before
+  (round 10).
 
 ## Scroll memory (`src/lib/scrollMemory.ts`)
 

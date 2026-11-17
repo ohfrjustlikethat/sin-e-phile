@@ -361,6 +361,8 @@ Honestly:
   button away, and answers in about 14 ms; subtitles can be restyled live, found, chosen, synced and
   loaded without leaving it. The controller works there as on a TV, and the right stick scrolls
   anything. A seven-step first run ends ready to watch, and where no source is set up the app says so.
+  Search is one poster grid, a title's page shows its backdrop and poster, and search by meaning comes
+  inside the installer, building its index by itself on first launch.
   [`SETUP.md`](SETUP.md) lists every prerequisite with its official link.
 - ⬜ Everything else described above this section
 
