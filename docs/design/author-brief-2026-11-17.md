@@ -225,3 +225,17 @@ work (found: the install never downloaded it; setup was finished before it was o
   gets a clear offer instead (the search page and Settings), with its size.
 - **Continue watching on Films and TV Shows:** a rail at the very top of each, films only on Films, shows only on TV
   Shows, above "On this PC"; hidden when there is nothing to continue.
+
+### Round 8 status (2026-11-17)
+
+| Report | Fix | Commit |
+|---|---|---|
+| Streams: "something broke in the interface", every title | One cache key held two shapes; the panel reads Settings' shape. Interface errors now reach the log. | b34ee3f |
+| Manage profiles opens at About | Opens at Profile | bb4ecb6 |
+| Bars never hide in full screen | A still pointer is not a movement; bars and pointer hide after 3 s, window and full screen | d5d6689 |
+| Continue watching shows "Episode #1.1" | One card per show, the episode and a bar; also atop Films and TV Shows; the show's page resumes it | a021a35 |
+| Paused, no show or episode | Show, "Season 1 · Episode 2 — name", time left, next, the show's cast | a021a35 |
+| Search by meaning does not work | Never worked on any install: the tokenizer's name, and vectors addressed by the producer's row ids. Keyed by IMDb id (ADR-0051); setup fetches it on a new install, an existing one is offered it (ADR-0050) | e140264 |
+
+**For the author to try:** the new installer on your install, then Search: "Download 347 MB" at the top, and a
+description such as "a heist where the plan goes wrong" once it is done (the index builds in about 30 s).

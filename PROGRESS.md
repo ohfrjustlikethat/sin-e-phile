@@ -53,7 +53,7 @@
 
 ## What's next
 
-Phase 16: build the author's 15-item plan in docs/design/author-brief-2026-11-17.md, in its order (their answers to 7 rounds of questions are there; do not re-ask). Item 1 (season packs) is done. Items 1 and 2 (season packs, direct downloads) are done. All fifteen items of the author's fix list are done (status table at the end of docs/design/author-brief-2026-11-17.md; later-phase depth in SPEC.md Appendix F I79-I86, ADR-0049). Next: give the author the new installer (src-tauri/target/release/bundle/) and their manual checks (listed in the brief), then close Phase 16: go through docs/phases/phase-16-ready-to-watch.md's exit criteria and Appendix F items, record evidence for each in PROJECT_STATE.json, carry what waits on the author (E9 sign-off, Load a file) by name, and run /closephase. 
+Phase 16: build the author's 15-item plan in docs/design/author-brief-2026-11-17.md, in its order (their answers to 7 rounds of questions are there; do not re-ask). Item 1 (season packs) is done. Items 1 and 2 (season packs, direct downloads) are done. All fifteen items and round 8 of the author's fix list are done (status tables at the end of docs/design/author-brief-2026-11-17.md; ADR-0050, ADR-0051). Next: give the author the new installer (target/release/bundle/nsis/) and their manual checks (listed in the brief), then close Phase 16: go through docs/phases/phase-16-ready-to-watch.md's exit criteria and Appendix F items, record evidence for each in PROJECT_STATE.json, carry what waits on the author (E9 sign-off, Load a file) by name, and run /closephase. 
 
 ---
 
