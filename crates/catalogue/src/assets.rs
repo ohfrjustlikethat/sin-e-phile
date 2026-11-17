@@ -27,6 +27,14 @@
 //! verified three times over — transport integrity, then its own internal checksum, then
 //! **model identity and document-builder version** — and the last of those is the one
 //! that matters.
+//!
+//! # The installed copy (ADR-0053)
+//!
+//! The installer carries all three files in `meaning/` beside the executable, laid out as
+//! a data folder is, so an installed copy has search by meaning with nothing to download.
+//! Each file is read from there when it is there, and from the data folder otherwise (a
+//! copy built with cargo, or one that downloaded them before). A downloaded copy that an
+//! installed one supersedes is removed ([`remove_superseded`]).
 
 use std::path::{Path, PathBuf};
 
@@ -84,9 +92,95 @@ pub enum AssetState {
     Unusable(String),
 }
 
-/// Everything the semantic half needs and does not ship with.
+/// The language model's file, in `models/`: one name for the download and every loader.
+pub const MODEL_FILE: &str = "bge-small-en-v1.5-int8.onnx";
+/// The tokenizer's file, in `models/`. The download once saved it as
+/// `bge-small-en-v1.5-int8-tokenizer.json` while the app and the tools loaded this name, so
+/// no install that downloaded search by meaning could load it (Phase 16, found on a copy of
+/// the author's install); only a machine whose file was placed by hand worked.
+pub const TOKENIZER_FILE: &str = "bge-small-en-v1.5-tokenizer.json";
+
+/// Where the language model is, for a data directory.
+pub fn model_path(data_dir: &Path) -> std::path::PathBuf {
+    data_dir.join("models").join(MODEL_FILE)
+}
+
+/// Where the tokenizer is, for a data directory.
+pub fn tokenizer_path(data_dir: &Path) -> std::path::PathBuf {
+    data_dir.join("models").join(TOKENIZER_FILE)
+}
+
+/// Where an installed copy carries search by meaning: `meaning/` beside the executable.
+pub const INSTALLED_DIR: &str = "meaning";
+
+/// The installed copy's folder, whether or not it is there.
+pub fn installed_dir() -> Option<PathBuf> {
+    Some(std::env::current_exe().ok()?.parent()?.join(INSTALLED_DIR))
+}
+
+/// The three files search by meaning reads, wherever each one is.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MeaningFiles {
+    pub artefact: PathBuf,
+    pub model: PathBuf,
+    pub tokenizer: PathBuf,
+}
+
+impl MeaningFiles {
+    /// For this executable: its installed copy first, then `data_dir`.
+    pub fn find(data_dir: &Path) -> Self {
+        Self::find_in(data_dir, installed_dir().as_deref())
+    }
+
+    /// Each file from `installed` when it is there, else from `data_dir` (where a download
+    /// puts it, so a missing file's path is the one to fetch it to).
+    pub fn find_in(data_dir: &Path, installed: Option<&Path>) -> Self {
+        let pick = |at: fn(&Path) -> PathBuf| {
+            installed
+                .map(at)
+                .filter(|p| p.is_file())
+                .unwrap_or_else(|| at(data_dir))
+        };
+        Self {
+            artefact: pick(sinephile_embedding::artefact_path),
+            model: pick(model_path),
+            tokenizer: pick(tokenizer_path),
+        }
+    }
+}
+
+/// Delete the data folder's copies of files the installed copy carries (ADR-0053): they
+/// are never read again, and one may be the corrupt download that broke the author's
+/// search by meaning (D90). Returns the bytes freed.
+pub fn remove_superseded(data_dir: &Path, installed: Option<&Path>) -> u64 {
+    let Some(installed) = installed else {
+        return 0;
+    };
+    let mut freed = 0;
+    for at in [
+        sinephile_embedding::artefact_path as fn(&Path) -> PathBuf,
+        model_path,
+        tokenizer_path,
+    ] {
+        let (mine, downloaded) = (at(installed), at(data_dir));
+        if mine.is_file() && downloaded.is_file() && mine != downloaded {
+            let bytes = std::fs::metadata(&downloaded).map(|m| m.len()).unwrap_or(0);
+            if std::fs::remove_file(&downloaded).is_ok() {
+                freed += bytes;
+            }
+        }
+    }
+    freed
+}
+
+/// Everything the semantic half needs: the installed copy's files, or the ones to download.
 pub fn optional_assets(data_dir: &Path) -> Vec<Asset> {
-    let models = data_dir.join("models");
+    optional_assets_in(data_dir, installed_dir().as_deref())
+}
+
+/// [`optional_assets`], with the installed copy's folder given.
+pub fn optional_assets_in(data_dir: &Path, installed: Option<&Path>) -> Vec<Asset> {
+    let files = MeaningFiles::find_in(data_dir, installed);
     vec![
         Asset {
             name: "Meaning index",
@@ -94,7 +188,7 @@ pub fn optional_assets(data_dir: &Path) -> Vec<Asset> {
             url: format!(
                 "https://github.com/ohfrjustlikethat/sin-e-phile/releases/download/{ARTEFACT_RELEASE}/embeddings-{MODEL}.bin"
             ),
-            path: sinephile_embedding::artefact_path(data_dir),
+            path: files.artefact,
             bytes: 329_537_568,
             // See the field's note: the artefact verifies itself, header and vectors.
             sha256: None,
@@ -103,7 +197,7 @@ pub fn optional_assets(data_dir: &Path) -> Vec<Asset> {
             name: "Language model",
             purpose: "Turns what you type into something the meaning index can match.",
             url: "https://huggingface.co/Xenova/bge-small-en-v1.5/resolve/main/onnx/model_quantized.onnx".into(),
-            path: models.join(format!("{MODEL}.onnx")),
+            path: files.model,
             bytes: 33_961_249,
             sha256: Some("6c9c6101a956d62dfb5e7190c538226c0c5bb9cb27b651234b6df063ee7dbfe4"),
         },
@@ -111,7 +205,7 @@ pub fn optional_assets(data_dir: &Path) -> Vec<Asset> {
             name: "Tokenizer",
             purpose: "Splits your words the same way the index was built.",
             url: "https://huggingface.co/Xenova/bge-small-en-v1.5/resolve/main/tokenizer.json".into(),
-            path: models.join(format!("{MODEL}-tokenizer.json")),
+            path: files.tokenizer,
             bytes: 711_661,
             sha256: Some("d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66"),
         },
@@ -147,6 +241,23 @@ pub fn state_of(asset: &Asset) -> AssetState {
     }
 }
 
+/// Is this asset usable, judged by reading all of it: the artefact's own checksum and
+/// identity, the others' pinned sha256. About a second for the artefact, so for the moment
+/// before the files are used, never for a screen that only asks what to offer.
+///
+/// [`state_of`] reads the artefact's header alone, and a file with a sound header and a
+/// corrupt middle passed it: the author's download read as complete, and every build
+/// failed on it (D90).
+pub fn verified_state(asset: &Asset) -> AssetState {
+    if !asset.path.is_file() {
+        return AssetState::Absent;
+    }
+    match verify(asset) {
+        Ok(()) => AssetState::Present,
+        Err(e) => AssetState::Unusable(e.to_string()),
+    }
+}
+
 /// Read just the header and ask whether this build can use it.
 ///
 /// **This is the check E7 is about.** A previously published artefact — a different
@@ -174,7 +285,7 @@ pub async fn download(
     }
     // A stale file would be skipped by the downloader, which is right for a resume and
     // wrong for replacing something that failed verification.
-    if matches!(state_of(asset), AssetState::Unusable(_)) {
+    if !matches!(verified_state(asset), AssetState::Absent) {
         let _ = std::fs::remove_file(&asset.path);
     }
 
@@ -183,7 +294,11 @@ pub async fn download(
         .fetch(&asset.url, &asset.path, &mut on_progress)
         .await?;
 
-    verify(asset)
+    // A download that fails its checks is never kept: kept, it read as downloaded and
+    // every build failed on it, with nothing to say so (D90).
+    verify(asset).inspect_err(|_| {
+        let _ = std::fs::remove_file(&asset.path);
+    })
 }
 
 /// Transport integrity, then the artefact's own checks.

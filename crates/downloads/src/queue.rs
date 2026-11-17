@@ -66,6 +66,7 @@ mod tests {
             file_path: None,
             added_at: String::new(),
             finished_at: None,
+            file_index: None,
         }
     }
 

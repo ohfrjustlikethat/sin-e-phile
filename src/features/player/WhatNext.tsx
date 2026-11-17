@@ -41,6 +41,7 @@ export const NextEpisodeCard = forwardRef<HTMLDivElement, CardProps>(function Ne
   return (
     <div
       ref={ref}
+      data-cutout
       role="dialog"
       aria-label="Next episode"
       className="absolute right-3 bottom-[96px] w-[360px] rounded-md bg-surface px-5 py-4"

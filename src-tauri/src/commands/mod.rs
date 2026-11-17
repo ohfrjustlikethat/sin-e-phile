@@ -4,7 +4,9 @@
 //! belongs in a module the command calls, so it can be tested without an app
 //! handle and reused from somewhere that is not IPC.
 
+pub mod artwork;
 pub mod assets;
+pub mod catalogue;
 pub mod downloads;
 pub mod home;
 pub mod imports;

@@ -1,5 +1,7 @@
 import { Toggle } from "@/design-system";
-import { usePlaybackChoice } from "@/lib/playbackChoice";
+import { qualityLabel, usePlaybackChoice } from "@/lib/playbackChoice";
+import { ChoiceRow } from "@/features/detail/ChoiceRow";
+import { SETTINGS_HEADING } from "./heading";
 
 /**
  * Settings → Playback (SPEC.md Phase 9): the expert panel's switch. Ctrl+Shift+S on a
@@ -10,11 +12,26 @@ export function PlaybackSection() {
   const setDetails = usePlaybackChoice((s) => s.setDetails);
   const autoplay = usePlaybackChoice((s) => s.autoplay);
   const setAutoplay = usePlaybackChoice((s) => s.setAutoplay);
+  const preferred = usePlaybackChoice((s) => s.preferred);
+  const setPreferred = usePlaybackChoice((s) => s.setPreferred);
   return (
     <section className="mb-9" aria-label="Playback">
-      <h2 className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
+      <h2 className={SETTINGS_HEADING}>
         Playback
       </h2>
+      <ChoiceRow
+        label="Preferred quality"
+        choices={[
+          { value: null, label: "Best for this PC" },
+          ...["uhd", "full_hd", "hd", "sd"].map((q) => ({ value: q, label: qualityLabel(q) })),
+        ]}
+        value={preferred}
+        onChange={setPreferred}
+      />
+      <p className="mt-2 mb-5 max-w-[62ch] text-[13px] text-ink-muted">
+        Play picks the healthiest stream at this quality, then the nearest one that will start smoothly. 4K is
+        picked only when it has a strong swarm behind it.
+      </p>
       <Toggle
         checked={details}
         onChange={setDetails}

@@ -174,6 +174,122 @@ async fn paste_describe_install_find_resolve() {
     );
 }
 
+/// A Stremio add-on (ADR-0047), configured: its settings live in the path, as a real
+/// one's do. Asked by IMDb id; answers with a torrent (a season pack's third file) and a
+/// web address, plus a video-site id the player cannot open.
+const STREMIO_MANIFEST: &str = r#"{"id":"org.example.loopback","version":"2.0.0",
+    "name":"Loopback Stremio","description":"A test add-on.","catalogs":[],
+    "resources":["catalog",{"name":"stream","types":["movie","series"],"idPrefixes":["tt"]}],
+    "types":["movie","series"],"behaviorHints":{"configurable":true}}"#;
+const STREMIO_STREAMS: &str = r#"{"streams":[
+    {"name":"Loopback\n1080p","title":"Nosferatu.1922.1080p.BluRay.x264\n👤 57 💾 4.2 GB",
+     "infoHash":"HASH40","fileIdx":2,
+     "sources":["tracker:udp://tracker.example:6969/announce"]},
+    {"name":"Loopback 480p","url":"https://cdn.example/nosferatu-480.mp4"},
+    {"name":"Trailer","ytId":"abc123"}]}"#;
+
+/// A made-up info hash, built at run time: the posture guard refuses a literal one.
+fn hash40() -> String {
+    "0123456789abcdef".repeat(3)[..40].to_string()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_stremio_add_on_installs_and_answers_by_imdb_id() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    let routes = vec![
+        (
+            "/cfg%3Dabc/manifest.json",
+            Reply::Json(STREMIO_MANIFEST.into()),
+        ),
+        (
+            "/cfg%3Dabc/stream/movie/tt0013442.json",
+            Reply::Json(STREMIO_STREAMS.replace("HASH40", &hash40().to_uppercase())),
+        ),
+    ];
+    thread::spawn(move || {
+        for stream in listener.incoming().flatten() {
+            let routes = routes.clone();
+            thread::spawn(move || answer(stream, &routes));
+        }
+    });
+
+    let db = Db::in_memory().await.unwrap();
+    let (url, manifest) = fetch_manifest(&*untrusted(), &format!("{base}/cfg%3Dabc/manifest.json"))
+        .await
+        .unwrap();
+    let shown = describe(&url, &manifest, &[]);
+    assert_eq!(shown.name, "Loopback Stremio");
+    assert_eq!(shown.finds, "Finds films and TV episodes.");
+    assert!(shown.delivers[0].starts_with("A Stremio add-on"));
+
+    install(&db, &url, &manifest).await.unwrap();
+    let (addons, refused) = installed(&db).await.unwrap();
+    assert!(refused.is_empty(), "the stored manifest reads back");
+    let ctx = Context {
+        untrusted_http: untrusted(),
+        addons,
+        ..Context::default()
+    };
+    let resolver = resolver_from(&db, all(&ctx)).await.unwrap();
+    assert!(resolver.ids().contains(&"addon:org.example.loopback"));
+
+    // Its card in Settings → Add-ons (Phase 16): version, what it serves, its protocol.
+    let cards = sinephile_sources::overview::overview(&db, &all(&ctx), &ctx.addons)
+        .await
+        .unwrap();
+    let card = cards
+        .iter()
+        .find(|c| c.id == "addon:org.example.loopback")
+        .expect("its card");
+    assert_eq!(card.version.as_deref(), Some("2.0.0"));
+    assert_eq!(card.serves.as_deref(), Some("Films and series"));
+    assert_eq!(card.protocol.as_deref(), Some("Stremio add-on"));
+    assert!(
+        card.configurable,
+        "its manifest says it has a settings page"
+    );
+    let built_in = cards
+        .iter()
+        .find(|c| c.addon_host.is_none())
+        .expect("a built-in");
+    assert_eq!(
+        (built_in.version.as_ref(), built_in.protocol.as_ref()),
+        (None, None)
+    );
+
+    let mut query = MediaQuery::film("Nosferatu", Some(1922));
+    query.ids.imdb = Some("tt0013442".into());
+    let found = resolver.find_all(&query).await;
+    let ours: Vec<_> = found
+        .candidates
+        .iter()
+        .filter(|c| c.provenance.backend == "addon:org.example.loopback")
+        .collect();
+    assert_eq!(ours.len(), 2, "the video-site id is left out");
+    let torrent = ours
+        .iter()
+        .find(|c| c.title.starts_with("Nosferatu.1922"))
+        .unwrap();
+    assert_eq!(
+        resolver.resolve(torrent).await.unwrap(),
+        PlayableStream::Torrent {
+            info_hash: hash40(),
+            file_index: Some(2),
+            trackers: vec!["udp://tracker.example:6969/announce".into()],
+        }
+    );
+
+    // A title without an IMDb id is not asked about at all.
+    let unknown = resolver
+        .find_all(&MediaQuery::film("Nosferatu", Some(1922)))
+        .await;
+    assert!(unknown
+        .candidates
+        .iter()
+        .all(|c| c.provenance.backend != "addon:org.example.loopback"));
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn a_manifest_that_redirects_or_is_missing_is_explained() {
     let base = addon(vec![(

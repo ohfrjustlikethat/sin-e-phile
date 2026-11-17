@@ -47,12 +47,41 @@ fn runtime(app: &AppHandle, state: &AppState) -> Result<Arc<PlayerRuntime>, Stri
         cache_dir: Some(crate::logging::data_dir().join("cache").join("mpv")),
     };
     let player = Player::new(&sinephile_player::dll_path(), &options).map_err(err)?;
+    // Clicks and movement over the picture, a native window above the page: the page
+    // hears of them only through this event (Phase 16). The host window reports them (it
+    // is what a click lands on, measured in the real window); mpv, should it ever be the
+    // one to receive them, reports them the same way.
+    let pointer_app = app.clone();
+    let tell: sinephile_player::host::PointerListener = Arc::new(move |what: &str| {
+        if what != "move" {
+            tracing::debug!(what, "pointer over the picture");
+        }
+        let _ = pointer_app.emit("player-pointer", what);
+    });
+    sinephile_player::host::on_pointer(tell.clone());
+    player.on_pointer(Box::new(move |what| tell(what)));
     let rt = Arc::new(PlayerRuntime {
         player,
         host: Mutex::new(host),
     });
     state.set_player(rt.clone());
     Ok(rt)
+}
+
+/// Hide or show the pointer over the picture, with the player's bars (Phase 16: they hide
+/// after three seconds without movement, in a window and in full screen).
+///
+/// **Async on purpose.** A command that is not async runs on the UI thread, and the host's
+/// lock can be held by a thread that is itself waiting for the UI thread (moving the video
+/// window is answered there): the first version of this froze the app, seen in the real
+/// window. Async, it waits on a worker, and the UI thread stays free to answer.
+#[tauri::command]
+#[specta::specta]
+pub async fn player_cursor(state: State<'_, AppState>, hidden: bool) -> Result<(), String> {
+    if let Some(rt) = state.player() {
+        rt.host.lock().expect("host").set_cursor_hidden(hidden);
+    }
+    Ok(())
 }
 
 /// Open something to play: an `http(s)` address or a file path. `start` resumes.
@@ -261,11 +290,14 @@ pub enum PlayerAction {
     AudioDelay {
         seconds: f64,
     },
-    /// Each −100…100.
+    /// The three adjustments each −100…100; `aspect` one of `sinephile_player::ASPECTS`;
+    /// `zoom` a percentage, 100 untouched.
     Picture {
         brightness: i32,
         contrast: i32,
         saturation: i32,
+        aspect: String,
+        zoom: i32,
     },
 }
 
@@ -274,6 +306,7 @@ pub enum PlayerAction {
 pub async fn player_action(state: State<'_, AppState>, action: PlayerAction) -> Result<(), String> {
     let rt = state.player().ok_or("nothing is playing")?;
     let p = &rt.player;
+    tracing::debug!(?action, "player action");
     match action {
         PlayerAction::Pause { paused } => p.set_paused(paused),
         PlayerAction::SeekTo { seconds } => p.seek_to(seconds),
@@ -289,11 +322,15 @@ pub async fn player_action(state: State<'_, AppState>, action: PlayerAction) -> 
             brightness,
             contrast,
             saturation,
-        } => p.set_picture(
-            i64::from(brightness),
-            i64::from(contrast),
-            i64::from(saturation),
-        ),
+            aspect,
+            zoom,
+        } => p
+            .set_picture(
+                i64::from(brightness),
+                i64::from(contrast),
+                i64::from(saturation),
+            )
+            .and_then(|()| p.set_framing(&aspect, i64::from(zoom))),
     }
     .map_err(err)
 }
@@ -475,6 +512,48 @@ pub async fn state_loop(app: AppHandle) {
         if let Some(rt) = app.state::<AppState>().player() {
             let _ = app.emit("player-state", view(&rt));
         }
+    }
+}
+
+/// Debug builds only: a line from the page into the log, for real-window checks the page
+/// cannot report any other way (Phase 16: is the page still running while video plays?).
+/// A no-op in release builds.
+#[tauri::command]
+#[specta::specta]
+pub fn dev_log(line: String) {
+    #[cfg(debug_assertions)]
+    tracing::info!(page = %line, "page");
+    #[cfg(not(debug_assertions))]
+    let _ = line;
+}
+
+/// Debug builds only: one of mpv's properties as text, for the probe (Phase 16).
+#[tauri::command]
+#[specta::specta]
+pub fn dev_player_prop(state: State<'_, AppState>, name: String) -> Option<String> {
+    #[cfg(debug_assertions)]
+    {
+        state.player().and_then(|rt| rt.player.property(&name))
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        let _ = (state, name);
+        None
+    }
+}
+
+/// Debug builds only: `SINEPHILE_PROBE=<ms>:<intent>,…` (e.g. `4000:subtitles_menu`), player
+/// intents the probe sends on a timer, as a pad would, for real-window checks (Phase 16).
+#[tauri::command]
+#[specta::specta]
+pub fn dev_probe_script() -> Option<String> {
+    #[cfg(debug_assertions)]
+    {
+        std::env::var("SINEPHILE_PROBE").ok()
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        None
     }
 }
 

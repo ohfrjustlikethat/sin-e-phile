@@ -3,6 +3,7 @@
 export { Button } from "./primitives/Button";
 export type { ButtonVariant, ButtonSize } from "./primitives/Button";
 export { IconButton } from "./primitives/IconButton";
+export { BackLink } from "./primitives/BackLink";
 export { Input } from "./primitives/Input";
 export { Select } from "./primitives/Select";
 export { Toggle } from "./primitives/Toggle";
@@ -19,8 +20,8 @@ export type { BadgeTone } from "./primitives/Badge";
 export { ProgressBar } from "./primitives/ProgressBar";
 export { Rating } from "./primitives/Rating";
 
-export { PosterCard } from "./media/PosterCard";
-export type { PosterFilm } from "./media/PosterCard";
+export { PosterCard, TypographicCard } from "./media/PosterCard";
+export type { PosterFilm, PosterSize } from "./media/PosterCard";
 export { EpisodeCard } from "./media/EpisodeCard";
 export type { Episode } from "./media/EpisodeCard";
 export { ChannelCard } from "./media/ChannelCard";

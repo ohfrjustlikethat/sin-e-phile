@@ -44,8 +44,9 @@ pub const DECISIVE_LEAD: f64 = 0.12;
 /// At or above this confidence a match is accepted without asking; below it, the file
 /// goes to the review queue. Set from `eval identify` (docs/eval-results.md, Phase 12):
 /// the lowest threshold under 1% wrong among accepted was 0.615, at 0.97% — too close to
-/// the line — so it sits where the tuning set measured 0.39%.
-pub const ACCEPT_AT: f64 = 0.75;
+/// the line — so it sits where the tuning set measured 0.39%. It lives with the queries
+/// that must honour it (the library, Home, a title's Play), in `sinephile_persistence`.
+pub const ACCEPT_AT: f64 = sinephile_persistence::MATCH_ACCEPTED_AT;
 
 /// A best score this high is fully plausible; at `IMPLAUSIBLE` or below, not at all.
 pub const PLAUSIBLE: f64 = 0.80;
@@ -389,8 +390,15 @@ pub async fn identify_with(
         if !SERIES_KINDS.contains(&s.kind.as_str()) {
             continue;
         }
-        let found =
-            find_episode(&episodes_repo, s.media_item_id, season, &episodes, &parsed).await?;
+        let found = find_episode(
+            &episodes_repo,
+            s.media_item_id,
+            season,
+            &episodes,
+            &parsed,
+            false,
+        )
+        .await?;
         s.signals.episode_found = found.map(|f| f.is_some());
         match found {
             Some(Some(_)) => s.score = (s.score + EPISODE_FOUND).min(1.0),
@@ -430,6 +438,7 @@ pub async fn identify_with(
                 season,
                 &episodes,
                 &parsed,
+                true,
             )
             .await?
             {
@@ -534,13 +543,17 @@ fn score(
 }
 
 /// The episode's id: `None` when there is nothing to look up, `Some(None)` when the
-/// series lacks it.
+/// series lacks it. `place`: the series is already chosen and only the episode is wanted,
+/// so a one-season show's "- 05" may be read as its fifth episode. While candidates are
+/// still being scored it may not: it would favour every one-season show over the rest
+/// (found by `eval identify`: "Steins;Gate 0 - 03" went to Steins;Gate).
 async fn find_episode(
     repo: &EpisodeRepository<'_>,
     series_id: i64,
     season: Option<u32>,
     episodes: &[u32],
     parsed: &Parsed,
+    place: bool,
 ) -> Result<Option<Option<i64>>, DbError> {
     if let (Some(s), Some(e)) = (season, episodes.first()) {
         let hit = repo
@@ -552,8 +565,30 @@ async fn find_episode(
         let hit = repo
             .resolve_absolute(series_id, Some(IdSource::Anilist), i64::from(*n))
             .await?;
+        if let Some(h) = hit {
+            return Ok(Some(Some(h.episode_id)));
+        }
+        if !place {
+            // No free source publishes absolute numbers (ADR-0031): a miss is no evidence.
+            return Ok(None);
+        }
+        // A series of one season numbers its episodes the same way absolutely and within
+        // the season, so "Cowboy Bebop - 05" is season 1, episode 5. This is the identity,
+        // not a sum: with two seasons or more nothing is derived (ADR-0031).
+        let numbered: Vec<i64> = repo
+            .seasons(series_id)
+            .await?
+            .into_iter()
+            .filter_map(|(s, _)| s.filter(|s| *s > 0))
+            .collect();
+        if let [only] = numbered.as_slice() {
+            let hit = repo
+                .resolve_seasonal(series_id, IdSource::Imdb, *only, i64::from(*n))
+                .await?;
+            return Ok(hit.map(|h| Some(h.episode_id)));
+        }
         // No free source publishes absolute numbers (ADR-0031): a miss is no evidence.
-        return Ok(hit.map(|h| Some(h.episode_id)));
+        return Ok(None);
     }
     Ok(None)
 }

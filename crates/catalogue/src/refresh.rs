@@ -209,7 +209,12 @@ pub async fn run(db: &Db, datasets: &std::path::Path) -> Result<Refreshed, JobEr
 /// `freshness::refresh_if_stale` for why that boundary and not another.
 pub async fn download(datasets: &std::path::Path) -> Result<(), JobError> {
     let downloader = crate::download::Downloader::new();
-    for dataset in [&crate::imdb::TITLE_RATINGS, &crate::imdb::TITLE_BASICS] {
+    for dataset in [
+        &crate::imdb::TITLE_RATINGS,
+        &crate::imdb::TITLE_BASICS,
+        // 52 MB: the episodes, which the title refresh never covered (Phase 16).
+        &crate::imdb::TITLE_EPISODE,
+    ] {
         let path = datasets.join(dataset.filename);
         // Deleted first, because the downloader skips a file it already has — which is
         // right for resumption and exactly wrong for a refresh.
@@ -220,18 +225,40 @@ pub async fn download(datasets: &std::path::Path) -> Result<(), JobError> {
     Ok(())
 }
 
+/// Where the watermark a refresh started from is kept while it runs.
+const STARTED_FROM: &str = "catalogue.refresh_watermark";
+
 /// Insert what is new and re-apply every rating. **The resumable half**, through `Job`.
+///
+/// A resumed refresh reads past the watermark it STARTED from, kept in a setting. Taken
+/// afresh, it would include the new ids the interrupted run already stored, and since the
+/// file is ordered as text, the new titles still to come below that higher mark would be
+/// skipped for good (Phase 16).
 pub async fn load(db: &Db, datasets: &std::path::Path) -> Result<Refreshed, JobError> {
     use std::sync::Arc;
 
     let before = title_count(db).await?;
-    let watermark = watermark(db).await?;
+    let settings = sinephile_persistence::repositories::ProfileRepository::new(db);
 
     let ratings_path = datasets.join(crate::imdb::TITLE_RATINGS.filename);
     let votes = Arc::new(crate::load::load_votes(&ratings_path)?);
     let averages = Arc::new(crate::load::load_average_ratings(&ratings_path)?);
 
     let mut job = Job::begin(db, "refresh").await?;
+    let kept = settings
+        .setting(STARTED_FROM)
+        .await?
+        .and_then(|w| w.parse::<u32>().ok());
+    let watermark = match (job.is_resuming().await?, kept) {
+        (true, Some(w)) => Some(w),
+        _ => {
+            let w = watermark(db).await?;
+            if let Some(w) = w {
+                settings.set_setting(STARTED_FROM, &w.to_string()).await?;
+            }
+            w
+        }
+    };
     crate::load::load_titles(
         &mut job,
         datasets.join(crate::imdb::TITLE_BASICS.filename),
@@ -248,4 +275,80 @@ pub async fn load(db: &Db, datasets: &std::path::Path) -> Result<Refreshed, JobE
         titles_added: title_count(db).await? - before,
         ratings_reapplied,
     })
+}
+
+/// Series a profile has: matched in the library, on a watchlist, or with a watched
+/// episode. Their new episodes are loaded whatever their votes.
+pub async fn followed_series(db: &Db) -> Result<std::collections::HashSet<i64>, JobError> {
+    let ids: Vec<i64> = sqlx::query_scalar(
+        "SELECT m.id FROM media_items m
+          WHERE m.kind IN ('series', 'anime_series') AND (
+                m.id IN (SELECT media_item_id FROM local_file_matches)
+             OR m.id IN (SELECT media_item_id FROM watchlist_items)
+             OR m.id IN (SELECT e.series_id FROM episodes e
+                           JOIN local_file_matches l ON l.media_item_id = e.media_item_id)
+             OR m.id IN (SELECT e.series_id FROM episodes e
+                           JOIN watch_events w ON w.media_item_id = e.media_item_id))",
+    )
+    .fetch_all(db.pool())
+    .await?;
+    Ok(ids.into_iter().collect())
+}
+
+/// The vote threshold the catalogue's episodes were first loaded at: a series earns its
+/// episodes by being one people sit down and watch through (see `EpisodeScope`).
+pub const EPISODE_VOTES: i64 = 5_000;
+
+/// ADR-0030 layer 1 for episodes, which the title refresh never covered: add every
+/// episode in `title.episode` not yet held, of a series in scope (anime, a series over
+/// `EPISODE_VOTES`, or one the user follows). Reads the file `download` fetched (fetching
+/// it only if it is gone) and `title.basics` (episode titles and years come from it).
+/// Resumable through its own `Job`.
+pub async fn episodes(db: &Db, datasets: &std::path::Path) -> Result<i64, JobError> {
+    use crate::episodes_load as ep;
+    use std::sync::Arc;
+
+    let path = datasets.join(crate::imdb::TITLE_EPISODE.filename);
+    let mut job = Job::begin(db, "refresh-episodes").await?;
+    if !path.is_file() {
+        crate::download::Downloader::new()
+            .fetch(&crate::imdb::TITLE_EPISODE.url(), &path, |_| {})
+            .await?;
+        crate::download::verify_gzip(&path)?;
+    }
+    let (before, _) = ep::count_episodes(db).await?;
+    let scope = ep::EpisodeScope {
+        all_anime: true,
+        min_votes: EPISODE_VOTES,
+    };
+    let series = ep::series(db).await?;
+    let followed = followed_series(db).await?;
+    let skip = ep::already_loaded(db).await?;
+    let wanted = ep::collect(&path, &series, scope, &followed, &skip)?;
+    if !wanted.is_empty() {
+        let by_id: std::collections::HashMap<u32, ep::Wanted> =
+            wanted.iter().map(|w| (w.tconst, *w)).collect();
+        ep::load_series_rows(&mut job, Arc::new(wanted)).await?;
+        ep::load_episodes(
+            &mut job,
+            datasets.join(crate::imdb::TITLE_BASICS.filename),
+            Arc::new(by_id),
+        )
+        .await?;
+        ep::load_seasons(&mut job).await?;
+    }
+    job.finish().await?;
+    let (after, _) = ep::count_episodes(db).await?;
+    Ok(after - before)
+}
+
+/// Whether a refresh was interrupted and should be finished before anything else.
+pub async fn unfinished(db: &Db) -> Result<bool, JobError> {
+    let n: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM ingest_jobs
+          WHERE name IN ('refresh', 'refresh-episodes') AND status IN ('running', 'failed')",
+    )
+    .fetch_one(db.pool())
+    .await?;
+    Ok(n > 0)
 }

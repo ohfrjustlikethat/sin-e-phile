@@ -10,6 +10,7 @@
 pub mod akas;
 pub mod anime;
 pub mod assets;
+pub mod bootstrap;
 pub mod credits;
 pub mod download;
 pub mod embed;
@@ -24,6 +25,7 @@ pub mod matching;
 pub mod measure;
 pub mod movielens;
 pub mod normalise;
+pub mod now;
 pub mod refresh;
 pub mod repair;
 pub mod search_index;

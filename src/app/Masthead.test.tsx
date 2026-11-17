@@ -18,12 +18,19 @@ function render(ui: React.ReactElement) {
 /** SPEC.md §3.1 and §9.4, ADR-0037. */
 describe("Masthead", () => {
   beforeEach(() => {
-    useUi.setState({ destination: "home", settingsOpen: false, downloadsOpen: false });
+    useUi.setState({
+      destination: "home",
+      tab: "home",
+      trails: { home: [], films: [], tv: [], watchlist: [], live: [], search: [] },
+      detail: null,
+      settingsOpen: false,
+      downloadsOpen: false,
+    });
   });
 
   it("has Downloads as a word, with the number in progress only when there is one", async () => {
     commands.downloads.mockImplementationOnce(() => ok([row("active"), row("queued"), row("done")]));
-    render(<Masthead searching={false} onSearchChange={() => {}} />);
+    render(<Masthead />);
     const button = await screen.findByRole("button", { name: "Downloads, 2 in progress" });
     expect(button).toHaveTextContent("Downloads2");
     fireEvent.click(button);
@@ -34,7 +41,7 @@ describe("Masthead", () => {
   });
 
   it("shows every destination as a word, in §3.1's order", () => {
-    render(<Masthead searching={false} onSearchChange={() => {}} />);
+    render(<Masthead />);
     const nav = screen.getByRole("navigation", { name: "Primary" });
     const labels = within(nav).getAllByRole("button").map((b) => b.textContent);
     expect(labels).toEqual(["Home", "Films", "TV Shows", "Watchlist", "Live"]);
@@ -42,17 +49,33 @@ describe("Masthead", () => {
 
   it("has a visible, labelled Search button that shows its key", () => {
     // Search was reachable only by shortcuts that appear nowhere on screen.
-    const onSearchChange = vi.fn();
-    render(<Masthead searching={false} onSearchChange={onSearchChange} />);
+    render(<Masthead />);
     const search = screen.getByRole("button", { name: /Search/ });
     expect(search).toHaveTextContent("/");
     fireEvent.click(search);
-    expect(onSearchChange).toHaveBeenCalledWith(true);
+    expect(useUi.getState().tab).toBe("search");
+    expect(search).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("Search and the destinations work from a film's page, Settings or Downloads (Phase 16)", () => {
+    useUi.getState().openDetail(7);
+    useUi.setState({ settingsOpen: true, downloadsOpen: true });
+    render(<Masthead />);
+    fireEvent.click(screen.getByRole("button", { name: /Search/ }));
+    expect(useUi.getState()).toMatchObject({ tab: "search", detail: null, settingsOpen: false, downloadsOpen: false });
+
+    useUi.setState({ downloadsOpen: true });
+    const nav = screen.getByRole("navigation", { name: "Primary" });
+    fireEvent.click(within(nav).getByRole("button", { name: "Watchlist" }));
+    expect(useUi.getState()).toMatchObject({ detail: null, downloadsOpen: false, destination: "watchlist" });
+    // Home kept its film: its tab shows it again.
+    fireEvent.click(within(nav).getByRole("button", { name: "Home" }));
+    expect(useUi.getState().detail).toBe(7);
   });
 
   it("marks exactly the current destination", () => {
     useUi.setState({ destination: "films" });
-    render(<Masthead searching={false} onSearchChange={() => {}} />);
+    render(<Masthead />);
     const current = screen
       .getAllByRole("button")
       .filter((b) => b.getAttribute("aria-current") === "page");
@@ -62,23 +85,22 @@ describe("Masthead", () => {
   it("claims no destination while search is showing", () => {
     // A tab saying "Films" behind a page of search results says you are somewhere
     // you are not.
-    useUi.setState({ destination: "films" });
-    render(<Masthead searching onSearchChange={() => {}} />);
+    useUi.setState({ destination: "films", tab: "search" });
+    render(<Masthead />);
     expect(document.querySelector('[aria-current="page"]')).toBeNull();
   });
 
   it("leaves search and settings when a destination is chosen", () => {
-    const onSearchChange = vi.fn();
-    useUi.setState({ settingsOpen: true });
-    render(<Masthead searching onSearchChange={onSearchChange} />);
+    useUi.setState({ settingsOpen: true, tab: "search" });
+    render(<Masthead />);
     fireEvent.click(screen.getByRole("button", { name: "Watchlist" }));
-    expect(onSearchChange).toHaveBeenCalledWith(false);
+    expect(useUi.getState().tab).toBe("watchlist");
     expect(useUi.getState().settingsOpen).toBe(false);
     expect(useUi.getState().destination).toBe("watchlist");
   });
 
   it("renders inert window controls outside the Tauri shell rather than crashing", () => {
-    render(<Masthead searching={false} onSearchChange={() => {}} />);
+    render(<Masthead />);
     expect(screen.getByRole("button", { name: "Close" })).toBeDisabled();
   });
 });

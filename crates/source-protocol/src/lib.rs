@@ -15,15 +15,19 @@
 //! **This crate cannot reach the network.** It has no HTTP client, by design: it
 //! parses what the app fetched, and the app decides what to fetch.
 
+pub mod addon;
 pub mod backend;
 pub mod catalogue;
 pub mod manifest;
+pub mod stremio;
 pub mod types;
 pub mod wire;
 
+pub use addon::AddonManifest;
 pub use backend::{SourceBackend, SourceError};
 pub use catalogue::{Catalogue, CatalogueEntry};
 pub use manifest::{parse_manifest_url, Endpoints, Manifest, ManifestError};
+pub use stremio::StremioManifest;
 pub use types::{
     BackendCapabilities, ExternalIds, Health, MediaKind, MediaQuery, PlayableStream, Provenance,
     Quality, Resolution, SourceCandidate, Transport, VideoCodec,

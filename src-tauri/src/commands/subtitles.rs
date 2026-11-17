@@ -32,6 +32,20 @@ pub struct SubtitleSettings {
     pub size: u32,
     pub position: u32,
     pub background: bool,
+    /// `#RRGGBB` (Phase 16); settings saved before it read as white.
+    #[serde(default = "white")]
+    pub colour: String,
+    /// 0 … 6 (Phase 16); settings saved before it read as mpv's 3.
+    #[serde(default = "three")]
+    pub outline: u32,
+}
+
+fn white() -> String {
+    "#FFFFFF".into()
+}
+
+fn three() -> u32 {
+    3
 }
 
 impl Default for SubtitleSettings {
@@ -44,6 +58,8 @@ impl Default for SubtitleSettings {
             size: s.size,
             position: s.position,
             background: s.background,
+            colour: s.colour,
+            outline: s.outline,
         }
     }
 }
@@ -55,6 +71,8 @@ impl SubtitleSettings {
             size: self.size,
             position: self.position,
             background: self.background,
+            colour: self.colour.clone(),
+            outline: self.outline,
         }
     }
 }
@@ -73,6 +91,18 @@ pub struct SubtitleSettingsView {
 
 /// What is showing now, for the nudge: (file, subtitle, nudge in ms).
 static CURRENT: Mutex<Option<(String, String, i64)>> = Mutex::new(None);
+
+/// What is playing (the player's target), and the subtitle file showing with its language,
+/// for the player's own subtitle controls (Phase 16): find, choose, load, align again.
+static PLAYING: Mutex<Option<String>> = Mutex::new(None);
+static SHOWING: Mutex<Option<Showing>> = Mutex::new(None);
+
+/// The subtitle file showing: its path, language, and the name the player's list gives it.
+type Showing = (std::path::PathBuf, Option<String>, String);
+
+/// The name of a track the app chose by itself (the chain's pick). A file a person loads or
+/// chooses is named for itself (round 10).
+const CHOSEN_BY_THE_APP: &str = "sin-e-phile";
 
 fn err(e: impl std::fmt::Display) -> String {
     e.to_string()
@@ -148,6 +178,21 @@ pub async fn set_subtitle_settings(
 pub async fn set_opensubtitles_key(state: State<'_, AppState>, key: String) -> Result<(), String> {
     let db = state.db().ok_or("the library is still opening")?;
     let profile = state.profile().await?;
+    // Checked as it is entered (Phase 16). Refused: not saved. Unreachable: saved, since
+    // being offline says nothing about the key.
+    let http: Arc<dyn sinephile_metadata_api::Transport> = state.http.clone();
+    match OpenSubtitles::new(http, key.trim().to_string())
+        .check()
+        .await
+    {
+        Err(sinephile_subtitles::fetch::FetchError::BadKey) => {
+            return Err("OpenSubtitles did not accept that key. Check it on your OpenSubtitles account page.".into());
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "could not check the OpenSubtitles key; saved unchecked")
+        }
+        Ok(()) => {}
+    }
     CredentialRepository::new(&db)
         .set_opensubtitles_key(profile, &key)
         .await
@@ -200,6 +245,8 @@ pub(crate) async fn open_for(
     current: impl Fn() -> bool + Send + 'static,
 ) -> Result<(), String> {
     *CURRENT.lock().expect("current") = None;
+    *SHOWING.lock().expect("showing") = None;
+    *PLAYING.lock().expect("playing") = Some(target.clone());
     let db = state.db().ok_or("the library is still opening")?;
     let wanted = settings(state).await?;
     rt.player.set_subtitle_style(&wanted.style()).map_err(err)?;
@@ -281,8 +328,14 @@ pub(crate) async fn open_for(
                 note,
             } => {
                 tracing::info!(path = %path.display(), %note, "subtitles: a file");
-                p.add_subtitle(&path.to_string_lossy(), "sin-e-phile", language.as_deref())
-                    .map_err(err)?;
+                p.add_subtitle(
+                    &path.to_string_lossy(),
+                    CHOSEN_BY_THE_APP,
+                    language.as_deref(),
+                )
+                .map_err(err)?;
+                *SHOWING.lock().expect("showing") =
+                    Some((path.clone(), language.clone(), CHOSEN_BY_THE_APP.into()));
             }
         }
         if let Some(sub) = decided.subtitle_key.clone() {
@@ -294,4 +347,217 @@ pub(crate) async fn open_for(
     })
     .await
     .map_err(err)?
+}
+
+// ---- the player's own subtitle controls (Phase 16) -------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct SubtitleOfferView {
+    pub file_id: String,
+    pub language: String,
+    pub hash_match: bool,
+    pub downloads: i32,
+    pub release: Option<String>,
+}
+
+/// The playing film's file on this machine, or why there is none.
+fn playing_file() -> Result<std::path::PathBuf, String> {
+    let target = PLAYING
+        .lock()
+        .expect("playing")
+        .clone()
+        .ok_or("nothing is playing")?;
+    let path = std::path::PathBuf::from(&target);
+    if path.is_file() {
+        Ok(path)
+    } else {
+        Err(
+            "Finding subtitles needs the film on this PC: a stream has no file to match them to."
+                .into(),
+        )
+    }
+}
+
+/// The playing file's hash, the key OpenSubtitles matches on.
+async fn playing_hash() -> Result<String, String> {
+    let file = playing_file()?;
+    tauri::async_runtime::spawn_blocking(move || sinephile_subtitles::hash::of_file(&file))
+        .await
+        .map_err(err)?
+        .map_err(err)?
+        .ok_or_else(|| "this file is too small to match subtitles to".to_string())
+}
+
+/// The profile's OpenSubtitles client, or why there is none.
+async fn provider(state: &AppState) -> Result<OpenSubtitles, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let profile = state.profile().await?;
+    let key = CredentialRepository::new(&db)
+        .opensubtitles_key(profile)
+        .await
+        .map_err(err)?
+        .ok_or("Add your OpenSubtitles key in Settings, Subtitles, to search for subtitles.")?;
+    let http: Arc<dyn sinephile_metadata_api::Transport> = state.http.clone();
+    Ok(OpenSubtitles::new(http, key))
+}
+
+/// Align `path` to the playing film where the tier allows, load it and show it. Returns
+/// what alignment did, in words.
+async fn show_file(
+    state: &AppState,
+    path: std::path::PathBuf,
+    language: Option<String>,
+    title: String,
+) -> Result<String, String> {
+    let rt = state.player().ok_or("nothing is playing")?;
+    let target = PLAYING
+        .lock()
+        .expect("playing")
+        .clone()
+        .ok_or("nothing is playing")?;
+    let vad = state
+        .effective_tier()
+        .allows(Capability::VadSubtitleAlignment);
+    let data = crate::logging::data_dir();
+    tauri::async_runtime::spawn_blocking(move || {
+        let local = std::path::Path::new(&target);
+        let file_key = if local.is_file() {
+            sinephile_subtitles::hash::of_file(local).ok().flatten()
+        } else {
+            None
+        }
+        .unwrap_or_else(|| target.clone());
+        let speech = Ffmpeg {
+            target: &target,
+            seconds: ALIGN_SECONDS,
+        };
+        let alignment = if vad {
+            Alignment::Speech(&speech)
+        } else {
+            Alignment::Duration(rt.player.state().duration.map(|d| (d * 1000.0) as i64))
+        };
+        let shown = plan::prepare(&data, &path, language, &file_key, alignment);
+        let Show::File {
+            path,
+            language,
+            note,
+        } = shown
+        else {
+            return Err("that subtitle could not be prepared".to_string());
+        };
+        rt.player
+            .add_subtitle(&path.to_string_lossy(), &title, language.as_deref())
+            .map_err(err)?;
+        *SHOWING.lock().expect("showing") = Some((path, language, title));
+        Ok(note)
+    })
+    .await
+    .map_err(err)?
+}
+
+/// What OpenSubtitles has for the playing film, best first. Searching spends nothing.
+#[tauri::command]
+#[specta::specta]
+pub async fn subtitle_offers(state: State<'_, AppState>) -> Result<Vec<SubtitleOfferView>, String> {
+    let hash = playing_hash().await?;
+    let os = provider(&state).await?;
+    let languages = settings(&state).await?.languages;
+    Ok(sinephile_subtitles::fetch::offers(&os, &hash, &languages)
+        .await
+        .map_err(err)?
+        .into_iter()
+        .map(|o| SubtitleOfferView {
+            file_id: o.file_id,
+            language: o.language,
+            hash_match: o.hash_match,
+            downloads: o.downloads.min(i64::from(i32::MAX)) as i32,
+            release: o.release,
+        })
+        .collect())
+}
+
+/// Download the offer the viewer chose (within today's budget), align it and show it.
+#[tauri::command]
+#[specta::specta]
+pub async fn subtitle_choose(
+    state: State<'_, AppState>,
+    offer: SubtitleOfferView,
+) -> Result<String, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let hash = playing_hash().await?;
+    let os = provider(&state).await?;
+    // Listed in the player by the release the person chose.
+    let title = offer
+        .release
+        .clone()
+        .filter(|r| !r.trim().is_empty())
+        .unwrap_or_else(|| "OpenSubtitles".into());
+    let chosen = sinephile_subtitles::fetch::Offer {
+        file_id: offer.file_id,
+        language: offer.language,
+        hash_match: offer.hash_match,
+        downloads: i64::from(offer.downloads),
+        release: offer.release,
+    };
+    let data = crate::logging::data_dir();
+    let found = sinephile_subtitles::fetch::take(&db, &os, &data, &hash, &chosen, &today())
+        .await
+        .map_err(err)?
+        .ok_or("Today's subtitle downloads are used up; they reset at midnight UTC.")?;
+    let sinephile_subtitles::Origin::Downloaded { relative_path, .. } = &found.origin else {
+        return Err("that subtitle could not be saved".into());
+    };
+    show_file(
+        &state,
+        data.join(relative_path),
+        found.language.clone(),
+        title,
+    )
+    .await
+}
+
+/// A subtitle file from disk, chosen in Windows' file picker, aligned and shown.
+#[tauri::command]
+#[specta::specta]
+pub async fn subtitle_load(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<Option<String>, String> {
+    use tauri::Manager as _;
+    let owner = app
+        .get_webview_window("main")
+        .and_then(|w| w.hwnd().ok())
+        .map(|h| h.0 as isize);
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        std::thread::spawn(move || {
+            let pattern = sinephile_subtitles::files::picker_pattern();
+            crate::commands::library::picker::file(
+                owner,
+                "Load subtitles",
+                Some(("Subtitles", &pattern)),
+            )
+        })
+        .join()
+        .unwrap_or(None)
+    })
+    .await
+    .map_err(err)?;
+    let Some(path) = picked else {
+        return Ok(None);
+    };
+    let path = std::path::PathBuf::from(path);
+    let title = sinephile_subtitles::files::track_title(&path);
+    show_file(&state, path, None, title).await.map(Some)
+}
+
+/// Align the showing subtitle file again, from its original.
+#[tauri::command]
+#[specta::specta]
+pub async fn subtitle_realign(state: State<'_, AppState>) -> Result<String, String> {
+    let (path, language, title) = SHOWING
+        .lock()
+        .expect("showing")
+        .clone()
+        .ok_or("Only a subtitle file can be aligned again; this one is part of the film.")?;
+    show_file(&state, path, language, title).await
 }

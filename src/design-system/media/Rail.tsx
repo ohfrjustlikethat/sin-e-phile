@@ -188,21 +188,25 @@ export function Rail<T>({
             scrolled sideways, and the ResizeObserver reported a viewport wide
             enough to mount all 500 cards. Virtualisation silently did nothing. */}
         <div className="min-w-0 py-8 pl-8 pr-14">
-          <header className="mb-5 flex items-baseline gap-4">
-            <h2 className="font-display text-[15px] font-extrabold uppercase tracking-[-0.01em] text-ink">
-              {label}
-            </h2>
-            <span className="h-px flex-1 bg-line-subtle" />
-            {why && <span className="label max-w-[280px] text-right">{why}</span>}
-            {onSeeAll && (
-              <button
-                type="button"
-                onClick={onSeeAll}
-                className="label transition-colors hover:text-ink"
-              >
-                See all
-              </button>
-            )}
+          <header className="mb-5">
+            <div className="flex items-baseline gap-4">
+              <h2 className="font-display text-[15px] font-extrabold uppercase tracking-[-0.01em] text-ink">
+                {label}
+              </h2>
+              <span className="h-px flex-1 bg-line-subtle" />
+              {onSeeAll && (
+                <button
+                  type="button"
+                  onClick={onSeeAll}
+                  className="label transition-colors hover:text-ink"
+                >
+                  See all
+                </button>
+              )}
+            </div>
+            {/* One line under the title (Appendix F, I72): at the far right it wrapped onto
+                two lines and read as a second heading. */}
+            {why && <p className="label mt-2 truncate">{why}</p>}
           </header>
 
           <div

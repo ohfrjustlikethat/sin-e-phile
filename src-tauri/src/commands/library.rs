@@ -185,6 +185,26 @@ pub fn start_scan(app: AppHandle, id: i64, root: PathBuf) {
             return; // already scanning
         }
     }
+    // A folder added while the first run's catalogue is built (onboarding) waits for it:
+    // the build scans every folder when it ends.
+    if crate::commands::catalogue::first_build_running() {
+        if let Some(s) = SCANNING.lock().expect("scanning").as_mut() {
+            s.remove(&id);
+        }
+        emit(
+            &app,
+            LibraryScanEvent {
+                folder_id: id as i32,
+                phase: "waiting".into(),
+                done: 0,
+                total: 0,
+                files: 0,
+                accepted: 0,
+                asked: 0,
+            },
+        );
+        return;
+    }
     tauri::async_runtime::spawn(async move {
         let Some(db) = app.state::<AppState>().db() else {
             return;
@@ -227,6 +247,10 @@ pub fn start_scan(app: AppHandle, id: i64, root: PathBuf) {
             Err(error) => {
                 tracing::error!(folder = id, %error, "library scan failed");
                 emit(&app, event("failed", 0, 0));
+                // Watched whatever the scan did (Phase 16): on the author's install the first scan
+                // failed ("database is locked", during the catalogue load), the folder was never
+                // watched, and new files went unnoticed until a restart.
+                ensure_watched(id, &root);
             }
         }
     });
@@ -251,6 +275,18 @@ fn ensure_watched(id: i64, root: &Path) {
     }
 }
 
+/// Scan every library folder: at launch, and when the first run's catalogue is ready.
+pub async fn scan_all(app: &AppHandle) {
+    let Some(db) = app.state::<AppState>().db() else {
+        return;
+    };
+    if let Ok(folders) = LibraryRepository::new(&db).folders().await {
+        for f in folders {
+            start_scan(app.clone(), f.id, PathBuf::from(f.path));
+        }
+    }
+}
+
 /// At launch: scan every folder (catching what changed while the app was closed), then
 /// watch it; and apply what the watchers report, once each path has been quiet for two
 /// seconds.
@@ -265,10 +301,14 @@ pub async fn library_loop(app: AppHandle) {
         }
         tokio::time::sleep(Duration::from_millis(500)).await;
     };
-    if let Ok(folders) = LibraryRepository::new(&db).folders().await {
-        for f in folders {
-            start_scan(app.clone(), f.id, PathBuf::from(f.path));
-        }
+    // A fresh install's catalogue is not built yet: scanning now would identify nothing
+    // (there is no index to search) and fight the build for the database. The catalogue's
+    // first refresh scans every folder when it ends (catalogue.rs `start`).
+    if sinephile_catalogue::bootstrap::ready(&db)
+        .await
+        .unwrap_or(true)
+    {
+        scan_all(&app).await;
     }
 
     let mut pending: HashMap<i64, Quieten> = HashMap::new();
@@ -314,18 +354,22 @@ pub async fn library_loop(app: AppHandle) {
 pub(crate) mod picker {
     use windows::core::w;
     use windows::core::HSTRING;
+    use windows::core::PCWSTR;
     use windows::Win32::Foundation::HWND;
     use windows::Win32::System::Com::{
         CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, CLSCTX_INPROC_SERVER,
         COINIT_APARTMENTTHREADED,
     };
+    use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
     use windows::Win32::UI::Shell::{
         FileOpenDialog, IFileOpenDialog, FOS_FILEMUSTEXIST, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS,
         SIGDN_FILESYSPATH,
     };
 
     /// Windows' file picker, titled `title`, owned by the app's window (Phase 14 imports).
-    pub fn file(owner: Option<isize>, title: &str) -> Option<String> {
+    /// `kind`, when given, is a name and a pattern ("Subtitles", "*.srt;*.ass"): those files
+    /// are offered first, with "All files" beside them.
+    pub fn file(owner: Option<isize>, title: &str, kind: Option<(&str, &str)>) -> Option<String> {
         // SAFETY: as `folder`: COM for exactly the dialog's lifetime, the one COM string
         // freed with CoTaskMemFree.
         unsafe {
@@ -340,6 +384,18 @@ pub(crate) mod picker {
                     .SetOptions(options | FOS_FILEMUSTEXIST | FOS_FORCEFILESYSTEM)
                     .ok()?;
                 dialog.SetTitle(&HSTRING::from(title)).ok()?;
+                if let Some((name, pattern)) = kind {
+                    // The strings outlive the call: the dialog copies them.
+                    let (name, pattern) = (HSTRING::from(name), HSTRING::from(pattern));
+                    let spec = |n: &HSTRING, p: &HSTRING| COMDLG_FILTERSPEC {
+                        pszName: PCWSTR(n.as_ptr()),
+                        pszSpec: PCWSTR(p.as_ptr()),
+                    };
+                    let (all, every) = (HSTRING::from("All files"), HSTRING::from("*.*"));
+                    dialog
+                        .SetFileTypes(&[spec(&name, &pattern), spec(&all, &every)])
+                        .ok()?;
+                }
                 dialog.Show(owner.map(|h| HWND(h as *mut _))).ok()?;
                 let item = dialog.GetResult().ok()?;
                 let name = item.GetDisplayName(SIGDN_FILESYSPATH).ok()?;
@@ -387,7 +443,7 @@ pub(crate) mod picker {
     pub fn folder(_: Option<isize>) -> Option<String> {
         None
     }
-    pub fn file(_: Option<isize>, _: &str) -> Option<String> {
+    pub fn file(_: Option<isize>, _: &str, _: Option<(&str, &str)>) -> Option<String> {
         None
     }
 }

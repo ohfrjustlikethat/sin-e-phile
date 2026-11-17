@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/lib/toast";
 import { Button, Input } from "@/design-system";
 import { onEvent } from "@/lib/events";
 import { commands, type LibraryFolderView, type LibraryScanEvent } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
+import { SETTINGS_HEADING } from "./heading";
 
 /**
  * Settings → Library — SPEC.md Phase 12.
@@ -39,6 +41,8 @@ export function scanLine(e: LibraryScanEvent | undefined): string | null {
       return `Identifying ${e.done.toLocaleString()} of ${e.total.toLocaleString()}`;
     case "failed":
       return "The scan stopped. Rescan to try again.";
+    case "waiting":
+      return "Waiting for the catalogue: its films are matched as soon as it is ready.";
     default:
       return null;
   }
@@ -52,6 +56,10 @@ export function LibrarySection() {
   const [typed, setTyped] = useState("");
   const [error, setError] = useState<string | null>(null);
   const setReviewOpen = useUi((s) => s.setReviewOpen);
+  // Folders just added: each says "Added ✓", and its first scan's result is said in a toast (Phase 16, the author:
+  // "adding local library feels like you did nothing").
+  const [added, setAdded] = useState<Set<number>>(new Set());
+  const awaiting = useRef(new Set<number>());
 
   useEffect(() => {
     const refresh = () => {
@@ -61,6 +69,18 @@ export function LibrarySection() {
     const scanned = onEvent<LibraryScanEvent>("library-scan", (e) => {
       setProgress((p) => ({ ...p, [e.folder_id]: e }));
       if (e.phase === "done" || e.phase === "failed") refresh();
+      if (!awaiting.current.has(e.folder_id)) return;
+      if (e.phase === "done") {
+        awaiting.current.delete(e.folder_id);
+        const files = `${e.files.toLocaleString()} ${e.files === 1 ? "file" : "files"} found`;
+        const asked = e.asked > 0 ? `, ${e.asked.toLocaleString()} to check` : "";
+        toast(`Library folder added: ${files}, ${e.accepted.toLocaleString()} recognised${asked}.`);
+      } else if (e.phase === "failed") {
+        awaiting.current.delete(e.folder_id);
+        toast("The folder was added, but its scan stopped. Rescan it to try again.", "danger");
+      } else if (e.phase === "waiting") {
+        toast("Library folder added. Its films are matched as soon as the catalogue is ready.", "neutral");
+      }
     });
     const changed = onEvent<number>("library-changed", refresh);
     return () => {
@@ -71,12 +91,17 @@ export function LibrarySection() {
 
   const add = useMutation({
     mutationFn: (path: string) => ok(commands.addLibraryFolder(path)),
-    onSuccess: () => {
+    onSuccess: (id) => {
       setTyped("");
       setError(null);
+      awaiting.current.add(id);
+      setAdded((a) => new Set(a).add(id));
       void client.invalidateQueries({ queryKey: KEY });
     },
-    onError: (e) => setError(e.message),
+    onError: (e) => {
+      setError(e.message);
+      toast(`The folder was not added: ${e.message}`, "danger");
+    },
   });
   const remove = useMutation({
     mutationFn: (id: number) => ok(commands.removeLibraryFolder(id)),
@@ -95,7 +120,7 @@ export function LibrarySection() {
   const list = folders.data ?? [];
   return (
     <section className="mb-9" aria-label="Library">
-      <h2 className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">Library</h2>
+      <h2 className={SETTINGS_HEADING}>Library</h2>
       <p className="mb-4 text-sm text-ink-muted">
         Folders of films and episodes on this PC. Each file is identified from its name, its folders and its
         length; anything uncertain waits for you rather than being guessed.
@@ -110,6 +135,7 @@ export function LibrarySection() {
             key={f.id}
             folder={f}
             line={scanLine(progress[f.id])}
+            added={added.has(f.id)}
             onRescan={() => rescan.mutate(f.id)}
             onRemove={() => remove.mutate(f.id)}
           />
@@ -117,7 +143,9 @@ export function LibrarySection() {
       </ul>
 
       {(review.data ?? 0) > 0 && (
-        <div className="mb-5 flex items-center justify-between gap-4 rounded-md border border-line px-4 py-3">
+        // On the page's left edge with every other control, so a pad going up or down the
+        // column meets it (Phase 16: at the far right, the D-pad passed it by).
+        <div className="mb-5 flex flex-col items-start gap-3 rounded-md border border-line px-4 py-3">
           <p className="text-sm text-ink">
             {review.data} {review.data === 1 ? "file needs" : "files need"} a quick check.
           </p>
@@ -158,6 +186,7 @@ export function LibrarySection() {
 function FolderRow(p: {
   folder: LibraryFolderView;
   line: string | null;
+  added?: boolean;
   onRescan: () => void;
   onRemove: () => void;
 }) {
@@ -167,7 +196,10 @@ function FolderRow(p: {
     <li className="flex items-center justify-between gap-4 border-t border-line-subtle py-3">
       <div className="min-w-0">
         {/* The folder's own name first: a long path truncated at the end hides it. */}
-        <p className="truncate text-sm text-ink">{folderName(folder.path)}</p>
+        <p className="truncate text-sm text-ink">
+          {folderName(folder.path)}
+          {p.added && <span className="ml-3 text-[12px] text-success">Added ✓</span>}
+        </p>
         <p className="truncate text-xs text-ink-faint" title={folder.path}>
           {folder.path}
         </p>

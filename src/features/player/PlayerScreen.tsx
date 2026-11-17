@@ -3,14 +3,17 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { useQuery } from "@tanstack/react-query";
 import { commands, type ChapterView, type PlayerStateView, type TrackView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
-import { clock, keyIntent, nextSpeed, type Intent } from "./intents";
+import { chapterTarget, clock, glide, keyIntent, nextSpeed, type Intent } from "./intents";
+import { usePadMode } from "@/design-system/focus/FocusLayer";
 import { onPlayerIntent } from "./intentBus";
 import { PauseOverlay } from "./PauseOverlay";
-import { PlayerMenu, ShortcutsPanel, StatsPanel, type Picture } from "./PlayerPanels";
+import { episodeLine, nextLine, shortPlace, named } from "./place";
+import { PICTURE_DEFAULT, PlayerMenu, ShortcutsPanel, StatsPanel, type Picture } from "./PlayerPanels";
 import { EndCard, NextEpisodeCard } from "./WhatNext";
 import { moment } from "./endCard";
 import { previewLeft, tileAt } from "./scrubPreview";
 import { usePlaybackChoice } from "@/lib/playbackChoice";
+import { setWindowFullscreen } from "@/lib/fullscreen";
 
 /**
  * The player — SPEC.md Phase 8, ADR-0020 (solid chrome through cutouts) and ADR-0021
@@ -24,7 +27,19 @@ import { usePlaybackChoice } from "@/lib/playbackChoice";
  * pause overlay can dim it like any HTML.
  */
 
-const HIDE_AFTER_MS = 2500;
+/** Hide or show the pointer over the picture; outside the app's window (the UI audit's browser) there is none. */
+function tellPointer(hidden: boolean): void {
+  try {
+    void commands.playerCursor(hidden).catch(() => {});
+  } catch {
+    // Not inside Tauri.
+  }
+}
+
+// The author's answer (Phase 16): three seconds without the mouse or the pad, in a window and in full screen.
+const HIDE_AFTER_MS = 3000;
+// Two clicks on the picture this close together are a double click (Windows' default is 500 ms).
+const DOUBLE_CLICK_MS = 500;
 
 function inTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -57,9 +72,8 @@ function usePlayerState(): PlayerStateView | null {
 }
 
 async function setFullscreen(on: boolean) {
-  if (!inTauri()) return;
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  await getCurrentWindow().setFullscreen(on);
+  // From any window state: a maximised window kept its old height in full screen (src/lib/fullscreen.ts).
+  await setWindowFullscreen(on);
 }
 
 export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
@@ -84,7 +98,9 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
     if (!state?.started) return;
     void commands.playerChapters().then((r) => setChapters(r.status === "ok" ? r.data : []));
   }, [state?.started]);
-  const chapterTitle = state?.chapter != null ? (chapters[state.chapter]?.title ?? null) : null;
+  // A chapter named only by its time ("00:00:00.000", as some files have) says nothing the clock does not.
+  const rawChapter = state?.chapter != null ? (chapters[state.chapter]?.title ?? null) : null;
+  const chapterTitle = rawChapter && !/^[\d:.]+$/.test(rawChapter.trim()) ? rawChapter : null;
 
   // The episodes either side (SPEC.md Phase 11): N/P and the stick clicks, and the card.
   const play = useUi((s) => s.play);
@@ -105,6 +121,13 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
     setFinished(false);
   }, [playing]);
   const next = neighbours.data?.next ?? null;
+  // An episode is named by its show first, then where it sits (Phase 16, the author's round 8).
+  const place = details.data?.show ?? null;
+  const heading = place?.title ?? playing?.title ?? "";
+  const where = place ? episodeLine(place) : null;
+  const barTitle = place
+    ? [place.title, shortPlace(place.season, place.episode) || null, named(place.episode_title)].filter(Boolean).join(" · ")
+    : (playing?.title ?? "");
   const now = moment({
     hasNext: !!next,
     position: state?.position ?? null,
@@ -122,7 +145,7 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
   }, [now, finished]);
   const goTo = useCallback(
     async (id: number) => {
-      const r = await commands.preparePlay(id, audio, quality);
+      const r = await commands.preparePlay(id, audio, quality, usePlaybackChoice.getState().preferred);
       if (r.status === "ok") play({ target: r.data.open, title: r.data.title, mediaItemId: id, start: r.data.start });
       else setError(r.error);
     },
@@ -164,7 +187,7 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
   const setMini = useUi((s) => s.setMini);
   const [panel, setPanel] = useState<"menu" | "shortcuts" | null>(null);
   const [stats, setStats] = useState(false);
-  const [picture, setPicture] = useState<Picture>({ brightness: 0, contrast: 0, saturation: 0 });
+  const [picture, setPicture] = useState<Picture>(PICTURE_DEFAULT);
   const [audioDelayMs, setAudioDelayMs] = useState(0);
   const menuPanel = useRef<HTMLDivElement>(null);
   const statsPanel = useRef<HTMLDivElement>(null);
@@ -181,6 +204,14 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
   const [paused, setPaused] = useState(false);
   const [chrome, setChrome] = useState(true);
   const [menu, setMenu] = useState<"audio" | "sub" | null>(null);
+  // A quick menu takes focus when it opens, on its first choice, so the pad is in it.
+  useEffect(() => {
+    if (!menu) return;
+    const id = requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('[role="menu"] [role="menuitem"]')?.focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [menu]);
   // The last nudge, shown for a moment in the controls (G/H, LB/RB).
   const [nudge, setNudge] = useState<string | null>(null);
   useEffect(() => {
@@ -240,20 +271,16 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
     };
   }, [playing]);
 
-  // Tell the native window where to sit and which shapes to cut out (ADR-0020).
+  // Tell the native window where to sit and which shapes to cut out (ADR-0020). Every
+  // overlay is marked `data-cutout` and gets its hole by being on screen: a hand-kept list
+  // forgot the subtitles and sound menus, which opened unseen beneath the video (Phase 16,
+  // measured in the real window). Paused, the video window is hidden and needs none.
   const layout = useCallback(() => {
-    const s = stage.current?.getBoundingClientRect();
-    if (!s) return;
-    const panels = [
-      ...(chrome && !paused ? [top.current, bottom.current] : []),
-      ...(showNextCard ? [card.current] : []),
-      ...(hover && chrome ? [preview.current] : []),
-      ...(panel === "menu" ? [menuPanel.current] : []),
-      ...(panel === "shortcuts" ? [shortcutsPanel.current] : []),
-      ...(stats ? [statsPanel.current] : []),
-    ];
-    const cutouts = panels
-      .filter((el): el is HTMLDivElement => !!el)
+    const root = stage.current;
+    const s = root?.getBoundingClientRect();
+    if (!root || !s) return;
+    const marked = paused ? [] : [...root.querySelectorAll<HTMLElement>("[data-cutout]")];
+    const cutouts = marked
       .map((el) => {
         const r = el.getBoundingClientRect();
         return {
@@ -265,15 +292,34 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
         };
       });
     void commands.playerLayout(s.x, s.y, s.width, s.height, window.devicePixelRatio, cutouts);
-  }, [chrome, paused, showNextCard, hover, panel, stats, mini]);
+    if ((window as unknown as { __probe?: boolean }).__probe) {
+      void commands.devLog(
+        `probe layout at=${performance.now().toFixed(0)} chrome=${chrome} menu=${menu} holes=${cutouts
+          .map((c) => `${Math.round(c.x)},${Math.round(c.y)},${Math.round(c.width)}x${Math.round(c.height)}`)
+          .join(" ")}`,
+      );
+    }
+  }, [chrome, paused, showNextCard, hover, panel, stats, mini, menu]);
 
   useLayoutEffect(() => {
     layout();
     const ro = new ResizeObserver(layout);
     if (stage.current) ro.observe(stage.current);
     window.addEventListener("resize", layout);
+    // An overlay appearing or going away reshapes the holes in the same frame.
+    let queued = 0;
+    const mo = new MutationObserver(() => {
+      if (queued) return;
+      queued = requestAnimationFrame(() => {
+        queued = 0;
+        layout();
+      });
+    });
+    if (stage.current) mo.observe(stage.current, { childList: true, subtree: true });
     return () => {
       ro.disconnect();
+      mo.disconnect();
+      cancelAnimationFrame(queued);
       window.removeEventListener("resize", layout);
     };
   }, [layout, menu]);
@@ -377,6 +423,11 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
         }
         if (intent.kind === "seek" || intent.kind === "volume" || intent.kind === "toggle_pause") return false;
       }
+      // A quick menu (subtitles, sound) is a panel too: the D-pad moves within it and A
+      // picks (Phase 16: Down in the subtitles menu used to turn the volume down).
+      if (menu && (intent.kind === "seek" || intent.kind === "volume" || intent.kind === "toggle_pause")) {
+        return false;
+      }
       wake();
       const s = state;
       switch (intent.kind) {
@@ -415,9 +466,13 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
           if (paused) void resume();
           act({ kind: "seek_by", seconds: intent.seconds });
           break;
-        case "volume":
-          act({ kind: "volume", percent: Math.min(130, Math.max(0, (s?.volume ?? 100) + intent.delta)) });
+        case "volume": {
+          const percent = Math.min(130, Math.max(0, (s?.volume ?? 100) + intent.delta));
+          act({ kind: "volume", percent });
+          // Said on screen: with the controls hidden, a change nobody sees reads as broken.
+          setNudge(`Volume ${Math.round(percent)}%`);
           break;
+        }
         case "mute":
           act({ kind: "mute", muted: !(s?.muted ?? false) });
           break;
@@ -438,7 +493,20 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
           break;
         case "episode": {
           const target = intent.next ? neighbours.data?.next : neighbours.data?.previous;
-          if (target) void goTo(target.id);
+          if (target) {
+            void goTo(target.id);
+            break;
+          }
+          // A film has no episode either side: the bumpers move by chapter (Phase 16).
+          const to = chapterTarget(chapters, s?.position ?? 0, intent.next);
+          if (to === null) {
+            setNudge(intent.next ? "No next chapter" : "No earlier chapter");
+            break;
+          }
+          if (paused) void resume();
+          act({ kind: "seek_to", seconds: to });
+          const title = chapters.find((c) => c.time === to)?.title;
+          setNudge(title ? `Chapter: ${title}` : `Chapter at ${clock(to)}`);
           break;
         }
         case "subtitle_delay":
@@ -468,9 +536,40 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
       return true;
     },
     [
-      act, audioDelayMs, fullscreen, goTo, leave, menu, mini, neighbours.data, next, panel, pause, paused,
+      act, audioDelayMs, chapters, fullscreen, goTo, leave, menu, mini, neighbours.data, next, panel, pause, paused,
       resume, setMini, showNextCard, state, togglePip, wake,
     ],
+  );
+
+  // A click on the picture pauses or plays, a double click goes full screen, and moving
+  // the mouse over it shows the controls. The picture is mpv's own window above the page,
+  // so the page hears of these only from mpv (Phase 16: "I can't click to pause").
+  // A click on the picture plays or pauses; a second within DOUBLE_CLICK_MS also toggles full
+  // screen (the author's answer). Clicks come from the native window while it plays and from the
+  // still frame while paused, so the double click is recognised here, across both.
+  const lastClick = useRef(0);
+  const clickPicture = useCallback(() => {
+    const now = performance.now();
+    const double = now - lastClick.current < DOUBLE_CLICK_MS;
+    lastClick.current = double ? 0 : now;
+    run({ kind: "toggle_pause" });
+    if (double) run({ kind: "fullscreen" });
+  }, [run]);
+  useTauriEvent<string>("player-pointer", (what) => {
+    if (what === "click") clickPicture();
+    else wake();
+  });
+  // Over the page's own parts (the bars, the panels), a movement is one only if the pointer is somewhere new: the
+  // content under a still pointer changes as the bars hide, and must not count (crates/player/src/host.rs).
+  const pointerAt = useRef<{ x: number; y: number } | null>(null);
+  const pointerMove = useCallback(
+    (e: React.MouseEvent) => {
+      const at = pointerAt.current;
+      if (at && at.x === e.screenX && at.y === e.screenY) return;
+      pointerAt.current = { x: e.screenX, y: e.screenY };
+      wake();
+    },
+    [wake],
   );
 
   useEffect(() => {
@@ -488,9 +587,36 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
     };
   }, [run, mini]);
 
+  // Between the backend's four reports a second, the bar and clock run on smoothly while
+  // the bar is shown (Phase 16: "jumpy"); `glide` keeps them honest about a stall.
+  const reported = useRef({ position: 0, at: 0, speed: 1, playing: false, duration: null as number | null });
+  useEffect(() => {
+    reported.current = {
+      position: state?.position ?? 0,
+      at: performance.now(),
+      speed: state?.speed ?? 1,
+      playing: !!state?.started && !state.paused && !state.ended && !paused,
+      duration: state?.duration ?? null,
+    };
+  }, [state, paused]);
+  const [frameAt, setFrameAt] = useState(() => performance.now());
+  const gliding = !mini && (chrome || !!menu || !!panel) && !!state?.started && !state.paused && !paused;
+  useEffect(() => {
+    if (!gliding) return;
+    let id = requestAnimationFrame(function frame(t) {
+      setFrameAt(t);
+      id = requestAnimationFrame(frame);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [gliding]);
+  const position = gliding ? glide(reported.current, frameAt) : (state?.position ?? 0);
+  const pad = usePadMode();
+  // The pointer goes with the bars, over the picture too (a native window: the host hides it there).
+  const pointerHidden = !!playing && !mini && !(chrome || paused || !!menu || !!panel);
+  useEffect(() => tellPointer(pointerHidden), [pointerHidden]);
+  useEffect(() => () => tellPointer(false), []);
   if (!playing) return null;
   const duration = state?.duration ?? 0;
-  const position = state?.position ?? 0;
   const tracks = state?.tracks ?? [];
   const showChrome = !mini && (chrome || paused || !!menu || !!panel);
 
@@ -525,20 +651,23 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
   return (
     <div
       ref={stage}
-      onMouseMove={wake}
+      onMouseMove={pointerMove}
       className="relative h-full w-full overflow-hidden bg-black text-ink"
       style={{ cursor: showChrome ? "default" : "none" }}
       aria-label={`Playing ${playing.title}`}
     >
       {paused && (
         <PauseOverlay
-          title={playing.title}
+          title={heading}
+          episode={where}
+          next={place && next ? nextLine(next) : null}
           still={still}
           position={position}
           duration={duration}
           chapter={chapterTitle}
           details={details.data}
           onResume={() => void resume()}
+          onPicture={clickPicture}
           onOpen={(id) => {
             stopPlaying();
             openDetail(id);
@@ -552,6 +681,8 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
           tracks={tracks}
           picture={picture}
           audioDelayMs={audioDelayMs}
+          speed={state?.speed ?? 1}
+          onSpeed={(faster) => run({ kind: "speed", faster })}
           stats={stats}
           onAudio={(id) => act({ kind: "audio", id })}
           onSubtitles={(id) => act({ kind: "subtitles", id })}
@@ -585,6 +716,7 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
         return (
           <div
             ref={preview}
+            data-cutout
             aria-hidden
             className="absolute bottom-[96px] overflow-hidden rounded-sm bg-surface"
             style={{ left: previewLeft(hover.x, width + 8, hover.barLeft, hover.barWidth) }}
@@ -638,9 +770,10 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
           <p className="label text-ink-muted">
             {playing.start ? `Resuming from ${clock(playing.start)}` : "Opening"}
           </p>
-          <h1 className="max-w-[70%] font-display text-[44px] leading-[1.05] font-semibold tracking-[-0.03em]">
-            {playing.title}
+          <h1 className="max-w-[70%] font-serif text-[52px] leading-[1.02] tracking-[-0.015em]">
+            {heading}
           </h1>
+          {where && <p className="text-[17px] text-ink-muted">{where}</p>}
         </div>
       )}
 
@@ -661,6 +794,7 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
           {!pip && (
           <div
             ref={top}
+            data-cutout
             data-tauri-drag-region
             className="absolute inset-x-3 top-3 flex h-12 items-center gap-4 rounded-md bg-surface px-3"
           >
@@ -670,12 +804,12 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
               </svg>
             </button>
             <span data-tauri-drag-region className="truncate font-display text-[17px] font-semibold tracking-[-0.02em]">
-              {playing.title}
+              {barTitle}
             </span>
           </div>
           )}
 
-          <div ref={bottom} className="absolute inset-x-3 bottom-3 rounded-md bg-surface px-4 pt-3 pb-2.5">
+          <div ref={bottom} data-cutout className="absolute inset-x-3 bottom-3 rounded-md bg-surface px-4 pt-3 pb-2.5">
             <Scrub
               position={position}
               duration={duration}
@@ -718,7 +852,9 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
                 onToggle={() => run({ kind: "subtitles_menu" })}
                 onPick={(id) => { act({ kind: "subtitles", id }); setMenu(null); }} />
               <button type="button" onClick={() => run({ kind: "mute" })} className="px-2 py-1 text-ink-muted hover:text-ink">
-                {state?.muted ? "Unmute" : `Volume ${Math.round(state?.volume ?? 100)}`}
+                {/* What the button does. The level is said once, beside it, when it changes
+                    (Phase 16: two volume readouts side by side). */}
+                {state?.muted ? "Unmute" : "Mute"}
               </button>
               <button type="button" onClick={() => run({ kind: "fullscreen" })} className="px-2 py-1 text-ink-muted hover:text-ink">
                 {fullscreen ? "Exit full screen" : "Full screen"}
@@ -726,6 +862,7 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
               </>
               )}
             </div>
+            {pad && <PadHints />}
           </div>
         </>
       )}
@@ -800,7 +937,7 @@ function TrackMenu({
         {label}
       </button>
       {open && (
-        <ul role="menu" className="absolute right-0 bottom-9 min-w-44 rounded-md border border-line bg-raised py-1">
+        <ul role="menu" data-cutout aria-label={label} className="absolute right-0 bottom-9 min-w-44 rounded-md border border-line bg-raised py-1">
           {kind === "sub" && (
             <li>
               <button type="button" role="menuitem" onClick={() => onPick(null)} className="w-full px-3 py-1.5 text-left hover:bg-surface">
@@ -820,6 +957,34 @@ function TrackMenu({
           {list.length === 0 && <li className="px-3 py-1.5 text-ink-faint">None in this file</li>}
         </ul>
       )}
+    </div>
+  );
+}
+
+/** ADR-0045's TV-standard buttons, in the bar while a pad is in use (Phase 16). Inside the
+ * bar, so inside its hole: a hints footer elsewhere would sit under the video. */
+const PAD_HINTS: [string, string][] = [
+  ["A", "Pause"],
+  ["◀▶", "Seek"],
+  ["▲▼", "Volume"],
+  ["Y", "Subtitles"],
+  ["X", "Sound"],
+  ["≡", "More"],
+  ["⧉", "Full screen"],
+  ["B", "Back"],
+];
+
+function PadHints() {
+  return (
+    <div aria-label="Controller buttons" role="note" className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[12px] text-ink-muted">
+      {PAD_HINTS.map(([b, what]) => (
+        <span key={what} className="flex items-center gap-1.5">
+          <span className="hint-glyph" aria-hidden>
+            {b}
+          </span>
+          {what}
+        </span>
+      ))}
     </div>
   );
 }

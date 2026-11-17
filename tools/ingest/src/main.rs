@@ -41,6 +41,8 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            measure what that will cost.
   ingest repair-variants   recompute titles.variant for rows the region-over-
                            language bug labelled english. Narrow and re-runnable.
+  ingest keep              what the app does hourly: finish an interrupted refresh,
+                           or refresh titles and episodes if IMDb republished
   ingest refresh           ADR-0030 layer 1: re-download title.basics and
                            title.ratings, insert only titles newer than the
                            highest id already held, and re-apply every rating.
@@ -61,6 +63,7 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            than downloaded, so it needs `ingest embed` to have
                            produced the artefact first. Re-runnable: it replaces
                            the index it finds.
+  ingest artefact-keys     name the published artefact's vectors by IMDb id (ADR-0051)
   ingest tidy [--dry-run]  delete dataset archives whose loader has completed. They
                            are 2.1 GB of a 6.4 GB data directory and every one has
                            already been read. Re-downloadable; ml-25m.zip is never
@@ -164,6 +167,7 @@ async fn main() -> Result<(), JobError> {
         }
         "repair-variants" => repair_variants(&db).await,
         "refresh" => refresh(&db, &dir.join("datasets")).await,
+        "keep" => keep(&db, &dir.join("datasets")).await,
         "embed" => embed_artefact(&db, &dir).await,
         "search-index" => {
             let trigram = args.iter().any(|a| a == "--trigram");
@@ -193,6 +197,7 @@ async fn main() -> Result<(), JobError> {
             .await
         }
         "vector-index" => vector_index(&db, &dir).await,
+        "artefact-keys" => artefact_keys(&db, &dir).await,
         "compact" => compact(&db).await,
         "verify-embeddings" => verify_embeddings(&dir),
         "verify-anime" => verify_anime(&db).await,
@@ -235,6 +240,7 @@ const COMPACT_AFTER: &[&str] = &[
     "movielens",
     "repair-variants",
     "refresh",
+    "keep",
     "wikipedia",
     "search-index",
 ];
@@ -601,7 +607,7 @@ async fn episodes(
         skip.len()
     );
 
-    let wanted = ep::collect(&path, &series, scope, &skip)?;
+    let wanted = ep::collect(&path, &series, scope, &Default::default(), &skip)?;
     tracing::info!("{} episodes in scope", wanted.len());
     if wanted.is_empty() {
         println!(
@@ -745,6 +751,19 @@ async fn movielens(
     Ok(())
 }
 
+/// What the app's hourly timer does (Phase 16): finish an interrupted refresh, or refresh
+/// if IMDb has republished, titles then episodes. The same function the app calls.
+async fn keep(db: &Db, datasets: &Path) -> Result<(), JobError> {
+    let started = std::time::Instant::now();
+    let transport = sinephile_metadata_api::HttpTransport::new();
+    let outcome = sinephile_catalogue::freshness::refresh(db, &transport, datasets, false).await;
+    println!();
+    println!("  {outcome:?}");
+    println!("  {:.0}s", started.elapsed().as_secs_f64());
+    println!();
+    Ok(())
+}
+
 /// ADR-0030 layer 1 — incremental bulk refresh.
 async fn refresh(db: &Db, datasets: &Path) -> Result<(), JobError> {
     use std::sync::Arc;
@@ -819,8 +838,8 @@ async fn embed_artefact(db: &Db, dir: &Path) -> Result<(), JobError> {
     use std::time::Instant;
 
     let models = Path::new("models");
-    let model = models.join("bge-small-en-v1.5-int8.onnx");
-    let tokenizer = models.join("bge-small-en-v1.5-tokenizer.json");
+    let model = models.join(sinephile_catalogue::assets::MODEL_FILE);
+    let tokenizer = models.join(sinephile_catalogue::assets::TOKENIZER_FILE);
     for (path, expected) in [
         (&model, embed::MODEL_SHA256),
         (&tokenizer, embed::TOKENIZER_SHA256),
@@ -1114,6 +1133,64 @@ async fn wikipedia(db: &Db, map: bool, extracts: bool, limit: i64) -> Result<(),
 /// half-done state a checkpoint could resume from. Interrupt it and the previous index
 /// is still there, untouched, because the new one is written to a temporary path and
 /// moved into place only once it is complete.
+/// Write the key file that names the published artefact's vectors by IMDb id (ADR-0051),
+/// from the catalogue the artefact was built from: this one. Refuses unless this
+/// catalogue's first core ids are exactly the artefact's, so the keys can only be true.
+/// Written into `crates/catalogue/assets/`, where the app compiles it in.
+async fn artefact_keys(db: &Db, dir: &Path) -> Result<(), JobError> {
+    use sinephile_embedding::keys::Keys;
+    use sinephile_persistence::repositories::CatalogueRepository;
+
+    let artefact_path = sinephile_embedding::artefact_path(dir);
+    let mut file = std::fs::File::open(&artefact_path)?;
+    let artefact = sinephile_embedding::Artefact::read(&mut file)
+        .map_err(|e| JobError::step("artefact-keys", e.to_string()))?;
+    let count = artefact.header.count as usize;
+
+    let repository = CatalogueRepository::new(db);
+    let core = repository.core_ids().await?;
+    if core.len() < count
+        || sinephile_embedding::id_digest(&core[..count]) != artefact.header.id_digest
+    {
+        return Err(JobError::step(
+            "artefact-keys",
+            "this catalogue is not the one the artefact was built from: its first core ids \
+             differ, so keys written from it would name the wrong films",
+        ));
+    }
+    let with_text = repository.core_ids_for_vectors().await?;
+    let wanted: Vec<i64> = with_text.iter().take(count).flatten().copied().collect();
+    let imdb = repository.imdb_for_ids(&wanted).await?;
+    let pairs: Vec<(u32, u32)> = with_text
+        .iter()
+        .take(count)
+        .enumerate()
+        .filter_map(|(position, id)| {
+            id.and_then(|id| imdb.get(&id))
+                .map(|n| (position as u32, *n))
+        })
+        .collect();
+    let keys = Keys {
+        artefact_digest: artefact.header.id_digest,
+        count: artefact.header.count,
+        pairs,
+    };
+    let out = Path::new("crates/catalogue/assets")
+        .join(format!("embeddings-{}.keys", sinephile_embedding::MODEL));
+    let mut bytes = Vec::new();
+    keys.write(&mut bytes)?;
+    std::fs::write(&out, &bytes)?;
+    println!(
+        "ingest: {} of {count} positions named by IMDb id ({} worth indexing, {} without one), {} bytes -> {}",
+        keys.pairs.len(),
+        wanted.len(),
+        wanted.len() - keys.pairs.len(),
+        bytes.len(),
+        out.display()
+    );
+    Ok(())
+}
+
 async fn vector_index(db: &Db, dir: &Path) -> Result<(), JobError> {
     // Routed through `sinephile_catalogue::index::build` rather than calling
     // `VectorIndex::build` directly, because the application builds an index too (D44)
@@ -1137,8 +1214,8 @@ Run `ingest embed` first, or download the published artefact.",
     // may have moved, and the model is one of the three files downloaded alongside it.
     let models = Path::new("models");
     let mut embedder = sinephile_catalogue::embed::OnnxEmbedder::pinned(
-        &models.join("bge-small-en-v1.5-int8.onnx"),
-        &models.join("bge-small-en-v1.5-tokenizer.json"),
+        &models.join(sinephile_catalogue::assets::MODEL_FILE),
+        &models.join(sinephile_catalogue::assets::TOKENIZER_FILE),
     )
     .map_err(|e| JobError::step("vector-index", e.to_string()))?;
 

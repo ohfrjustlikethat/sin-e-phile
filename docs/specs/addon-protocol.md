@@ -311,3 +311,25 @@ nothing else: the registry, the ordering, the health record, the settings screen
 resolver all find it from that list (Phase 6 E1, commit `bd80a1f`). **No built-in
 backend may name or reach an unlicensed content source** — `SPEC.md` §2.1, enforced by
 `tools/guard` over the whole history.
+
+## 10. Stremio add-ons (ADR-0047)
+
+The app also speaks Stremio's add-on protocol, so an add-on written for Stremio works here unchanged.
+`source_protocol::AddonManifest` decides by shape: a manifest with `resources` and no `protocol` is
+Stremio's (`source_protocol::stremio`), anything else is checked as §2's.
+
+- **Installing**: paste the manifest's address (it must end in `manifest.json`) or its `stremio://`
+  link, which stands for the `https` address. The manifest must offer the `stream` resource for
+  `movie` or `series`, by IMDb ids (`idPrefixes` absent or matching `tt`), and must not say
+  `configurationRequired` (set it up on its own page first; a configured add-on keeps its settings in
+  its path, which is kept whole). What is stored is re-serialised from what was checked.
+- **Asking**: `GET <base>/stream/movie/<tt…>.json`, or `/stream/series/<tt…>:<season>:<episode>.json`
+  for an episode (the series' id). A title without an IMDb id is not asked about; a 404 is "nothing".
+- **Answers**: `{"streams":[…]}`, at most 2 MiB and 80 streams kept. A stream with `infoHash` (and
+  `fileIdx`, and `sources` entries `tracker:<url>`) becomes a torrent; one with `url` a web stream.
+  `ytId`, `externalUrl` and any stream with `behaviorHints.proxyHeaders` are left out: this player
+  cannot open them. Every stream passes `wire::check_stream`. Resolution, HDR, codec, size (`💾 4.2 GB`,
+  or `behaviorHints.videoSize`) and seeders (`👤 57`) are read from the stream's text.
+- **Resolving**: there is no second request; the candidate's key holds the stream, checked again.
+- **Conformance**: `SINEPHILE_ADDON=<manifest address> SINEPHILE_ADDON_IMDB=tt… cargo test -p
+  sinephile-sources --test conformance -- --ignored --nocapture` runs the app's own client against it.

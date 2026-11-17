@@ -197,6 +197,40 @@ async fn media_repository_surface() {
         .await
         .expect("most_voted_with_votes");
     assert_eq!(pool, vec![(famous, 900_000), (known, 1_000)]);
+    // new_releases — this year's (here: 1990 on) with enough votes, most first
+    assert_eq!(
+        repo.new_releases(1990, 500, 5).await.expect("new_releases"),
+        vec![(famous, 900_000)]
+    );
+    assert!(repo
+        .new_releases(1990, 1_000_000, 5)
+        .await
+        .unwrap()
+        .is_empty());
+
+    // most_voted_of — one kind, by votes, optionally one genre (Phase 16's catalogue rails)
+    assert_eq!(
+        repo.most_voted_of(false, None, 2)
+            .await
+            .expect("most_voted_of"),
+        vec![famous, known]
+    );
+    assert!(
+        repo.most_voted_of(true, None, 5).await.unwrap().is_empty(),
+        "no shows with votes here"
+    );
+    genre("Crime", known).await;
+    assert_eq!(
+        repo.most_voted_of(false, Some("Crime"), 5).await.unwrap(),
+        vec![known],
+        "only the genre asked for"
+    );
+    // new_of — one kind, from a year, with enough votes
+    assert_eq!(
+        repo.new_of(false, 1990, 500, 5).await.expect("new_of"),
+        vec![famous]
+    );
+    assert!(repo.new_of(true, 1990, 500, 5).await.unwrap().is_empty());
 
     // most_voted_films_between — only the years asked for
     assert_eq!(
@@ -322,6 +356,22 @@ async fn episode_repository_surface() {
         repo.seasons(series).await.expect("seasons"),
         [(Some(1), 2), (Some(2), 1)]
     );
+    // new_episodes — nothing followed yet by this profile, so nothing new
+    let viewer = ProfileRepository::new(&db).ensure_default().await.unwrap();
+    assert!(repo
+        .new_episodes(viewer, 30, 0, 10)
+        .await
+        .expect("new_episodes")
+        .is_empty());
+    // followed (watchlist): its newest episode added this month, one row for the series
+    sqlx::query("INSERT INTO watchlist_items (profile_id, media_item_id) VALUES (?, ?)")
+        .bind(viewer)
+        .bind(series)
+        .execute(db.pool())
+        .await
+        .unwrap();
+    let fresh = repo.new_episodes(viewer, 30, 0, 10).await.unwrap();
+    assert_eq!(fresh, vec![(series, s2e1, Some(2), Some(1))]);
     let first = repo
         .episodes_of(series, Some(1))
         .await
@@ -379,6 +429,98 @@ async fn episode_repository_surface() {
             .expect("numberings_for")
             .len(),
         1
+    );
+
+    // set_watched / finished_in_season (Appendix F, I21): a season, a series, a title.
+    use sinephile_persistence::repositories::WatchScope;
+    let profiles = ProfileRepository::new(&db);
+    let season_one = WatchScope::Season {
+        series,
+        season: Some(1),
+    };
+    assert!(profiles
+        .finished_in_season(viewer, series, Some(1))
+        .await
+        .expect("finished_in_season")
+        .is_empty());
+    assert_eq!(
+        profiles
+            .set_watched(viewer, season_one, true)
+            .await
+            .expect("set_watched (a season)"),
+        2,
+        "season 1's two episodes, not season 2's"
+    );
+    assert_eq!(
+        profiles
+            .finished_in_season(viewer, series, Some(1))
+            .await
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(profiles
+        .finished_in_season(viewer, series, Some(2))
+        .await
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        profiles
+            .set_watched(viewer, season_one, true)
+            .await
+            .unwrap(),
+        0,
+        "marking again records no second viewing"
+    );
+    assert_eq!(
+        profiles
+            .set_watched(viewer, WatchScope::Series(series), true)
+            .await
+            .expect("set_watched (a series)"),
+        1,
+        "only the episode not yet watched"
+    );
+    assert!(profiles.finished(viewer, s2e1).await.unwrap());
+    // Unwatched: the viewing goes, and so does the place it was left at.
+    let part_way = PlaybackPosition {
+        media_item_id: s2e1,
+        position_seconds: 10,
+        duration_seconds: Some(100),
+        audio_language: None,
+        subtitle_language: None,
+    };
+    profiles.save_position(viewer, &part_way).await.unwrap();
+    assert_eq!(
+        profiles
+            .set_watched(viewer, WatchScope::Title(s2e1), false)
+            .await
+            .expect("set_watched (a title, unwatched)"),
+        1
+    );
+    assert!(!profiles.finished(viewer, s2e1).await.unwrap());
+    assert!(profiles.position(viewer, s2e1).await.unwrap().is_none());
+    // Watched: a part-played title leaves Continue watching.
+    profiles.save_position(viewer, &part_way).await.unwrap();
+    assert_eq!(
+        profiles
+            .set_watched(viewer, WatchScope::Title(s2e1), true)
+            .await
+            .unwrap(),
+        1
+    );
+    assert!(profiles
+        .continue_watching(viewer, 10)
+        .await
+        .unwrap()
+        .iter()
+        .all(|p| p.media_item_id != s2e1));
+    assert_eq!(
+        profiles
+            .set_watched(viewer, WatchScope::Series(series), false)
+            .await
+            .unwrap(),
+        3,
+        "unwatching the series clears all three episodes"
     );
 }
 
@@ -583,6 +725,22 @@ async fn profile_repository_surface() {
         1
     );
 
+    // recent_positions (Phase 16) — finished or not, most recent first
+    assert_eq!(
+        repo.recent_positions(second, 10)
+            .await
+            .expect("recent_positions")
+            .first()
+            .map(|p| p.media_item_id),
+        Some(film)
+    );
+    // latest_in_series — a film is in no series
+    assert!(repo
+        .latest_in_series(second, film)
+        .await
+        .expect("latest_in_series")
+        .is_none());
+
     // add_to_watchlist — insert and ON CONFLICT DO NOTHING
     repo.add_to_watchlist(second, film, Some("because"))
         .await
@@ -593,6 +751,19 @@ async fn profile_repository_surface() {
 
     // watchlist
     assert_eq!(repo.watchlist(second).await.expect("watchlist"), vec![film]);
+
+    // on_watchlist / remove_from_watchlist (Appendix F, I39) — per profile; a second
+    // removal finds nothing to remove
+    assert!(repo.on_watchlist(second, film).await.expect("on_watchlist"));
+    assert!(!repo.on_watchlist(first, film).await.unwrap());
+    assert!(repo
+        .remove_from_watchlist(second, film)
+        .await
+        .expect("remove_from_watchlist"));
+    assert!(!repo.remove_from_watchlist(second, film).await.unwrap());
+    assert!(!repo.on_watchlist(second, film).await.unwrap());
+    assert!(repo.watchlist(second).await.unwrap().is_empty());
+    repo.add_to_watchlist(second, film, None).await.unwrap();
 
     // set_setting — insert and ON CONFLICT update
     repo.set_setting("theme", "dark")
@@ -1147,6 +1318,23 @@ async fn db_surface() {
         .add_external_id(probe, IdSource::Imdb, "tt0000001", 1.0)
         .await
         .expect("probe imdb id");
+
+    // ids_for_imdb / imdb_for_ids (ADR-0051) — both ways, and a number nobody holds is
+    // simply absent
+    let by_imdb = catalogue
+        .ids_for_imdb(&[1, 9_999_999])
+        .await
+        .expect("ids_for_imdb");
+    assert_eq!(by_imdb.get(&1), Some(&probe));
+    assert_eq!(by_imdb.len(), 1);
+    assert_eq!(
+        catalogue
+            .imdb_for_ids(&[probe, 999_999])
+            .await
+            .expect("imdb_for_ids")
+            .get(&probe),
+        Some(&1)
+    );
     assert!(wiki.map("tt0000001", "Probe Article").await.expect("map"));
     // Re-mapping after an article was moved updates the title and must NOT re-queue.
     assert!(wiki
@@ -1733,6 +1921,125 @@ async fn library_repository_surface() {
     assert!(!repo.file(id).await.unwrap().unwrap().probed);
     assert!(repo.match_of(id).await.unwrap().unwrap().confirmed);
 
+    // recently_added — the matched film, once
+    assert_eq!(
+        repo.recently_added(10).await.expect("recently_added"),
+        vec![heat]
+    );
+
+    // A guess below the threshold is the review queue's, not the library's: neither
+    // recently_added nor files_for_item use it (Phase 16, the author's misread episodes).
+    let guessed = repo
+        .upsert_file(&NewLocalFile {
+            path: "C:/films/Monster - Chapter 08 - The Fugitive.mkv",
+            size_bytes: 3000,
+            ..f.clone()
+        })
+        .await
+        .expect("guessed file");
+    let guessed = match guessed {
+        Upserted::New(g) => g,
+        other => panic!("{other:?}"),
+    };
+    repo.set_match(
+        guessed,
+        &FileMatch {
+            media_item_id: other,
+            confidence: 0.07,
+            method: MatchMethod::Metadata,
+            covers: 1,
+            confirmed: false,
+        },
+    )
+    .await
+    .expect("a guess");
+    assert_eq!(repo.recently_added(10).await.unwrap(), vec![heat]);
+    assert!(repo.files_for_item(other).await.unwrap().is_empty());
+    // Out of the way of the review queue's counts below.
+    repo.set_ignored(guessed, true).await.expect("set aside");
+
+    // episodes_on_this_pc — the series' episodes with a file the library stands behind:
+    // the guess (a 0.07 match) does not count, the accepted file does.
+    let show = media
+        .insert(&NewMediaItem::film("Monster", 2004))
+        .await
+        .expect("series");
+    let (ep1, ep8) = (
+        media
+            .insert(&NewMediaItem::film("Herr Dr. Tenma", 2004))
+            .await
+            .expect("ep1"),
+        media
+            .insert(&NewMediaItem::film("The Fugitive", 2004))
+            .await
+            .expect("ep8"),
+    );
+    let episodes = EpisodeRepository::new(&db);
+    episodes
+        .create_series(show, false)
+        .await
+        .expect("create_series");
+    episodes
+        .create_episode(ep1, show, None, Some(1), Some(1), None)
+        .await
+        .expect("ep1 row");
+    episodes
+        .create_episode(ep8, show, None, Some(1), Some(8), None)
+        .await
+        .expect("ep8 row");
+    let on_disk = |path: &'static str| NewLocalFile {
+        path,
+        size_bytes: 5000,
+        ..f.clone()
+    };
+    let Upserted::New(have) = repo
+        .upsert_file(&on_disk("D:/TV/Monster - Chapter 01.mkv"))
+        .await
+        .unwrap()
+    else {
+        panic!("new")
+    };
+    let Upserted::New(unsure) = repo
+        .upsert_file(&on_disk("D:/TV/Monster - Chapter 08.mkv"))
+        .await
+        .unwrap()
+    else {
+        panic!("new")
+    };
+    let accepted = |id: i64, conf: f64| FileMatch {
+        media_item_id: id,
+        confidence: conf,
+        method: MatchMethod::Filename,
+        covers: 1,
+        confirmed: false,
+    };
+    repo.set_match(have, &accepted(ep1, 0.95))
+        .await
+        .expect("accepted");
+    repo.set_match(unsure, &accepted(ep8, 0.07))
+        .await
+        .expect("a guess");
+    assert_eq!(
+        repo.episodes_on_this_pc(show)
+            .await
+            .expect("episodes_on_this_pc"),
+        vec![ep1]
+    );
+    // library_titles — the show once (through its episode), kept apart from the films; the
+    // guessed episode adds nothing. Its kind is a series for this.
+    sqlx::query("UPDATE media_items SET kind = 'anime_series' WHERE id = ?")
+        .bind(show)
+        .execute(db.pool())
+        .await
+        .unwrap();
+    assert_eq!(
+        repo.library_titles(true).await.expect("library_titles"),
+        vec![show]
+    );
+    assert_eq!(repo.library_titles(false).await.unwrap(), vec![heat]);
+    repo.set_ignored(have, true).await.expect("set aside");
+    repo.set_ignored(unsure, true).await.expect("set aside");
+
     // clear_match / set_candidates / candidates / review_queue / review_count
     repo.clear_match(id).await.expect("clear");
     assert_eq!(repo.match_of(id).await.unwrap(), None);
@@ -1883,11 +2190,15 @@ async fn download_repository_surface() {
             limit_kib: Some(2048),
             not_before: Some("2026-11-08T00:00:00Z"),
             reason: Some("A favourite, worth the disk."),
+            file_index: Some(3),
         })
         .await
         .expect("add");
     let d = repo.get(high).await.unwrap().expect("row");
     assert_eq!(d.state, DownloadState::Queued);
+    // The one file of the torrent it wants (a season pack's episode), kept.
+    assert_eq!(d.file_index, Some(3));
+    assert_eq!(repo.get(low).await.unwrap().unwrap().file_index, None);
     assert_eq!(
         (d.priority, d.limit_kib, d.torrent.as_deref()),
         (5, Some(2048), Some(&[1u8, 2, 3][..]))

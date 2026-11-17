@@ -1,13 +1,20 @@
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { commands, type Capability, type HardwareProfile, type Tier } from "@/lib/ipc";
-import { useUi } from "@/lib/store";
+import { SETTINGS_SECTIONS, useUi, type SettingsSection } from "@/lib/store";
+import { Settings as DownloadsSettings } from "@/features/downloads/DownloadsScreen";
 import { NetworkSection } from "./NetworkSection";
 import { ControllerSection } from "./ControllerSection";
 import { SourcesSection } from "./SourcesSection";
 import { PlaybackSection } from "./PlaybackSection";
 import { SubtitlesSection } from "./SubtitlesSection";
 import { LibrarySection } from "./LibrarySection";
+import { CatalogueSection } from "./CatalogueSection";
+import { MeaningDownload } from "@/features/search/MeaningDownload";
+import { TmdbSection } from "./TmdbSection";
+import { ArtworkSection } from "./ArtworkSection";
 import { ProfilesSection } from "./ProfilesSection";
+import { SETTINGS_HEADING } from "./heading";
 
 /**
  * Settings — SPEC.md Phase 1, subtask 1.9.
@@ -18,8 +25,87 @@ import { ProfilesSection } from "./ProfilesSection";
  * So this screen states what the machine is and what that means, without hedging
  * and without implying the user has bought the wrong computer.
  */
+/** The side list's words for each section. */
+const NAMES: Record<SettingsSection, string> = {
+  profile: "Profile",
+  library: "Library",
+  addons: "Add-ons",
+  playback: "Playback",
+  subtitles: "Subtitles",
+  downloads: "Downloads",
+  network: "Network",
+  controller: "Controller",
+  about: "About",
+};
+
+/**
+ * Phase 16 (the author: "too long and hard to find things"): a side list of sections, one shown at a time beside
+ * it, each short. Which one is open is kept while away (the store), and a link from elsewhere opens the right one
+ * (`openSettingsAt`).
+ */
 export function SettingsScreen() {
-  const setSettingsOpen = useUi((s) => s.setSettingsOpen);
+  const section = useUi((s) => s.settingsSection);
+  const setSection = useUi((s) => s.setSettingsSection);
+  // Opened with nothing focused (Menu on the pad, the gear): focus starts on the open section in the list, so the
+  // D-pad starts somewhere (Phase 16, the author: focus gets lost in Settings).
+  const nav = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const at = document.activeElement;
+    if (!at || at === document.body || !at.isConnected) {
+      // Without scrolling: Settings reopens where it was left (the scroll memory), and the list is sticky.
+      nav.current?.querySelector<HTMLElement>('[aria-current="page"]')?.focus({ preventScroll: true });
+    }
+  }, []);
+  return (
+    <div className="flex gap-12 px-16 pt-6 pb-24">
+      <nav ref={nav} aria-label="Settings sections" className="sticky top-6 w-48 shrink-0 self-start">
+        <h1 className="mb-6 font-serif text-[40px] leading-none tracking-[-0.015em] text-ink">Settings</h1>
+        <ul className="flex flex-col">
+          {SETTINGS_SECTIONS.map((s) => (
+            <li key={s}>
+              <button
+                type="button"
+                aria-current={s === section ? "page" : undefined}
+                onClick={() => setSection(s)}
+                className={[
+                  "w-full border-l-2 py-2 pl-4 text-left text-[15px] transition-colors duration-[var(--dur-standard)]",
+                  s === section
+                    ? "border-oxblood-bright text-ink"
+                    : "border-transparent text-ink-muted hover:text-ink",
+                ].join(" ")}
+              >
+                {NAMES[s]}
+              </button>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-8 text-[12px] leading-relaxed text-ink-faint">Everything here stays on this machine.</p>
+      </nav>
+      <div className="min-w-0 max-w-3xl flex-1 pt-2" aria-label={NAMES[section]}>
+        {section === "profile" && <ProfilesSection />}
+        {section === "library" && (
+          <>
+            <LibrarySection />
+            <CatalogueSection />
+            <MeaningDownload />
+            <ArtworkSection />
+            <TmdbSection />
+          </>
+        )}
+        {section === "addons" && <SourcesSection />}
+        {section === "playback" && <PlaybackSection />}
+        {section === "subtitles" && <SubtitlesSection />}
+        {section === "downloads" && <DownloadsSettings />}
+        {section === "network" && <NetworkSection />}
+        {section === "controller" && <ControllerSection />}
+        {section === "about" && <AboutSection />}
+      </div>
+    </div>
+  );
+}
+
+/** The machine, what it enables, where the data lives, and what never leaves it. */
+function AboutSection() {
   const queryClient = useQueryClient();
 
   const profile = useQuery({
@@ -38,31 +124,7 @@ export function SettingsScreen() {
   });
 
   return (
-    <div className="mx-auto max-w-3xl px-10 py-10">
-      <header className="mb-9 flex items-start justify-between">
-        <div>
-          <h1 className="text-[26px] font-semibold tracking-[-0.02em]">Settings</h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            Everything here stays on this machine.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setSettingsOpen(false)}
-          className="rounded-md border border-line px-3.5 py-2 text-sm text-ink-muted transition-colors hover:bg-raised hover:text-ink"
-        >
-          Done
-        </button>
-      </header>
-
-      <ProfilesSection />
-      <LibrarySection />
-      <SourcesSection />
-      <PlaybackSection />
-      <SubtitlesSection />
-      <NetworkSection />
-      <ControllerSection />
-
+    <div>
       {profile.isPending && <Skeleton />}
       {profile.isError && (
         <p className="text-sm text-danger">
@@ -305,7 +367,7 @@ function OverrideButton({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-9">
-      <h2 className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
+      <h2 className={SETTINGS_HEADING}>
         {title}
       </h2>
       {children}

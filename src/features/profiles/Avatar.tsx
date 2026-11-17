@@ -32,12 +32,25 @@ export function Avatar({
   name,
   colour,
   size = "sm",
+  picture,
 }: {
   name: string;
   colour: string | null;
   size?: "sm" | "lg";
+  /** A profile picture, as a `data:` URL (Phase 16): a rounded square in place of the initial. */
+  picture?: string | null;
 }) {
   const box = size === "lg" ? "h-28 w-28 text-[52px]" : "h-7 w-7 text-[13px]";
+  if (picture) {
+    return (
+      <img
+        src={picture}
+        alt=""
+        aria-hidden
+        className={`shrink-0 object-cover ${size === "lg" ? "rounded-xl" : "rounded-md"} ${box}`}
+      />
+    );
+  }
   return (
     <span
       aria-hidden

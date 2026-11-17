@@ -1,4 +1,5 @@
 import React from "react";
+import { commands } from "@/lib/ipc";
 
 interface State {
   error: Error | null;
@@ -23,6 +24,11 @@ export class ErrorBoundary extends React.Component<
 
   override componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error("render error", error, info.componentStack);
+    // Into the log file too, so the next one can be read afterwards (Phase 16). Outside the Tauri shell (the UI
+    // audit's browser) the call throws, and that is fine.
+    void Promise.resolve()
+      .then(() => commands.logUiError(`${error.name}: ${error.message}`, info.componentStack ?? null))
+      .catch(() => {});
   }
 
   override render() {

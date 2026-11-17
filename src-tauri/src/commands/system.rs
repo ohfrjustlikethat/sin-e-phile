@@ -32,6 +32,15 @@ pub fn has_capability(state: State<'_, AppState>, capability: Capability) -> boo
 }
 
 /// Where portable data lives, for the Settings screen to show honestly.
+/// An interface error, written to the log in every build (Phase 16: the author saw "something broke in the
+/// interface" and the error itself went only to the page's console, so nothing could be read afterwards).
+#[tauri::command]
+#[specta::specta]
+pub fn log_ui_error(message: String, stack: Option<String>) {
+    let cut = |s: &str| s.chars().take(4000).collect::<String>();
+    tracing::error!(message = %cut(&message), stack = %cut(stack.as_deref().unwrap_or("")), "interface error");
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn get_data_dir() -> String {
@@ -66,4 +75,27 @@ pub fn frontend_ready(window: tauri::Window) -> u32 {
     let _ = window.show();
     let _ = window.set_focus();
     elapsed_ms
+}
+
+/// The official pages where a viewer signs up for their own keys (Phase 16's first run,
+/// ADR-0013, ADR-0027). The page names one; it never passes an address, so nothing else
+/// can be opened this way.
+fn sign_up_page(which: &str) -> Option<&'static str> {
+    match which {
+        "opensubtitles" => Some("https://www.opensubtitles.com/en/consumers"),
+        "tmdb" => Some("https://www.themoviedb.org/settings/api"),
+        _ => None,
+    }
+}
+
+/// Open one of `sign_up_page`'s pages in the default browser.
+#[tauri::command]
+#[specta::specta]
+pub fn open_sign_up(which: String) -> Result<(), String> {
+    let url = sign_up_page(&which).ok_or("no such page")?;
+    std::process::Command::new("explorer")
+        .arg(url)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }

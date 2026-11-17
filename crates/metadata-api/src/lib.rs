@@ -14,6 +14,7 @@ pub mod cache;
 pub mod limiter;
 pub mod reqwest_transport;
 pub mod store;
+pub mod tmdb;
 pub mod transport;
 pub mod wikipedia;
 

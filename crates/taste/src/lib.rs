@@ -8,11 +8,13 @@
 //!   seed is enough to show that an import is reflected and to start a Home screen.
 
 pub mod axes;
+pub mod continuing;
 pub mod describe;
 pub mod home;
 pub mod model;
 pub mod modes;
 pub mod rounds;
+pub mod shelf;
 pub mod signals;
 
 use std::collections::HashSet;

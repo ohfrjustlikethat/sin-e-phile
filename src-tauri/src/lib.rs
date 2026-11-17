@@ -6,6 +6,7 @@
 pub mod commands;
 pub mod logging;
 pub mod persistence;
+pub mod shell;
 pub mod state;
 pub mod tiers;
 
@@ -38,9 +39,11 @@ fn ipc_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
             commands::system::get_hardware_profile,
+            commands::system::open_sign_up,
             commands::system::set_tier_override,
             commands::system::has_capability,
             commands::system::get_data_dir,
+            commands::system::log_ui_error,
             commands::system::debug_trigger_panic,
             commands::system::frontend_ready,
             commands::search::search,
@@ -52,6 +55,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::sources::addon_preview,
             commands::sources::addon_install,
             commands::sources::addon_remove,
+            commands::sources::addon_configure,
             commands::sources::catalogue_open,
             commands::sources::links_list,
             commands::sources::links_import,
@@ -65,6 +69,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::torrent::torrent_resume,
             commands::torrent::torrent_remove,
             commands::player::player_open,
+            commands::player::player_cursor,
             commands::player::player_layout,
             commands::player::player_action,
             commands::player::player_pause_still,
@@ -72,8 +77,12 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::player::player_close,
             commands::player::player_state,
             commands::player::dev_autoplay,
+            commands::player::dev_log,
+            commands::player::dev_probe_script,
+            commands::player::dev_player_prop,
             commands::playback::item_detail,
             commands::playback::prepare_play,
+            commands::playback::play_candidate,
             commands::playback::save_position,
             commands::playback::rate_title,
             commands::playback::title_rating,
@@ -82,8 +91,14 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::subtitles::set_opensubtitles_key,
             commands::subtitles::clear_opensubtitles_key,
             commands::subtitles::subtitle_nudge,
+            commands::subtitles::subtitle_offers,
+            commands::subtitles::subtitle_choose,
+            commands::subtitles::subtitle_load,
+            commands::subtitles::subtitle_realign,
             commands::series::series_detail,
             commands::series::season_episodes,
+            commands::series::set_watched,
+            commands::series::title_watched,
             commands::series::episode_neighbours,
             commands::overlay::pause_details,
             commands::overlay::filmography,
@@ -116,6 +131,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::downloads::qbittorrent_check,
             commands::downloads::downloads_storage,
             commands::downloads::download_clear,
+            commands::downloads::download_show,
             commands::profiles::profiles,
             commands::profiles::create_profile,
             commands::profiles::update_profile,
@@ -128,9 +144,29 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::taste::set_taste_input,
             commands::taste::taste_preview,
             commands::taste::taste_round,
+            commands::catalogue::catalogue_status,
+            commands::catalogue::refresh_catalogue,
+            commands::catalogue::tmdb_status,
+            commands::catalogue::set_tmdb_key,
+            commands::catalogue::clear_tmdb_key,
             commands::taste::taste_profile,
             commands::taste::correct_taste,
             commands::home::home,
+            commands::home::watchlist,
+            commands::home::library_titles,
+            commands::home::catalogue_rails,
+            commands::home::continue_watching,
+            commands::artwork::artwork_settings,
+            commands::artwork::set_show_posters,
+            commands::artwork::poster,
+            commands::artwork::backdrop,
+            commands::artwork::pick_picture,
+            commands::artwork::picture_preview,
+            commands::artwork::set_profile_picture,
+            commands::artwork::profile_picture,
+            commands::artwork::clear_profile_picture,
+            commands::home::title_watchlisted,
+            commands::home::set_watchlisted,
             commands::playback::end_viewing,
             commands::playback::record_signal,
             commands::home::onboarding_done,
@@ -225,14 +261,11 @@ pub fn run() {
                     .state::<AppState>()
                     .set_engine(crate::commands::assets::engine_for(&dir));
 
-                let transport = sinephile_metadata_api::HttpTransport::new();
-                let outcome = sinephile_catalogue::freshness::refresh_if_stale(
-                    &db,
-                    &transport,
-                    &dir.join("datasets"),
-                )
-                .await;
-                tracing::info!(?outcome, "catalogue freshness");
+                // The catalogue keeps itself current from here on: checked now and every
+                // hour, an interrupted refresh finished first (Phase 16).
+                tauri::async_runtime::spawn(crate::commands::catalogue::keep_current(
+                    db_handle.clone(),
+                ));
             });
 
             // The window stays hidden (tauri.conf.json `visible: false`) until the

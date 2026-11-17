@@ -1,7 +1,9 @@
 //! The optional-download IPC surface (ADR-0014, subtask 5.9). Thin, per §7.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use serde::{Deserialize, Serialize};
-use tauri::{Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use sinephile_catalogue::assets;
 
@@ -32,6 +34,20 @@ pub struct AssetPlan {
     pub outstanding_bytes: i64,
     /// Is the semantic half already working? If so there is nothing to consent to.
     pub complete: bool,
+    /// It is downloading or being built now: a new install's setup started it (ADR-0050),
+    /// or someone pressed the button. The screens show that download, not a second.
+    pub running: bool,
+}
+
+/// One download of search by meaning at a time.
+static RUNNING: AtomicBool = AtomicBool::new(false);
+
+/// Clears [`RUNNING`] however the download ends.
+struct Running;
+impl Drop for Running {
+    fn drop(&mut self) {
+        RUNNING.store(false, Ordering::SeqCst);
+    }
 }
 
 fn data_dir() -> std::path::PathBuf {
@@ -74,9 +90,12 @@ pub fn optional_assets() -> AssetPlan {
         .collect();
 
     AssetPlan {
-        complete: outstanding == 0,
+        // Every file here *and* the index built over them: files without the index are a
+        // search that still matches only words (D44), and the button is what builds it.
+        complete: outstanding == 0 && sinephile_vector_index::index_path(&dir).is_file(),
         assets: described,
         outstanding_bytes: outstanding,
+        running: RUNNING.load(Ordering::SeqCst),
     }
 }
 
@@ -105,11 +124,9 @@ pub struct AssetProgress {
 /// keyword-only path is not a convenience fallback; it is the Tier 0 floor (SPEC.md §8,
 /// ADR-0014) taking the same code path as everything else.
 pub fn engine_for(dir: &std::path::Path) -> sinephile_search_engine::Engine {
-    let models = dir.join("models");
-    match sinephile_embedder::Embedder::pinned(
-        &models.join("bge-small-en-v1.5-int8.onnx"),
-        &models.join("bge-small-en-v1.5-tokenizer.json"),
-    ) {
+    // The installed copy's model when there is one (ADR-0053), else the downloaded one.
+    let files = assets::MeaningFiles::find(dir);
+    match sinephile_embedder::Embedder::pinned(&files.model, &files.tokenizer) {
         Ok(embedder) => match sinephile_vector_index::VectorIndex::view(
             &sinephile_vector_index::index_path(dir),
         ) {
@@ -149,14 +166,101 @@ pub fn engine_for(dir: &std::path::Path) -> sinephile_search_engine::Engine {
 /// — without it the user would have to restart the app to use what they just fetched.
 #[tauri::command]
 #[specta::specta]
-pub async fn download_optional_assets(
-    app: tauri::AppHandle,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn download_optional_assets(app: AppHandle) -> Result<(), String> {
+    // Logged as well as shown: on the author's install it failed on every press and the log
+    // said nothing (D90).
+    fetch_meaning(&app, Fetch::Allowed)
+        .await
+        .inspect_err(|e| tracing::warn!(error = %e, "search by meaning did not finish"))
+}
+
+/// Whether getting search by meaning ready may download what is missing.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Fetch {
+    /// A person asked, or a new install's setup (ADR-0050).
+    Allowed,
+    /// Only what is on disk: the installed copy (ADR-0053), never a download unasked.
+    OnDiskOnly,
+}
+
+/// Once the catalogue is searchable: build the index when every file is already here (an
+/// installed copy carries them, ADR-0053) and it is not built yet. Downloads nothing.
+pub(crate) fn build_meaning_when_on_disk(app: &AppHandle) {
+    let plan = optional_assets();
+    if plan.complete || plan.running || plan.outstanding_bytes > 0 {
+        return;
+    }
+    tracing::info!("search by meaning: its files are here, building the index (ADR-0053)");
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = fetch_meaning(&app, Fetch::OnDiskOnly).await {
+            tracing::warn!(error = %e, "search by meaning: the index was not built");
+        }
+    });
+}
+
+/// A new install's setup (ADR-0050): once the catalogue is searchable, search by meaning is
+/// fetched without a button, as setup says it will be. In the background; its progress is
+/// the same `asset-progress` the button's would be.
+pub(crate) fn fetch_meaning_for_setup(app: &AppHandle) {
+    if optional_assets().complete {
+        return;
+    }
+    tracing::info!("new install: fetching search by meaning (ADR-0050)");
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = fetch_meaning(&app, Fetch::Allowed).await {
+            tracing::warn!(error = %e, "search by meaning: the setup download did not finish");
+        }
+    });
+}
+
+/// Download what is missing and build the index, once at a time. Ends with
+/// `meaning-ready` (true when search by meaning works now) for every screen showing it.
+async fn fetch_meaning(app: &AppHandle, may: Fetch) -> Result<(), String> {
+    if RUNNING.swap(true, Ordering::SeqCst) {
+        return Err("search by meaning is already downloading".into());
+    }
+    let _running = Running;
+    let state = app.state::<AppState>();
+    let result = fetch(app, &state, may).await;
+    let _ = app.emit("meaning-ready", result.is_ok());
+    result
+}
+
+async fn fetch(app: &AppHandle, state: &State<'_, AppState>, may: Fetch) -> Result<(), String> {
     let dir = data_dir();
+    // A download the installed copy supersedes is never read again; on the author's install it
+    // was also the corrupt one (D90).
+    let freed = assets::remove_superseded(&dir, assets::installed_dir().as_deref());
+    if freed > 0 {
+        tracing::info!(
+            freed,
+            "search by meaning: removed downloads the installed copy replaces"
+        );
+    }
     for asset in assets::optional_assets(&dir) {
-        if matches!(assets::state_of(&asset), assets::AssetState::Present) {
-            continue;
+        // All of each file, not its header: a sound header over a corrupt middle read as
+        // downloaded, and the build failed on it every time (D90). A file that fails is
+        // removed by `download` before it fetches again.
+        let checked = asset.clone();
+        let verdict =
+            tauri::async_runtime::spawn_blocking(move || assets::verified_state(&checked))
+                .await
+                .map_err(|e| e.to_string())?;
+        match verdict {
+            assets::AssetState::Present => continue,
+            assets::AssetState::Unusable(why) => {
+                tracing::warn!(asset = asset.name, %why, "search by meaning: a file failed its check");
+                if may == Fetch::OnDiskOnly {
+                    // Removed so the offer says what it costs to fetch again, honestly.
+                    let _ = std::fs::remove_file(&asset.path);
+                }
+            }
+            assets::AssetState::Absent => {}
+        }
+        if may == Fetch::OnDiskOnly {
+            return Err(format!("{} needs downloading first", asset.name));
         }
         let name = asset.name.to_string();
         let handle = app.clone();
@@ -175,7 +279,7 @@ pub async fn download_optional_assets(
         .map_err(|e| format!("{}: {e}", asset.name))?;
     }
 
-    build_index(&app, &state, &dir).await?;
+    build_index(app, state, &dir).await?;
     state.set_engine(engine_for(&dir));
     Ok(())
 }
@@ -196,12 +300,9 @@ async fn build_index(
         return Err("the catalogue is not open yet".into());
     };
 
-    let models = dir.join("models");
-    let mut embedder = sinephile_embedder::Embedder::pinned(
-        &models.join("bge-small-en-v1.5-int8.onnx"),
-        &models.join("bge-small-en-v1.5-tokenizer.json"),
-    )
-    .map_err(|e| format!("the language model could not be loaded: {e}"))?;
+    let files = assets::MeaningFiles::find(dir);
+    let mut embedder = sinephile_embedder::Embedder::pinned(&files.model, &files.tokenizer)
+        .map_err(|e| format!("the language model could not be loaded: {e}"))?;
 
     let handle = app.clone();
     let built = sinephile_catalogue::index::build(&db, &mut embedder, dir, move |done, total| {

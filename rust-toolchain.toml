@@ -1,0 +1,8 @@
+# Pinned (CLAUDE.md rule 15). Rust 1.100 (2026-11-09) changed cargo's build-dir layout
+# (target/debug/build/<crate>/<hash>/out), and ort-sys 2.0.0-rc.13's copy-dylibs finds the
+# target folder by counting three levels up from OUT_DIR, so on 1.100 it copies ONNX
+# Runtime's DLLs into target/debug/build and panics on build/examples (CI run 43739589636).
+# Move this only deliberately, with ort-sys checked on the new version.
+[toolchain]
+channel = "1.98.0"
+components = ["rustfmt", "clippy"]

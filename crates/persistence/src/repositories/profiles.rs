@@ -57,6 +57,27 @@ pub struct PlaybackPosition {
     pub subtitle_language: Option<String>,
 }
 
+fn position_of(row: sqlx::sqlite::SqliteRow) -> Result<PlaybackPosition, DbError> {
+    Ok(PlaybackPosition {
+        media_item_id: row.try_get("media_item_id")?,
+        position_seconds: row.try_get("position_seconds")?,
+        duration_seconds: row.try_get("duration_seconds")?,
+        audio_language: row.try_get("audio_language")?,
+        subtitle_language: row.try_get("subtitle_language")?,
+    })
+}
+
+/// What a mark as watched covers (Appendix F, I21).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WatchScope {
+    /// One film or one episode.
+    Title(i64),
+    /// One season of a series; `None` is its episodes without a season number.
+    Season { series: i64, season: Option<i64> },
+    /// Every episode of a series.
+    Series(i64),
+}
+
 pub struct ProfileRepository<'a> {
     db: &'a Db,
 }
@@ -68,21 +89,24 @@ impl<'a> ProfileRepository<'a> {
 
     pub async fn create(&self, name: &str, is_default: bool) -> Result<i64, DbError> {
         // A partial unique index makes two defaults impossible, so demote the
-        // incumbent first rather than letting the insert fail.
+        // incumbent first rather than letting the insert fail. In one transaction: an
+        // insert that fails (a name already taken) must not leave the demotion behind,
+        // and no profile the default (round 10).
+        let mut tx = self.db.pool().begin().await?;
         if is_default {
             sqlx::query("UPDATE profiles SET is_default = 0 WHERE is_default = 1")
-                .execute(self.db.pool())
+                .execute(&mut *tx)
                 .await?;
         }
-        Ok(
-            sqlx::query_scalar(
-                "INSERT INTO profiles (name, is_default) VALUES (?, ?) RETURNING id",
-            )
-            .bind(name)
-            .bind(i64::from(is_default))
-            .fetch_one(self.db.pool())
-            .await?,
+        let id = sqlx::query_scalar(
+            "INSERT INTO profiles (name, is_default) VALUES (?, ?) RETURNING id",
         )
+        .bind(name)
+        .bind(i64::from(is_default))
+        .fetch_one(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(id)
     }
 
     pub async fn default_profile(&self) -> Result<Option<Profile>, DbError> {
@@ -200,11 +224,34 @@ impl<'a> ProfileRepository<'a> {
     /// The default profile's id, creating one if there is none. Profiles proper arrive
     /// in Phase 14; until then everything personal — resume points first — belongs to
     /// this one, and Phase 14's first real profile can adopt it.
+    ///
+    /// Safe to ask from many places at once, and it mends an install left without a
+    /// default (round 10): two first asks at once each saw none; one made "You", the
+    /// other demoted it and failed on the name, and every later launch failed the same
+    /// way. Each step is now one statement, so asks at once cannot undo each other.
     pub async fn ensure_default(&self) -> Result<i64, DbError> {
         if let Some(p) = self.default_profile().await? {
             return Ok(p.id);
         }
-        self.create("You", true).await
+        // Profiles but no default: the first profile has it back.
+        sqlx::query(
+            "UPDATE profiles SET is_default = 1
+             WHERE id = (SELECT MIN(id) FROM profiles)
+               AND NOT EXISTS (SELECT 1 FROM profiles WHERE is_default = 1)",
+        )
+        .execute(self.db.pool())
+        .await?;
+        // No profiles at all: "You", made once however many ask.
+        sqlx::query(
+            "INSERT OR IGNORE INTO profiles (name, is_default)
+             SELECT 'You', 1 WHERE NOT EXISTS (SELECT 1 FROM profiles)",
+        )
+        .execute(self.db.pool())
+        .await?;
+        self.default_profile()
+            .await?
+            .map(|p| p.id)
+            .ok_or(DbError::Sqlx(sqlx::Error::RowNotFound))
     }
 
     pub async fn all(&self) -> Result<Vec<Profile>, DbError> {
@@ -501,6 +548,105 @@ impl<'a> ProfileRepository<'a> {
         .await?)
     }
 
+    /// Mark what `scope` covers as watched or not, by hand (Appendix F, I21). Returns how
+    /// many titles changed.
+    ///
+    /// - **Watched** records one completed viewing of each title not already finished, the
+    ///   length of its running time, exactly as an imported "watched" does, and drops the
+    ///   resume position so it leaves Continue watching.
+    /// - **Unwatched** removes every viewing and the resume position: as if never played.
+    ///   A rating is not a viewing and stays.
+    pub async fn set_watched(
+        &self,
+        profile_id: i64,
+        scope: WatchScope,
+        watched: bool,
+    ) -> Result<u64, DbError> {
+        // The titles a scope covers, as a subquery over ?2 (a title or a series) and ?3 (a
+        // season number; NULL is the episodes without one).
+        let ids = match scope {
+            WatchScope::Title(_) => "SELECT ?2 AS id WHERE ?3 IS NULL",
+            WatchScope::Season { .. } => {
+                "SELECT media_item_id AS id FROM episodes WHERE series_id = ?2 AND season_number IS ?3"
+            }
+            WatchScope::Series(_) => {
+                "SELECT media_item_id AS id FROM episodes WHERE series_id = ?2 AND ?3 IS NULL"
+            }
+        };
+        let (target, season) = match scope {
+            WatchScope::Title(id) | WatchScope::Series(id) => (id, None),
+            WatchScope::Season { series, season } => (series, season),
+        };
+        let mut tx = self.db.pool().begin().await?;
+        let changed = if watched {
+            sqlx::query(&format!(
+                "INSERT INTO watch_events (profile_id, media_item_id, watched_seconds, completed, ended_at)
+                 SELECT ?1, t.id, COALESCE(m.runtime_minutes, 0) * 60, 1, datetime('now')
+                 FROM ({ids}) t JOIN media_items m ON m.id = t.id
+                 WHERE NOT EXISTS (SELECT 1 FROM watch_events w
+                                   WHERE w.profile_id = ?1 AND w.media_item_id = t.id AND w.completed = 1)"
+            ))
+            .bind(profile_id)
+            .bind(target)
+            .bind(season)
+            .execute(&mut *tx)
+            .await?
+            .rows_affected()
+        } else {
+            sqlx::query(&format!(
+                "DELETE FROM watch_events WHERE profile_id = ?1 AND media_item_id IN ({ids})"
+            ))
+            .bind(profile_id)
+            .bind(target)
+            .bind(season)
+            .execute(&mut *tx)
+            .await?
+            .rows_affected()
+        };
+        let positions = sqlx::query(&format!(
+            "DELETE FROM playback_positions WHERE profile_id = ?1 AND media_item_id IN ({ids})"
+        ))
+        .bind(profile_id)
+        .bind(target)
+        .bind(season)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+        tx.commit().await?;
+        // Unwatching a title that was only ever part-played still changed something.
+        Ok(if watched {
+            changed
+        } else {
+            changed.max(positions)
+        })
+    }
+
+    /// Which of a season's episodes this profile has seen through, by the same rule as
+    /// [`Self::finished`] (Appendix F, I21: the ticks on a series' page).
+    pub async fn finished_in_season(
+        &self,
+        profile_id: i64,
+        series_id: i64,
+        season: Option<i64>,
+    ) -> Result<Vec<i64>, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT e.media_item_id FROM episodes e
+             WHERE e.series_id = ?2 AND e.season_number IS ?3
+               AND (EXISTS (SELECT 1 FROM watch_events w
+                            WHERE w.profile_id = ?1 AND w.media_item_id = e.media_item_id AND w.completed = 1)
+                    OR EXISTS (SELECT 1 FROM playback_positions p
+                               WHERE p.profile_id = ?1 AND p.media_item_id = e.media_item_id
+                                 AND p.duration_seconds IS NOT NULL
+                                 AND p.position_seconds >= (p.duration_seconds * 95 / 100)))
+             ORDER BY e.media_item_id",
+        )
+        .bind(profile_id)
+        .bind(series_id)
+        .bind(season)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
     /// What this profile liked, with a weight, strongest first (Phase 14's taste seed;
     /// Phase 15 builds the full model on the same signals): five stars 1.0, four 0.7, and
     /// a completed watch with no rating 0.3. Three stars and below are not liking.
@@ -519,6 +665,50 @@ impl<'a> ProfileRepository<'a> {
         .bind(profile_id)
         .fetch_all(self.db.pool())
         .await?)
+    }
+
+    /// Every saved position, finished or not, most recent first (Phase 16: a finished
+    /// episode's show continues with the next episode, so finished ones are needed too).
+    pub async fn recent_positions(
+        &self,
+        profile_id: i64,
+        limit: i64,
+    ) -> Result<Vec<PlaybackPosition>, DbError> {
+        let rows = sqlx::query(
+            "SELECT media_item_id, position_seconds, duration_seconds,
+                    audio_language, subtitle_language
+             FROM playback_positions
+             WHERE profile_id = ?
+             ORDER BY updated_at DESC, rowid DESC
+             LIMIT ?",
+        )
+        .bind(profile_id)
+        .bind(limit)
+        .fetch_all(self.db.pool())
+        .await?;
+        rows.into_iter().map(position_of).collect()
+    }
+
+    /// The latest position saved in any episode of one series, finished or not.
+    pub async fn latest_in_series(
+        &self,
+        profile_id: i64,
+        series_id: i64,
+    ) -> Result<Option<PlaybackPosition>, DbError> {
+        let row = sqlx::query(
+            "SELECT p.media_item_id, p.position_seconds, p.duration_seconds,
+                    p.audio_language, p.subtitle_language
+             FROM playback_positions p
+             JOIN episodes e ON e.media_item_id = p.media_item_id
+             WHERE p.profile_id = ? AND e.series_id = ?
+             ORDER BY p.updated_at DESC, p.rowid DESC
+             LIMIT 1",
+        )
+        .bind(profile_id)
+        .bind(series_id)
+        .fetch_optional(self.db.pool())
+        .await?;
+        row.map(position_of).transpose()
     }
 
     /// Continue-watching, most recent first.
@@ -573,6 +763,32 @@ impl<'a> ProfileRepository<'a> {
         .execute(self.db.pool())
         .await?;
         Ok(())
+    }
+
+    /// Take a title off the watchlist. Returns whether it was on it.
+    pub async fn remove_from_watchlist(
+        &self,
+        profile_id: i64,
+        media_item_id: i64,
+    ) -> Result<bool, DbError> {
+        let removed =
+            sqlx::query("DELETE FROM watchlist_items WHERE profile_id = ? AND media_item_id = ?")
+                .bind(profile_id)
+                .bind(media_item_id)
+                .execute(self.db.pool())
+                .await?
+                .rows_affected();
+        Ok(removed == 1)
+    }
+
+    pub async fn on_watchlist(&self, profile_id: i64, media_item_id: i64) -> Result<bool, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM watchlist_items WHERE profile_id = ? AND media_item_id = ?)",
+        )
+        .bind(profile_id)
+        .bind(media_item_id)
+        .fetch_one(self.db.pool())
+        .await?)
     }
 
     pub async fn watchlist(&self, profile_id: i64) -> Result<Vec<i64>, DbError> {

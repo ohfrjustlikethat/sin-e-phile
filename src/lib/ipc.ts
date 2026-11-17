@@ -14,6 +14,8 @@ export const commands = {
 	 *  moment, not an apology").
 	 */
 	getHardwareProfile: () => __TAURI_INVOKE<HardwareProfile>("get_hardware_profile"),
+	/**  Open one of `sign_up_page`'s pages in the default browser. */
+	openSignUp: (which: string) => typedError<null, string>(__TAURI_INVOKE("open_sign_up", { which })),
 	/**
 	 *  Override the detected tier, or clear the override with `None`.
 	 * 
@@ -33,8 +35,13 @@ export const commands = {
 	 *  The ONLY way a feature may ask about hardware (§8).
 	 */
 	hasCapability: (capability: Capability) => __TAURI_INVOKE<boolean>("has_capability", { capability }),
-	/**  Where portable data lives, for the Settings screen to show honestly. */
 	getDataDir: () => __TAURI_INVOKE<string>("get_data_dir"),
+	/**
+	 *  Where portable data lives, for the Settings screen to show honestly.
+	 *  An interface error, written to the log in every build (Phase 16: the author saw "something broke in the
+	 *  interface" and the error itself went only to the page's console, so nothing could be read afterwards).
+	 */
+	logUiError: (message: string, stack: string | null) => __TAURI_INVOKE<void>("log_ui_error", { message, stack }),
 	/**
 	 *  Deliberately panic, to prove the crash handler works.
 	 * 
@@ -87,6 +94,12 @@ export const commands = {
 	 */
 	addonInstall: (pasted: string) => typedError<string, string>(__TAURI_INVOKE("addon_install", { pasted })),
 	addonRemove: (id: string) => typedError<null, string>(__TAURI_INVOKE("addon_remove", { id })),
+	/**
+	 *  Open an installed add-on's own settings page in the browser (Settings → Add-ons, Phase 16).
+	 *  By id, never by address: the app opens only the page of an add-on the person installed,
+	 *  as its manifest names it.
+	 */
+	addonConfigure: (id: string) => typedError<null, string>(__TAURI_INVOKE("addon_configure", { id })),
 	/**  Open a catalogue from an address the user supplied. No default exists. */
 	catalogueOpen: (url: string) => typedError<CatalogueView, string>(__TAURI_INVOKE("catalogue_open", { url })),
 	linksList: () => typedError<LinkInfo[], string>(__TAURI_INVOKE("links_list")),
@@ -116,6 +129,16 @@ export const commands = {
 	torrentRemove: (id: string, deleteFiles: boolean) => typedError<null, string>(__TAURI_INVOKE("torrent_remove", { id, deleteFiles })),
 	/**  Open something to play: an `http(s)` address or a file path. `start` resumes. */
 	playerOpen: (target: string, start: number | null) => typedError<null, string>(__TAURI_INVOKE("player_open", { target, start })),
+	/**
+	 *  Hide or show the pointer over the picture, with the player's bars (Phase 16: they hide
+	 *  after three seconds without movement, in a window and in full screen).
+	 * 
+	 *  **Async on purpose.** A command that is not async runs on the UI thread, and the host's
+	 *  lock can be held by a thread that is itself waiting for the UI thread (moving the video
+	 *  window is answered there): the first version of this froze the app, seen in the real
+	 *  window. Async, it waits on a worker, and the UI thread stays free to answer.
+	 */
+	playerCursor: (hidden: boolean) => typedError<null, string>(__TAURI_INVOKE("player_cursor", { hidden })),
 	/**
 	 *  Place the video and cut the chrome out of it. Coordinates are CSS pixels within the
 	 *  window's client area; `scale` is the page's `devicePixelRatio`.
@@ -154,6 +177,19 @@ export const commands = {
 	 *  real window can be checked without driving the UI. Compiled out of release builds.
 	 */
 	devAutoplay: () => typedError<string | null, string>(__TAURI_INVOKE("dev_autoplay")),
+	/**
+	 *  Debug builds only: a line from the page into the log, for real-window checks the page
+	 *  cannot report any other way (Phase 16: is the page still running while video plays?).
+	 *  A no-op in release builds.
+	 */
+	devLog: (line: string) => __TAURI_INVOKE<void>("dev_log", { line }),
+	/**
+	 *  Debug builds only: `SINEPHILE_PROBE=<ms>:<intent>,…` (e.g. `4000:subtitles_menu`), player
+	 *  intents the probe sends on a timer, as a pad would, for real-window checks (Phase 16).
+	 */
+	devProbeScript: () => __TAURI_INVOKE<string | null>("dev_probe_script"),
+	/**  Debug builds only: one of mpv's properties as text, for the probe (Phase 16). */
+	devPlayerProp: (name: string) => __TAURI_INVOKE<string | null>("dev_player_prop", { name }),
 	itemDetail: (id: number) => typedError<{
 	id: number,
 	title: string,
@@ -163,7 +199,13 @@ export const commands = {
 	synopsis: string | null,
 	credits: CreditView[],
 } | null, string>(__TAURI_INVOKE("item_detail", { id })),
-	preparePlay: (id: number, language: string | null, quality: string | null) => typedError<PlayPlanView, string>(__TAURI_INVOKE("prepare_play", { id, language, quality })),
+	preparePlay: (id: number, language: string | null, quality: string | null, preferred: string | null) => typedError<PlayPlanView, string>(__TAURI_INVOKE("prepare_play", { id, language, quality, preferred })),
+	/**
+	 *  Play one candidate from the streams panel (Phase 16): it is resolved (a torrent starts
+	 *  streaming) and becomes what the plan chose, so the player's fallbacks are the honest
+	 *  copies ranked below it. Returns the address the player opens.
+	 */
+	playCandidate: (id: number, index: number) => typedError<string, string>(__TAURI_INVOKE("play_candidate", { id, index })),
 	/**  Remember where the viewer is, for resume. Called periodically and on leaving. */
 	savePosition: (id: number, position: number | null, duration: number | null) => typedError<null, string>(__TAURI_INVOKE("save_position", { id, position, duration })),
 	/**  The viewer's 1–5 rating, from the end card (Phase 11, ADR-0043). `None` clears it. */
@@ -178,8 +220,23 @@ export const commands = {
 	 *  subtitle (Phase 10 E5). Returns the nudge now in force.
 	 */
 	subtitleNudge: (deltaMs: number) => typedError<number, string>(__TAURI_INVOKE("subtitle_nudge", { deltaMs })),
+	/**  What OpenSubtitles has for the playing film, best first. Searching spends nothing. */
+	subtitleOffers: () => typedError<SubtitleOfferView[], string>(__TAURI_INVOKE("subtitle_offers")),
+	/**  Download the offer the viewer chose (within today's budget), align it and show it. */
+	subtitleChoose: (offer: SubtitleOfferView) => typedError<string, string>(__TAURI_INVOKE("subtitle_choose", { offer })),
+	/**  A subtitle file from disk, chosen in Windows' file picker, aligned and shown. */
+	subtitleLoad: () => typedError<string | null, string>(__TAURI_INVOKE("subtitle_load")),
+	/**  Align the showing subtitle file again, from its original. */
+	subtitleRealign: () => typedError<string, string>(__TAURI_INVOKE("subtitle_realign")),
 	seriesDetail: (id: number) => typedError<SeriesView, string>(__TAURI_INVOKE("series_detail", { id })),
 	seasonEpisodes: (id: number, season: number | null) => typedError<EpisodeView[], string>(__TAURI_INVOKE("season_episodes", { id, season })),
+	/**
+	 *  Mark a film, an episode, a season or a whole show as watched, or as not. Returns how
+	 *  many titles changed. **Thin**: the rule is `ProfileRepository::set_watched`'s.
+	 */
+	setWatched: (scope: WatchedScope, watched: boolean) => typedError<number, string>(__TAURI_INVOKE("set_watched", { scope, watched })),
+	/**  Whether this profile has seen a film or an episode through. */
+	titleWatched: (id: number) => typedError<boolean, string>(__TAURI_INVOKE("title_watched", { id })),
 	episodeNeighbours: (id: number) => typedError<Neighbours, string>(__TAURI_INVOKE("episode_neighbours", { id })),
 	pauseDetails: (id: number) => typedError<PauseDetails, string>(__TAURI_INVOKE("pause_details", { id })),
 	/**  A cast or crew member's other work, from the overlay. */
@@ -241,7 +298,7 @@ export const commands = {
 	 *  advisor's sentence is kept as the reason. A title already downloading is not added
 	 *  twice.
 	 */
-	downloadTitle: (id: number, tonight: boolean, reason: string | null) => typedError<DownloadView, string>(__TAURI_INVOKE("download_title", { id, tonight, reason })),
+	downloadTitle: (id: number, tonight: boolean, reason: string | null, candidate: number | null) => typedError<DownloadView, string>(__TAURI_INVOKE("download_title", { id, tonight, reason, candidate })),
 	/**  Higher runs first. */
 	downloadPriority: (id: number, priority: number) => typedError<null, string>(__TAURI_INVOKE("download_priority", { id, priority })),
 	/**  This download's own speed limit, KiB/s; `None` for none. */
@@ -264,6 +321,11 @@ export const commands = {
 	downloadsStorage: () => typedError<StorageView, string>(__TAURI_INVOKE("downloads_storage")),
 	/**  Delete a finished download from disk and from the library. */
 	downloadClear: (id: number) => typedError<null, string>(__TAURI_INVOKE("download_clear", { id })),
+	/**
+	 *  Show a finished download's file in Explorer (Phase 16, the author: finished files could not
+	 *  be found from the page). By the download's id, so only the app's own downloads are shown.
+	 */
+	downloadShow: (id: number) => typedError<null, string>(__TAURI_INVOKE("download_show", { id })),
 	/**  Every profile, the most recently used first. */
 	profiles: () => typedError<ProfileView[], string>(__TAURI_INVOKE("profiles")),
 	createProfile: (name: string, avatarColour: string | null, isKids: boolean, pin: string | null) => typedError<ProfileView, string>(__TAURI_INVOKE("create_profile", { name, avatarColour, isKids, pin })),
@@ -297,6 +359,17 @@ export const commands = {
 	 *  decades and, once something is liked, half near the taste so far.
 	 */
 	tasteRound: (shown: number[], size: number | null) => typedError<TastePick[], string>(__TAURI_INVOKE("taste_round", { shown, size })),
+	catalogueStatus: () => typedError<CatalogueStatus, string>(__TAURI_INVOKE("catalogue_status")),
+	/**  "Refresh now": a refresh whatever the publisher says, in the background. */
+	refreshCatalogue: () => typedError<boolean, string>(__TAURI_INVOKE("refresh_catalogue")),
+	tmdbStatus: () => typedError<TmdbStatus, string>(__TAURI_INVOKE("tmdb_status")),
+	/**
+	 *  Save this profile's own TMDB key, checked first: a refused key is not saved. Then what
+	 *  is showing now is fetched with it, in the background.
+	 */
+	setTmdbKey: (key: string) => typedError<null, string>(__TAURI_INVOKE("set_tmdb_key", { key })),
+	/**  Remove this profile's key and what was fetched with it (ADR-0027). */
+	clearTmdbKey: () => typedError<boolean, string>(__TAURI_INVOKE("clear_tmdb_key")),
 	/**
 	 *  The profile's taste, described (Phase 15): its modes from the model, its axes from its
 	 *  signals and statements. Without the vector half there are no modes, only the axes.
@@ -305,6 +378,47 @@ export const commands = {
 	/**  Correct one mode of the profile's taste: "more", "less", "not_me", or `None` to undo. */
 	correctTaste: (anchor: number, correction: string | null) => typedError<null, string>(__TAURI_INVOKE("correct_taste", { anchor, correction })),
 	home: () => typedError<RailView[], string>(__TAURI_INVOKE("home")),
+	/**  The watchlist page (Appendix F, I39): what this profile saved, newest first. */
+	watchlist: () => typedError<HomeCard[], string>(__TAURI_INVOKE("watchlist")),
+	/**
+	 *  What is on this PC: its shows (`shows`), or its films, by title (Phase 16: the Films
+	 *  and TV Shows pages, before Phase 19 adds the catalogue around them).
+	 */
+	libraryTitles: (shows: boolean) => typedError<HomeCard[], string>(__TAURI_INVOKE("library_titles", { shows })),
+	/**
+	 *  The catalogue under Films (or, with `shows`, TV Shows), below what is on this PC
+	 *  (Phase 16, brief item 9): most watched, new this year, and the main genres.
+	 */
+	catalogueRails: (shows: boolean) => typedError<RailView[], string>(__TAURI_INVOKE("catalogue_rails", { shows })),
+	/**
+	 *  Continue watching at the top of Films (or, with `shows`, TV Shows): only its own kind
+	 *  (Phase 16, the author's round 8). A show's card is the show, with the episode under it.
+	 */
+	continueWatching: (shows: boolean) => typedError<HomeCard[], string>(__TAURI_INVOKE("continue_watching", { shows })),
+	artworkSettings: () => typedError<ArtworkView, string>(__TAURI_INVOKE("artwork_settings")),
+	/**  Switch the keyless posters on or off for this profile (onboarding, Settings → Library). */
+	setShowPosters: (on: boolean) => typedError<null, string>(__TAURI_INVOKE("set_show_posters", { on })),
+	/**  A title's poster as a `data:` URL, or `None`: no source chosen, no IMDb id, or no poster. */
+	poster: (id: number) => typedError<string | null, string>(__TAURI_INVOKE("poster", { id })),
+	/**
+	 *  A title's backdrop, the wide still across the top of its page, as a `data:` URL; `None` as
+	 *  for a poster.
+	 */
+	backdrop: (id: number) => typedError<string | null, string>(__TAURI_INVOKE("backdrop", { id })),
+	/**  Windows' file picker, for a profile picture. */
+	pickPicture: () => typedError<string | null, string>(__TAURI_INVOKE("pick_picture")),
+	/**  The chosen picture, ready for the crop to be adjusted. */
+	picturePreview: (path: string) => typedError<PicturePreview, string>(__TAURI_INVOKE("picture_preview", { path })),
+	/**  Cut the chosen square from the picture and keep it as `profile`'s picture. */
+	setProfilePicture: (profile: number, path: string, crop: CropView) => typedError<null, string>(__TAURI_INVOKE("set_profile_picture", { profile, path, crop })),
+	/**  `profile`'s picture as a `data:` URL, or `None`: it has none. */
+	profilePicture: (profile: number) => typedError<string | null, string>(__TAURI_INVOKE("profile_picture", { profile })),
+	/**  Take `profile`'s picture away: its coloured initial shows again. */
+	clearProfilePicture: (profile: number) => typedError<null, string>(__TAURI_INVOKE("clear_profile_picture", { profile })),
+	/**  Whether a title is on this profile's watchlist. */
+	titleWatchlisted: (id: number) => typedError<boolean, string>(__TAURI_INVOKE("title_watchlisted", { id })),
+	/**  Save a title to the watchlist, or take it off. */
+	setWatchlisted: (id: number, on: boolean) => typedError<null, string>(__TAURI_INVOKE("set_watchlisted", { id, on })),
 	/**
 	 *  The player left a title (Phase 15): seconds actually played, where it stopped, its
 	 *  length. Recorded as a viewing, completed or abandoned at its point; a skim is not.
@@ -360,6 +474,13 @@ export type AiringView = {
 	airs_at: number | null,
 };
 
+export type ArtworkView = {
+	/**  The keyless posters are switched on for this profile. */
+	posters: boolean,
+	/**  This profile has a TMDB key, so TMDB's posters are used. */
+	tmdb: boolean,
+};
+
 /**
  *  What is missing, and what agreeing would cost.
  * 
@@ -372,6 +493,11 @@ export type AssetPlan = {
 	outstanding_bytes: number,
 	/**  Is the semantic half already working? If so there is nothing to consent to. */
 	complete: boolean,
+	/**
+	 *  It is downloading or being built now: a new install's setup started it (ADR-0050),
+	 *  or someone pressed the button. The screens show that download, not a second.
+	 */
+	running: boolean,
 };
 
 /**  Progress, emitted as it happens. One event per asset per chunk. */
@@ -416,6 +542,22 @@ export type CandidateView = {
 	/**  The one that opens. */
 	chosen: boolean,
 	terms: TermView[],
+	/**  Its place in the ranking: what `play_candidate` and `download_title` are given. */
+	index: number,
+	/**  High dynamic range, when the source says so. */
+	hdr: boolean,
+	size_bytes: number | null,
+	/**  A swarm's seeders, when it is a swarm and they were counted. */
+	seeders: number | null,
+	/**  Served directly (a web address or this PC): no swarm to count. */
+	direct: boolean,
+	/**  Audio and subtitle languages it states, BCP 47. */
+	audio: string[],
+	subtitles: string[],
+	/**  Why it would not start smoothly, if it would not (the author's "best stream"). */
+	weak: string | null,
+	/**  It can be downloaded: a torrent or a web address, not a file already here. */
+	downloadable: boolean,
 };
 
 /**  What a tier permits. Features ask about a `Capability`, never about hardware. */
@@ -452,6 +594,25 @@ export type CatalogueItem = {
 	manifest: string,
 };
 
+export type CatalogueStatus = {
+	/**  When the last refresh that did something finished (UTC, ISO 8601). */
+	refreshed_at: string | null,
+	titles_added: number | null,
+	episodes_added: number | null,
+	running: boolean,
+	/**
+	 *  Search and identification can work: titles loaded and the first run's stage A
+	 *  done (Phase 16). Until then onboarding shows `building`, and Home waits.
+	 */
+	ready: boolean,
+	/**
+	 *  While the first run's catalogue is built: what it is doing ("Building search"),
+	 *  and how far the whole build has come, 0 to 100.
+	 */
+	building: string | null,
+	percent: number,
+};
+
 export type CatalogueView = {
 	name: string,
 	addons: CatalogueItem[],
@@ -467,6 +628,13 @@ export type CreditView = {
 	name: string,
 	role: string,
 	character: string | null,
+};
+
+/**  A square in fractions of the picture: `x` and `side` of its width, `y` of its height. */
+export type CropView = {
+	x: number | null,
+	y: number | null,
+	side: number | null,
 };
 
 /**  A chrome panel's silhouette in CSS pixels; the page converts nothing, this does. */
@@ -517,6 +685,10 @@ export type EpisodeView = {
 	episode: number | null,
 	title: string,
 	air_date: string | null,
+	/**  Seen through by this profile. Only a season's list fills it in. */
+	watched: boolean,
+	/**  A file of this episode is on this PC (Phase 16). */
+	on_this_pc: boolean,
 };
 
 /**
@@ -547,6 +719,10 @@ export type HomeCard = {
 	year: number | null,
 	made_by: string | null,
 	runtime_minutes: number | null,
+	/**  A line beyond the card's own facts: "New: S2 E5" for a series with a new episode. */
+	note: string | null,
+	/**  How far into it, 0 to 1: Continue watching's bar (Phase 16). */
+	progress: number | null,
 };
 
 export type ImportView = {
@@ -619,6 +795,8 @@ export type OptionalAsset = {
 };
 
 export type PauseDetails = {
+	/**  For an episode: its show, season and number. */
+	show: ShowPlace | null,
 	cast: PersonView[],
 	crew: PersonView[],
 	ratings: RatingView[],
@@ -631,6 +809,15 @@ export type PersonView = {
 	name: string,
 	/**  For the cast: who they play. For the crew: what they did. */
 	part: string | null,
+};
+
+/**  A picture being chosen: its preview, its size, and the square chosen automatically. */
+export type PicturePreview = {
+	/**  A `data:` URL of the preview. */
+	url: string,
+	width: number,
+	height: number,
+	crop: CropView,
 };
 
 /**  What Play will open, decided now (see `sinephile_playback::plan`). */
@@ -662,8 +849,11 @@ export type PlayPlanView = {
 export type PlayerAction = { kind: "pause"; paused: boolean } | { kind: "seek_to"; seconds: number | null } | { kind: "seek_by"; seconds: number | null } | { kind: "frame_step"; forward: boolean } | { kind: "volume"; percent: number | null } | { kind: "mute"; muted: boolean } | { kind: "speed"; speed: number | null } | { kind: "audio"; id: number } | { kind: "subtitles"; id: number | null } | 
 /**  Seconds; positive plays the sound later. */
 { kind: "audio_delay"; seconds: number | null } | 
-/**  Each −100…100. */
-{ kind: "picture"; brightness: number; contrast: number; saturation: number };
+/**
+ *  The three adjustments each −100…100; `aspect` one of `sinephile_player::ASPECTS`;
+ *  `zoom` a percentage, 100 untouched.
+ */
+{ kind: "picture"; brightness: number; contrast: number; saturation: number; aspect: string; zoom: number };
 
 /**  The player as the chrome draws it, a few times a second. */
 export type PlayerStateView = {
@@ -803,8 +993,22 @@ export type SeasonView = {
 };
 
 export type SeriesView = {
+	/**  Episodes with a file on this PC (Phase 16). */
+	on_this_pc: number,
+	/**
+	 *  The show's own files the catalogue has no episode for, as their names number
+	 *  them, in order (`sinephile_library::shelf`).
+	 */
+	also_here: ShelvedView[],
 	seasons: SeasonView[],
 	next_airing: AiringView | null,
+	/**  How many of its episodes this profile has seen through (Appendix F, I21). */
+	watched: number,
+	/**
+	 *  The episode this profile is in the middle of, or the one after the last it
+	 *  finished: the page's Resume (Phase 16). `None` until one is started.
+	 */
+	up_next: UpNextView | null,
 };
 
 export type SheetsView = {
@@ -814,6 +1018,28 @@ export type SheetsView = {
 	tile_width: number,
 	tile_height: number,
 	count: number,
+};
+
+/**  A file of the show's, placed by its own name rather than by the catalogue. */
+export type ShelvedView = {
+	path: string,
+	season: number | null,
+	episode: number | null,
+	title: string | null,
+};
+
+/**
+ *  Which show an episode belongs to, and where in it: the pause screen names the show
+ *  first (Phase 16, the author: it did not say what show or which episode).
+ */
+export type ShowPlace = {
+	id: number,
+	/**  The show's name. */
+	title: string,
+	season: number | null,
+	episode: number | null,
+	/**  The episode's own name, when the catalogue has one (not "Episode #1.2"). */
+	episode_title: string | null,
 };
 
 /**  One row of the Sources list. */
@@ -826,6 +1052,12 @@ export type SourceInfo = {
 	enabled: boolean,
 	health: string,
 	last_error: string | null,
+	/**  An add-on's version; "Films and series"; "Stremio add-on" (Phase 16's add-on cards). */
+	version: string | null,
+	serves: string | null,
+	protocol: string | null,
+	/**  It has its own settings page, which `addon_configure` opens. */
+	configurable: boolean,
 };
 
 /**  Everything the Sources section needs at once. */
@@ -866,6 +1098,14 @@ export type StoredView = {
 	watched: boolean,
 };
 
+export type SubtitleOfferView = {
+	file_id: string,
+	language: string,
+	hash_match: boolean,
+	downloads: number,
+	release: string | null,
+};
+
 /**  The viewer's subtitle settings, per profile. */
 export type SubtitleSettings = {
 	/**  Languages, most preferred first (`en`, `fr`). */
@@ -876,6 +1116,10 @@ export type SubtitleSettings = {
 	size: number,
 	position: number,
 	background: boolean,
+	/**  `#RRGGBB` (Phase 16); settings saved before it read as white. */
+	colour?: string,
+	/**  0 … 6 (Phase 16); settings saved before it read as mpv's 3. */
+	outline?: number,
 };
 
 export type SubtitleSettingsView = {
@@ -944,6 +1188,13 @@ export type TitleView = {
 	part: string | null,
 };
 
+export type TmdbStatus = {
+	/**  This profile has its own key saved. */
+	has_key: boolean,
+	/**  When "showing now" was last fetched with it. */
+	fetched_on: string | null,
+};
+
 /**  Every torrent's progress, once a second while the engine runs. */
 export type TorrentProgress = {
 	torrents: TorrentView[],
@@ -995,6 +1246,22 @@ export type UnmatchedView = {
 	year: number | null,
 	why: string,
 };
+
+/**  The episode a show's page offers to resume (`sinephile_taste::continuing`). */
+export type UpNextView = {
+	id: number,
+	season: number | null,
+	episode: number | null,
+	/**  "S1 E2 · Traces to Nowhere", or "Next: S1 E3". */
+	line: string,
+	/**  How far into it, 0 to 1; `None` when it starts from the beginning. */
+	progress: number | null,
+};
+
+/**  What a mark as watched covers, from the page that asked (Appendix F, I21). */
+export type WatchedScope = 
+/**  A film or one episode. */
+{ kind: "title"; id: number } | { kind: "season"; series: number; season: number | null } | { kind: "series"; id: number };
 
 /**
  *  The engine's [`MatchReason`], in the words a person would use.

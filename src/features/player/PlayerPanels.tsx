@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { commands, type StatView, type TrackView } from "@/lib/ipc";
 import { SHORTCUTS } from "./intents";
+import { SubtitleTools } from "./SubtitleTools";
 
 /**
  * Phase 11's controls, each a panel cut out of the video like the player's bars.
@@ -14,13 +15,40 @@ export interface Picture {
   brightness: number;
   contrast: number;
   saturation: number;
+  /** One of `ASPECTS`' values: the file's own shape, a forced ratio, or cropped to fill. */
+  aspect: string;
+  /** A percentage, 100 untouched. */
+  zoom: number;
 }
+
+export const PICTURE_DEFAULT: Picture = { brightness: 0, contrast: 0, saturation: 0, aspect: "auto", zoom: 100 };
+
+/** The shapes the panel cycles through, as mpv is told them and as the viewer reads them. */
+export const ASPECTS: [string, string][] = [
+  ["auto", "As filmed"],
+  ["16:9", "16:9"],
+  ["4:3", "4:3"],
+  ["2.35:1", "2.35:1"],
+  ["fill", "Fill the screen"],
+];
+
+/** The next shape, wrapping round. */
+export function nextAspect(aspect: string): string {
+  const i = ASPECTS.findIndex(([value]) => value === aspect);
+  return (ASPECTS[(i + 1) % ASPECTS.length] ?? ASPECTS[0]!)[0];
+}
+
+export const ZOOM_MIN = 50;
+export const ZOOM_MAX = 300;
 
 interface MenuProps {
   tracks: TrackView[];
   picture: Picture;
   audioDelayMs: number;
+  /** Playback speed, 1 normal. */
+  speed: number;
   stats: boolean;
+  onSpeed: (faster: boolean) => void;
   onAudio: (id: number) => void;
   onSubtitles: (id: number | null) => void;
   onSubtitleDelay: (ms: number) => void;
@@ -41,13 +69,17 @@ export const PlayerMenu = forwardRef<HTMLDivElement, MenuProps>(function PlayerM
   useEffect(() => first.current?.focus(), []);
   const audio = p.tracks.filter((t) => t.kind === "audio");
   const subs = p.tracks.filter((t) => t.kind === "sub");
-  const step = (key: keyof Picture, by: number) =>
+  const step = (key: "brightness" | "contrast" | "saturation", by: number) =>
     p.onPicture({ ...p.picture, [key]: Math.max(-100, Math.min(100, p.picture[key] + by)) });
+  const zoom = (by: number) =>
+    p.onPicture({ ...p.picture, zoom: Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, p.picture.zoom + by)) });
+  const shape = ASPECTS.find(([value]) => value === p.picture.aspect)?.[1] ?? "As filmed";
   const label = (t: TrackView) => [t.lang, t.title].filter(Boolean).join(" · ") || `Track ${t.id}`;
 
   return (
     <div
       ref={ref}
+      data-cutout
       role="dialog"
       aria-label="Player menu"
       className="absolute top-[68px] right-3 bottom-[96px] flex w-[min(420px,38%)] flex-col gap-5 overflow-y-auto rounded-md bg-surface px-5 py-5"
@@ -80,6 +112,7 @@ export const PlayerMenu = forwardRef<HTMLDivElement, MenuProps>(function PlayerM
           <button type="button" className={small} aria-label="Subtitles earlier" onClick={() => p.onSubtitleDelay(-100)}>−</button>
           <button type="button" className={small} aria-label="Subtitles later" onClick={() => p.onSubtitleDelay(100)}>+</button>
         </div>
+        <SubtitleTools />
       </section>
       <section aria-label="Sound timing">
         <div className="flex items-center gap-2 px-2">
@@ -90,8 +123,33 @@ export const PlayerMenu = forwardRef<HTMLDivElement, MenuProps>(function PlayerM
           <button type="button" className={small} aria-label="Sound later" onClick={() => p.onAudioDelay(100)}>+</button>
         </div>
       </section>
+      <section aria-label="Speed">
+        <div className="flex items-center gap-2 px-2">
+          <span className="flex-1 text-[13px] text-ink-muted">
+            Speed <span className="tabular-nums text-ink">{p.speed === 1 ? "Normal" : `${p.speed}×`}</span>
+          </span>
+          <button type="button" className={small} aria-label="Slower" onClick={() => p.onSpeed(false)}>−</button>
+          <button type="button" className={small} aria-label="Faster" onClick={() => p.onSpeed(true)}>+</button>
+        </div>
+      </section>
       <section aria-label="Picture">
         <h2 className="label mb-1.5">Picture</h2>
+        <button
+          type="button"
+          className={row}
+          aria-label={`Shape: ${shape}`}
+          onClick={() => p.onPicture({ ...p.picture, aspect: nextAspect(p.picture.aspect) })}
+        >
+          <span className="text-ink-muted">Shape</span>
+          <span className="text-ink">{shape}</span>
+        </button>
+        <div className="flex items-center gap-2 px-2 py-0.5">
+          <span className="flex-1 text-[13px] text-ink-muted">
+            Zoom <span className="tabular-nums text-ink">{p.picture.zoom}%</span>
+          </span>
+          <button type="button" className={small} aria-label="Zoom out" onClick={() => zoom(-10)}>−</button>
+          <button type="button" className={small} aria-label="Zoom in" onClick={() => zoom(10)}>+</button>
+        </div>
         {(["brightness", "contrast", "saturation"] as const).map((key) => (
           <div key={key} className="flex items-center gap-2 px-2 py-0.5">
             <span className="flex-1 text-[13px] capitalize text-ink-muted">
@@ -101,7 +159,7 @@ export const PlayerMenu = forwardRef<HTMLDivElement, MenuProps>(function PlayerM
             <button type="button" className={small} aria-label={`More ${key}`} onClick={() => step(key, 10)}>+</button>
           </div>
         ))}
-        <button type="button" className={`${row} mt-1`} onClick={() => p.onPicture({ brightness: 0, contrast: 0, saturation: 0 })}>
+        <button type="button" className={`${row} mt-1`} onClick={() => p.onPicture(PICTURE_DEFAULT)}>
           <span className="text-ink-muted">Reset the picture</span>
         </button>
       </section>
@@ -143,7 +201,7 @@ export const StatsPanel = forwardRef<HTMLDivElement, object>(function StatsPanel
     };
   }, []);
   return (
-    <div ref={ref} aria-label="Statistics" className="absolute top-[68px] left-3 rounded-md bg-surface px-4 py-3">
+    <div ref={ref} data-cutout aria-label="Statistics" className="absolute top-[68px] left-3 rounded-md bg-surface px-4 py-3">
       <table className="text-[12px]">
         <tbody>
           {stats.map((s) => (
@@ -164,6 +222,7 @@ export const ShortcutsPanel = forwardRef<HTMLDivElement, { onClose: () => void }
   return (
     <div
       ref={ref}
+      data-cutout
       role="dialog"
       aria-label="Shortcuts"
       className="absolute top-1/2 left-1/2 max-h-[80%] w-[min(720px,90%)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-md bg-surface px-6 py-5"

@@ -260,3 +260,191 @@ async fn a_refresh_with_nothing_new_adds_nothing() {
     ingest(&db, &path, &[100, 200], "refresh").await;
     assert_eq!(refresh::title_count(&db).await.expect("count"), 2);
 }
+
+/// A datasets folder as `refresh::download` leaves it: basics (films, a series, its
+/// episode), ratings, and the episode file.
+fn datasets(dir: &std::path::Path, films: &[u32], series: u32, episode: u32) {
+    let n = null();
+    let mut basics = basics(films);
+    basics.push_str(&format!(
+        "tt{series:07}\ttvSeries\tA Quiet Show\tA Quiet Show\t0\t2025\t{n}\t30\tDrama\n"
+    ));
+    basics.push_str(&format!(
+        "tt{episode:07}\ttvEpisode\tThe Second One\tThe Second One\t0\t2026\t{n}\t30\tDrama\n"
+    ));
+    write_gz(dir, "title.basics.tsv.gz", &basics);
+    let mut ratings = "tconst\taverageRating\tnumVotes\n".to_string();
+    for id in films {
+        ratings.push_str(&format!("tt{id:07}\t7.0\t5000\n"));
+    }
+    // Far below the 5,000 votes a series needs for its episodes, unless followed.
+    ratings.push_str(&format!("tt{series:07}\t7.5\t40\n"));
+    write_gz(dir, "title.ratings.tsv.gz", &ratings);
+    write_gz(
+        dir,
+        "title.episode.tsv.gz",
+        &format!("tconst\tparentTconst\tseasonNumber\tepisodeNumber\ntt{episode:07}\ttt{series:07}\t1\t2\n"),
+    );
+}
+
+#[tokio::test]
+async fn an_interrupted_refresh_is_finished_before_the_publisher_is_asked() {
+    // Phase 16, the author's catalogue: a refresh left `running` on 2026-11-07, its files
+    // on disk and their validator remembered, and every launch since answered
+    // `AlreadyCurrent` and stopped. New films and episodes never arrived.
+    use sinephile_catalogue::freshness::{refresh as run, remember, Outcome};
+    use sinephile_metadata_api::transport::{FakeTransport, Response};
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let db = Db::open_in(dir.path()).await.expect("open");
+    let data = dir.path().join("datasets");
+    std::fs::create_dir_all(&data).expect("mkdir");
+
+    // The catalogue as first ingested: two films and the quiet series.
+    datasets(&data, &[100, 200], 300, 999);
+    let path = data.join("title.basics.tsv.gz");
+    ingest(&db, &path, &[100, 200, 300], "imdb").await;
+    let series: i64 = sqlx::query_scalar(
+        "SELECT media_item_id FROM external_ids WHERE source = 'imdb' AND external_id = 'tt0000300'",
+    )
+    .fetch_one(db.pool())
+    .await
+    .expect("series");
+    // Followed: on a watchlist.
+    let profile: i64 = sqlx::query_scalar("INSERT INTO profiles (name) VALUES ('Me') RETURNING id")
+        .fetch_one(db.pool())
+        .await
+        .expect("profile");
+    sqlx::query("INSERT INTO watchlist_items (profile_id, media_item_id) VALUES (?, ?)")
+        .bind(profile)
+        .bind(series)
+        .execute(db.pool())
+        .await
+        .expect("watchlist");
+
+    // Then IMDb republished with a new film and a new episode; the download finished,
+    // its validator was remembered, and the load was interrupted before it began.
+    datasets(&data, &[100, 200, 400], 300, 999);
+    remember(&db, "\"abc-28\"").await.expect("remember");
+    sqlx::query("INSERT INTO ingest_jobs (name) VALUES ('refresh')")
+        .execute(db.pool())
+        .await
+        .expect("job");
+
+    let transport = FakeTransport::default();
+    transport.push(Response::new(200, "").with_header("etag", "\"abc-28\""));
+    let outcome = run(&db, &transport, &data, false).await;
+    assert_eq!(
+        outcome,
+        Outcome::Refreshed {
+            titles_added: 1,
+            episodes_added: 1
+        }
+    );
+    assert!(titles(&db).await.contains(&"tt0000400".to_string()));
+    assert_eq!(
+        transport.requests.lock().expect("lock").len(),
+        0,
+        "the unfinished refresh is finished without asking anyone"
+    );
+    // And now it is current: the next launch costs one HEAD.
+    assert_eq!(
+        run(&db, &transport, &data, false).await,
+        Outcome::AlreadyCurrent
+    );
+}
+
+#[tokio::test]
+async fn a_resumed_refresh_reads_past_the_watermark_it_started_from() {
+    // An interrupted refresh has already stored some new, high ids. Taken afresh on
+    // resume, the watermark would rise past them and skip, for good, the new titles still
+    // to come that sit below them (the file is ordered as text). Phase 16.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let db = Db::open_in(dir.path()).await.expect("open");
+    let data = dir.path().join("datasets");
+    std::fs::create_dir_all(&data).expect("mkdir");
+
+    datasets(&data, &[100, 200], 300, 999);
+    ingest(&db, &data.join("title.basics.tsv.gz"), &[100, 200], "imdb").await;
+    // The refresh started from 200 and got as far as storing 900 before it stopped.
+    datasets(&data, &[100, 200, 500, 900], 300, 999);
+    sqlx::query("INSERT INTO settings (key, value) VALUES ('catalogue.refresh_watermark', '200')")
+        .execute(db.pool())
+        .await
+        .expect("setting");
+    let job: i64 =
+        sqlx::query_scalar("INSERT INTO ingest_jobs (name) VALUES ('refresh') RETURNING id")
+            .fetch_one(db.pool())
+            .await
+            .expect("job");
+    sqlx::query("INSERT INTO ingest_steps (job_id, name, ordinal, items_done) VALUES (?, 'interrupted', 99, 1)")
+        .bind(job)
+        .execute(db.pool())
+        .await
+        .expect("step");
+    let partial = write_gz(dir.path(), "partial.tsv.gz", &basics(&[900]));
+    ingest(&db, &partial, &[900], "partial").await;
+    assert_eq!(refresh::watermark(&db).await.expect("w"), Some(900));
+
+    refresh::load(&db, &data).await.expect("load");
+    assert!(
+        titles(&db).await.contains(&"tt0000500".to_string()),
+        "500 is new, and below the 900 the interrupted run had already stored"
+    );
+}
+
+#[tokio::test]
+async fn what_is_showing_now_is_matched_to_the_catalogue_and_kept_for_the_profile() {
+    // Phase 16: with the profile's own TMDB key, the films in cinemas and the series on the
+    // air, matched by IMDb id, kept for Home's "New releases".
+    use sinephile_catalogue::now::{fetched_on, refresh as now, NOW_KEY};
+    use sinephile_metadata_api::tmdb::Tmdb;
+    use sinephile_metadata_api::transport::{FakeTransport, Response};
+    use sinephile_persistence::repositories::CredentialRepository;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let db = Db::open_in(dir.path()).await.expect("open");
+    let path = write_gz(dir.path(), "a.tsv.gz", &basics(&[100, 200]));
+    ingest(&db, &path, &[100, 200], "imdb").await;
+    let profile: i64 = sqlx::query_scalar("INSERT INTO profiles (name) VALUES ('Me') RETURNING id")
+        .fetch_one(db.pool())
+        .await
+        .expect("profile");
+
+    let fake = Arc::new(FakeTransport::default());
+    // Asked in this order: films pages 1 and 2, then each film's IMDb id, then the series
+    // page. The fake answers the last pushed first, so they are pushed in reverse.
+    fake.push(Response::new(200, r#"{"results":[]}"#)); // series on the air: none
+    fake.push(Response::new(200, r#"{"imdb_id":"tt9999999"}"#)); // film 3: not in the catalogue
+    fake.push(Response::new(200, r#"{"imdb_id":"tt0000100"}"#)); // film 2
+    fake.push(Response::new(200, r#"{"imdb_id":"tt0000200"}"#)); // film 1
+    fake.push(Response::new(200, r#"{"results":[]}"#)); // films, page 2
+    fake.push(Response::new(
+        200,
+        r#"{"results":[{"id":1},{"id":2},{"id":3}]}"#,
+    )); // page 1
+    let tmdb = Tmdb::new(fake.clone(), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    let matched = now(&db, &tmdb, profile, "2026-11-08").await.expect("now");
+    assert_eq!(matched, 2);
+    let kept = CredentialRepository::new(&db)
+        .get(profile, NOW_KEY)
+        .await
+        .unwrap()
+        .unwrap();
+    let ids: Vec<i64> = sqlx::query_scalar(
+        "SELECT media_item_id FROM external_ids WHERE external_id IN ('tt0000200', 'tt0000100')
+          ORDER BY external_id DESC",
+    )
+    .fetch_all(db.pool())
+    .await
+    .unwrap();
+    assert_eq!(
+        kept,
+        format!(r#"{{"day":"2026-11-08","ids":[{},{}]}}"#, ids[0], ids[1]),
+        "in TMDB's order"
+    );
+    assert_eq!(
+        fetched_on(&db, profile).await.unwrap().as_deref(),
+        Some("2026-11-08")
+    );
+}

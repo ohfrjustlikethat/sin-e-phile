@@ -234,6 +234,27 @@ impl Qbittorrent {
         }
     }
 
+    /// The torrent's files, in qBittorrent's (and the torrent's) order. Empty until it has
+    /// the metadata.
+    async fn files(&self, hash: &str) -> Result<Vec<File>, BackendError> {
+        let r = self
+            .call(
+                Method::Get,
+                &format!("torrents/files?{}", form(&[("hash", hash)])),
+                None,
+            )
+            .await?;
+        if r.status != 200 {
+            return Err(BackendError::Refused(format!(
+                "qBittorrent answered {}",
+                r.status
+            )));
+        }
+        serde_json::from_str(&r.body).map_err(|e| {
+            BackendError::Refused(format!("qBittorrent's file list did not parse: {e}"))
+        })
+    }
+
     async fn info(&self, hash: &str) -> Result<Option<Info>, BackendError> {
         let r = self
             .call(
@@ -340,11 +361,9 @@ impl Backend for Qbittorrent {
             .info(id)
             .await?
             .ok_or_else(|| BackendError::Unknown(id.into()))?;
-        let total = if i.total_size > 0 {
-            i.total_size
-        } else {
-            i.size
-        };
+        // `size` is what is selected for download, `total_size` the whole torrent: with
+        // one episode of a season pack chosen, only `size` is what will arrive.
+        let total = if i.size > 0 { i.size } else { i.total_size };
         let error = matches!(i.state.as_str(), "error" | "missingFiles")
             .then(|| format!("qBittorrent reports {}", i.state));
         Ok(Progress {
@@ -383,21 +402,51 @@ impl Backend for Qbittorrent {
         }
     }
 
-    async fn video_file(&self, id: &str) -> Result<PathBuf, BackendError> {
+    async fn keep_only(&self, id: &str, file: usize) -> Result<bool, BackendError> {
+        let files = self.files(id).await?;
+        // From a magnet link it knows no files until it has the torrent's metadata.
+        if files.is_empty() {
+            return Ok(false);
+        }
+        if file >= files.len() {
+            return Err(BackendError::Refused(format!(
+                "the torrent has no file {file}"
+            )));
+        }
+        let others: Vec<String> = (0..files.len())
+            .filter(|&i| i != file)
+            .map(|i| i.to_string())
+            .collect();
+        if others.is_empty() {
+            return Ok(true);
+        }
+        let joined = others.join("|");
+        let body = form(&[("hash", id), ("id", joined.as_str()), ("priority", "0")]);
+        let r = self
+            .call(Method::Post, "torrents/filePrio", Some(body))
+            .await?;
+        if r.status == 200 {
+            Ok(true)
+        } else {
+            Err(BackendError::Refused(format!(
+                "qBittorrent answered {}",
+                r.status
+            )))
+        }
+    }
+
+    async fn video_file(&self, id: &str, file: Option<usize>) -> Result<PathBuf, BackendError> {
         let info = self
             .info(id)
             .await?
             .ok_or_else(|| BackendError::Unknown(id.into()))?;
-        let r = self
-            .call(
-                Method::Get,
-                &format!("torrents/files?{}", form(&[("hash", id)])),
-                None,
-            )
-            .await?;
-        let files: Vec<File> = serde_json::from_str(&r.body).map_err(|e| {
-            BackendError::Refused(format!("qBittorrent's file list did not parse: {e}"))
-        })?;
+        let files = self.files(id).await?;
+        if let Some(i) = file {
+            let f = files
+                .get(i)
+                .ok_or_else(|| BackendError::Refused(format!("the torrent has no file {i}")))?;
+            return Ok(Path::new(&info.save_path).join(&f.name));
+        }
         let listed: Vec<TorrentFile> = files
             .iter()
             .enumerate()
@@ -437,6 +486,7 @@ mod tests {
             file_path: None,
             added_at: String::new(),
             finished_at: None,
+            file_index: None,
         }
     }
 

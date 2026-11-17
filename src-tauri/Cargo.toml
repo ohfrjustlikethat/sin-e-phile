@@ -44,6 +44,7 @@ sinephile-persistence = { path = "../crates/persistence" }
 # The catalogue pipeline, so the app can refresh itself on launch (D37, ADR-0030).
 # It is a crate rather than a tool precisely so this line can exist.
 sinephile-catalogue = { path = "../crates/catalogue" }
+sinephile-artwork = { path = "../crates/artwork" }
 sinephile-metadata-api = { path = "../crates/metadata-api" }
 # Search itself. The IPC layer holds it and calls it; every decision it makes lives in
 # the crate, where it can be tested without an app handle (ADR-0022).

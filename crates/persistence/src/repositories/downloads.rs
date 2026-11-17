@@ -70,6 +70,8 @@ pub struct Download {
     pub file_path: Option<String>,
     pub added_at: String,
     pub finished_at: Option<String>,
+    /// The one file of the torrent wanted (a season pack's episode); `None`, all of it.
+    pub file_index: Option<i64>,
 }
 
 /// A torrent's bytes would fill a screen; the debug view says how many there are.
@@ -104,10 +106,14 @@ pub struct NewDownload<'a> {
     pub limit_kib: Option<i64>,
     pub not_before: Option<&'a str>,
     pub reason: Option<&'a str>,
+    /// The one file of the torrent wanted; `None`, all of it.
+    pub file_index: Option<i64>,
 }
 
-const COLUMNS: &str = "id, media_item_id, title, source, torrent, backend, backend_id, priority, state,
-    total_bytes, done_bytes, limit_kib, not_before, reason, error, file_path, added_at, finished_at";
+const COLUMNS: &str =
+    "id, media_item_id, title, source, torrent, backend, backend_id, priority, state,
+    total_bytes, done_bytes, limit_kib, not_before, reason, error, file_path, added_at, finished_at,
+    file_index";
 
 fn row(r: &SqliteRow) -> Result<Download, sqlx::Error> {
     Ok(Download {
@@ -129,6 +135,7 @@ fn row(r: &SqliteRow) -> Result<Download, sqlx::Error> {
         file_path: r.try_get("file_path")?,
         added_at: r.try_get("added_at")?,
         finished_at: r.try_get("finished_at")?,
+        file_index: r.try_get("file_index")?,
     })
 }
 
@@ -144,8 +151,9 @@ impl<'a> DownloadRepository<'a> {
     pub async fn add(&self, d: &NewDownload<'_>) -> Result<i64, DbError> {
         Ok(sqlx::query_scalar(
             "INSERT INTO downloads
-                 (media_item_id, title, source, torrent, backend, priority, limit_kib, not_before, reason)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) RETURNING id",
+                 (media_item_id, title, source, torrent, backend, priority, limit_kib, not_before, reason,
+                  file_index)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10) RETURNING id",
         )
         .bind(d.media_item_id)
         .bind(d.title)
@@ -156,6 +164,7 @@ impl<'a> DownloadRepository<'a> {
         .bind(d.limit_kib)
         .bind(d.not_before)
         .bind(d.reason)
+        .bind(d.file_index)
         .fetch_one(self.db.pool())
         .await?)
     }

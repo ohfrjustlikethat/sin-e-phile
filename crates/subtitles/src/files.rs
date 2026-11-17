@@ -12,7 +12,26 @@ fn is_video(path: &str) -> bool {
 }
 
 /// Extensions the player can load as subtitles.
-const EXTENSIONS: [&str; 5] = ["srt", "ass", "ssa", "vtt", "sub"];
+pub const EXTENSIONS: [&str; 5] = ["srt", "ass", "ssa", "vtt", "sub"];
+
+/// [`EXTENSIONS`] as Windows' file picker takes them, so "Load a file" offers subtitle files first
+/// (round 10: it showed every file in the folder).
+pub fn picker_pattern() -> String {
+    EXTENSIONS
+        .iter()
+        .map(|e| format!("*.{e}"))
+        .collect::<Vec<_>>()
+        .join(";")
+}
+
+/// What the player's list calls a subtitle file a person loaded: its own name, without the extension
+/// (round 10: every file was listed as "sin-e-phile").
+pub fn track_title(path: &std::path::Path) -> String {
+    path.file_stem()
+        .map(|s| s.to_string_lossy().trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "Subtitles".into())
+}
 
 /// Common names and ISO 639-2 codes, to the BCP 47 primary subtag the app uses.
 const LANGUAGES: [(&str, &str); 24] = [
@@ -156,6 +175,15 @@ mod tests {
             .iter()
             .map(|f| (f.language.as_deref(), f.forced))
             .collect()
+    }
+
+    #[test]
+    fn the_picker_offers_every_subtitle_kind_and_a_loaded_file_keeps_its_name() {
+        assert_eq!(picker_pattern(), "*.srt;*.ass;*.ssa;*.vtt;*.sub");
+        let p = |s: &str| track_title(std::path::Path::new(s));
+        assert_eq!(p("C:/Films/Sunrise.1927.en.srt"), "Sunrise.1927.en");
+        assert_eq!(p("D:/subs/clip-test.ass"), "clip-test");
+        assert_eq!(p(""), "Subtitles");
     }
 
     #[test]

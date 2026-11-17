@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { commands, type SearchHit, type SearchResponse, type Why } from "@/lib/ipc";
 import { Skeleton, EmptyState } from "@/design-system";
+import { TitleCard } from "@/features/home/TitleCard";
+import { moveFocus, type Direction } from "@/lib/gamepad";
 import { MeaningDownload } from "./MeaningDownload";
 import { useUi } from "@/lib/store";
 
@@ -22,45 +24,72 @@ import { useUi } from "@/lib/store";
  * anything older than what is already displayed is dropped — otherwise the results
  * visibly flick backwards as you type, which looks like a bug in the engine rather
  * than in the screen.
+ *
+ * # One grid (the author, round 9)
+ *
+ * Results were a ranked list grouped by kind, so a search showed films and nothing else until it was scrolled.
+ * Now they are one poster grid, about eight across: films first, then series, anime and episodes in the same
+ * grid, each marked with its kind, every result the same size. The cards are Home's, so posters, the lettered
+ * card and focus memory come with them.
+ *
+ * "Films first" is among results that matched equally well, not over the whole page: sorted strictly, "peaks"
+ * put the Twin Peaks series after forty films that only matched in meaning, off the screen again, which was
+ * the complaint (seen in the real window on a copy of the author's catalogue).
  */
 const DEBOUNCE_MS = 120;
 
-/** What each match reason should say to a person, and how loudly. */
-const WHY: Record<Why, { label: string; tone: "accent" | "neutral" }> = {
-  exact_title: { label: "exact title", tone: "accent" },
-  both: { label: "title and meaning", tone: "accent" },
-  semantic: { label: "similar in meaning", tone: "neutral" },
-  keyword: { label: "matched words", tone: "neutral" },
-  fuzzy: { label: "close spelling", tone: "neutral" },
-  filter: { label: "matched your filters", tone: "accent" },
+/** Enough for six rows of eight. */
+const LIMIT = 48;
+
+/** The first result's button: where Down from the field goes, by key or by pad. */
+const FIRST = "search-first-result";
+
+/**
+ * Why a result is here, said only where the title alone does not show it (SPEC.md §15 Phase 5's "why this
+ * matched"). An exact title or matching words are visible on the card; a match in meaning or a near spelling is
+ * not, and a person wonders why it is there.
+ */
+const WHY_NOTE: Partial<Record<Why, string>> = {
+  semantic: "similar in meaning",
+  both: "title and meaning",
+  fuzzy: "close spelling",
+  filter: "matched your filters",
 };
 
-/** The order kinds appear in. Films first because that is what most searches are for. */
-const KIND_ORDER = ["film", "anime_film", "series", "anime_series", "episode"] as const;
+/**
+ * The order kinds appear in: films first because that is what most searches are for, then shows, then episodes.
+ * An anime film is a film and an anime series a show: split, "anime about loneliness" put every live-action film
+ * the engine ranked lower ahead of the anime films it ranked higher (seen in the release build).
+ */
+const KIND_GROUP: Record<string, number> = { film: 0, anime_film: 0, series: 1, anime_series: 1, episode: 2 };
 
-const KIND_LABEL: Record<string, string> = {
-  film: "Films",
-  anime_film: "Anime films",
-  series: "TV series",
+/** The mark on a result that is not a film. */
+const KIND_MARK: Record<string, string> = {
+  anime_film: "Anime film",
+  series: "Series",
   anime_series: "Anime series",
-  episode: "Episodes",
-  live_channel: "Live channels",
+  episode: "Episode",
+  live_channel: "Live channel",
 };
 
-function groupByKind(hits: SearchHit[]): [string, SearchHit[]][] {
-  const groups = new Map<string, SearchHit[]>();
-  for (const hit of hits) {
-    const existing = groups.get(hit.kind);
-    if (existing) existing.push(hit);
-    else groups.set(hit.kind, [hit]);
-  }
-  // Ranked order is preserved INSIDE each group; only the groups themselves are
-  // ordered, and an unknown kind sorts last rather than vanishing.
-  return [...groups.entries()].sort(
-    ([a], [b]) =>
-      (KIND_ORDER.indexOf(a as never) + 1 || 99) - (KIND_ORDER.indexOf(b as never) + 1 || 99),
-  );
+/** How well a result matched, best first: its exact title, its words, a near spelling, its meaning. */
+const TIER: Record<Why, number> = { exact_title: 0, both: 1, keyword: 1, filter: 1, fuzzy: 2, semantic: 3 };
+
+/**
+ * Films first among results that matched equally well; the engine's rank decides everything else (see above).
+ * Within a tier and a kind the rank is kept, and an unknown kind goes last in its tier.
+ */
+export function filmsFirst(hits: SearchHit[]): SearchHit[] {
+  const place = (kind: string) => KIND_GROUP[kind] ?? 3;
+  return [...hits].sort((a, b) => TIER[a.why] - TIER[b.why] || place(a.kind) - place(b.kind));
 }
+
+const ARROWS: Record<string, Direction> = {
+  ArrowUp: "up",
+  ArrowDown: "down",
+  ArrowLeft: "left",
+  ArrowRight: "right",
+};
 
 /** Display size for the query: large while it is a title, smaller as it becomes a sentence. */
 function querySize(query: string): string {
@@ -77,84 +106,6 @@ function status(response: SearchResponse | null, searching: boolean): string {
   return `${count} · ${response.semantic ? "titles, people and meaning" : "titles and people only"}`;
 }
 
-/**
- * One result, in one of three weights.
- *
- * §9.0 bans uniform sizing, and a ranked list has a natural hierarchy to show: the
- * lead result is set large with its synopsis, the next two a step down, and the rest
- * as a quiet list. The page reads as an edited answer with a lead and a body, not as a
- * table of equals.
- *
- * The match reason is quiet text, not a box on every row. It is only coloured when
- * it says something strong ("exact title", "matched your filters").
- */
-function Entry({
-  hit,
-  number,
-  weight,
-  focused,
-  onFocus,
-  onOpen,
-}: {
-  hit: SearchHit;
-  number: number;
-  weight: "lead" | "second" | "list";
-  focused: boolean;
-  onFocus: () => void;
-  onOpen: () => void;
-}) {
-  const why = WHY[hit.why];
-  const byline = [
-    hit.made_by,
-    hit.year,
-    hit.runtime_minutes !== null ? `${hit.runtime_minutes} min` : null,
-  ]
-    .filter((part) => part !== null && part !== undefined)
-    .join(" · ");
-
-  const title = {
-    lead: "text-[46px] leading-[1.02] tracking-[-0.01em]",
-    second: "text-[26px] leading-tight",
-    list: "text-[20px] leading-snug",
-  }[weight];
-
-  return (
-    <div
-      data-row
-      data-focus-tile
-      role="link"
-      tabIndex={0}
-      onFocus={onFocus}
-      onClick={onOpen}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") onOpen();
-      }}
-      className={`grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-x-4 border-b border-line-subtle ${
-        weight === "lead" ? "pb-8" : weight === "second" ? "py-5" : "py-3"
-      } ${focused ? "bg-raised" : ""}`}
-    >
-      <span className="spine">{String(number).padStart(2, "0")}</span>
-      <div className="min-w-0">
-        <h3 className={`font-serif text-ink ${title} ${weight === "list" ? "truncate" : ""}`}>
-          {hit.title}
-          {weight === "list" && byline && (
-            <span className="label ml-4 align-middle">{byline}</span>
-          )}
-        </h3>
-        {weight !== "list" && byline && <p className="label mt-2">{byline}</p>}
-        {weight === "lead" && hit.excerpt && (
-          <p className="mt-4 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
-            {hit.excerpt}
-          </p>
-        )}
-      </div>
-      <span className={`label ${why.tone === "accent" ? "text-oxblood-text" : ""}`}>
-        {why.label}
-      </span>
-    </div>
-  );
-}
-
 export function SearchScreen() {
   const openDetail = useUi((s) => s.openDetail);
   // Opened from a search: a light signal for the taste model (Phase 15). Never in the way.
@@ -164,10 +115,11 @@ export function SearchScreen() {
       .catch(() => {});
     openDetail(id);
   };
-  const [query, setQuery] = useState("");
+  // Kept while away: search keeps its words and its trail like a tab (Phase 16).
+  const [query, setQuery] = useState(() => useUi.getState().searchQuery);
+  useEffect(() => useUi.getState().setSearchQuery(query), [query]);
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [searching, setSearching] = useState(false);
-  const [focused, setFocused] = useState(-1);
   const [error, setError] = useState<string | null>(null);
   // ADR-0030 layer 3: a miss is put to the sources AFTER it is on screen.
   const [asking, setAsking] = useState(false);
@@ -178,7 +130,6 @@ export function SearchScreen() {
   // The sequence number of the most recent response rendered. See the note above.
   const latest = useRef(0);
   const issued = useRef(0);
-  const rowsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const text = query.trim();
@@ -194,7 +145,7 @@ export function SearchScreen() {
     const timer = setTimeout(() => {
       const sequence = ++issued.current;
       commands
-        .search(text, 20)
+        .search(text, LIMIT)
         .then((result) => {
           if (sequence < latest.current) return; // A slower, older query. Discard it.
           latest.current = sequence;
@@ -211,7 +162,6 @@ export function SearchScreen() {
             setResponse(null);
             setError(result.error);
           }
-          setFocused(-1);
         })
         .finally(() => {
           if (sequence >= latest.current) setSearching(false);
@@ -232,7 +182,7 @@ export function SearchScreen() {
       .then(async (result) => {
         if (sequence !== issued.current || result.status !== "ok" || !result.data) return;
         setFound(result.data);
-        const again = await commands.search(text, 20);
+        const again = await commands.search(text, LIMIT);
         if (sequence === issued.current && again.status === "ok") setResponse(again.data);
       })
       .finally(() => {
@@ -240,32 +190,26 @@ export function SearchScreen() {
       });
   }
 
-  const hits = response?.hits ?? [];
-  const groups = groupByKind(hits);
-  let position = 0;
+  const hits = filmsFirst(response?.hits ?? []);
 
+  /** Down or Enter in the field goes to the first result; the arrows then move through the grid. */
   function onKeyDown(event: React.KeyboardEvent) {
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    if ((event.key === "ArrowDown" || event.key === "Enter") && hits.length > 0) {
       event.preventDefault();
-      const step = event.key === "ArrowDown" ? 1 : -1;
-      const next = Math.min(Math.max(focused + step, 0), hits.length - 1);
-      setFocused(next);
-      rowsRef.current?.querySelectorAll<HTMLElement>("[data-row]")[next]?.scrollIntoView({
-        block: "nearest",
-      });
-    }
-    // The arrows only highlight; Enter opens what is highlighted.
-    if (event.key === "Enter") {
-      const hit = hits[focused];
-      if (hit) {
-        event.preventDefault();
-        open(hit.id);
-      }
+      document.getElementById(FIRST)?.focus();
     }
   }
 
+  /** The arrow keys move through the grid as the D-pad does: to the nearest card that way, up to the field. */
+  function onGridKeyDown(event: React.KeyboardEvent) {
+    const direction = ARROWS[event.key];
+    if (!direction) return;
+    event.preventDefault();
+    moveFocus(direction);
+  }
+
   return (
-    <div className="flex h-full max-w-[1100px] flex-col px-16 pt-14 pb-24">
+    <div className="flex h-full flex-col px-16 pt-14 pb-24">
       {/*
         The query is set in the display face, large, on a single rule rather than in a
         box: what was asked is the headline of this page, and the results are the
@@ -276,17 +220,28 @@ export function SearchScreen() {
         value={query}
         onChange={(e) => setQuery(e.currentTarget.value)}
         onKeyDown={onKeyDown}
+        // The pad's Down (and Done on the on-screen keyboard) goes to the first result, not to the card under the
+        // middle of this wide field.
+        data-pad-down={FIRST}
         placeholder="A title, a director, or what it is about"
         aria-label="Search the catalogue"
         spellCheck={false}
         // The underline IS the focus indicator: it turns oxblood when focused, so the
         // global ring (a box) is replaced rather than removed. The size steps down as
         // the query grows, because a sentence-long query at 46px scrolls out of sight.
-        className={`w-full border-0 border-b-2 border-line-strong bg-transparent pb-4 font-display leading-none font-semibold tracking-[-0.035em] text-ink placeholder:text-ink-faint focus:border-oxblood-bright focus-visible:outline-none ${querySize(query)}`}
+        className={`w-full max-w-[1100px] border-0 border-b-2 border-line-strong bg-transparent pb-4 font-display leading-none font-semibold tracking-[-0.035em] text-ink placeholder:text-ink-faint focus:border-oxblood-bright focus-visible:outline-none ${querySize(query)}`}
       />
       <p className="label mt-3 h-4" aria-live="polite">
         {status(response, searching)}
       </p>
+      {/* At the top while nothing is typed (the author, round 8: under the results it went unseen); once there is a
+          query it goes under the results, so Down from the field still reaches the first result (the pad audit). It
+          hides itself once search by meaning works. */}
+      {!query.trim() && (
+        <div className="mt-6">
+          <MeaningDownload />
+        </div>
+      )}
 
       <div className="mt-10">
         {searching && !response && (
@@ -342,36 +297,32 @@ export function SearchScreen() {
           </p>
         )}
 
-        <div ref={rowsRef} className="flex flex-col gap-14">
-          {groups.map(([kind, group]) => (
-            <section key={kind} aria-label={KIND_LABEL[kind] ?? kind}>
-              <h2 className="label flex items-baseline justify-between border-t border-line-strong pt-3 pb-5">
-                <span className="text-ink-muted">{KIND_LABEL[kind] ?? kind}</span>
-                <span>{String(group.length).padStart(2, "0")}</span>
-              </h2>
-              <ol className="flex flex-col">
-                {group.map((hit) => {
-                  // DISPLAY order, not rank: grouping can put a lower-ranked film above a
-                  // higher-ranked series, and the arrow keys walk the DOM. Numbering,
-                  // weight and focus all follow what the eye and the keyboard see.
-                  const index = position++;
-                  return (
-                    <li key={hit.id}>
-                      <Entry
-                        hit={hit}
-                        number={index + 1}
-                        weight={index === 0 ? "lead" : index < 3 ? "second" : "list"}
-                        focused={focused === index}
-                        onFocus={() => setFocused(index)}
-                        onOpen={() => open(hit.id)}
-                      />
-                    </li>
-                  );
-                })}
-              </ol>
-            </section>
-          ))}
-        </div>
+        {hits.length > 0 && (
+          <ol
+            aria-label="Results"
+            onKeyDown={onGridKeyDown}
+            className="grid grid-cols-3 gap-x-5 gap-y-8 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8"
+          >
+            {hits.map((hit, i) => (
+              <li key={hit.id}>
+                <TitleCard
+                  id={hit.id}
+                  size="fill"
+                  buttonId={i === 0 ? FIRST : undefined}
+                  film={{
+                    id: String(hit.id),
+                    title: hit.title,
+                    year: hit.year ?? 0,
+                    director: hit.made_by ?? "",
+                    tag: KIND_MARK[hit.kind],
+                    note: WHY_NOTE[hit.why],
+                  }}
+                  onOpen={() => open(hit.id)}
+                />
+              </li>
+            ))}
+          </ol>
+        )}
       </div>
 
       {/*

@@ -157,3 +157,79 @@ Saying so plainly is better than implying a freshness the design cannot deliver.
 | 2 — airing schedules | Phase 4 for AniList; Phase 11 for the UI |
 | 3 — search-triggered backfill | Phase 6 from backend-reported titles; Phase 12 adds the parser and the IMDb merge |
 | 4 — full re-ingest | Phase 4 (already exists — `ingest imdb` is idempotent) |
+
+---
+
+## Phase 16 — the layers made automatic, and two bugs that kept them from running
+
+The author, 2026-11-08: *"the problem of having latest tv shows and their latest episodes, as well
+as latest movies still persists, they are not updated like i said they should be, at all."*
+
+**What was wrong.** The launch-time `refresh_if_stale` remembers IMDb's validator as soon as the
+216 MB is on disk, so an interrupted load never downloads it again. But only a later refresh resumed
+the load, and a later refresh never came: the next launch found the validator current and stopped.
+The author's catalogue had a refresh job left `running` since 2026-11-07, and the one before it took
+twelve days to finish across launches. Episodes were never refreshed at all: `title.episode` was
+loaded once, for series over 5,000 votes and anime.
+
+**What it does now** (`freshness::refresh`, called by `src-tauri/src/commands/catalogue.rs`):
+
+- **An unfinished refresh is finished first**, before the publisher is asked anything.
+- **The resume reads past the watermark it started from**, kept in the `catalogue.refresh_watermark`
+  setting. Taken afresh it would include the new ids the interrupted run already stored, and skip for
+  good the new titles below them (the file is ordered as text). A refresh batch also drops ids it
+  already holds, so a resume can never die on a duplicate.
+- **Episodes are part of every refresh**: `title.episode` (52 MB) is fetched with the other two, and
+  every episode not yet held is added for anime, a series over 5,000 votes, or **a series the user
+  follows** (matched in the library, on a watchlist, or with a watched episode) whatever its votes.
+- **The app checks every hour**, launch included: one HEAD request, and a download only when IMDb has
+  republished (about daily). **AniList's next airing** is fetched every six hours for every followed
+  anime. Settings shows when the catalogue last changed and what it added, with "Refresh now";
+  Home refetches when a refresh adds something.
+- `ingest keep` runs the same function from the command line.
+
+**Not covered**: a show that IMDb splits where other sources do not. Twin Peaks' 2017 season is a
+separate IMDb series (its 18 parts are that series' season 1), so files named `S03E01` under the 1990
+show are placed on the 1990 series without an episode row. Mapping one numbering onto another needs a
+source that publishes it (D85).
+
+
+## Phase 16 — the first run's build, and the catch-up (2026-11-17)
+
+The author's install had 2.7 million titles and an empty search index. The refresh is the only
+thing a fresh install ran, and it loads titles, ratings and episodes; the steps that make them
+searchable were run by hand on the development copy (`ingest akas`, `normalise`,
+`search-index`) and never by the app. Search found nothing, the library identified nothing
+(identification searches the same index), and Films and TV Shows were empty.
+
+`crates/catalogue/src/bootstrap.rs` owns the fix, run after every refresh (`run`, called from
+`src-tauri/src/commands/catalogue.rs` `start`):
+
+- **Ready** means a load job (`refresh`, or `ingest imdb`) has completed *and* stage A's two jobs
+  have: `titles-normalise`, then `search-index` (the word index, plus the typo index over the core
+  tier). Not "there are titles": an interrupted load leaves titles behind.
+- **Alternate titles** (`imdb-akas`) load after stage A, in the background. They were 862 of the
+  2,519 seconds the build took on a copy of the author's install (docs/eval-results.md), and first
+  they kept Home closed fourteen minutes longer.
+- **The catch-up** (`catalogue-catch-up`) normalises the titles with no normalised form
+  (`normalise::fill_missing`) and indexes what the index lacks. The index skips what it holds, so it
+  first un-marks every title that has gained a name not yet normalised; that is how alternate titles
+  and the refresh's new titles reach the index. It is due when a load or an alternate-titles run
+  finished after the last catch-up, or a catch-up stopped part-way. Before it, the titles the weekly
+  refresh added were never searchable.
+- **Enrichment** follows alternate titles, each step done once: cast and crew (`imdb-credits`; 2,655 s on
+  the development copy) and AniList's anime (`anilist`; 785 s). People's names are in the word index, so
+  credits un-mark every credited title before the job finishes, and the catch-up after it re-indexes them;
+  AniList's titles reach the index the same way. MovieLens is not fetched: nothing in the app reads it.
+  Once a step's job has finished, its archive is deleted (`tidy`: alternate titles, principals and names,
+  1.5 GB); the refresh's own files stay. Every half-gigabyte decompression runs on a blocking thread.
+- **The meaning index** is offered in onboarding's taste step with its size, and fetched only when asked
+  (ADR-0014); `embeddings-v3` is published for it.
+- **The library waits** while a first build runs (`first_build_running`): the launch scan and a
+  folder added in onboarding report `waiting`. The scans start as soon as stage A is done, or when
+  the build stops without it (a machine offline at first run still lists its files), and every
+  folder is looked at again once alternate titles have loaded.
+- **The page**: `catalogue_status` carries `ready`, `building` (the step's label) and `percent`, each
+  part of the wait weighted by its measured time, normalising and indexing counted by rows.
+  Onboarding shows it in its footer; Home, Films, TV and search show "Getting ready… N%" until it is
+  ready. An unreadable status counts as ready.

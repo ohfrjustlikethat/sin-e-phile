@@ -156,6 +156,65 @@ impl<'a> CatalogueRepository<'a> {
         .await?)
     }
 
+    /// This catalogue's id for each IMDb number it holds (`tt0111161` is 111161), for the
+    /// key file that names a published artefact's vectors (ADR-0051). Asked in chunks, so a
+    /// quarter of a million numbers is a few hundred indexed lookups, not a table scan.
+    pub async fn ids_for_imdb(
+        &self,
+        numbers: &[u32],
+    ) -> Result<std::collections::HashMap<u32, i64>, DbError> {
+        let mut out = std::collections::HashMap::with_capacity(numbers.len());
+        for chunk in numbers.chunks(500) {
+            let marks = vec!["?"; chunk.len()].join(",");
+            let sql = format!(
+                "SELECT external_id, media_item_id FROM external_ids
+                 WHERE source = 'imdb' AND external_id IN ({marks})"
+            );
+            let mut query = sqlx::query_as::<_, (String, i64)>(&sql);
+            for n in chunk {
+                query = query.bind(format!("tt{n:07}"));
+            }
+            for (tconst, id) in query.fetch_all(self.db.pool()).await? {
+                if let Some(n) = tconst
+                    .strip_prefix("tt")
+                    .and_then(|d| d.parse::<u32>().ok())
+                {
+                    out.insert(n, id);
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    /// The IMDb number of each of these ids that has one: the producer's side of the key
+    /// file (ADR-0051).
+    pub async fn imdb_for_ids(
+        &self,
+        ids: &[i64],
+    ) -> Result<std::collections::HashMap<i64, u32>, DbError> {
+        let mut out = std::collections::HashMap::with_capacity(ids.len());
+        for chunk in ids.chunks(500) {
+            let marks = vec!["?"; chunk.len()].join(",");
+            let sql = format!(
+                "SELECT media_item_id, external_id FROM external_ids
+                 WHERE source = 'imdb' AND media_item_id IN ({marks})"
+            );
+            let mut query = sqlx::query_as::<_, (i64, String)>(&sql);
+            for id in chunk {
+                query = query.bind(id);
+            }
+            for (id, tconst) in query.fetch_all(self.db.pool()).await? {
+                if let Some(n) = tconst
+                    .strip_prefix("tt")
+                    .and_then(|d| d.parse::<u32>().ok())
+                {
+                    out.insert(id, n);
+                }
+            }
+        }
+        Ok(out)
+    }
+
     /// Core ids in artefact order, `None` where the item has no descriptive text.
     ///
     /// # Why an item without a synopsis must not be in the vector index

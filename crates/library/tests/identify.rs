@@ -51,6 +51,69 @@ fn evidence(name: &str) -> Evidence {
     }
 }
 
+/// A series with `seasons` seasons of `per` episodes each; returns the series and S1E5.
+async fn show(db: &Db, title: &str, year: i64, seasons: i64, per: i64) -> (i64, i64) {
+    let series = item(db, MediaKind::AnimeSeries, title, year, 24, 400_000).await;
+    let episodes = EpisodeRepository::new(db);
+    episodes.create_series(series, false).await.unwrap();
+    let mut s1e5 = 0;
+    for s in 1..=seasons {
+        let season = episodes.create_season(series, s, None).await.unwrap();
+        for e in 1..=per {
+            let id = MediaRepository::new(db)
+                .insert(&NewMediaItem {
+                    kind: Some(MediaKind::Episode),
+                    primary_title: format!("Session {e}"),
+                    ..Default::default()
+                })
+                .await
+                .unwrap();
+            episodes
+                .create_episode(id, series, Some(season), Some(s), Some(e), None)
+                .await
+                .unwrap();
+            if (s, e) == (1, 5) {
+                s1e5 = id;
+            }
+        }
+    }
+    (series, s1e5)
+}
+
+#[tokio::test]
+async fn a_fansub_number_is_the_episode_only_when_the_show_has_one_season() {
+    // Phase 16: "[Group] Show - 05" under the show's folder.
+    let db = Db::in_memory().await.unwrap();
+    let (bebop, fifth) = show(&db, "Space Cowboys Blues", 1998, 1, 26).await;
+    let r = identify(
+        &db,
+        &Evidence {
+            name: "[KOHAKU] Space Cowboys Blues - 05 [1080p].mkv".into(),
+            folders: vec!["Space Cowboys Blues (1998)".into()],
+            duration_minutes: None,
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(r.best().unwrap().media_item_id, bebop);
+    assert_eq!(r.episode.map(|e| e.episode_id), Some(fifth));
+
+    // Two seasons: "- 30" is not derived by adding up seasons (ADR-0031), and "- 05" is not
+    // assumed to be season 1 either.
+    let db = Db::in_memory().await.unwrap();
+    let (two, _) = show(&db, "Long Running Saga", 2001, 2, 25).await;
+    for n in ["05", "30"] {
+        let r = identify(
+            &db,
+            &evidence(&format!("[KOHAKU] Long Running Saga - {n} [1080p].mkv")),
+        )
+        .await
+        .unwrap();
+        assert_eq!(r.best().unwrap().media_item_id, two);
+        assert_eq!(r.episode, None, "- {n} in a two-season show");
+    }
+}
+
 #[tokio::test]
 async fn the_year_tells_a_remake_from_the_original() {
     let db = Db::in_memory().await.unwrap();

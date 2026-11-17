@@ -1,6 +1,7 @@
 import { Slider, Toggle } from "@/design-system";
 import { play } from "@/design-system/focus/feedback";
 import { useControllerSettings } from "@/lib/controllerSettings";
+import { SETTINGS_HEADING } from "./heading";
 
 /**
  * Settings → Controller — ADR-0042.
@@ -13,7 +14,7 @@ export function ControllerSection() {
   const s = useControllerSettings();
   return (
     <section className="mb-9" aria-label="Controller">
-      <h2 className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
+      <h2 className={SETTINGS_HEADING}>
         Controller
       </h2>
       <div className="flex flex-col gap-4">

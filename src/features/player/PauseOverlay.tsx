@@ -21,17 +21,36 @@ const CREW_LABEL: Record<string, string> = {
 };
 
 interface Props {
+  /** The film's title, or for an episode its show's (Phase 16). */
   title: string;
+  /** For an episode: "Season 1 · Episode 2 — Traces to Nowhere". */
+  episode?: string | null;
+  /** For an episode: "Next: S1 E3". */
+  next?: string | null;
   still: string | null;
   position: number | null;
   duration: number | null;
   chapter: string | null;
   details: PauseDetails | undefined;
   onResume: () => void;
+  /** A click on the still picture: as a click on the playing film, it plays (Phase 16). */
+  onPicture?: () => void;
   onOpen: (id: number) => void;
 }
 
-export function PauseOverlay({ title, still, position, duration, chapter, details, onResume, onOpen }: Props) {
+export function PauseOverlay({
+  title,
+  episode,
+  next,
+  still,
+  position,
+  duration,
+  chapter,
+  details,
+  onResume,
+  onPicture,
+  onOpen,
+}: Props) {
   const resume = useRef<HTMLButtonElement>(null);
   const [person, setPerson] = useState<PersonView | null>(null);
   const [films, setFilms] = useState<TitleView[] | null>(null);
@@ -67,15 +86,17 @@ export function PauseOverlay({ title, still, position, duration, chapter, detail
   return (
     <div className="absolute inset-0" role="dialog" aria-label="Paused">
       {still && <img src={still} alt="" className="absolute inset-0 h-full w-full object-contain transition-opacity duration-200" />}
-      <div className="absolute inset-0 bg-black/60" />
+      <div className="absolute inset-0 bg-black/60" data-testid="pause-picture" onClick={onPicture} />
 
       <div className="absolute top-[30%] left-[6%] flex max-w-[44%] flex-col gap-4">
         <p className="label text-ink-muted">
           Paused · {clock(position)} of {clock(duration)}
           {left !== null && ` · ${Math.round(left / 60)} min left`}
         </p>
-        <h1 className="font-display text-[44px] leading-[1.05] font-semibold tracking-[-0.03em]">{title}</h1>
+        <h1 className="font-serif text-[52px] leading-[1.02] tracking-[-0.015em]">{title}</h1>
+        {episode && <p className="text-[19px] leading-snug text-ink">{episode}</p>}
         {chapter && <p className="text-[15px] text-ink-muted">{chapter}</p>}
+        {next && <p className="text-[14px] text-ink-faint">{next}</p>}
         <div>
           <button
             ref={resume}
@@ -92,7 +113,7 @@ export function PauseOverlay({ title, still, position, duration, chapter, detail
           catalogue knows: a bare file has nothing to say here, and an empty panel looks broken. */}
       {details && (
         <aside
-          aria-label="About this film"
+          aria-label={details.show ? "About this show" : "About this film"}
           className="absolute top-[68px] right-3 bottom-[96px] flex w-[min(440px,38%)] flex-col overflow-y-auto rounded-md bg-surface px-7 py-6"
         >
           {person ? (

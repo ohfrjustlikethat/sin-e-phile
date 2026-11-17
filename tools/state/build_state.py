@@ -2,7 +2,7 @@
 """
 Generate PROJECT_STATE.json's phase table by PARSING SPEC.md §15.
 
-SPEC.md §10.1 requires PROJECT_STATE.json to enumerate all 28 phases with their
+SPEC.md §10.1 requires PROJECT_STATE.json to enumerate all 29 phases with their
 exit criteria. Transcribing ~150 checkboxes by hand would be tedious and, more to
 the point, would silently drift the moment §15 is amended — and drift between the
 spec and the state file is precisely what §2.8 exists to prevent.
@@ -149,8 +149,8 @@ def main() -> int:
     args = parser.parse_args()
 
     generated = parse_spec()
-    if len(generated) != 28:
-        print(f"build_state: parsed {len(generated)} phases from SPEC.md §15, expected 28. "
+    if len(generated) != 29:
+        print(f"build_state: parsed {len(generated)} phases from SPEC.md §15, expected 29. "
               f"Has the heading format changed?", file=sys.stderr)
         return 2
 
@@ -169,13 +169,13 @@ def main() -> int:
                   "Run: python tools/state/build_state.py --write", file=sys.stderr)
             return 1
         total = sum(len(p["exit_criteria"]) for p in merged)
-        print(f"build_state: in sync — 28 phases, {total} exit criteria")
+        print(f"build_state: in sync — 29 phases, {total} exit criteria")
         return 0
 
     state["phases"] = merged
     STATE.write_text(json.dumps(state, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     total = sum(len(p["exit_criteria"]) for p in merged)
-    print(f"build_state: wrote 28 phases, {total} exit criteria to PROJECT_STATE.json")
+    print(f"build_state: wrote 29 phases, {total} exit criteria to PROJECT_STATE.json")
     return 0
 
 

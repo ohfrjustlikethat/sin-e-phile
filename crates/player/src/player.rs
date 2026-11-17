@@ -91,6 +91,10 @@ pub struct SubtitleStyle {
     pub position: u32,
     /// A dark box behind the text instead of an outline.
     pub background: bool,
+    /// The text's colour, `#RRGGBB` (Phase 16).
+    pub colour: String,
+    /// The outline's thickness, 0 none … 6 heavy; mpv's default is 3.
+    pub outline: u32,
 }
 
 impl Default for SubtitleStyle {
@@ -100,6 +104,8 @@ impl Default for SubtitleStyle {
             size: 46,
             position: 95,
             background: false,
+            colour: "#FFFFFF".into(),
+            outline: 3,
         }
     }
 }
@@ -141,7 +147,22 @@ pub struct Player {
     mpv: Arc<Mpv>,
     seen: Arc<(Mutex<Seen>, Condvar)>,
     events: Option<JoinHandle<()>>,
+    pointer: Arc<Mutex<Option<PointerHandler>>>,
 }
+
+/// What the mouse did over the picture: `"click"` or `"move"`.
+pub type PointerHandler = Box<dyn Fn(&str) + Send + Sync>;
+
+/// The video is a native window above the page, so the page never sees a click or a
+/// movement over the picture (Phase 16: "I can't click to pause"). In the app those reach
+/// the host window (`host::on_pointer`, measured in the real window); should mpv's own
+/// window ever take them, it reports them the same way, as script messages, and does
+/// nothing else: its own bindings stay off. A double click is the page's to recognise
+/// from two clicks, so it is not reported here, or it would count twice.
+const POINTER_SECTION: &str = concat!(
+    "MBTN_LEFT script-message sinephile click\n",
+    "MOUSE_MOVE script-message sinephile move",
+);
 
 impl Player {
     pub fn new(dll: &Path, options: &Options) -> Result<Self, PlayerError> {
@@ -181,21 +202,44 @@ impl Player {
         let level = std::env::var("SINEPHILE_MPV_LOG").unwrap_or_else(|_| "warn".into());
         mpv.request_log_messages(&level).map_err(PlayerError::Mpv)?;
         mpv.initialize().map_err(PlayerError::Mpv)?;
+        mpv.command(&[
+            "define-section",
+            "sinephile-pointer",
+            POINTER_SECTION,
+            "force",
+        ])
+        .and_then(|()| mpv.command(&["enable-section", "sinephile-pointer"]))
+        .map_err(PlayerError::Mpv)?;
 
         let mpv = Arc::new(mpv);
         let seen: Arc<(Mutex<Seen>, Condvar)> = Arc::default();
+        let pointer: Arc<Mutex<Option<PointerHandler>>> = Arc::default();
         let events = {
-            let (mpv, seen) = (mpv.clone(), seen.clone());
+            let (mpv, seen, pointer) = (mpv.clone(), seen.clone(), pointer.clone());
             std::thread::Builder::new()
                 .name("mpv-events".into())
-                .spawn(move || pump(&mpv, &seen))
+                .spawn(move || pump(&mpv, &seen, &pointer))
                 .map_err(|e| PlayerError::Mpv(e.to_string()))?
         };
         Ok(Self {
             mpv,
             seen,
             events: Some(events),
+            pointer,
         })
+    }
+
+    /// Press a key or button through mpv's own input, as the window would: for tests of
+    /// what mpv answers and what it reports.
+    #[doc(hidden)]
+    pub fn press_key(&self, key: &str) -> Result<(), PlayerError> {
+        self.cmd(&["keypress", key])
+    }
+
+    /// Who hears about clicks and movement over the picture (see `POINTER_SECTION`).
+    /// Called on mpv's event thread, so it must be quick.
+    pub fn on_pointer(&self, handler: PointerHandler) {
+        *self.pointer.lock().expect("pointer") = Some(handler);
     }
 
     fn cmd(&self, args: &[&str]) -> Result<(), PlayerError> {
@@ -366,6 +410,15 @@ impl Player {
         self.prop("saturation", &saturation.clamp(-100, 100).to_string())
     }
 
+    /// The picture's shape and size on screen (Phase 16): `aspect` is one of [`ASPECTS`],
+    /// `zoom_percent` 50…300 with 100 untouched. See [`framing`].
+    pub fn set_framing(&self, aspect: &str, zoom_percent: i64) -> Result<(), PlayerError> {
+        for (key, value) in framing(aspect, zoom_percent) {
+            self.prop(key, &value)?;
+        }
+        Ok(())
+    }
+
     /// What the stats overlay shows: (property, value) in display order, only those mpv
     /// reports for this file.
     pub fn stats(&self) -> Vec<(&'static str, String)> {
@@ -433,6 +486,8 @@ impl Player {
         self.prop("sub-font-size", &style.size.to_string())?;
         // 100 is the bottom edge; lower raises the line.
         self.prop("sub-pos", &style.position.clamp(0, 100).to_string())?;
+        self.prop("sub-color", &colour_or_white(&style.colour))?;
+        self.prop("sub-border-size", &style.outline.min(6).to_string())?;
         if style.background {
             self.prop("sub-border-style", "opaque-box")?;
             self.prop("sub-back-color", "#B0000000")
@@ -477,6 +532,12 @@ impl Player {
 
     fn get(&self, key: &str) -> Option<String> {
         self.mpv.get_property(key)
+    }
+
+    /// One of mpv's properties, as text: for checking in a real window that a setting
+    /// reached the player (the debug probe, Phase 16).
+    pub fn property(&self, key: &str) -> Option<String> {
+        self.get(key)
     }
 
     fn num(&self, key: &str) -> Option<f64> {
@@ -559,10 +620,26 @@ impl Drop for Player {
 
 /// The one thread that calls `mpv_wait_event`. It records load, first frame and end of
 /// file, wakes anyone waiting, and passes mpv's warnings to the log.
-fn pump(mpv: &Mpv, seen: &(Mutex<Seen>, Condvar)) {
+fn pump(mpv: &Mpv, seen: &(Mutex<Seen>, Condvar), pointer: &Mutex<Option<PointerHandler>>) {
     loop {
-        let ffi::Event { id, log: text, end } = mpv.wait_event(0.25);
+        let ffi::Event {
+            id,
+            log: text,
+            end,
+            message,
+        } = mpv.wait_event(0.25);
         if id == ffi::MPV_EVENT_NONE {
+            continue;
+        }
+        if let Some(what) = pointer_message(message.as_deref()) {
+            // A still pointer over a window that changed shape is not a movement (host.rs).
+            #[cfg(windows)]
+            if what == "move" && !crate::host::pointer_moved() {
+                continue;
+            }
+            if let Some(f) = pointer.lock().expect("pointer").as_ref() {
+                f(what);
+            }
             continue;
         }
         if let Some(t) = text {
@@ -591,6 +668,16 @@ fn pump(mpv: &Mpv, seen: &(Mutex<Seen>, Condvar)) {
     }
 }
 
+/// The pointer event a client message carries, if it is one of ours.
+fn pointer_message(words: Option<&[String]>) -> Option<&str> {
+    match words? {
+        [who, what] if who == "sinephile" && matches!(what.as_str(), "click" | "move") => {
+            Some(what.as_str())
+        }
+        _ => None,
+    }
+}
+
 /// A bitrate for the stats panel, in bits per second: Mbit/s from one megabit up,
 /// kbit/s below it. A still or near-static picture encodes to a few kbit/s, which
 /// one-decimal Mbit/s printed as a misleading "0.0".
@@ -612,5 +699,84 @@ mod bitrate_tests {
         assert_eq!(bitrate(1_000_000.0), "1.0 Mbit/s");
         assert_eq!(bitrate(38_400.0), "38 kbit/s");
         assert_eq!(bitrate(128_000.0), "128 kbit/s");
+    }
+}
+
+/// A `#RRGGBB` colour as given, or white: anything else would be sent to mpv as is, and a
+/// colour mpv cannot read leaves the subtitles unreadable.
+pub fn colour_or_white(c: &str) -> String {
+    let ok = c.len() == 7 && c.starts_with('#') && c[1..].chars().all(|x| x.is_ascii_hexdigit());
+    if ok {
+        c.to_ascii_uppercase()
+    } else {
+        "#FFFFFF".into()
+    }
+}
+
+#[cfg(test)]
+mod colour_tests {
+    use super::colour_or_white;
+
+    #[test]
+    fn a_colour_mpv_cannot_read_falls_back_to_white() {
+        assert_eq!(colour_or_white("#ffd400"), "#FFD400");
+        assert_eq!(colour_or_white("yellow"), "#FFFFFF");
+        assert_eq!(colour_or_white("#12345"), "#FFFFFF");
+        assert_eq!(colour_or_white("#GGGGGG"), "#FFFFFF");
+    }
+}
+
+/// The picture shapes the panel offers (Phase 16): the file's own, three forced ratios for a
+/// file that carries the wrong one, and "fill", which crops instead of showing black bars.
+pub const ASPECTS: [&str; 5] = ["auto", "16:9", "4:3", "2.35:1", "fill"];
+
+/// The mpv properties for a shape and a zoom, in the order they are set.
+///
+/// - A forced ratio goes to `video-aspect-override`; "auto" and "fill" hand the ratio back to
+///   the file (`-1`), and anything not in [`ASPECTS`] is treated as "auto" rather than sent on.
+/// - "fill" is `panscan` 1: scale until the window is covered, cropping what overflows.
+/// - mpv's `video-zoom` is a power of two (1 doubles the picture), so a percentage becomes
+///   its base-2 logarithm; the percentage is held to 50…300.
+pub fn framing(aspect: &str, zoom_percent: i64) -> [(&'static str, String); 3] {
+    let ratio = match aspect {
+        "16:9" | "4:3" | "2.35:1" => aspect.to_string(),
+        _ => "-1".to_string(),
+    };
+    let panscan = if aspect == "fill" { "1.0" } else { "0.0" };
+    let zoom = (zoom_percent.clamp(50, 300) as f64 / 100.0).log2();
+    [
+        ("video-aspect-override", ratio),
+        ("panscan", panscan.to_string()),
+        ("video-zoom", format!("{zoom:.4}")),
+    ]
+}
+
+#[cfg(test)]
+mod framing_tests {
+    use super::framing;
+
+    fn values(aspect: &str, zoom: i64) -> [String; 3] {
+        framing(aspect, zoom).map(|(_, v)| v)
+    }
+
+    #[test]
+    fn a_forced_ratio_is_sent_and_anything_else_hands_the_ratio_back_to_the_file() {
+        assert_eq!(values("16:9", 100), ["16:9", "0.0", "0.0000"]);
+        assert_eq!(values("2.35:1", 100), ["2.35:1", "0.0", "0.0000"]);
+        assert_eq!(values("auto", 100), ["-1", "0.0", "0.0000"]);
+        assert_eq!(values("21:9; quit", 100), ["-1", "0.0", "0.0000"]);
+    }
+
+    #[test]
+    fn fill_crops_rather_than_stretching() {
+        assert_eq!(values("fill", 100), ["-1", "1.0", "0.0000"]);
+    }
+
+    #[test]
+    fn zoom_is_a_power_of_two_and_held_to_its_range() {
+        assert_eq!(values("auto", 200)[2], "1.0000");
+        assert_eq!(values("auto", 50)[2], "-1.0000");
+        assert_eq!(values("auto", 10)[2], "-1.0000");
+        assert_eq!(values("auto", 9000)[2], format!("{:.4}", 3f64.log2()));
     }
 }

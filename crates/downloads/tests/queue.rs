@@ -178,6 +178,98 @@ async fn a_finished_download_files_itself_into_the_library_already_matched() {
         .any(|f| f.path == file));
 }
 
+/// A season pack: three episodes, each exactly four pieces (so no piece holds bytes of
+/// two episodes), seeded on loopback.
+async fn seed_pack() -> Seed {
+    let dir = TempDir::new().unwrap();
+    let root = dir.path().join("content").join("Show.S01");
+    std::fs::create_dir_all(&root).unwrap();
+    for (i, n) in ["E01", "E02", "E03"].iter().enumerate() {
+        let bytes = content(i as u64 + 7, MIB);
+        std::fs::write(root.join(format!("Show.S01{n}.mkv")), bytes).unwrap();
+    }
+    let created = create_torrent(
+        &root,
+        CreateTorrentOptions {
+            name: Some("Show.S01"),
+            trackers: vec![],
+            piece_length: Some(256 * 1024),
+        },
+        &BlockingSpawner::new(2),
+    )
+    .await
+    .unwrap();
+    let torrent = created.as_bytes().unwrap().to_vec();
+    let mut config = offline(&dir.path().join("seeder"));
+    config.seeding = SeedingPolicy::KeepSeeding;
+    let engine = Engine::start(config).await.unwrap();
+    engine
+        .add(
+            Source::File(torrent.clone()),
+            AddOptions {
+                output_folder: Some(root.clone()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    let port = engine.listen_addr().unwrap().port();
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    Seed {
+        _dir: dir,
+        _engine: engine,
+        torrent,
+        peer: SocketAddr::from(([127, 0, 0, 1], port)),
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn one_episode_of_a_season_pack_is_all_that_is_downloaded() {
+    // Phase 16: a source points at one episode inside a season pack (its file index), and
+    // the whole pack was downloaded. Only that file is fetched, and it is the file filed.
+    let s = seed_pack().await;
+    let db = Db::in_memory().await.unwrap();
+    let work = TempDir::new().unwrap();
+    let engine = Arc::new(
+        Engine::start(offline(&work.path().join("engine")))
+            .await
+            .unwrap(),
+    );
+    let downloads = work.path().join("Downloads");
+    let m = manager(&db, engine.clone(), vec![s.peer], downloads.clone());
+
+    let id = DownloadRepository::new(&db)
+        .add(&NewDownload {
+            file_index: Some(1),
+            ..film("Show S01E02", &s.torrent)
+        })
+        .await
+        .unwrap();
+    until_done(&m, &db, id, Duration::from_secs(60)).await;
+
+    let d = DownloadRepository::new(&db).get(id).await.unwrap().unwrap();
+    let torrent = d.backend_id.clone().expect("the engine's id");
+    let files = engine.files(&torrent).unwrap();
+    assert_eq!(files.len(), 3);
+    let wanted = files.iter().find(|f| f.index == 1).unwrap();
+    let filed = d.file_path.clone().expect("the file it made");
+    assert_eq!(
+        Path::new(&filed),
+        engine.file_path(&torrent, wanted).unwrap(),
+        "the episode chosen is the file filed"
+    );
+    assert_eq!(std::fs::metadata(&filed).unwrap().len(), MIB as u64);
+    for other in files.iter().filter(|f| f.index != 1) {
+        let path = engine.file_path(&torrent, other).unwrap();
+        let len = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+        assert!(
+            len < MIB as u64,
+            "{} was downloaded too ({len} bytes)",
+            other.path
+        );
+    }
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn the_most_important_runs_first_when_only_one_may() {
     let a = seed("Thief.1981", 2 * MIB, None).await;

@@ -15,19 +15,141 @@
 //!   newly exposed area before mpv repaints it.
 //! - On pause the window is **hidden**, and the page shows a still frame instead, so the
 //!   pause overlay can dim and blur with ordinary HTML (ADR-0021).
+//! - **The mouse over the picture reaches this window, not mpv's.** Measured in the real
+//!   app on 2026-11-17: `WindowFromPoint` over the playing picture is `SinephileVideoHost`,
+//!   and a real click logged nothing from mpv's input section (the headless test had only
+//!   injected the key into mpv). So this window reports presses and movement itself
+//!   (`on_pointer`), which is how a click on the film pauses it.
 
 use windows::core::w;
-use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
     CombineRgn, CreateRectRgn, CreateRoundRectRgn, DeleteObject, SetWindowRgn, HRGN, RGN_DIFF,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindowThreadProcessId, RegisterClassW,
-    SetWindowPos, ShowWindow, HWND_TOP, SWP_NOACTIVATE, SW_HIDE, SW_SHOWNA, WINDOW_EX_STYLE,
-    WM_ERASEBKGND, WNDCLASSW, WS_CHILD, WS_CLIPSIBLINGS,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, GetCursorPos, GetWindowThreadProcessId,
+    IsChild, LoadCursorW, PostMessageW, RegisterClassW, SetCursor, SetWindowPos, ShowWindow,
+    WindowFromPoint, HTCLIENT, HWND_TOP, IDC_ARROW, SWP_NOACTIVATE, SW_HIDE, SW_SHOWNA,
+    WINDOW_EX_STYLE, WM_APP, WM_ERASEBKGND, WM_LBUTTONDOWN, WM_MOUSEMOVE, WM_SETCURSOR, WNDCLASSW,
+    WS_CHILD, WS_CLIPSIBLINGS,
 };
+
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
+/// Who hears about the mouse over the picture: `"click"` for each press of the left button
+/// (the page decides what two in quick succession mean), `"move"` at most every
+/// [`MOVE_EVERY`]. One player at a time, so one listener for the process.
+pub type PointerListener = Arc<dyn Fn(&str) + Send + Sync>;
+
+static POINTER: Mutex<Option<PointerListener>> = Mutex::new(None);
+static MOVES: Mutex<MoveFilter> = Mutex::new(MoveFilter::new());
+/// The pointer is hidden over the picture while the player's bars are (Phase 16).
+static CURSOR_HIDDEN: AtomicBool = AtomicBool::new(false);
+/// Posted to the host when the pointer is hidden or shown, so a still pointer changes at once.
+const WM_CURSOR_CHANGED: u32 = WM_APP + 1;
+
+/// Movement is reported this often at most: it only wakes the controls, and a report per
+/// `WM_MOUSEMOVE` would be a hundred events a second across the IPC bridge.
+pub const MOVE_EVERY: Duration = Duration::from_millis(100);
+
+/// Listen to the mouse over the picture (replacing any earlier listener).
+pub fn on_pointer(listener: PointerListener) {
+    *POINTER.lock().expect("pointer") = Some(listener);
+}
+
+fn tell(what: &str) {
+    // Cloned out first: the listener may take a while, and must not hold the lock.
+    let listener = POINTER.lock().expect("pointer").clone();
+    if let Some(l) = listener {
+        l(what);
+    }
+}
+
+/// Which mouse reports are movements worth telling the page about.
+///
+/// Windows sends `WM_MOUSEMOVE` when the pointer moves, and also when the window under a
+/// **still** pointer changes shape or place. Hiding the player's bars changes this window's
+/// shape (its cutouts), so each hide brought a report that woke the bars again: in full
+/// screen, with the pointer over the picture, they never hid (Phase 16, the author's
+/// report, reproduced in the real window). So a report counts only if the pointer is
+/// somewhere new on the screen, and at most every [`MOVE_EVERY`].
+#[derive(Debug)]
+pub struct MoveFilter {
+    /// Where the pointer was last seen, in screen pixels.
+    at: Option<(i32, i32)>,
+    /// When a movement was last told.
+    told: Option<Instant>,
+}
+
+impl MoveFilter {
+    pub const fn new() -> Self {
+        Self {
+            at: None,
+            told: None,
+        }
+    }
+
+    /// A report of the pointer at `at` (screen pixels; `None` when it cannot be read) at `now`.
+    pub fn moved(&mut self, at: Option<(i32, i32)>, now: Instant) -> bool {
+        if let Some(at) = at {
+            if self.at == Some(at) {
+                return false;
+            }
+            // Remembered even when not told, so a later report from the same place is not.
+            self.at = Some(at);
+        }
+        let due = self
+            .told
+            .is_none_or(|t| now.saturating_duration_since(t) >= MOVE_EVERY);
+        if due {
+            self.told = Some(now);
+        }
+        due
+    }
+}
+
+impl Default for MoveFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn cursor_at() -> Option<(i32, i32)> {
+    let mut p = POINT::default();
+    unsafe { GetCursorPos(&mut p) }.ok().map(|()| (p.x, p.y))
+}
+
+/// Whether the pointer has really moved since the last report (see [`MoveFilter`]). Also
+/// for mpv's own reports, which carry no position.
+pub fn pointer_moved() -> bool {
+    MOVES
+        .lock()
+        .expect("moves")
+        .moved(cursor_at(), Instant::now())
+}
+
+/// The pointer is over this window or a window inside it (mpv's).
+fn pointer_over(hwnd: HWND) -> bool {
+    let Some((x, y)) = cursor_at() else {
+        return false;
+    };
+    let under = unsafe { WindowFromPoint(POINT { x, y }) };
+    under == hwnd || unsafe { IsChild(hwnd, under) }.as_bool()
+}
+
+fn apply_cursor() {
+    unsafe {
+        if CURSOR_HIDDEN.load(Ordering::SeqCst) {
+            SetCursor(None);
+        } else if let Ok(arrow) = LoadCursorW(None, IDC_ARROW) {
+            SetCursor(Some(arrow));
+        }
+    }
+}
 
 /// A chrome panel's silhouette, in physical pixels relative to the host's top-left.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -57,9 +179,31 @@ unsafe impl Sync for VideoHost {}
 const CLASS: windows::core::PCWSTR = w!("SinephileVideoHost");
 
 unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
-    if msg == WM_ERASEBKGND {
+    match msg {
         // Claim it was erased; mpv paints every pixel itself.
-        return LRESULT(1);
+        WM_ERASEBKGND => return LRESULT(1),
+        WM_LBUTTONDOWN => {
+            tell("click");
+            return LRESULT(0);
+        }
+        WM_MOUSEMOVE => {
+            if pointer_moved() {
+                tell("move");
+            }
+            return LRESULT(0);
+        }
+        // Windows asks which pointer to show whenever it moves over the window.
+        WM_SETCURSOR if (lp.0 & 0xFFFF) as u32 == HTCLIENT => {
+            apply_cursor();
+            return LRESULT(1);
+        }
+        WM_CURSOR_CHANGED => {
+            if pointer_over(hwnd) {
+                apply_cursor();
+            }
+            return LRESULT(0);
+        }
+        _ => {}
     }
     DefWindowProcW(hwnd, msg, wp, lp)
 }
@@ -163,6 +307,16 @@ impl VideoHost {
     pub fn hide(&self) {
         unsafe {
             let _ = ShowWindow(self.hwnd, SW_HIDE);
+        }
+    }
+
+    /// Hide the pointer over the picture, or show it again: with the player's bars, after
+    /// three seconds without movement (Phase 16). Windows only asks for the pointer when it
+    /// moves, so a still pointer is changed now, on the window's own thread.
+    pub fn set_cursor_hidden(&self, hidden: bool) {
+        CURSOR_HIDDEN.store(hidden, Ordering::SeqCst);
+        unsafe {
+            let _ = PostMessageW(Some(self.hwnd), WM_CURSOR_CHANGED, WPARAM(0), LPARAM(0));
         }
     }
 
@@ -346,6 +500,76 @@ mod tests {
         unsafe {
             let _ = DestroyWindow(parent);
         }
+    }
+
+    #[test]
+    fn a_press_on_the_picture_is_reported_and_movement_is_thinned() {
+        // Phase 16, measured in the real app: the click lands on this window, not mpv's.
+        use windows::Win32::UI::WindowsAndMessaging::SendMessageW;
+        let parent = parent_window();
+        let host = VideoHost::new(parent.0 as isize).unwrap();
+        let heard = Arc::new(Mutex::new(Vec::<String>::new()));
+        let h = heard.clone();
+        on_pointer(Arc::new(move |what| {
+            h.lock().unwrap().push(what.to_string())
+        }));
+        let send = |msg: u32| unsafe {
+            SendMessageW(host.hwnd, msg, Some(WPARAM(0)), Some(LPARAM(0)));
+        };
+        let still = cursor_at();
+        send(WM_LBUTTONDOWN);
+        send(WM_MOUSEMOVE);
+        send(WM_LBUTTONDOWN); // a second press: the page decides it is a double click
+                              // Reports with the pointer where it was: what hiding the bars sends (MoveFilter).
+        std::thread::sleep(MOVE_EVERY);
+        send(WM_MOUSEMOVE);
+        std::thread::sleep(MOVE_EVERY);
+        send(WM_MOUSEMOVE);
+        let heard = heard.lock().unwrap().clone();
+        assert_eq!(heard.iter().filter(|w| *w == "click").count(), 2);
+        // Unless the person running the tests moved the mouse meanwhile, a still pointer is
+        // told once at most, however often Windows reports it.
+        if still.is_some() && cursor_at() == still {
+            assert!(
+                heard.iter().filter(|w| *w == "move").count() <= 1,
+                "{heard:?}"
+            );
+        }
+        drop(host);
+        unsafe {
+            let _ = DestroyWindow(parent);
+        }
+    }
+
+    #[test]
+    fn a_still_pointer_is_not_a_movement() {
+        // Phase 16: hiding the bars made Windows report the pointer where it already was,
+        // which woke the bars again; in full screen they never hid.
+        let t = Instant::now();
+        let mut f = MoveFilter::new();
+        assert!(
+            f.moved(Some((100, 100)), t),
+            "the first report is a movement"
+        );
+        assert!(
+            !f.moved(Some((100, 100)), t + MOVE_EVERY * 3),
+            "the same place again is not"
+        );
+        assert!(
+            !f.moved(Some((140, 90)), t + MOVE_EVERY / 2),
+            "a real move, too soon after the last"
+        );
+        assert!(
+            !f.moved(Some((140, 90)), t + MOVE_EVERY * 4),
+            "where that move ended is not new"
+        );
+        assert!(
+            f.moved(Some((150, 90)), t + MOVE_EVERY * 5),
+            "a real move, in time"
+        );
+        // When the position cannot be read, only time decides.
+        assert!(f.moved(None, t + MOVE_EVERY * 7));
+        assert!(!f.moved(None, t + MOVE_EVERY * 7));
     }
 
     #[test]

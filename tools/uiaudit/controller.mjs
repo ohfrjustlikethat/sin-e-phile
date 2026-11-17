@@ -54,21 +54,76 @@ if (!CHROME) {
 const FAKE = `(() => {
   const SUNRISE = { id: 7, title: "Sunrise", year: 1927, kind: "film", why: "exact_title",
     made_by: "F. W. Murnau", runtime_minutes: 94, excerpt: null };
-  const searchResponse = (q) => ({ hits: /sun/i.test(q) ? [SUNRISE] : [], searchable_titles: 900000,
+  // Ranked above the film: the grid still starts with the film (round 9).
+  const DAYBREAK = { id: 8, title: "Daybreak Stories", year: 1990, kind: "series", why: "keyword",
+    made_by: null, runtime_minutes: null, excerpt: null };
+  const searchResponse = (q) => ({ hits: /sun/i.test(q) ? [DAYBREAK, SUNRISE] : [], searchable_titles: 900000,
     catalogue_partial: false, semantic: true, ready: true });
   const answers = {
     search: (a) => searchResponse(a.query),
     search_backfill: () => ({ found: 0, added: [] }),
-    optional_assets: () => ({ missing: [], total_bytes: 0 }),
+    optional_assets: () => ({ assets: [{ name: "Meaning index", purpose: "Lets you search by describing a film.", bytes: 329537568, state: "absent", unusable_reason: null }], outstanding_bytes: 329537568, complete: false }),
+    // Appendix F, I21: marked by hand, and remembered for the rest of the flow.
+    // Phase 16 E3: a film with chapters, for the bumpers.
+    player_chapters: () => [{ time: 0, title: "Opening" }, { time: 600, title: "The city" }, { time: 1500, title: null }],
+    // Appendix F, I39: the watchlist, saved from the film page and read by its own page.
+    title_watchlisted: () => window.__saved === true,
+    set_watchlisted: (a) => { window.__saved = a.on; return null; },
+    watchlist: () => (window.__saved === true
+      ? [{ id: 7, title: "Sunrise", year: 1927, made_by: "F. W. Murnau", runtime_minutes: 94, note: null }] : []),
+    title_watched: () => window.__watched === true,
+    set_watched: (a) => { window.__watched = a.watched; return 1; },
     item_detail: () => ({ id: 7, title: "Sunrise", year: 1927, kind: "film", runtime_minutes: 94,
       synopsis: "A married farmer falls under the spell of a woman from the city.",
       credits: [{ name: "F. W. Murnau", role: "director", character: null }] }),
+    // The paused film's details, long enough to scroll (Phase 16's right stick).
+    pause_details: () => ({ cast: Array.from({ length: 40 }, (_, i) => ({ person_id: i + 1, name: "Player " + (i + 1),
+      part: "Part " + (i + 1) })), crew: [], ratings: [], more_like_this: [] }),
     prepare_play: () => ({ title: "Sunrise", open: "https://films.example/sunrise.mp4", start: null,
       from: "Internet Archive", offered: 2, languages: ["en", "de"], original_language: null,
-      qualities: ["full_hd", "hd"], unmet: null, why: "1080p · served directly", candidates: [] }),
+      qualities: ["full_hd", "hd"], unmet: null, why: "1080p · served directly",
+      // Phase 16: the streams panel lists these; Play, the round Download and each row use them.
+      candidates: [0, 1].map((index) => ({ title: index ? "Sunrise (1927) 720p" : "Sunrise (1927) 1080p",
+        from: "Internet Archive", transport: "http", quality: index ? "720p" : "1080p", codec: "h264", total: 5 - index,
+        sunk: null, unmet: null, local: false, chosen: index === 0, terms: [], index, hdr: false,
+        size_bytes: 4.2 * 1024 ** 3, seeders: null, direct: true, audio: ["en"], subtitles: [], weak: null,
+        downloadable: true })) }),
+    play_candidate: (a) => "https://films.example/sunrise-" + a.index + ".mp4",
     player_pause_still: () => "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
     dev_autoplay: () => null,
-    library_folders: () => [],
+    // Phase 16 E7: a fresh install, then what the first run sets up by pad, remembered for the
+    // rest of the flow (and read by Appendix F I38's "Finish setting up" card).
+    library_folders: () => window.__folders,
+    // The Films and TV Shows pages (Phase 16), passed through on the way to Watchlist.
+    library_titles: () => [],
+    // ADR-0048: posters, off until chosen; the fake has none to show.
+    artwork_settings: () => ({ posters: !!window.__posters, tmdb: !!window.__tmdbSet }),
+    set_show_posters: (a) => { window.__posters = a.on; return null; },
+    poster: () => null,
+    // Phase 16: profile pictures; none chosen in the flow.
+    profile_picture: () => null,
+    pick_picture: () => null,
+    // Phase 16: the catalogue under Films and TV Shows, so neither tab is empty.
+    catalogue_rails: (a) => [{ key: "most", title: a.shows ? "Most watched shows" : "Most watched films",
+      items: [{ id: 7, title: "Sunrise", year: 1927, made_by: "F. W. Murnau", runtime_minutes: 94, note: null }] }],
+    add_library_folder: (a) => {
+      window.__folders.push({ id: window.__folders.length + 1, path: a.path, files: 0, scanned_at: null, scanning: true });
+      return window.__folders.length;
+    },
+    addon_preview: (a) => ({ pasted: a.url, backend_id: "example-films", name: "Example Films", version: "1.0.0",
+      description: "Films from an example source.", finds: "Finds films and episodes.", delivers: ["Streams"],
+      host: "a.example", homepage: null, replaces: false }),
+    addon_install: (a) => { window.__addon = a.pasted; return "example-films"; },
+    sources_overview: () => ({ sources: [{ id: "archive", name: "Internet Archive", blurb: "Public-domain films.",
+      addon_host: null, enabled: true, health: "Answering", last_error: null },
+      ...(window.__addon ? [{ id: "example-films", name: "Example Films", blurb: "Films from an example source.",
+        addon_host: "a.example", enabled: true, health: "Answering", last_error: null }] : [])], refused_addons: [] }),
+    torrent_settings: () => ({ download_limit_kib: null, upload_limit_kib: null, peer_limit: 200, keep_seeding: false,
+      bind_interface: window.__adapter ?? null, adapters: [{ name: "Ethernet", connected: true },
+        { name: "VPN tunnel", connected: true }], engine_running: false }),
+    set_torrent_settings: (a) => { window.__adapter = a.bindInterface; return null; },
+    set_opensubtitles_key: (a) => { window.__osKey = a.key; return null; },
+    set_tmdb_key: (a) => { window.__tmdbKey = a.key; return null; },
     // Phase 12 E5: twenty files waiting, answered by pad alone further down.
     library_review_count: () => window.__review.length,
     library_review: () => window.__review,
@@ -116,7 +171,10 @@ const FAKE = `(() => {
     }),
     correct_taste: (a) => { window.__corrections[a.anchor] = a.correction; return null; },
     home: () => [{ key: "loved", title: "Widely loved", items: [{ id: 7, title: "Sunrise", year: 1927,
-      made_by: "F. W. Murnau", runtime_minutes: 94 }] }],
+      made_by: "F. W. Murnau", runtime_minutes: 94 }] },
+      // Phase 16 E3: a rail long enough to run off the screen, for the right stick.
+      { key: "taste", title: "For you", items: Array.from({ length: 24 }, (_, i) => ({ id: 300 + i,
+        title: "Rail film " + (i + 1), year: 1950 + i, made_by: "A Director", runtime_minutes: 100 })) }],
     // Phase 14: two profiles, so Who's watching? opens on launch; Jon's has a PIN.
     profiles: () => window.__profiles,
     switch_profile: (a) => {
@@ -124,13 +182,28 @@ const FAKE = `(() => {
       window.__profiles.forEach((p) => { p.active = p.id === a.id; });
       return window.__profiles.find((p) => p.id === a.id);
     },
+    // Phase 16: subtitles found and chosen in the player.
+    subtitle_offers: () => [
+      { file_id: "3", language: "en", hash_match: true, downloads: 5, release: "Sunrise.1927.BluRay" },
+      { file_id: "2", language: "en", hash_match: false, downloads: 10, release: "Sunrise.1927.WEB" },
+    ],
+    subtitle_choose: () => "aligned: offset +1200 ms",
+    // Phase 16 E2: the subtitles' delay, which the backend keeps and returns.
+    subtitle_nudge: (a) => (window.__subDelay = (window.__subDelay ?? 0) + a.deltaMs),
+    set_subtitle_settings: () => null,
+    tmdb_status: () => ({ has_key: !!window.__tmdbKey, fetched_on: null }),
+    // Phase 16: the catalogue keeps itself current.
+    catalogue_status: () => ({ refreshed_at: "2026-11-08T06:21:10Z", titles_added: 885, episodes_added: 7951,
+      running: false, ready: true, building: null, percent: 100 }),
+    refresh_catalogue: () => true,
     subtitle_settings: () => ({ settings: { languages: ["en"], always: false, font: "Segoe UI", size: 46,
-      position: 95, background: false }, has_key: false, used_today: 0, budget: 5, server_remaining: null }),
+      position: 95, background: false }, has_key: !!window.__osKey, used_today: 0, budget: 5, server_remaining: null }),
   };
   let nextId = 1;
   window.__calls = [];
   window.__downloads = [];
   window.__onboarded = false;
+  window.__folders = [];
   window.__corrections = {};
   window.__profiles = [
     { id: 1, name: "Jon", is_default: true, avatar_colour: "slate", is_kids: false, has_pin: true, active: true },
@@ -142,14 +215,18 @@ const FAKE = `(() => {
     name: "Monster - " + String(i + 1).padStart(2, "0") + " [DVD].mkv", folders: "Anime", minutes: 24, height: 480,
     read_title: "Monster", read_year: null, read_episode: "Episode " + (i + 1), same_name: 0,
     options: [monster(10, "anime_series", 24), monster(11, "series", 45)] }));
+  window.__on = {};
+  window.__cbs = {};
+  window.__emit = (event, payload) => (window.__on[event] ?? []).forEach((h) => window.__cbs[h]?.({ event, id: h, payload }));
   window.__TAURI_INTERNALS__ = {
     invoke: async (cmd, args) => {
       window.__calls.push([cmd, args ?? {}]);
-      if (cmd === "plugin:event|listen") return nextId++;
+      // An event's handler is kept, so the flow can send what the backend would (__emit).
+      if (cmd === "plugin:event|listen") { (window.__on[args.event] ??= []).push(args.handler); return nextId++; }
       const f = answers[cmd];
       return f ? f(args ?? {}) : null;
     },
-    transformCallback: () => nextId++,
+    transformCallback: (fn) => { const id = nextId++; window.__cbs[id] = fn; return id; },
     unregisterCallback: () => {},
     convertFileSrc: (s) => s,
     metadata: { currentWindow: { label: "main" }, currentWebview: { windowLabel: "main", label: "main" } },
@@ -158,6 +235,7 @@ const FAKE = `(() => {
   const pad = { id: "Xbox Wireless Controller (simulated)", index: 0, connected: true, mapping: "standard",
     timestamp: 0, axes: [0, 0, 0, 0], buttons };
   window.__padSet = (b, down) => { buttons[b] = { pressed: down, touched: down, value: down ? 1 : 0 }; pad.timestamp++; };
+  window.__padAxis = (i, v) => { pad.axes[i] = v; pad.timestamp++; };
   navigator.getGamepads = () => [pad, null, null, null];
 })();`;
 
@@ -297,6 +375,73 @@ await waitFor(() => evalJs(`!!document.querySelector("header, nav") && !!window.
 
 // ── the pad ─────────────────────────────────────────────────────────────────
 const B = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, MENU: 9, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
+/**
+ * Phase 16 (the author: "glitches and weird ui/gui", layout and spacing, cards and text):
+ * what is wrong with the layout on screen now. The page must not scroll sideways; no text
+ * may be cut off inside its box; nothing may run off the right edge, except inside
+ * something that scrolls on purpose (a rail).
+ */
+const layoutProblems = () =>
+  // The same rules as src/lib/layoutCheck.ts (kept in step by hand: this runs in a plain
+  // browser page, the other in the app through the debug probe).
+  evalJs(`(() => {
+  const out = [];
+  if (document.documentElement.scrollWidth > innerWidth + 1) {
+    const culprit = [...document.body.querySelectorAll("*")].find(
+      (el) => el.getBoundingClientRect().right > innerWidth + 1 && (el.parentElement?.getBoundingClientRect().right ?? 0) <= innerWidth + 1,
+    );
+    out.push(
+      \`the window scrolls sideways by \${document.documentElement.scrollWidth - innerWidth}px: \${
+        culprit ? \`\${culprit.tagName.toLowerCase()}.\${String(culprit.className).split(" ").slice(0, 5).join(".")}\` : "unknown"
+      }\`,
+    );
+  }
+  const pages = [...document.querySelectorAll('main, [role="dialog"][aria-modal="true"]')];
+  for (const pg of pages) {
+    if (pg.scrollWidth <= pg.clientWidth + 1) continue;
+    // Name the outermost element that crosses the edge: the one to fix.
+    const edge = pg.getBoundingClientRect().right + 1;
+    const culprit = [...pg.querySelectorAll("*")].find(
+      (el) => el.getBoundingClientRect().right > edge && (el.parentElement?.getBoundingClientRect().right ?? 0) <= edge,
+    );
+    const name = culprit
+      ? \`\${culprit.tagName.toLowerCase()}.\${String(culprit.className).split(" ").slice(0, 6).join(".")} (\${Math.round(culprit.getBoundingClientRect().width)}px) "\${(culprit.textContent ?? "").trim().slice(0, 30)}"\`
+      : "unknown";
+    out.push(\`the page scrolls sideways: \${name}\`);
+  }
+  const inScroller = (el) => {
+    for (let a = el.parentElement; a && !pages.includes(a); a = a.parentElement) {
+      const o = getComputedStyle(a).overflowX;
+      if (o === "auto" || o === "scroll" || o === "hidden") return true;
+    }
+    return false;
+  };
+  for (const el of document.querySelectorAll("h1, h2, h3, p, button, a, label, li span")) {
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
+    const cs = getComputedStyle(el);
+    const text = (el.textContent ?? "").trim().slice(0, 40);
+    if (cs.overflow === "hidden" && cs.textOverflow !== "ellipsis" && el.scrollWidth > el.clientWidth + 2) {
+      out.push(\`cut off: \${text}\`);
+    }
+    if (r.right > innerWidth + 1 && cs.position !== "fixed" && !inScroller(el)) out.push(\`off the edge: \${text}\`);
+  }
+  return [...new Set(out)].slice(0, 12);
+})()`);
+const SIZES = [[1280, 720], [1600, 900], [1920, 1080]];
+/** Check the layout at each size, then put the window back. */
+const layoutAtSizes = async (where) => {
+  const found = [];
+  for (const [width, height] of SIZES) {
+    await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
+    await sleep(250);
+    for (const p of await layoutProblems()) found.push(`${width}x${height} ${p}`);
+  }
+  await send("Emulation.clearDeviceMetricsOverride");
+  await sleep(200);
+  check(found.length === 0, `${where}: no layout problems at 1280, 1600 and 1920 wide${found.length ? " — " + found.join("; ") : ""}`);
+};
+
 /** Down for a few frames, then up: one press, as a thumb makes it. */
 const press = async (b) => {
   await evalJs(`__padSet(${b}, true)`);
@@ -360,21 +505,99 @@ const steerTo = async (label) => {
   throw new Error(`the D-pad could not reach ${label}`);
 };
 
+/**
+ * One press toward a goal, as a thumb would: up or down while it lies above or below, else
+ * across. And across when the last vertical press found nothing that way, or came back to
+ * somewhere already passed: Down from the right of a row takes the nearest thing below
+ * there (the footer), Up comes back, and a goal at the far left is never reached that way.
+ */
+const towards = async (dx, dy, state) => {
+  const vertical = Math.abs(dy) > 8 && !(state.stuck && Math.abs(dx) > 8);
+  await evalJs(`void (window.__before = document.activeElement)`);
+  const b = vertical ? (dy > 0 ? B.DOWN : B.UP) : (dx > 0 ? B.RIGHT : B.LEFT);
+  await press(b);
+  state.stuck = vertical && (await evalJs(`(() => { const a = document.activeElement;
+    const again = a === window.__before || window.__passed.has(a); window.__passed.add(a); return again; })()`));
+  // STEER=1 traces every press, for when a step cannot reach its goal.
+  if (process.env.STEER) console.log(`    steer ${Object.keys(B).find((k) => B[k] === b)} (dx ${Math.round(dx)}, dy ${Math.round(dy)})`
+    + ` -> ${JSON.stringify(await active())}${state.stuck ? " (stuck)" : ""}`);
+};
+
 /** Steer the D-pad to the button labelled `label` (its aria-label or text). */
 const steerToButton = async (label) => {
+  const state = { stuck: false };
+  await evalJs(`void (window.__passed = new Set([document.activeElement]))`);
   for (let i = 0; i < 24; i++) {
     const a = await active();
     if (a?.text === label) return;
     const goal = await evalJs(`(() => { const b = [...document.querySelectorAll('button')].find((x) =>
       (x.getAttribute("aria-label") || x.textContent || "").trim() === ${JSON.stringify(label)}); if (!b) return null;
       const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
-    if (!goal || !a) throw new Error(`no button ${label}`);
-    const dx = goal.x - a.x;
-    const dy = goal.y - a.y;
-    if (Math.abs(dy) > 8) await press(dy > 0 ? B.DOWN : B.UP);
-    else await press(dx > 0 ? B.RIGHT : B.LEFT);
+    if (!goal || !a) throw new Error(`no button ${label}${a ? "" : " (nothing has focus)"}`);
+    await towards(goal.x - a.x, goal.y - a.y, state);
   }
-  throw new Error(`the D-pad could not reach ${label}`);
+  const where = await evalJs(`(() => { const a = document.activeElement; const r = a.getBoundingClientRect();
+    const l = a.id && document.querySelector('label[for="' + a.id + '"]');
+    const b = [...document.querySelectorAll('button')].find((x) => (x.getAttribute("aria-label") || x.textContent || "").trim()
+      === ${JSON.stringify(label)}); const g = b?.getBoundingClientRect();
+    return a.tagName + ' "' + ((l && l.textContent.trim()) || a.textContent.trim()) + '" at ' + Math.round(r.x) + "," + Math.round(r.y)
+      + " " + Math.round(r.width) + "x" + Math.round(r.height) + "; the goal at " + (g ? Math.round(g.x) + "," + Math.round(g.y) : "none")
+      + " in a window " + innerWidth + "x" + innerHeight; })()`);
+  throw new Error(`the D-pad could not reach ${label}; focus stayed on ${where}`);
+};
+
+/** A page expression for the form control whose <label> reads `label`. */
+const fieldByLabel = (label) => `(() => { const l = [...document.querySelectorAll("label")]
+  .find((x) => x.textContent.trim() === ${JSON.stringify(label)}); return l ? document.getElementById(l.htmlFor) : null; })`;
+
+/** Steer the D-pad to whatever the page expression `find` returns. */
+const steerToEl = async (find, what) => {
+  const state = { stuck: false };
+  await evalJs(`void (window.__passed = new Set([document.activeElement]))`);
+  for (let i = 0; i < 40; i++) {
+    const at = await evalJs(`(() => { const el = ${find}(); if (!el) return null; const a = document.activeElement;
+      const r = el.getBoundingClientRect(); const f = a && a !== document.body ? a.getBoundingClientRect() : null;
+      return { here: a === el, gx: r.x + r.width / 2, gy: r.y + r.height / 2,
+        ax: f ? f.x + f.width / 2 : 0, ay: f ? f.y + f.height / 2 : 0 }; })()`);
+    if (!at) throw new Error(`no ${what}`);
+    if (at.here) return;
+    await towards(at.gx - at.ax, at.gy - at.ay, state);
+  }
+  const where = await evalJs(`(() => { const a = document.activeElement; const r = a.getBoundingClientRect();
+    const g = ${find}()?.getBoundingClientRect(); return a.tagName + ' "' + (a.getAttribute("aria-label") || a.textContent).trim()
+      .slice(0, 40) + '" at ' + Math.round(r.x) + "," + Math.round(r.y) + "; the goal at " + (g ? Math.round(g.x) + ","
+      + Math.round(g.y) + " " + Math.round(g.width) + "x" + Math.round(g.height) : "none") + " in " + innerWidth + "x" + innerHeight; })()`);
+  throw new Error(`the D-pad could not reach ${what}; focus stayed on ${where}`);
+};
+
+/** The on-screen keyboard's pages (src/app/keyboardText.ts), and the one showing now. */
+const KEY_PAGES = ["abcdefghijklmnopqrstuvwxyz1234567890", "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+  ".,-_@:/'!?&+#()*=%$\"~;[]{}<>|\\^`"];
+const keyPage = async () => {
+  // The page key is labelled with the page it leads to.
+  const next = await evalJs(`document.querySelector('[aria-label^="Keys: "]')?.getAttribute("aria-label").slice(6)`);
+  return (["abc", "ABC", "#+="].indexOf(next) + 2) % 3;
+};
+
+/** Type `text` on the open on-screen keyboard as a thumb would: RB for the page, the D-pad, A. */
+const typeOnPad = async (text) => {
+  for (const ch of text) {
+    const want = KEY_PAGES.findIndex((p) => p.includes(ch));
+    for (let i = 0; i < 3 && (await keyPage()) !== want; i++) await press(B.RB);
+    await steerTo(ch);
+    await press(B.A);
+  }
+};
+
+/** Phase 16 E7: a field filled by pad: the D-pad to it, A for the keyboard, the keys, Menu. */
+const fillByPad = async (label, text) => {
+  await steerToEl(fieldByLabel(label), `the "${label}" field`);
+  await press(B.A);
+  await waitFor(() => evalJs(`!!document.querySelector('[aria-label="On-screen keyboard"]')`), "the keyboard", 20);
+  await typeOnPad(text);
+  await press(B.MENU);
+  await waitFor(() => evalJs(`!document.querySelector('[aria-label="On-screen keyboard"]')`), "the keyboard to close", 20);
+  return evalJs(`${fieldByLabel(label)}()?.value`);
 };
 
 // ── the flow ────────────────────────────────────────────────────────────────
@@ -394,7 +617,90 @@ try {
   await shoot("00b-title-cards");
   await steerToButton("Continue");
   await press(B.A);
-  await waitFor(() => evalJs(`document.body.textContent.includes("Where to watch")`), "step 3", 25);
+  // Phase 16 E7: each step filled in by pad alone, and each says it took: a folder typed in,
+  // an add-on chosen by its address (checked, then added), both keys checked as they are
+  // saved, and downloads bound to the VPN's adapter from its list.
+  const PATH = "d:\\films";
+  const ADDRESS = "https://a.example/m.json";
+  const ADAPTER = fieldByLabel("Use only this network adapter");
+  const FILLED_BY_PAD = {
+    "Your films on this PC": async () => {
+      const typed = await fillByPad("Or type its path", PATH);
+      await steerToButton("Add");
+      await press(B.A);
+      await waitFor(async () => (await calls("add_library_folder")).length === 1, "the folder to be added", 25);
+      await waitFor(() => evalJs(`[...document.querySelectorAll("p")].some((p) => p.title === ${JSON.stringify(PATH)})`),
+        "the folder in the list", 25);
+      check(typed === PATH && (await calls("add_library_folder"))[0].path === PATH,
+        `first run, by pad: a library folder typed and added (${typed})`);
+    },
+    "Where films come from": async () => {
+      const typed = await fillByPad("Source address", ADDRESS);
+      await steerToButton("Look at it");
+      await press(B.A);
+      await waitFor(() => evalJs(`!!document.querySelector('[aria-label="About Example Films"]')`), "what the add-on declares", 25);
+      await steerToButton("Add source");
+      await press(B.A);
+      await waitFor(() => evalJs(`document.body.textContent.includes("Example Films was added and is on.")`), "the add-on added", 25);
+      check(typed === ADDRESS && (await calls("addon_install"))[0]?.pasted === ADDRESS,
+        `first run, by pad: an add-on chosen by its address, looked at, then added (${typed})`);
+    },
+    Subtitles: async () => {
+      await fillByPad("API key", "k3y");
+      await steerToButton("Save key");
+      await press(B.A);
+      await waitFor(() => evalJs(`document.body.textContent.includes("Your key is saved.")`), "the OpenSubtitles key saved", 25);
+      check((await calls("set_opensubtitles_key"))[0]?.key === "k3y", "first run, by pad: an OpenSubtitles key typed, checked and saved");
+    },
+    "Posters and what's on": async () => {
+      // ADR-0048: posters are off until chosen; the switch is reached and turned on by pad.
+      await steerToEl(`(() => document.querySelector('section[aria-label="Posters"] [role="switch"]'))`, "the posters switch");
+      await press(B.A);
+      await waitFor(async () => (await calls("set_show_posters")).length === 1, "posters switched on", 25);
+      check((await calls("set_show_posters"))[0].on === true, "first run, by pad: posters switched on, and the switch says what it sends");
+      await fillByPad("TMDB API key", "t9");
+      await steerToButton("Save key");
+      await press(B.A);
+      await waitFor(() => evalJs(`document.querySelector('section[aria-label="TMDB"]')?.textContent.includes("Your key is saved.")`),
+        "the TMDB key saved", 25);
+      check((await calls("set_tmdb_key"))[0]?.key === "t9", "first run, by pad: a TMDB key typed, checked and saved");
+    },
+    Downloads: async () => {
+      await steerToEl(ADAPTER, "the network adapter");
+      await press(B.A);
+      const list = `document.querySelector('[role="dialog"][aria-label="Use only this network adapter"]')`;
+      await waitFor(() => evalJs(`!!${list}`), "the adapter list", 20);
+      check((await active())?.text.startsWith("Any connection"), "A on a list (the network adapter) opens it by pad, focus on the current choice");
+      await steerToButton("VPN tunnel");
+      await press(B.A);
+      check((await evalJs(`${ADAPTER}().value`)) === "VPN tunnel" && !(await evalJs(`!!${list}`)) &&
+        (await evalJs(`document.activeElement === ${ADAPTER}()`)), "A chooses the VPN's adapter; the list closes, focus back on it");
+      await steerToEl(`(() => [...document.querySelectorAll('section[aria-label="Network"] button')]
+        .find((b) => b.textContent.trim() === "Save"))`, "Network's Save");
+      await press(B.A);
+      await waitFor(async () => (await calls("set_torrent_settings")).length === 1, "the network settings saved", 25);
+      check((await calls("set_torrent_settings"))[0].bindInterface === "VPN tunnel" &&
+        (await evalJs(`document.querySelector('section[aria-label="Network"]').textContent.includes("Saved.")`)),
+        "first run, by pad: downloads bound to the VPN's adapter, and saved");
+    },
+  };
+  // Phase 16: four steps that leave the viewer ready to watch, each moved through by pad.
+  for (const [title, check_] of [
+    ["Your films on this PC", "Add a folder"],
+    ["Where films come from", "comes with no sources of its own"],
+    ["Subtitles", "Get a free key"],
+    ["Posters and what's on", "sees which titles you look at"],
+    ["Downloads", "choose its network adapter"],
+  ]) {
+    await waitFor(() => evalJs(`[...document.querySelectorAll("h1")].some((h) => h.textContent === ${JSON.stringify(title)})`), title, 25);
+    check(await evalJs(`document.body.textContent.includes(${JSON.stringify(check_)})`), `first run: "${title}" says what it is for`);
+    await layoutAtSizes(`first run, "${title}"`);
+    await (FILLED_BY_PAD[title] ?? (async () => {}))();
+    if (title !== "Downloads") {
+      await steerToButton("Continue");
+      await press(B.A);
+    }
+  }
   await steerToButton("Start watching");
   await press(B.A);
   await waitFor(async () => (await calls("finish_onboarding")).length === 1, "the wizard to finish", 25);
@@ -423,6 +729,33 @@ try {
   check(switched.length === 2 && switched[1].pin === "2468", "the right PIN, typed with the D-pad and A, opens the profile");
   check(await evalJs(`!!document.querySelector('[aria-label="Jon: switch profile"]')`), "the masthead shows who is watching");
   await shoot("01-home");
+  await layoutAtSizes("Home");
+  // Appendix F, I38, after E7: the first run set everything up by pad, so Home has nothing
+  // left to ask for. (A fresh install's card, "0 of 4 done", is src/features/home tests'.)
+  check(!(await evalJs(`!!document.querySelector('section[aria-label="Finish setting up"]')`)) &&
+    (await calls("library_folders")).length > 0 && (await calls("torrent_settings")).length > 0,
+    "after a first run that set everything up by pad, Home has nothing left to set up");
+  // Phase 16 E3: the right stick scrolls a long rail sideways, and focus follows into view.
+  const inRail = () => evalJs(`!!document.activeElement?.closest('section[aria-label="For you"]')`);
+  for (let i = 0; i < 14 && !(await inRail()); i++) await press(B.DOWN);
+  check(await inRail(), "the D-pad reaches the long rail");
+  const railLeft = () => evalJs(`document.querySelector('section[aria-label="For you"] [data-rail-viewport]').scrollLeft`);
+  const leftBefore = await railLeft();
+  await evalJs(`__padAxis(2, 0.9)`);
+  await sleep(500);
+  await evalJs(`__padAxis(2, 0)`);
+  await sleep(200);
+  const leftAfter = await railLeft();
+  check(leftAfter > leftBefore + 300, `the right stick scrolls the rail sideways (${leftBefore} -> ${Math.round(leftAfter)})`);
+  check(await evalJs(`(() => { const r = document.activeElement.getBoundingClientRect();
+      return !!document.activeElement.closest('section[aria-label="For you"]') && r.right > 0 && r.left < innerWidth; })()`),
+    `focus follows along the rail, onto a card in view (${(await active())?.text})`);
+  // The control: the check must see a page that runs off the edge, or it measures nothing.
+  await evalJs(`(() => { const d = document.createElement("p"); d.id = "too-wide"; d.textContent = "too wide";
+    d.style.width = "3000px"; document.querySelector("main").appendChild(d); })()`);
+  const seen = await layoutProblems();
+  await evalJs(`document.getElementById("too-wide").remove()`);
+  check(seen.length > 0, `the layout check sees a 3000 px paragraph (${seen.join("; ")})`);
 
   await press(B.Y);
   const kb = await waitFor(() => evalJs(`!!document.querySelector('[aria-label="On-screen keyboard"]')`), "the keyboard", 20);
@@ -476,7 +809,12 @@ try {
   await steerTo("Done");
   await press(B.A);
   await waitFor(async () => (await active())?.text.includes("Sunrise"), "focus on the result", 25);
-  check(true, "Done closes the keyboard and focus lands on the result");
+  check(true, "Done closes the keyboard and focus lands on the first result, the film, though a series ranked higher");
+  // Round 9: one grid, films first; the D-pad moves across it, and a series carries its mark.
+  await press(B.RIGHT);
+  check((await active())?.text === "Daybreak Stories, 1990, Series", `Right reaches the series beside it, marked (${(await active())?.text})`);
+  await press(B.LEFT);
+  check((await active())?.text.includes("Sunrise"), `Left comes back to the film (${(await active())?.text})`);
   await shoot("03-result");
 
   await press(B.A);
@@ -502,12 +840,36 @@ try {
   check(stops.count >= 10 && stops.misses.length === 0, `the ring surrounds every focus stop on the film page (${stops.count} stops; missed: ${stops.misses.join(", ") || "none"})`);
   await sleep(300);
 
-  // Phase 9: the language choice is reachable with the pad, and choosing re-plans.
-  // Below Play: the advisor's Download (Phase 13), then the Audio row.
-  await waitFor(() => evalJs(`document.body.textContent.includes("so download it first")`), "the advisor's sentence", 25);
+  // Phase 16 (the author): under the wide Play, big round buttons with a word under each.
   await press(B.DOWN);
-  check((await active())?.text.startsWith("Download"), `D-pad down from Play reaches Download (${(await active())?.text})`);
-  await press(B.DOWN);
+  check((await active())?.text === "Download", `D-pad down from Play reaches the round Download (${(await active())?.text})`);
+  // Appendix F, I39: the film is saved to the watchlist; the circle fills and the word says so.
+  await press(B.RIGHT);
+  check((await active())?.text === "Watchlist", `Right reaches Watchlist (${(await active())?.text})`);
+  await press(B.A);
+  await waitFor(async () => (await active())?.text === "On watchlist", "the film to be saved", 25);
+  check((await calls("set_watchlisted")).at(-1).on === true &&
+    (await evalJs(`document.activeElement.getAttribute("aria-pressed")`)) === "true",
+    "A saves the film to the watchlist, and the button says it is on");
+  // Appendix F, I21: the film is marked watched by hand, and back.
+  await press(B.RIGHT);
+  check((await active())?.text === "Mark watched", `Right reaches "Mark watched" (${(await active())?.text})`);
+  await press(B.A);
+  await waitFor(async () => (await active())?.text === "Watched", "the mark to show", 25);
+  const marked = (await calls("set_watched")).at(-1);
+  check(marked.watched === true && marked.scope.kind === "title" && marked.scope.id === 7, "A marks the film watched, and the button says so");
+  await press(B.A);
+  await waitFor(async () => (await active())?.text === "Mark watched", "the mark to clear", 25);
+  check((await calls("set_watched")).at(-1).watched === false, "A again marks it as not watched");
+  // Streams: every stream, from the right; Phase 9's language choice is at its top.
+  await press(B.RIGHT);
+  check(((await active())?.text ?? "").startsWith("Streams"), `Right reaches Streams (${(await active())?.text})`);
+  await press(B.A);
+  await waitFor(() => evalJs(`!!document.querySelector('[role="dialog"][aria-label="Streams"]')`), "the streams panel", 25);
+  check(await evalJs(`document.querySelector('[role="dialog"][aria-label="Streams"]').contains(document.activeElement)`),
+    "A opens the streams panel, with the D-pad inside it");
+  await shoot("04a-streams");
+  for (let i = 0; i < 3 && (await active())?.text !== "Auto"; i++) await press(B.DOWN);
   await waitFor(async () => (await active())?.text === "Auto", "the Audio row", 25);
   await press(B.RIGHT);
   await press(B.RIGHT);
@@ -515,8 +877,15 @@ try {
   await press(B.A);
   const replanned = await waitFor(async () => (await calls("prepare_play"))[1], "a new plan", 25);
   check(replanned.language === "de" && replanned.quality === null, "A on a language plans again with it");
+  check(await evalJs(`!!document.querySelector('[role="dialog"][aria-label="Streams"]')`),
+    "the panel stays open while it plans again");
   await shoot("04b-language");
-  // Up past Download, to Play.
+  await press(B.B);
+  await waitFor(() => evalJs(`!document.querySelector('[role="dialog"][aria-label="Streams"]')`), "the panel to close", 25);
+  check(((await active())?.text ?? "").startsWith("Streams") &&
+    (await evalJs(`(document.querySelector("main article h1")?.textContent ?? "").includes("Sunrise")`)),
+    "B closes the panel, back on Streams, and the film's page stays");
+  // Up to Play.
   for (let i = 0; i < 3 && (await active())?.text !== "Play"; i++) await press(B.UP);
   await waitFor(async () => (await active())?.text === "Play", "Play again", 25);
 
@@ -525,10 +894,164 @@ try {
   check(opened.target === "https://films.example/sunrise.mp4", "A on Play starts the player");
   await shoot("05-playing");
 
+  // Phase 16 (ADR-0045's TV-standard mapping): the author found the pad changed nothing
+  // during playback. Up raises the volume and says so; Y opens the subtitles with focus in
+  // the menu; Down then moves within it rather than lowering the volume; A picks.
+  const actions = async (kind) => (await calls("player_action")).filter((a) => a.action?.kind === kind);
+  await press(B.UP);
+  const louder = await waitFor(async () => (await actions("volume"))[0], "a volume change", 25);
+  check(louder.action.percent > 100, `Up raises the volume (${louder.action.percent})`);
+  check(
+    await evalJs(`[...document.querySelectorAll('[role="status"]')].some((e) => e.textContent.includes("Volume 105%"))`),
+    "and the change is said on screen (Volume 105%)",
+  );
+  check(
+    await evalJs(`document.querySelector('[aria-label="Controller buttons"]')?.textContent.includes("Subtitles")`),
+    "the player's bar shows the pad's buttons",
+  );
+  const holes = async () => ((await calls("player_layout")).at(-1)?.cutouts ?? []).length;
+  const holesBefore = await holes();
+  await press(B.Y);
+  await waitFor(() => evalJs(`!!document.querySelector('[role="menu"][aria-label="Subtitles"]')`), "the subtitles menu", 25);
+  check((await active())?.text === "Off", "Y opens the subtitles, focus on its first choice");
+  await waitFor(async () => (await holes()) === holesBefore + 1, "a hole for the menu", 25);
+  check(true, `the menu is cut out of the video: ${holesBefore} -> ${holesBefore + 1} holes`);
+  const volumes = (await actions("volume")).length;
+  await press(B.DOWN);
+  check((await actions("volume")).length === volumes, "Down inside the menu does not change the volume");
+  await press(B.UP);
+  await press(B.A);
+  const picked = await waitFor(async () => (await actions("subtitles"))[0], "a subtitles choice", 25);
+  check(picked.action.id === null, "A picks the focused choice (Off)");
+  check(await evalJs(`!document.querySelector('[role="menu"]')`), "and the menu closes");
+
+  // Phase 16 E3: X and the bumpers. The backend's report arrives as its event does: a film
+  // 30 s in, with two sound tracks and chapters.
+  await evalJs(`__emit("player-state", { position: 30, duration: 5640, paused: false, buffered_until: null, volume: 105,
+    muted: false, speed: 1, hwdec: null, ended: false, started: true, chapter: 0, dropped_frames: 0,
+    tracks: [{ id: 1, kind: "audio", lang: "en", title: "English", selected: true },
+             { id: 2, kind: "audio", lang: "de", title: "German", selected: false },
+             { id: 3, kind: "sub", lang: "en", title: "English", selected: false }] })`);
+  await press(B.X);
+  await waitFor(() => evalJs(`!!document.querySelector('[role="menu"][aria-label="Audio"]')`), "the sound menu", 25);
+  check((await active())?.text.startsWith("English"), `X opens the sound menu, focus on its first track (${(await active())?.text})`);
+  await press(B.DOWN);
+  await press(B.A);
+  const sound = await waitFor(async () => (await actions("audio"))[0], "a sound track chosen", 25);
+  check(sound.action.id === 2, "Down and A choose the second sound track (German)");
+  check(await evalJs(`!document.querySelector('[role="menu"]')`), "and the sound menu closes");
+  await press(B.RB);
+  const forward = await waitFor(async () => (await actions("seek_to")).at(-1), "a chapter jump", 25);
+  check(forward.action.seconds === 600, "RB in a film goes to the next chapter (10:00)");
+  check(
+    await evalJs(`[...document.querySelectorAll('[role="status"]')].some((e) => e.textContent.includes("Chapter: The city"))`),
+    "and says which chapter",
+  );
+  await press(B.LB);
+  await waitFor(async () => (await actions("seek_to")).length === 2, "a second chapter jump", 25);
+  check((await actions("seek_to")).at(-1).action.seconds === 0, "LB restarts the chapter it is in (0:00)");
+  // Left and right seek ten seconds; held, they repeat, which is the scrub.
+  const seeksBefore = (await actions("seek_by")).length;
+  await press(B.RIGHT);
+  const tap = (await actions("seek_by")).slice(seeksBefore);
+  check(tap.length === 1 && tap[0].action.seconds === 10, `Right seeks forward 10 s, once for one press (${tap.length})`);
+  await evalJs(`__padSet(${B.LEFT}, true)`);
+  await sleep(900);
+  await evalJs(`__padSet(${B.LEFT}, false)`);
+  await sleep(160);
+  const held = (await actions("seek_by")).slice(seeksBefore + 1);
+  check(held.length >= 3 && held.every((a) => a.action.seconds === -10),
+    `Left held for 0.9 s scrubs back: ${held.length} steps of 10 s`);
+
+  // Phase 16 E1: every control in the full panel is reachable by pad. Walk it row by row —
+  // right along a row until focus stops moving, then down — marking what focus lands on,
+  // and compare with every enabled control the panel holds.
+  await press(B.MENU);
+  await waitFor(() => evalJs(`!!document.querySelector('[aria-label="Player menu"]')`), "the player's panel", 25);
+  const PANEL_CONTROLS = `[...document.querySelectorAll('[aria-label="Player menu"] :is(button, input, select, [tabindex="0"]):not(:disabled)')]`;
+  const mark = () => evalJs(`(() => { const a = document.activeElement; if (!a) return null; a.dataset.padSeen ??= String((window.__padSeen = (window.__padSeen ?? 0) + 1)); return a.dataset.padSeen; })()`);
+  await mark();
+  // Right only while the row has a control further right: on a full-width row, Right goes
+  // to the nearest thing up and to the right, which is correct navigation but not a walk.
+  const moreOnRow = (sign) => evalJs(`(() => { const a = document.activeElement.getBoundingClientRect();
+    return ${PANEL_CONTROLS}.some((e) => { const r = e.getBoundingClientRect();
+      return r.top < a.bottom - 1 && r.bottom > a.top + 1 && ${sign} * (r.left + r.width / 2 - (a.left + a.width / 2)) > 1; }); })()`);
+  for (let row = 0; row < 40; row++) {
+    for (let i = 0; i < 8 && (await moreOnRow(-1)); i++) {
+      await press(B.LEFT);
+      await mark();
+    }
+    for (let i = 0; i < 8 && (await moreOnRow(1)); i++) {
+      await press(B.RIGHT);
+      await mark();
+    }
+    const before = await mark();
+    await press(B.DOWN);
+    if ((await mark()) === before) break;
+  }
+  const unreached = await evalJs(`${PANEL_CONTROLS}.filter((e) => !e.dataset.padSeen).map((e) => e.getAttribute("aria-label") ?? e.textContent.trim())`);
+  // Phase 16 E3: the right stick scrolls the panel too. The walk left it at the bottom.
+  const panelTop = () => evalJs(`document.querySelector('[aria-label="Player menu"]').scrollTop`);
+  const topBefore = await panelTop();
+  await evalJs(`__padAxis(3, -0.9)`);
+  await sleep(400);
+  await evalJs(`__padAxis(3, 0)`);
+  await sleep(200);
+  const topAfter = await panelTop();
+  check(topBefore > 100 && topAfter < topBefore - 100,
+    `the right stick scrolls the player panel (${Math.round(topBefore)} -> ${Math.round(topAfter)})`);
+  const total = await evalJs(`${PANEL_CONTROLS}.length`);
+  check(total > 10 && unreached.length === 0, `the D-pad reaches every control in the player panel (${total - unreached.length}/${total}; missed: ${unreached.join(", ") || "none"})`);
+  await press(B.B);
+  await waitFor(() => evalJs(`!document.querySelector('[aria-label="Player menu"]')`), "the panel to close", 25);
+
+  // Phase 16: subtitles found and chosen from the full panel, by pad alone.
+  await press(B.MENU);
+  await waitFor(() => evalJs(`!!document.querySelector('[aria-label="Player menu"]')`), "the player's panel", 25);
+  let onFind = false;
+  for (let i = 0; i < 20 && !onFind; i++) {
+    await press(B.DOWN);
+    onFind = ((await active())?.text ?? "").startsWith("Find subtitles");
+  }
+  check(onFind, "the D-pad reaches 'Find subtitles' in the panel");
+  await press(B.A);
+  await waitFor(() => evalJs(`document.body.textContent.includes("Sunrise.1927.WEB")`), "the subtitles found", 25);
+  let onOffer = false;
+  for (let i = 0; i < 4 && !onOffer; i++) {
+    await press(B.DOWN);
+    onOffer = ((await active())?.text ?? "").includes("Sunrise.1927.BluRay");
+  }
+  check(onOffer, "the D-pad reaches the first subtitle found");
+  await press(B.A);
+  const chose = await waitFor(async () => (await calls("subtitle_choose"))[0], "a subtitle chosen", 25);
+  check(chose.offer?.file_id === "3", "A downloads and shows the chosen subtitle");
+  check(await evalJs(`document.body.textContent.includes("Showing the chosen subtitles")`), "and says so");
+  // Phase 16 E2: sync in 0.1 s steps, and the style, each by pad in the panel.
+  await steerToButton("Subtitles later");
+  await press(B.A);
+  await waitFor(async () => (await calls("subtitle_nudge")).length === 1, "the subtitles moved", 25);
+  check((await calls("subtitle_nudge"))[0].deltaMs === 100 &&
+    (await waitFor(() => evalJs(`document.body.textContent.includes("Subtitles +0.1 s")`), "the nudge said", 25), true),
+    "A on 'Subtitles later' moves them 0.1 s, and says so (Subtitles +0.1 s)");
+  await steerToButton("Larger subtitles");
+  await press(B.A);
+  await waitFor(async () => (await calls("set_subtitle_settings")).length > 0, "the style saved", 25);
+  const styled = (await calls("set_subtitle_settings")).at(-1);
+  check(styled.settings.size === 50, `A on 'Larger subtitles' sets the style for this profile (size 46 -> ${styled.settings.size})`);
+  await press(B.B);
+  await waitFor(() => evalJs(`!document.querySelector('[aria-label="Player menu"]')`), "the panel to close", 25);
+
   await press(B.A);
   await waitFor(() => evalJs(`document.body.textContent.includes("Paused")`), "the pause overlay", 25);
   check((await calls("player_pause_still")).length === 1, "A pauses, into a still frame");
   await shoot("06-paused");
+  // Phase 16: the right stick reads the paused film's details, focus staying on Resume.
+  const about = () => evalJs(`document.querySelector('[aria-label="About this film"]')?.scrollTop ?? -1`);
+  await waitFor(async () => (await about()) >= 0, "the film's details", 25);
+  await evalJs(`__padAxis(3, 0.9)`);
+  await sleep(400);
+  await evalJs(`__padAxis(3, 0)`);
+  check((await about()) > 100, `the right stick scrolls the paused film's details (${await about()})`);
 
   await press(B.RT);
   const seeks = await calls("player_action");
@@ -545,23 +1068,24 @@ try {
   // Phase 13: download from the film page, then pause it on the Downloads page, by pad.
   await waitFor(async () => (await active())?.text === "Play", "Play after the player", 25);
   await press(B.DOWN);
-  await waitFor(async () => (await active())?.text.startsWith("Download"), "Download", 25);
+  await waitFor(async () => (await active())?.text === "Download", "Download", 25);
   await press(B.A);
   const asked = await waitFor(async () => (await calls("download_title"))[0], "the download", 25);
-  check(asked.id === 7 && asked.tonight === false && /download it first/.test(asked.reason ?? ""),
-    "A on Download queues the film, with the advisor's sentence as its reason");
-  await waitFor(async () => (await active())?.text === "See downloads", "focus to follow to See downloads", 25);
-  check(true, "focus follows to 'See downloads' instead of falling to the page");
+  check(asked.id === 7 && asked.tonight === false && asked.candidate === null,
+    "A on the round Download queues the film's best stream");
+  await waitFor(async () => ((await active())?.text ?? "").startsWith("Downloading"), "the button to say so", 25);
+  check(true, `the round button stays focused and says how far it has got (${(await active())?.text})`);
   check(await evalJs(`!!document.querySelector('[aria-label="Downloads, 1 in progress"]')`),
     "the masthead counts the download");
   await press(B.A);
   await waitFor(() => evalJs(`document.body.textContent.includes("from 9 people")`), "the Downloads page", 25);
-  check(true, "A on See downloads opens the Downloads page, live: rate and people");
+  check(true, "A on it opens the Downloads page, live: rate and people");
   await shoot("07a-downloads");
   let onPause = false;
   for (let i = 0; i < 12 && !onPause; i++) {
     await press(B.DOWN);
     onPause = (await active())?.text === "Pause";
+    if (process.env.STEER) console.log(`    down -> ${JSON.stringify(await active())}`);
   }
   check(onPause, "the D-pad reaches Pause");
   await press(B.A);
@@ -571,13 +1095,57 @@ try {
   await waitFor(() => evalJs(`!document.body.textContent.includes("Downloading at once")`), "the page to close", 25);
   check(true, "B leaves the Downloads page");
 
+  // Appendix F, I39: the Watchlist tab is a page now, and holds what was saved.
+  const onWatchlist = () => evalJs(`!!document.querySelector('section[aria-label="Watchlist"]')`);
+  for (let i = 0; i < 5 && !(await onWatchlist()); i++) await press(B.RB);
+  check(await onWatchlist(), "RB reaches the Watchlist tab, and it is a page, not a placeholder");
+  check(await evalJs(`document.querySelector('section[aria-label="Watchlist"]').textContent.includes("Sunrise")`),
+    "the film saved from its page is on it");
+  // The first press lands in the masthead (nothing had focus after the tab changed).
+  for (let i = 0; i < 3 && !((await active())?.text ?? "").includes("Sunrise"); i++) await press(B.DOWN);
+  check(((await active())?.text ?? "").includes("Sunrise"), `the D-pad reaches the saved film (${(await active())?.text})`);
+  await shoot("07e-watchlist");
+  await layoutAtSizes("Watchlist");
+
+  // Phase 16 (the author): each tab keeps its page, and the way back says where it goes.
+  const titleShown = () => evalJs(`(document.querySelector('main article h1')?.textContent ?? "").includes("Sunrise")`);
+  await press(B.A);
+  await waitFor(titleShown, "the saved film's page", 25);
+  check(await evalJs(`!!document.querySelector('button[aria-label="Back to Watchlist"]')`),
+    "its page has a back arrow that says Watchlist");
+  await press(B.RB);
+  await waitFor(async () => !(await titleShown()), "the next tab", 25);
+  await press(B.LB);
+  await waitFor(titleShown, "the film's page again", 25);
+  check(true, "RB then LB comes back to the film's page: the Watchlist tab kept it");
+  await press(B.B);
+  await waitFor(onWatchlist, "the Watchlist again", 25);
+  check(!(await titleShown()), "B goes back from the film's page to the Watchlist");
+  // Phase 16 (the author: after closing anything, focus was not where it was): back on the card it opened.
+  await waitFor(async () => ((await active())?.text ?? "").includes("Sunrise"), "focus back on the card", 25);
+  check(true, "and focus is back on the film's card, where it was");
+
   // ADR-0043 (Phase 11 E6): every text field, not just search. Menu opens Settings, the
-  // D-pad walks down to the OpenSubtitles key, and the pad types a key with upper case.
+  // D-pad walks down past the library's path field to the add-on catalogue's address, and
+  // the pad types with upper case. (The OpenSubtitles key this used to type into is saved
+  // by the first run now, so its field has gone: Phase 16 E7.)
+  const FIELD = "Or browse a catalogue";
+  const settingsOpen = () => evalJs(`!!document.querySelector('nav[aria-label="Settings sections"]')`);
+  // Phase 16 (the author): Settings is a side list of sections, one shown at a time.
+  const openSection = async (name, shows) => {
+    await steerToButton(name);
+    await press(B.A);
+    await waitFor(() => evalJs(`document.body.textContent.includes(${JSON.stringify(shows)})`), `the ${name} section`, 25);
+    await press(B.RIGHT); // into the section
+  };
   await press(B.MENU);
-  await waitFor(() => evalJs(`document.body.textContent.includes("OpenSubtitles")`), "Settings", 25);
-  const onKeyField = () =>
-    evalJs(`(() => { const l = [...document.querySelectorAll("label")].find((x) => x.textContent.trim() === "API key");
-      return !!l && document.activeElement === document.getElementById(l.htmlFor); })()`);
+  await waitFor(settingsOpen, "Settings", 25);
+  check(await evalJs(`!!document.activeElement?.closest('nav[aria-label="Settings sections"]')`),
+    "Menu opens Settings with focus on its side list");
+  await openSection("Add-ons", "Add a source");
+  check(await evalJs(`!document.body.textContent.includes("OpenSubtitles")`),
+    "A on Add-ons in the side list shows that section alone");
+  const onKeyField = () => evalJs(`document.activeElement === ${fieldByLabel(FIELD)}()`);
   let onField = false;
   let popped = false;
   for (let i = 0; i < 80 && !onField; i++) {
@@ -585,7 +1153,7 @@ try {
     popped ||= await evalJs(`!!document.querySelector('[aria-label="On-screen keyboard"]')`);
     onField = await onKeyField();
   }
-  check(onField && !popped, "the D-pad walks Settings to the API key field without a keyboard popping up on the way");
+  check(onField && !popped, "the D-pad walks Settings to a text field below others without a keyboard popping up on the way");
   await press(B.A);
   await waitFor(() => evalJs(`!!document.querySelector('[aria-label="On-screen keyboard"]')`), "the keyboard", 20);
   check(true, "A on the field opens the keyboard");
@@ -599,21 +1167,27 @@ try {
   await press(B.A);
   await press(B.A); // "99"
   await press(B.X); // X deletes
-  const key = await evalJs(`(() => { const l = [...document.querySelectorAll("label")].find((x) => x.textContent.trim() === "API key");
-    return document.getElementById(l.htmlFor).value; })()`);
-  check(key === "Ab9", `typed a key with case using the bumpers, and X deleted: "${key}"`);
+  const key = await evalJs(`${fieldByLabel(FIELD)}().value`);
+  check(key === "Ab9", `typed with case using the bumpers, and X deleted: "${key}"`);
   await shoot("07b-api-key");
   await press(B.MENU); // Menu is Done
   await waitFor(() => evalJs(`!document.querySelector('[aria-label="On-screen keyboard"]')`), "the keyboard to close", 20);
   check(await onKeyField(), "Menu closes the keyboard (Done), and focus stays on the field");
 
-  // Phase 12 E5: the review queue by pad alone. From the key field the D-pad climbs to
+  // Phase 12 E5: the review queue by pad alone. The side list's Library, then down to
   // "Check them"; then each A answers the focused (first) card, twenty times.
+  await openSection("Library", "Add a folder");
   let onCheck = false;
-  for (let i = 0; i < 60 && !onCheck; i++) {
-    await press(B.UP);
-    onCheck = (await active())?.text === "Check them";
+  const walked = [];
+  for (const dir of [B.DOWN, B.UP]) {
+    for (let i = 0; i < 40 && !onCheck; i++) {
+      await press(dir);
+      const at = (await active())?.text;
+      walked.push(at);
+      onCheck = at === "Check them";
+    }
   }
+  if (!onCheck) console.log("  walked up through: " + walked.slice(-12).join(" | "));
   check(onCheck, "the D-pad reaches the review queue's 'Check them' in Settings");
   await press(B.A);
   await waitFor(() => evalJs(`document.body.textContent.includes("Check your library")`), "the review queue", 25);
@@ -632,11 +1206,13 @@ try {
   const answered = (await calls("resolve_review")).length;
   check(answered === 20 && seconds < 60, `20 answers by A alone in ${seconds.toFixed(1)} s (E5: under a minute)`);
   await press(B.B);
-  await waitFor(() => evalJs(`document.body.textContent.includes("OpenSubtitles")`), "Settings again", 25);
+  await waitFor(settingsOpen, "Settings again", 25);
   check(true, "B returns from the queue to Settings");
 
   // Phase 15: the taste profile by pad. The D-pad finds "See Jon's taste" in Settings,
   // A opens it, and a mode is corrected with A alone.
+  if (!(await evalJs(`!!document.activeElement && document.activeElement !== document.body`))) await press(B.LEFT);
+  await openSection("Profile", "See Jon's taste");
   let onTaste = false;
   for (let i = 0; i < 80 && !onTaste; i++) {
     await press(B.DOWN);
@@ -664,9 +1240,49 @@ try {
   const fixed = await waitFor(async () => (await calls("correct_taste"))[0], "the correction", 25);
   check(fixed.anchor === 31 && fixed.correction === "less", "A on Less corrects the first mode");
   await press(B.B);
-  await waitFor(() => evalJs(`document.body.textContent.includes("OpenSubtitles")`), "Settings after the taste", 25);
+  await waitFor(settingsOpen, "Settings after the taste", 25);
   check(true, "B returns from the taste profile to Settings");
+  // The longest section, for the right stick.
+  if (!(await evalJs(`!!document.activeElement && document.activeElement !== document.body`))) await press(B.LEFT);
+  await openSection("Add-ons", "Add a source");
+
+  // Phase 16: the right stick scrolls the page under focus, and focus follows onto what is
+  // in view, so the next D-pad press starts from where the eye is.
+  const scrolled = () => evalJs(`document.querySelector("main").scrollTop`);
+  const top = await scrolled();
+  await evalJs(`__padAxis(3, 0.9)`);
+  await sleep(600);
+  await evalJs(`__padAxis(3, 0)`);
+  await sleep(200);
+  const after = await scrolled();
+  check(after > top + 200, `the right stick scrolls Settings down (${top} -> ${after})`);
+  check(
+    await evalJs(`(() => { const r = document.activeElement?.getBoundingClientRect(); return !!r && r.bottom > 0 && r.top < innerHeight; })()`),
+    "focus follows onto something in view",
+  );
   await press(B.B); // leave Settings
+  // Phase 16: a page comes back where it was left, in real layout (Settings is long).
+  await press(B.MENU);
+  await waitFor(settingsOpen, "Settings again", 25);
+  await sleep(150);
+  const again = await scrolled();
+  check(Math.abs(again - after) < 4, `Settings opens again where it was left (${Math.round(after)} -> ${Math.round(again)})`);
+  await press(B.B);
+
+  // Round 10 (the author): Who's watching?, opened from the avatar, has a way back that says where it goes,
+  // reached by the D-pad; it keeps whoever is watching and puts focus back on the avatar.
+  const switches = (await calls("switch_profile")).length;
+  await steerToButton("Jon: switch profile");
+  await press(B.A);
+  await waitFor(() => evalJs(`document.body.textContent.includes("Who's watching?")`), "the picker from the avatar", 25);
+  const backTo = await evalJs(`[...document.querySelectorAll('[role="dialog"] button')]
+    .map((b) => b.getAttribute("aria-label") || "").find((l) => l.startsWith("Back to ")) ?? null`);
+  check(backTo !== null, `opened from the avatar, Who's watching? has a way back (${backTo})`);
+  await steerToButton(backTo);
+  await press(B.A);
+  await waitFor(() => evalJs(`!document.body.textContent.includes("Who's watching?")`), "the picker to close by its way back", 25);
+  check((await calls("switch_profile")).length === switches, "A on it goes back, keeping whoever is watching");
+  check((await active())?.text === "Jon: switch profile", "and focus is back on the avatar");
 
   // Reduced motion: every transform goes, the ring stops gliding.
   await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });

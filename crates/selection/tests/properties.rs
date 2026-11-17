@@ -90,6 +90,7 @@ fn context(rng: &mut Rng) -> Context {
         audio_language: rng.maybe(|r| r.pick(&LANGS).to_string()),
         subtitle_language: rng.maybe(|r| r.pick(&LANGS).to_string()),
         wanted: rng.maybe(|r| r.pick(&RESOLUTIONS[..4])),
+        preferred: rng.maybe(|r| r.pick(&RESOLUTIONS[..4])),
         throughput: rng.maybe(|r| r.below(10_000_000) + 1),
     }
 }

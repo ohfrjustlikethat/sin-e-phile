@@ -92,6 +92,16 @@ pub fn parse(input: &str) -> Parsed {
 
     let mut found = tags::find(s, anime);
 
+    // "Chapter 2" with a year in the name is a film's title ("John Wick Chapter 2 2017"),
+    // not a series' episode.
+    if found.iter().any(|t| matches!(t.kind, Kind::Year(_))) {
+        found.retain(|t| {
+            !(matches!(t.kind, Kind::Episode { .. })
+                && s.get(t.start..t.start + 7)
+                    .is_some_and(|w| w.eq_ignore_ascii_case("chapter")))
+        });
+    }
+
     // "Episode 50 (2011)": an episode word opening the name and followed by a year is a
     // film's title, not an episode number.
     let first = found

@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **3.3.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **4.6.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -105,7 +105,7 @@ have.
 5. `SESSION_LOG.md` entry appended — including the phase retrospective, if a phase
    ended (ADR-0016 A5).
 6. `docs/specs/*.md` written for anything built this session. Prose expansion of
-   `HOW_IT_WORKS.md` and `GLOSSARY.md` is deferred to Phase 27; a 2–3 sentence stub
+   `HOW_IT_WORKS.md` and `GLOSSARY.md` is deferred to Phase 28; a 2–3 sentence stub
    and one-line terms are enough now.
 7. Learning note written or updated (`docs/learning/phase-NN-notes.md`).
 8. Everything committed and pushed.
@@ -153,7 +153,7 @@ working a later independent phase instead — working out of order beats sitting
 
 ### The understanding gate fires at tier boundaries, not every phase (`SPEC.md` §10.10)
 
-**Gates: the end of Phase 8, the end of Phase 18, the end of whatever tier the author
+**Gates: the end of Phase 8, the end of Phase 19, the end of whatever tier the author
 stops at, and whenever the author asks.** At those points, ask the five self-check
 questions from the relevant learning notes, in the chat — and **keep developing while
 they answer** (ADR-0040).
@@ -299,6 +299,12 @@ long-running series the feature exists for, and a confidently wrong number is wo
 than a NULL. AniList also paginates only to 5,000 entries, so its catalogue is swept
 per `seasonYear`.
 
+**Search by meaning ships inside the installer** (ADR-0053): `npm run release` carries the model, tokenizer and meaning
+file in `meaning/` beside the exe (refused unless they hash as published), and the index builds once the catalogue is
+searchable. A copy without them falls back to ADR-0050: setup starts the 347 MB model and meaning index once the
+catalogue is searchable, and says so with the size; an existing install is offered it (Search, Settings), never fetched
+unasked. Every other optional download stays behind a button with its size (ADR-0014).
+
 **TMDB is optional, and no key ever ships** (ADR-0013, ADR-0027). The app is fully
 functional on the offline IMDb + MovieLens catalogue with no key. Each user supplies
 their **own** key, per profile, in settings, under their own acceptance of TMDB's
@@ -312,7 +318,7 @@ typographic treatment rather than breaking.
 - **Design is audited, not admired** (§9.0). Every screen must pass "would this pass as a
   MUBI or Criterion screen?". Navigation is the **top masthead** with a labelled Search
   button (ADR-0037); never reintroduce a sidebar. A default install has no artwork, so
-  design the artwork-free state first. Phase 18 ends with a full overhaul and the
+  design the artwork-free state first. Phase 19 ends with a full overhaul and the
   author's sign-off on a screenshot set.
 - **An Xbox controller is a remote** (ADR-0041): the Gamepad API drives the same focus
   system as the keyboard, everywhere. Anything reachable by keyboard must be reachable
@@ -332,12 +338,25 @@ typographic treatment rather than breaking.
   profiles; Surprise me; mood shelves; ambient screen after 5 idle minutes in TV mode; no
   launch intro; watch stats. ADR-0043's table says which phase builds each.
 - **Release polish and reading** (ADR-0044): leaving the player shrinks the picture into its
-  tile; shared-element motion; seamless resume and crash restore (Phase 18). Reading adds
-  EPUB, DRM-free MOBI/AZW3, Guided View and a full controller scheme (Phase 25). The release
+  tile; shared-element motion; seamless resume and crash restore (Phase 19). Reading adds
+  EPUB, DRM-free MOBI/AZW3, Guided View and a full controller scheme (Phase 26). The release
   is **unsigned**, and **no pre-built catalogue is ever distributed**: the IMDb datasets are
-  personal, non-commercial (Phase 27). Idle RAM is measured over the whole process tree,
-  WebView2 included (Phase 21).
-- **Every phase is finished** (ADR-0043): all 28, at full depth, within about two weeks of
+  personal, non-commercial (Phase 28). Idle RAM is measured over the whole process tree,
+  WebView2 included (Phase 22).
+- **Ready to Watch comes first** (ADR-0045): Phase 16 was inserted after the author found the
+  release build unusable though every test passed, and **every phase from the old 16 moved up by
+  one** (29 phases, 0–28). Documents written before 2026-11-08 (ADRs 0001–0044, old amendments,
+  the session log, phase docs and notes up to 15) use the old numbers. Judge features by using the
+  release build the way a person would (no add-ons installed, a real TV folder), not only by
+  fixtures. Never name or link a content-source add-on, even in `SETUP.md`.
+- **Stremio add-ons** (ADR-0047): the app speaks Stremio's add-on protocol beside its own. A user pastes a
+  Stremio add-on's address (or `stremio://` link); it is asked by IMDb id, under the same limits as any add-on.
+  This changes nothing in rule 5: the app ships, suggests and names no add-on, anywhere.
+- **The improvement backlog** (ADR-0046): `SPEC.md` Appendix F lists 86 improvements (I01–I86; I79–I86 from the author's fix list, ADR-0049), each
+  assigned to a phase. They are that phase's deliverables, not exit criteria, and the phase doc prints
+  them. At phase close each is done (commit in the Done column) or carried to a named phase with a
+  reason, never dropped. ⚑ items are taste calls for Phase 19's mockups; the default is no change.
+- **Every phase is finished** (ADR-0043): all 29, at full depth, within about two weeks of
   2026-11-06. No tier is cut; tier boundaries are understanding-gate checkpoints, not stops.
 - **Windows only.** Use Windows APIs directly where they give a better result.
 - **Portable by default.** All data in `./data/` next to the executable. Installed
@@ -443,7 +462,8 @@ python tools/statecheck/check.py         # is the repo resumable by a cold sessi
 python tools/phasedoc/generate.py --log N  # keep the phase doc current
 
 npm run tauri dev          # run the app in development
-npm run tauri build        # production build
+npm run tauri build        # production build (no search-by-meaning files)
+npm run release            # the installer: carries search by meaning (ADR-0053)
 cargo test --workspace     # Rust tests (never from inside src-tauri)
 cargo fmt && cargo clippy -- -D warnings
 npm test                   # frontend tests
@@ -481,24 +501,24 @@ which case the understanding gate fires (§10.10).
 
 ## Where the project can legitimately stop
 
-28 phases is months of solo work, and abandonment is the most likely failure mode of
+29 phases is months of solo work, and abandonment is the most likely failure mode of
 this project (R7) — more likely than any technical risk. So the tiers in `SPEC.md`
 Appendix E are real stopping points, not a nice-to-have:
 
 - **Tier A (Phases 0–8)** — a working vertical slice. Something to show.
-- **Tier B (Phases 9–18, then 21, then 27)** — **this is the project.** Complete,
+- **Tier B (Phases 9–19, then 22, then 28)** — **this is the project.** Complete,
   coherent, measured, with case studies. If the author completes Tier B and stops,
-  they have succeeded. Phase 21 depends on 18, with 20 optional (amendment 11).
-- **Tier C (19, 20, 23)** — depth. Strengthens it meaningfully.
-- **Tier D (22, 24, 25, 26)** — breadth. Fully independent; any, all, or none.
+  they have succeeded. Phase 22 depends on 19, with 21 optional (amendment 11).
+- **Tier C (20, 21, 24)** — depth. Strengthens it meaningfully.
+- **Tier D (23, 25, 26, 27)** — breadth. Fully independent; any, all, or none.
 
-Phase 27 (portfolio finalisation) is run **whenever the author decides to stop**,
+Phase 28 (portfolio finalisation) is run **whenever the author decides to stop**,
 against whatever exists. It is not the last phase — it's the phase you run when
 you're done. Suggest running it at the end of Tier B regardless, so the project is
 always presentable.
 
 **A finished Tier B project beats an abandoned Tier D one, always.** If the author
-seems to be losing momentum, say this out loud rather than starting Phase 24.
+seems to be losing momentum, say this out loud rather than starting Phase 25.
 
 ---
 

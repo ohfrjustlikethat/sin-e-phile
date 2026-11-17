@@ -176,6 +176,13 @@ pub async fn load_titles(
 
             let count = pending.len() as i64;
             let finished = pending.len() < BATCH;
+            // A refresh keeps only what it does not hold: a resume whose position and
+            // stored rows ever disagree must not die on a duplicate (Phase 16). A first
+            // ingestion (no watermark) holds nothing and pays nothing for this.
+            if above_id.is_some() && !pending.is_empty() {
+                let held = held_of(tx, &pending).await?;
+                pending.retain(|t| !held.contains(&t.tconst));
+            }
             insert_titles(tx, &pending).await?;
 
             Ok(match (finished, last_id) {
@@ -236,6 +243,26 @@ fn collect_current(
         in_core: scope.in_core(title_type, vote_count, adult, year),
         genres: row.list("genres").into_iter().map(str::to_string).collect(),
     })
+}
+
+/// Which of these titles the catalogue already holds, by IMDb id.
+async fn held_of(
+    tx: &mut SqliteTx<'_>,
+    titles: &[Title],
+) -> Result<std::collections::HashSet<String>, JobError> {
+    let mut held = std::collections::HashSet::new();
+    for chunk in titles.chunks(ROWS_PER_STATEMENT) {
+        let marks = vec!["?"; chunk.len()].join(", ");
+        let sql = format!(
+            "SELECT external_id FROM external_ids WHERE source = 'imdb' AND external_id IN ({marks})"
+        );
+        let mut q = sqlx::query_scalar::<_, String>(&sql);
+        for t in chunk {
+            q = q.bind(&t.tconst);
+        }
+        held.extend(q.fetch_all(&mut **tx).await?);
+    }
+    Ok(held)
 }
 
 /// Insert a batch, inside the runner's transaction.

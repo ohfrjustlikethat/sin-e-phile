@@ -374,11 +374,12 @@ def do_progress() -> int:
     tier_of = {}
     for number in range(0, 9):
         tier_of[number] = "A"
-    for number in list(range(9, 19)) + [21, 27]:
+    # Spec 4.0.0 (ADR-0045) inserted Phase 16 and moved every later phase up by one.
+    for number in list(range(9, 20)) + [22, 28]:
         tier_of[number] = "B"
-    for number in (19, 20, 23):
+    for number in (20, 21, 24):
         tier_of[number] = "C"
-    for number in (22, 24, 25, 26):
+    for number in (23, 25, 26, 27):
         tier_of[number] = "D"
 
     mark = {"complete": "x", "in_progress": "~", "blocked": "!",
@@ -440,7 +441,7 @@ def do_progress() -> int:
     lines += [
         "---",
         "",
-        "## All 28 phases",
+        "## All 29 phases",
         "",
         "Tiers are the legitimate stopping points from `SPEC.md` Appendix E. "
         "**Tier B is the definition of done** — complete it and the project has succeeded.",

@@ -1,7 +1,15 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { onEvent } from "@/lib/events";
 import { commands, type AssetPlan, type AssetProgress } from "@/lib/ipc";
 import { Button, ProgressBar } from "@/design-system";
+import { CATALOGUE } from "@/features/settings/catalogueKey";
+
+async function ok<T>(p: Promise<{ status: "ok"; data: T } | { status: "error"; error: string }>) {
+  const r = await p;
+  if (r.status === "error") throw new Error(r.error);
+  return r.data;
+}
 
 /**
  * Consent for the optional downloads (ADR-0014, subtask 5.9).
@@ -12,6 +20,11 @@ import { Button, ProgressBar } from "@/design-system";
  * the size shown, before it happens** — no background fetch, no "we'll just grab this".
  * So the size comes from pinned values the backend states up front, never from starting
  * a download to find out, and nothing is requested until the button is pressed.
+ *
+ * The one exception (ADR-0050, the author's decision): a **new** install's setup starts it
+ * once the catalogue is searchable. In setup (`setup`) this says so, with the size, before
+ * and while it happens; everywhere else it is the offer, with its button. While either is
+ * running every copy of this shows that download (`running`), never a second.
  *
  * # Why it says what search does without it
  *
@@ -48,39 +61,70 @@ function describe(progress: AssetProgress): { label: string; percent: number } {
   return { percent, label: `${progress.name} — ${megabytes(progress.done_bytes)}${of}` };
 }
 
-export function MeaningDownload({ onDone }: { onDone?: () => void }) {
+export function MeaningDownload({ onDone, setup = false }: { onDone?: () => void; setup?: boolean }) {
   const [plan, setPlan] = useState<AssetPlan | null>(null);
   const [progress, setProgress] = useState<AssetProgress | null>(null);
-  const [running, setRunning] = useState(false);
+  const [pressed, setPressed] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
-  useEffect(() => {
-    void commands.optionalAssets().then(setPlan);
+  const reload = useCallback(() => {
+    void Promise.resolve()
+      .then(() => commands.optionalAssets())
+      .then(setPlan)
+      .catch(() => {});
   }, []);
+  useEffect(reload, [reload]);
 
-  useEffect(() => onEvent<AssetProgress>("asset-progress", setProgress), []);
+  useEffect(
+    () =>
+      onEvent<AssetProgress>("asset-progress", (p) => {
+        setProgress(p);
+        // Setup's download began after this was drawn: show it, not the button.
+        setPlan((plan) => (plan && !plan.running ? { ...plan, running: true } : plan));
+      }),
+    [],
+  );
+  // However it ends, and whoever started it: show what is true now.
+  useEffect(
+    () =>
+      onEvent<boolean>("meaning-ready", (works) => {
+        setPressed(false);
+        setProgress(null);
+        reload();
+        if (works) onDone?.();
+      }),
+    [reload, onDone],
+  );
 
   if (!plan || plan.complete) return null;
 
   const outstanding = plan.assets.filter((a) => a.state !== "present");
   const unusable = plan.assets.filter((a) => a.state === "unusable");
+  const running = pressed || plan.running;
+  // Everything downloaded, the index not yet built (a build that stopped): the button builds, and says so.
+  const size = megabytes(plan.outstanding_bytes);
+  const action = plan.outstanding_bytes > 0 ? `Download ${size}` : "Build the index";
+  const doing =
+    plan.outstanding_bytes > 0
+      ? `${setup ? "Downloading as part of setting up" : "Downloading"} · ${size}.`
+      : "Building the index on this PC, about a minute.";
 
   async function start() {
-    setRunning(true);
+    setPressed(true);
     setFailed(null);
     const result = await commands.downloadOptionalAssets();
-    setRunning(false);
     if (result.status === "error") {
+      setPressed(false);
       setFailed(result.error);
-      return;
+      reload();
     }
-    setPlan(await commands.optionalAssets());
-    onDone?.();
+    // Success arrives as `meaning-ready`, for this copy and every other.
   }
 
   return (
-    <section className="rounded border border-line-subtle bg-surface p-5">
-      <h2 className="text-base font-medium">Search by meaning</h2>
+    <section aria-label="Search by meaning" className="rounded border border-line-subtle bg-surface p-5">
+      {/* Not `text-base`: in this theme that is the page's background colour, and the heading was invisible. */}
+      <h2 className="text-[16px] font-medium text-ink">Search by meaning</h2>
       <p className="mt-1 max-w-prose text-[13.5px] leading-relaxed text-ink-muted">
         Search works now — titles, people, directors, decades, and spelling you got
         slightly wrong. This adds the part that lets you <em>describe</em> a film instead:
@@ -115,20 +159,27 @@ export function MeaningDownload({ onDone }: { onDone?: () => void }) {
         </p>
       )}
 
-      <div className="mt-5 flex items-center gap-4">
-        <Button onClick={start} disabled={running}>
-          {running
-            ? progress?.phase === "building"
-              ? "Building…"
-              : "Downloading…"
-            : `Download ${megabytes(plan.outstanding_bytes)}`}
-        </Button>
-        {!running && (
+      {setup && !running ? (
+        <SetupStart
+          size={size}
+          installed={plan.outstanding_bytes === 0}
+          action={action}
+          onStart={() => void start()}
+        />
+      ) : running ? (
+        <p className="mt-5 text-[13.5px] text-ink" role="status">
+          {doing} Search works meanwhile.
+        </p>
+      ) : (
+        <div className="mt-5 flex items-center gap-4">
+          <Button onClick={start}>{action}</Button>
           <span className="text-[13.5px] text-ink-muted">
-            Optional. Nothing is downloaded until you choose to.
+            {plan.outstanding_bytes > 0
+              ? "Optional. Nothing is downloaded until you choose to."
+              : "Everything it needs is on this PC; the index is built from it here."}
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       {running && progress && (
         <div className="mt-4">
@@ -143,5 +194,40 @@ export function MeaningDownload({ onDone }: { onDone?: () => void }) {
         </p>
       )}
     </section>
+  );
+}
+
+/**
+ * In setup, before it runs (ADR-0050): a new install's catalogue is not searchable yet, and the download starts by
+ * itself once it is, so this says so; once the catalogue is ready and nothing started it (an install set up before),
+ * it is the button. The catalogue's status is read with the same key and shape as everywhere else.
+ */
+function SetupStart({
+  size,
+  installed,
+  action,
+  onStart,
+}: {
+  size: string;
+  /** The installer carried the files (ADR-0053): nothing to download, only the index to build. */
+  installed: boolean;
+  action: string;
+  onStart: () => void;
+}) {
+  const catalogue = useQuery({ queryKey: CATALOGUE, queryFn: () => ok(commands.catalogueStatus()) });
+  if (catalogue.data && !catalogue.data.ready) {
+    return (
+      <p className="mt-5 text-[13.5px] text-ink">
+        {installed
+          ? "Comes with the app. Its index is built on this PC as soon as your catalogue can be searched."
+          : `Downloads by itself, ${size}, as soon as your catalogue can be searched.`}
+      </p>
+    );
+  }
+  return (
+    <div className="mt-5 flex items-center gap-4">
+      <Button onClick={onStart}>{action}</Button>
+      <span className="text-[13.5px] text-ink-muted">Optional. Search works without it.</span>
+    </div>
   );
 }

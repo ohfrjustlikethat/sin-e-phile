@@ -50,8 +50,16 @@ pub trait Backend: Send + Sync {
     async fn pause(&self, id: &str) -> Result<(), BackendError>;
     async fn resume(&self, id: &str) -> Result<(), BackendError>;
     async fn remove(&self, id: &str, delete_files: bool) -> Result<(), BackendError>;
-    /// The finished download's video file.
-    async fn video_file(&self, id: &str) -> Result<PathBuf, BackendError>;
+    /// The finished download's video file: the one wanted (`file`, a season pack's
+    /// episode) when the download names one, else the feature as the selection rules see it.
+    async fn video_file(&self, id: &str, file: Option<usize>) -> Result<PathBuf, BackendError>;
+    /// Fetch only `file` of this torrent (Phase 16: a source points at one episode in a
+    /// season pack, and the whole pack was downloaded). Called each tick until it returns
+    /// true: a backend that learns the file list late (qBittorrent, from a magnet link)
+    /// applies it once it can. One that chose the file when it was added says so at once.
+    async fn keep_only(&self, _id: &str, _file: usize) -> Result<bool, BackendError> {
+        Ok(true)
+    }
 }
 
 /// What a download's `source` and `torrent` columns say to fetch. An info hash may carry
@@ -145,6 +153,11 @@ impl Backend for Rqbit {
         "librqbit"
     }
 
+    /// Torrents only: a web address is `Direct`'s.
+    fn accepts(&self, d: &Download) -> bool {
+        !crate::direct::is_web(d)
+    }
+
     async fn available(&self) -> bool {
         true
     }
@@ -162,6 +175,11 @@ impl Backend for Rqbit {
             initial_peers: self.initial_peers.clone(),
             output_folder: Some(target.clone()),
             download_limit: limit,
+            // A season pack's one episode, when the source chose it: only that file.
+            only_files: d
+                .file_index
+                .and_then(|i| usize::try_from(i).ok())
+                .map(|i| vec![i]),
             ..Default::default()
         };
         let id = self
@@ -219,12 +237,21 @@ impl Backend for Rqbit {
         self.engine.remove(id, delete_files).await.map_err(refused)
     }
 
-    async fn video_file(&self, id: &str) -> Result<PathBuf, BackendError> {
-        let file = self
-            .engine
-            .main_file(id, Wanted::default())
-            .map_err(refused)?;
-        self.engine.file_path(id, &file).map_err(refused)
+    async fn video_file(&self, id: &str, file: Option<usize>) -> Result<PathBuf, BackendError> {
+        let chosen = match file {
+            Some(i) => self
+                .engine
+                .files(id)
+                .map_err(refused)?
+                .into_iter()
+                .find(|f| f.index == i)
+                .ok_or_else(|| BackendError::Refused(format!("the torrent has no file {i}")))?,
+            None => self
+                .engine
+                .main_file(id, Wanted::default())
+                .map_err(refused)?,
+        };
+        self.engine.file_path(id, &chosen).map_err(refused)
     }
 }
 
@@ -252,6 +279,7 @@ mod tests {
             file_path: None,
             added_at: String::new(),
             finished_at: None,
+            file_index: None,
         }
     }
 

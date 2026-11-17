@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { useUi } from "@/lib/store";
 import { usePlaybackChoice } from "@/lib/playbackChoice";
@@ -12,6 +12,7 @@ const commands = {
   playerClose: vi.fn(() => ok(null)),
   playerLayout: vi.fn(() => ok(null)),
   playerAction: vi.fn(() => ok(null)),
+  playerCursor: vi.fn((_hidden: boolean) => ok(null)),
   playerPauseStill: vi.fn(() => ok("data:image/jpeg;base64,AAAA")),
   playerResumeVideo: vi.fn(() => ok(null)),
   savePosition: vi.fn(() => ok(null)),
@@ -26,7 +27,7 @@ const commands = {
     }),
   ),
   filmography: vi.fn(() => ok([{ id: 11, title: "Faust", year: 1926, kind: "film", part: "Mephisto" }])),
-  playerChapters: vi.fn(() => ok([])),
+  playerChapters: vi.fn(() => ok([] as { time: number | null; title: string | null }[])),
   episodeNeighbours: vi.fn(() =>
     ok({ previous: null, next: null } as { previous: unknown; next: unknown }),
   ),
@@ -46,8 +47,13 @@ vi.mock("@tauri-apps/api/event", () => ({
     return Promise.resolve(() => {});
   }),
 }));
+const fullscreen = vi.hoisted(() => vi.fn((_on: boolean) => Promise.resolve()));
 vi.mock("@tauri-apps/api/window", () => ({
-  getCurrentWindow: () => ({ setFullscreen: () => Promise.resolve() }),
+  getCurrentWindow: () => ({
+    setFullscreen: fullscreen,
+    isFullscreen: () => Promise.resolve(false),
+    isMaximized: () => Promise.resolve(false),
+  }),
 }));
 const { PlayerScreen: Bare } = await import("./PlayerScreen");
 /** The player inside the query client the app gives it. */
@@ -162,6 +168,92 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
     // Real seconds pass: the count is of seconds played, so the test waits for them.
   }, 10_000);
 
+  it("a click on the picture pauses, and moving over it shows the controls (Phase 16)", async () => {
+    events.on = {};
+    const w = window as unknown as Record<string, unknown>;
+    w.__TAURI_INTERNALS__ = {};
+    try {
+      render(<PlayerScreen />);
+      await waitFor(() => expect(events.on["player-pointer"]).toBeDefined());
+      act(() =>
+        events.on["player-state"]?.({
+          payload: {
+            position: 60, duration: 5700, paused: false, buffered_until: null, volume: 100,
+            muted: false, speed: 1, hwdec: null, ended: false, started: true, tracks: [],
+          },
+        }),
+      );
+      act(() => events.on["player-pointer"]?.({ payload: "click" }));
+      await waitFor(() => expect(commands.playerPauseStill).toHaveBeenCalled());
+      act(() => events.on["player-pointer"]?.({ payload: "move" }));
+      expect(screen.getByRole("button", { name: "Mute" })).toBeInTheDocument();
+      expect(screen.queryByText(/^Volume \d/)).toBeNull();
+    } finally {
+      delete w.__TAURI_INTERNALS__;
+    }
+  });
+
+  it("the bars and the pointer hide after 3 s still; only a real movement brings them back (Phase 16)", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<PlayerScreen />);
+      act(() => vi.advanceTimersByTime(100));
+      const stage = screen.getByLabelText("Playing Nosferatu");
+      fireEvent.mouseMove(stage, { screenX: 400, screenY: 300 });
+      expect(screen.getByRole("button", { name: "Mute" })).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(2900));
+      expect(screen.getByRole("button", { name: "Mute" })).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(200));
+      expect(screen.queryByRole("button", { name: "Mute" })).toBeNull();
+      expect(commands.playerCursor).toHaveBeenLastCalledWith(true);
+      // What the page hears as the bars go from under a still pointer: not a movement.
+      fireEvent.mouseMove(stage, { screenX: 400, screenY: 300 });
+      expect(screen.queryByRole("button", { name: "Mute" })).toBeNull();
+      fireEvent.mouseMove(stage, { screenX: 420, screenY: 300 });
+      expect(screen.getByRole("button", { name: "Mute" })).toBeInTheDocument();
+      expect(commands.playerCursor).toHaveBeenLastCalledWith(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a click on the still picture plays again; two quick clicks also go full screen (Phase 16)", async () => {
+    events.on = {};
+    const w = window as unknown as Record<string, unknown>;
+    w.__TAURI_INTERNALS__ = {};
+    let clock = 1000;
+    const now = vi.spyOn(performance, "now").mockImplementation(() => clock);
+    const playing = {
+      position: 60, duration: 5700, paused: false, buffered_until: null, volume: 100,
+      muted: false, speed: 1, hwdec: null, ended: false, started: true, tracks: [],
+    };
+    try {
+      render(<PlayerScreen />);
+      await waitFor(() => expect(events.on["player-pointer"]).toBeDefined());
+      act(() => events.on["player-state"]?.({ payload: playing }));
+
+      // One click on the film pauses it; a click on the still, a second later, plays it.
+      act(() => events.on["player-pointer"]?.({ payload: "click" }));
+      await waitFor(() => expect(commands.playerPauseStill).toHaveBeenCalledTimes(1));
+      clock += 1000;
+      fireEvent.click(await screen.findByTestId("pause-picture"));
+      await waitFor(() => expect(commands.playerResumeVideo).toHaveBeenCalledTimes(1));
+      expect(fullscreen).not.toHaveBeenCalled();
+
+      // Two clicks 200 ms apart: paused and played again, and full screen.
+      clock += 2000;
+      act(() => events.on["player-pointer"]?.({ payload: "click" }));
+      await waitFor(() => expect(commands.playerPauseStill).toHaveBeenCalledTimes(2));
+      clock += 200;
+      fireEvent.click(await screen.findByTestId("pause-picture"));
+      await waitFor(() => expect(commands.playerResumeVideo).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(fullscreen).toHaveBeenCalledWith(true));
+    } finally {
+      now.mockRestore();
+      delete w.__TAURI_INTERNALS__;
+    }
+  });
+
   it("leaves on Escape and closes the player", async () => {
     const { unmount } = render(<PlayerScreen />);
     fireEvent.keyDown(window, { key: "Escape" });
@@ -205,6 +297,29 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
     expect(panel).toHaveTextContent("Vampyr");
   });
 
+  it("an episode pauses on its show's name, season, episode and what is next (Phase 16, round 8)", async () => {
+    useUi.setState({ playing: { target: "https://films.example/tp.mp4", title: "Episode #1.2", mediaItemId: 72, start: null } });
+    commands.pauseDetails.mockImplementationOnce(() =>
+      ok({
+        show: { id: 70, title: "Twin Peaks", season: 1, episode: 2, episode_title: "Traces to Nowhere" },
+        cast: [{ person_id: 5, name: "Kyle MacLachlan", part: "Dale Cooper" }],
+        crew: [], ratings: [], more_like_this: [],
+      } as never),
+    );
+    commands.episodeNeighbours.mockImplementationOnce(() =>
+      ok({ previous: null, next: { id: 73, season: 1, episode: 3, title: "Episode #1.3", air_date: null, watched: false, on_this_pc: false } }),
+    );
+    render(<PlayerScreen />);
+    await waitFor(() => expect(commands.pauseDetails).toHaveBeenCalledWith(72));
+    fireEvent.keyDown(window, { key: " " });
+    const paused = await screen.findByRole("dialog", { name: "Paused" });
+    expect(await within(paused).findByRole("heading", { name: "Twin Peaks" })).toBeInTheDocument();
+    expect(within(paused).getByText("Season 1 · Episode 2 — Traces to Nowhere")).toBeInTheDocument();
+    expect(within(paused).getByText("Next: S1 E3")).toBeInTheDocument();
+    expect(within(paused).getByRole("complementary", { name: "About this show" })).toHaveTextContent("Kyle MacLachlan");
+    expect(screen.queryByText("Episode #1.2")).toBeNull();
+  });
+
   it("a file the catalogue does not know pauses without an empty panel (Phase 11 E5 run)", async () => {
     useUi.setState({ playing: { target: "C:/films/Garden.mkv", title: "Garden", mediaItemId: null, start: null } });
     render(<PlayerScreen />);
@@ -240,13 +355,34 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
     }
   }
 
+  it("in a film the bumpers move by chapter, and say where they went (Phase 16)", async () => {
+    commands.playerChapters.mockImplementation(() =>
+      ok([{ time: 0, title: "Opening" }, { time: 600, title: "The city" }, { time: 1500, title: null }]),
+    );
+    await inTauri(async () => {
+      render(<PlayerScreen />);
+      await waitFor(() => expect(events.on["player-state"]).toBeDefined());
+      act(() => events.on["player-state"]?.({ payload: { ...STATE, duration: 5640, position: 30 } }));
+      await waitFor(() => expect(commands.playerChapters).toHaveBeenCalled());
+      await waitFor(() => {
+        act(() => void sendPlayerIntent({ kind: "episode", next: true }));
+        expect(commands.playerAction).toHaveBeenCalledWith({ kind: "seek_to", seconds: 600 });
+      });
+      expect(await screen.findByText("Chapter: The city")).toBeInTheDocument();
+      // Thirty seconds in, back restarts the opening chapter.
+      act(() => void sendPlayerIntent({ kind: "episode", next: false }));
+      expect(commands.playerAction).toHaveBeenCalledWith({ kind: "seek_to", seconds: 0 });
+    });
+    commands.playerChapters.mockImplementation(() => ok([]));
+  });
+
   it("N plays the next episode (Phase 11)", async () => {
     commands.episodeNeighbours.mockImplementation(() => ok({ previous: null, next: NEXT }));
     render(<PlayerScreen />);
     await waitFor(() => expect(commands.episodeNeighbours).toHaveBeenCalledWith(1));
     await waitFor(() => {
       fireEvent.keyDown(window, { key: "n" });
-      expect(commands.preparePlay).toHaveBeenCalledWith(42, null, null);
+      expect(commands.preparePlay).toHaveBeenCalledWith(42, null, null, null);
     });
     await waitFor(() => expect(useUi.getState().playing?.mediaItemId).toBe(42));
     commands.episodeNeighbours.mockImplementation(() => ok({ previous: null, next: null }));
@@ -286,7 +422,7 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
       expect(screen.getByRole("dialog", { name: "Next episode" })).toHaveTextContent("Play in 10");
       for (let i = 0; i < 10; i++) act(() => vi.advanceTimersByTime(1000));
       vi.useRealTimers();
-      await waitFor(() => expect(commands.preparePlay).toHaveBeenCalledWith(42, null, null));
+      await waitFor(() => expect(commands.preparePlay).toHaveBeenCalledWith(42, null, null, null));
     });
     commands.episodeNeighbours.mockImplementation(() => ok({ previous: null, next: null }));
   });
@@ -316,7 +452,15 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
     expect(taken).toBe(false);
     expect(commands.playerAction).not.toHaveBeenCalledWith({ kind: "seek_by", seconds: 10 });
     fireEvent.click(screen.getByRole("button", { name: "More brightness" }));
-    expect(commands.playerAction).toHaveBeenCalledWith({ kind: "picture", brightness: 10, contrast: 0, saturation: 0 });
+    expect(commands.playerAction).toHaveBeenCalledWith({ kind: "picture", brightness: 10, contrast: 0, saturation: 0, aspect: "auto", zoom: 100 });
+    // Phase 16: the picture's shape and zoom, each one press.
+    fireEvent.click(screen.getByRole("button", { name: "Shape: As filmed" }));
+    expect(commands.playerAction).toHaveBeenLastCalledWith({ kind: "picture", brightness: 10, contrast: 0, saturation: 0, aspect: "16:9", zoom: 100 });
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    expect(commands.playerAction).toHaveBeenLastCalledWith({ kind: "picture", brightness: 10, contrast: 0, saturation: 0, aspect: "16:9", zoom: 110 });
+    expect(screen.getByRole("button", { name: "Shape: 16:9" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reset the picture" }));
+    expect(commands.playerAction).toHaveBeenLastCalledWith({ kind: "picture", brightness: 0, contrast: 0, saturation: 0, aspect: "auto", zoom: 100 });
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Player menu" })).not.toBeInTheDocument();
     expect(useUi.getState().playing).not.toBeNull();

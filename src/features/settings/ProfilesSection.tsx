@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { ProfileAvatar } from "@/features/profiles/ProfileAvatar";
+import { ChoosePicture } from "@/features/profiles/ChoosePicture";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Input, Toggle } from "@/design-system";
 import { commands, type ProfileView } from "@/lib/ipc";
@@ -7,6 +9,7 @@ import { PROFILES, useProfiles } from "@/features/profiles/useProfiles";
 import { ImportHistory } from "@/features/profiles/ImportHistory";
 import { TasteInput } from "@/features/profiles/TasteInput";
 import { useUi } from "@/lib/store";
+import { SETTINGS_HEADING } from "./heading";
 
 /**
  * Settings → Profiles — SPEC.md Phase 14. Add a profile (a name, a colour, kids or not,
@@ -29,7 +32,7 @@ export function ProfilesSection() {
 
   return (
     <section className="mb-9" aria-label="Profiles">
-      <h2 className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">Profiles</h2>
+      <h2 className={SETTINGS_HEADING}>Profiles</h2>
       <ul className="flex flex-col">
         {profiles.map((p) => (
           <ProfileRow key={p.id} profile={p} locked={locked} last={profiles.length === 1} />
@@ -79,7 +82,7 @@ function ProfileRow({ profile, locked, last }: { profile: ProfileView; locked: b
   if (editing) return <ProfileForm profile={profile} onDone={() => setEditing(false)} />;
   return (
     <li className="flex items-center gap-3 border-b border-line-subtle py-2.5">
-      <Avatar name={profile.name} colour={profile.avatar_colour} />
+      <ProfileAvatar profile={profile} />
       <span className="flex-1 text-sm text-ink">
         {profile.name}
         <span className="ml-2 text-xs text-ink-faint">
@@ -136,6 +139,8 @@ function ProfileForm({ profile, onDone }: { profile?: ProfileView; onDone: () =>
   return (
     <li className="mt-3 flex list-none flex-col gap-3 border border-line p-4">
       <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} />
+      {/* A picture for an existing profile (Phase 16); a new one gets its picture once it exists. */}
+      {profile && <ChoosePicture profile={profile.id} />}
       <div role="radiogroup" aria-label="Colour" className="flex gap-2">
         {AVATAR_COLOURS.map((c) => (
           <button

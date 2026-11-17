@@ -44,6 +44,14 @@ impl OpenSubtitles {
             .header("Accept", "application/json")
     }
 
+    /// Whether the key is accepted (Phase 16: checked when it is entered, not on the first
+    /// film that needs it). One small request that needs the key and spends no download.
+    pub async fn check(&self) -> Result<(), FetchError> {
+        self.send(Request::get(format!("{BASE}/infos/languages")).limit(MAX_SEARCH))
+            .await
+            .map(|_| ())
+    }
+
     async fn send(&self, r: Request) -> Result<String, FetchError> {
         let response = self
             .transport
@@ -76,6 +84,9 @@ struct Item {
 #[derive(Deserialize)]
 struct Attributes {
     language: Option<String>,
+    /// The release it was timed for, as its uploader named it.
+    #[serde(default)]
+    release: Option<String>,
     #[serde(default)]
     download_count: i64,
     #[serde(default)]
@@ -132,6 +143,7 @@ impl Provider for OpenSubtitles {
                     language: a.language?.to_ascii_lowercase(),
                     hash_match: a.moviehash_match,
                     downloads: a.download_count,
+                    release: a.release.filter(|r| !r.trim().is_empty()),
                 })
             })
             .collect())

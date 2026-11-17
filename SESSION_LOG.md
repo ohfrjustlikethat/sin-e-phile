@@ -2208,3 +2208,301 @@ Both were caught by rereading, which is not a process.
 **Carry forward.** The author batch now: a real controller (8 E5), a VPN cut (7 E7), the review screen's
 feel, D77, a first-time person through onboarding (14 E1), sign-off on onboarding and Home (14 E4, E6), and
 the taste screen on a real profile (15 E3).
+
+### Session 22, continued (2026-11-08) — the author's review, and spec 4.0.0
+
+**What happened.** The author used the release build after Phase 15 and answered the batch: the taste screen
+works (more polish wanted); first run is under two minutes; the controller and TV mode are good; first run
+and Home still have glitches; downloads could not be tested (the library had 0 add-ons, and nothing said
+so); Settings headings are weak; a `Twin Peaks` folder with season subfolders was read as films; the
+player feels choppy, the pad cannot change volume or subtitles, there is no subtitle style, download or
+sync; the right stick does nothing; new films and episodes never arrive; the local library is not on Home
+straight after a scan. They asked for a list of every plugin "like stremio" with download links.
+
+**Questions asked and answered** (twelve, in three rounds): recorded in ADR-0045's table.
+
+**D77 resolved** in a release build: 0 console windows from the app's FFprobe and FFmpeg paths in a
+windowed program; 5 from the same FFprobe without the flag (the control).
+
+**D83 recurred** in CI; cause traced into librqbit's shutdown and `Engine::stop` made to wait for the
+session to end (details in D83). Not reproduced locally.
+
+**Decisions.** A fix-first phase, **Phase 16 — Ready to Watch**, before the recommendation engine; every
+later phase moves up by one. The plugin list becomes `SETUP.md`: every prerequisite with its official link,
+and how to add any add-on by its address; it names no content source (§2.1), and I said so to the author.
+Phase 8 E5, Phase 14 E1 and Phase 15 E3 discharged from the author's answers; Phase 7 E7 and Phase 14 E4/E6
+received by Phase 16.
+
+**Spec amendments.** spec_version 4.0.0 (A35, ADR-0045): Phase 16 inserted; Phases 17–28 renumbered; tiers
+and gates moved; CLAUDE.md resynced; the state tools and schema now expect 29 phases.
+
+### Session 23 (2026-11-16) — Phase 16 resumed: B15, E1, the docs
+
+**Resumed** eight days after the last entry (under the 14-day cold-resume line). statecheck clean; the
+repository agreed with the state file except that five commits from 2026-11-08 had never been pushed.
+
+**Pushed after the full pre-push suite.** gitleaks flagged two `generic-api-key` hits in local commit
+112059e: a literal cache key (`libmpv-<hash prefix>`) in `ci.yml`, a false positive already replaced by
+`hashFiles(...)` in the next commit. Both were unpushed, so they were folded into one commit (a635fe1) and
+history never carried the literal; no allowlist entry, no ADR needed.
+
+**B15.** The libmpv host answers again and the cached-DLL step ran, but CI went red for a new reason:
+ort-sys's build script panicked on a cold build. My first explanation (a missing `target/debug/examples`
+on a cold cache) was wrong: making the folders changed nothing. The build-script log showed the cause:
+`OUT_DIR` was `target\debuguild\ort-sys/<hash>\out`. **Rust 1.100 (2026-11-09) changed cargo's
+build-dir layout**, CI's `@stable` picked it up, and ort-sys rc.13's `copy-dylibs` counts three levels up
+from `OUT_DIR` to find the target folder, so it landed in `target/debug/build` and failed on
+`build/examples`. The dev machine is on 1.98.0. Fix: `rust-toolchain.toml` pins 1.98.0 (rule 15), so CI
+and the dev machine build with the same compiler; the folder step was taken out again. Recorded as debt:
+moving past 1.98 needs ort-sys fixed or bumped first.
+
+**E1 met.** The pad-flow audit only proved "Find subtitles" was reachable in the player panel. A new step
+walks the whole panel by D-pad, row by row, and requires every enabled control: 34/34, seen to fail at
+20/34 with the Speed section made inert. The walk's first version looped because Right on a full-width row
+goes up-right — correct navigation, a wrong walk.
+
+**Docs.** `docs/specs/ready-to-watch.md` (player, pad map, right stick, subtitles in the player, Home order,
+first run, layout check); `docs/learning/phase-16-notes.md` with its five questions; README and
+HOW_IT_WORKS updated, including two references left stale by the renumbering (Phase 5's carried meaning
+criterion is Phase 17's, not 16's).
+
+**Regression (rule 13)**: identify 99.05% / 0.39%, tvlayouts 59/59, import E2 met, taste 40.63%, switch
+32.3 / 37.3 ms p95, modes 96.6%, update 131.9 ms — no regression (`docs/eval-results.md`).
+
+**Decisions taken.** Fold the unpushed commits rather than allowlist; pin the Rust toolchain to 1.98.0
+rather than drop `--all-features` or patch ort-sys. **Spec amendments:** none.
+
+**Spec amendment, same day: 4.1.0 (A36, ADR-0046) — the improvement backlog.** The author switched models
+to go faster and asked for every improvement worth making, saved to the spec. The app was reviewed as a
+person uses it; 78 items (I01–I78) went into `SPEC.md` Appendix F, each assigned to the phase that touches
+the same code, as deliverables rather than exit criteria. Seven are built in Phase 16. `tools/phasedoc`
+prints a phase's items in its doc; CLAUDE.md resynced in the same commit. **The review also found a gap in
+Phase 16 itself**: the picture panel has no aspect or zoom, which the phase specifies, so E1 was marked met
+too early this morning and is reopened until they exist.
+
+**Built the same day, then pushed after the full suite (162e994, CI run 43822192618 green):** picture shape
+(as filmed, 16:9, 4:3, 2.35:1, fill) and zoom 50–300% (7776473); Appendix F's seven Phase 16 items — I01 Start
+over, I33, I71, I72 (7776473), I21 mark watched for a film, episode, season or show (643e750), I39 a working
+Watchlist page and save button (2cd797f), I38 the "Finish setting up" card (6000ceb); the bumpers move by chapter
+in a film, and the pad flow now covers X, the bumpers, seek and hold-to-scrub (b3d2c70).
+
+**Three controller bugs, found by making the pad flow push the right stick on a rail and in the panel**
+(E3 names both; nothing had tested them): (1) the stick could not move a rail at all — the rail snaps to its
+cards and each frame's few pixels snapped back (0 → 0 px); snapping is now suspended while the stick drives an
+element and restored at rest; (2) the virtualised rail unmounted the focused card a frame after the stick's
+last movement, and focus fell to the page; within 600 ms of the stick moving something, a lost focus is put
+back near where it was, onto a control that is really on screen; (3) Down at the foot of the player's panel
+left the dialog for the bar, so the stick then scrolled nothing; a dialog now holds the D-pad and the follow.
+
+**E6 and E7, then four more controller faults (2026-11-16, Opus).** E6 measured in the real app on a copy of the
+catalogue database: a finished scan shows on Home 28 ms after (5 films) and 38 ms (200 films), seen to fail with
+Home's refetch removed (b4f3307). E7: the pad flow now fills the first run in by pad instead of pressing Continue
+through it, which found that no select and no slider could be changed by pad at all (ADR-0041 says anything a
+keyboard reaches a pad reaches), that a button disabling itself dropped focus onto the page, and that a long step's
+fields sat under the sticky footer. Fixed in af1be92: `PadPicker`, `adjustValue`, `rescueFocus` (with
+`wentWithItsScreen`, so opening another screen is left to that screen), `scroll-pb-32`. Decisions taken: the pad
+gets its own list for selects rather than replacing the native `<select>` (keyboard and mouse keep the platform's);
+Settings' typing check moved to a field that stays once the first run saves the OpenSubtitles key.
+
+**Author batch sent (2026-11-16).** The release build from 6334d7b, then: sign-off screenshots (E9, with Phase 14
+E4/E6), a download and a stream with a source of the author's choosing, the Phase 7 E7 VPN cut, "Load a file" in
+the player (E2), the first run with a real controller (E7 confirmation), and the embeddings-v3 decision (reserved:
+publishing a release, and the IMDb terms behind ADR-0044's "no pre-built catalogue"; default, not publishing).
+Also found and fixed today: choosing a found subtitle dropped focus out of the player panel (6334d7b).
+
+**The author's second report (2026-11-16, Opus).** "TV shows displayed as individual titles; can't click to
+pause; two volume readouts; Search won't click off Home; no way to try sources or downloads; no full-screen
+button on the controller." Investigated against their own database, read only. Fixed: episode numbering the
+parser did not know (`Ep. 01`, `Chapter 01`, year ranges, shelf prefixes, `Extra 1`), guesses below the
+accept line kept off Home and Play, waiting files re-identified at every scan (c00d4e5); clicks over the
+picture reported by mpv, View as the player's full screen, "Mute" instead of a second volume readout,
+Search and the destinations closing a title's page (1fcb1b7); a show's page marking what is on this PC and
+listing its own files in order; Films and TV Shows listing the library; a "try it" line in Sources (public-
+domain films stream from the Internet Archive; downloading needs a torrent source). Decisions taken: Films
+and TV Shows show the library now, ahead of Phase 19's catalogue browsing; files the catalogue cannot place
+keep their own numbering (ADR-0031). Open: downloads of web streams (the Archive) are not possible; asked
+the author which controller faults they meant.
+
+**A mistake to record.** Regenerating the IPC bindings launches the debug app; run directly it opens the
+repository's `data/` folder, which is the author's own database. Twice this evening it ran for a few seconds
+there and rescanned their library with the new reading (13:10 UTC). The result is what their next launch
+would have done (Monster 74 and Samurai Champloo 26 episodes, every film placed but one, which waits for
+review), but their data was changed unasked. From now on the debug app runs with `SINEPHILE_DATA_DIR` on a
+scratch folder, and tests use a copy. Verified on a copy afterwards: a rescan leaves 0 files misfiled.
+
+**Stremio add-ons (2026-11-17, Opus).** The author asked for a list of sources that stream "everything" to give
+users at onboarding; declined (unlicensed sources, and §2.1), and a Word file of free, legal sources was made
+instead (outside the repository). The author then chose, as ADR-0040 reserves to them, for the app to speak
+Stremio's add-on protocol: ADR-0047, spec 4.2.0 (A37). `source_protocol::stremio` and `AddonManifest`,
+`sinephile_sources::backends::stremio::StremioBackend`; asked by IMDb id; unplayable streams left out; the same
+limits as any add-on. Tested against a loopback Stremio add-on end to end, each new path seen to fail. The app
+still ships, suggests and names no add-on.
+
+**The author's fix list, items 1–7 (2026-11-17, Opus).** The author tested the installed app and answered seven
+rounds of questions (`docs/design/author-brief-2026-11-17.md`, the 15-item plan). Done, each pushed with the full
+pre-push suite and CI green:
+1. Season packs fetch only the chosen episode (248baa9). 2. Web addresses download directly and resume (15781a5).
+3. **The root cause of "no shows or movies, search not working, library broken"**: a fresh install never built
+   its search index. The installed database matched 0 of the author's 200 files; a copy after the new first-run
+   build matched 199 (24b545d). Stage A (normalise, index) runs after the first load while onboarding shows its
+   progress and Home says "Getting ready… N%"; alternate titles, cast and crew, and AniList follow in the
+   background, each followed by a catch-up that makes what it added searchable (a4df39a); the weekly refresh's
+   new titles were never searchable before, and now are. `embeddings-v3` published (the author's decision);
+   the published file matches the local one byte for byte. Timings in `docs/eval-results.md`.
+4. Click to pause, in the real window (6c8d015): a real `mouse_event` click showed the click lands on the app's
+   own `SinephileVideoHost` window, never on mpv's, so the earlier fix (tested by injecting a key into mpv)
+   could not have worked. The host window now reports clicks; a click on the paused still plays; a double
+   click goes full screen. Checked with screenshots of the real window.
+5. Full screen from a maximised window kept the maximised height (bar 80 px up); it un-maximises first now
+   (08b6b90), checked in the real window.
+6. Each tab keeps its trail and scroll; a large labelled Back top-left; Escape, Backspace and B take one step
+   (5058717). The pad audit found the scroll memory dead after any film had played (a listener bound to a
+   `<main>` that the full-screen player replaces); fixed with a callback ref.
+7. The title page (0ad50c7, 56215ed): a wide Play; round Download, Watchlist, Watched, Streams; the advice
+   removed; a streams panel by add-on with per-row Play and Download; "best" is the healthiest stream at the
+   preferred quality (a new Settings choice), then the nearest healthy one, 4K only with 50+ seeders. The pad
+   audit found B in the panel also left the film's page: the pad's synthetic Escape was not cancelable, so no
+   screen could ever mark B handled. Fixed at the source.
+
+**Decisions taken (ADR-0040, none reserved):** stage A before Home and enrichment after it; MovieLens not fetched
+(nothing in the app reads it); library scans wait only while a first build runs; Y, "/" and Ctrl+F go to the
+search box while the masthead's Search returns to where search was left; a weak stream is under 10 seeders, or a
+4K one under 50; the step above the preferred quality wins a tie; the streams panel renders inside the app frame.
+No SPEC.md amendment. Known debt D88 (logs and Downloads ignore `SINEPHILE_DATA_DIR`).
+
+**Two mistakes to record.** A bindings run was stopped with `taskkill /IM sin-e-phile.exe`, which would also
+close the author's installed app (same image name); runs are stopped by PID now (memory updated). A commit
+subject of 73 characters was rejected by the hook and the next commit swept its files in; caught before
+pushing, split again with `git reset --soft`.
+
+**The author's fix list, items 8–15 (2026-11-17, Opus).** All fifteen items of the plan are done; the table and the
+author's manual checks are at the end of `docs/design/author-brief-2026-11-17.md`.
+8. Settings (aa398c3): a side list of nine sections; add-ons as cards with Configure (by id, `<base>/configure` in the
+   browser); every add, save and remove said inline and in a toast (`src/lib/toast.ts`). 9. Films and TV (0fc2922):
+   the library, then catalogue rails (most watched, new, genres), each rail measured on 3.1 M titles. 10. Posters
+   (08a59f5, ADR-0048, allowlist `metahub.space`): fetched by the backend, re-encoded, cached, handed over as `data:`
+   URLs; checked in the real app. 11. Profile pictures (f3a6e43). 12. Onboarding polish (4cc59d2). 13. Library
+   (7ae1608): every one of the author's 200 files checked on a copy (all correct; the "2026" films are 2026 films); the
+   cause of "new files not noticed" was the watcher starting only after a successful scan, and the first scan had
+   failed during the catalogue load; checked live in the real app (in at 2 s, out at 2 s). 14. Downloads (46f868c).
+   15. Focus (5a160aa): focus comes back to the card opened.
+
+**Decisions taken (none reserved):** the keyless poster service as the author named it, off by default and said
+plainly; add-on logos wait for artwork (monogram now); the slow genres left out of the rails; Settings' side list
+sticky; spec 4.3.0 (A38, ADR-0049) puts eight deepening items in Appendix F (I79–I86).
+
+**Found by the pad audit, fixed at the source:** the pad's B was a non-cancelable synthetic Escape, so no screen could
+mark it handled (B in the streams panel also left the film's page); the scroll memory stopped recording after any
+film had played (`<main>` is a new element afterwards); focus restore at first moved Settings to its top. Each is now
+held by a check.
+
+**A mistake to record.** The guard refused a commit: a doc comment wrote Explorer's `"select"` in quotes, which its
+SQL pattern reads as a statement under `src-tauri`. The comment was reworded; the guard was not touched.
+
+**Round 8 (2026-11-17, Opus): the author tried the new installer.** Their report and eight answers are in the brief's
+"Round 8". Fixed, each checked in the real window where a window was the question:
+- **Streams crashed on every title** (b34ee3f): the panel and Settings shared the cache key `["sources"]` with two
+  shapes; reproduced in a test as exactly `order.indexOf is not a function`. Interface errors now reach the log file.
+- **Manage profiles opened Settings at About** (bb4ecb6).
+- **The bars never hid in full screen** (d5d6689): reproduced (6 s still, bars still up). Hiding the bars reshapes the
+  video window and Windows reports the still pointer as a move, which woke them. A move now counts only if the pointer
+  is somewhere new. The pointer hides with the bars after 3 s. The first version of `player_cursor` was a sync command
+  and froze the app (UI thread waiting on a lock held by a thread waiting on the UI thread); it is async.
+- **Continue watching by show** (a021a35): one card per show with the episode and a bar, atop Films and TV Shows too;
+  the show's page resumes that episode; the pause screen names the show, season, episode, time left and what is next.
+  Checked on a copy of the author's data: Monster S1 E1, Twin Peaks S1 E2, Project Hail Mary; Resume played Twin Peaks
+  E2 from 1:16.
+- **Search by meaning**: the author's install never had it. A new install now fetches it in setup (ADR-0050,
+  spec 4.4.0, A39); an existing one is offered it at the top of Search and in Settings. Pressing it on a copy of the
+  author's data found the real bug: **the download saved the tokenizer under a name nothing loads**, so no install that
+  downloaded it could ever have used it. One name now, in one place, with a test. The offer's heading was invisible
+  (`text-base` is a colour in this theme); a test now refuses the class.
+
+**Decisions taken (none reserved):** chapter titles that are only a time are hidden; the show's page gets the same wide
+Resume as a film's Play; "Build the index" when everything is downloaded but the index is not.
+
+## 2026-11-17 — Phase 16, round 9 of the author's fix list: a search grid, a title's backdrop
+
+The author tested the round 8 installer: everything works except search by meaning, which downloads but never builds
+its index; they want it inside the installer and pinned it until the end of this round (D90: the button's failure is
+never logged, so the log is silent; the files on their install are complete). Asked four questions: one grid with films
+first, about 8 across, every result the same size; a title's page with a backdrop and the poster on the right.
+
+- **Search as one poster grid** (aebfb44): Home's cards, so posters, the lettered card and focus memory come with them;
+  48 results; each other kind marked, and a quiet note where the match is not visible. **Films first only among equally
+  good matches**: sorted strictly, "peaks" put the Twin Peaks series after forty films that matched only in meaning, off
+  the screen, which was the complaint. Seen in the real window on a copy of the author's data: "twin peaks" shows both
+  series in the first row.
+- **A title's backdrop and poster** (aebfb44, ADR-0052, spec 4.5.0, A41): the same two sources as posters; the still is
+  faded behind the top of the page, the poster stands on the right. Seen on Twin Peaks and Fire Walk with Me.
+
+**Decisions taken (none reserved):** films first within match tiers rather than over the whole page (above); the "why"
+note shown only for meaning, near spelling, filters, and title-and-meaning; the backdrop's top edge faded with a mask.
+**Spec amendments:** 4.5.0, A41 (Appendix F's I80: backdrops now, from both sources; cast photos stay Phase 19).
+
+## 2026-11-18 — Phase 16, round 9: search by meaning inside the installer (D90)
+
+The pinned item. Read the author's install (read-only): the model and tokenizer were right, the meaning file was the right
+size with a sound header and 5,128,192 bytes wrong from byte 69,422,516 — the file's own data 1,005,504 bytes late. A
+resumed download had been answered from an earlier byte than it asked for, and the downloader trusted every `206`. The
+checksum caught it; then the bad file was kept, the screen judged files by their header, "Build the index" failed on the
+checksum every time, and the button's error was never logged. Reproduced on a copy: "checksum mismatch: the artefact is
+corrupt or was modified".
+
+- **Downloads:** a resume continues only when `Content-Range` starts where it asked, else the whole file again; a download
+  that fails its checks is deleted; before building, every file is checked in full; failures are logged. Tests serve a
+  file from a thread, honestly and not (`crates/catalogue/tests/download.rs`, `meaning_files.rs`), each seen to fail.
+- **The installer carries the files** (ADR-0053, spec 4.6.0, A42; the author's request): `npm run release` packs them
+  into `meaning/` beside the exe, refused unless they hash as published (`tools/bundle/check_meaning.py`, seen to refuse
+  the author's copy). The installed copy is read first, a superseded download removed, and the index builds by itself
+  once the catalogue is searchable; that path never downloads.
+- **Checked on a copy in the author's exact state**, release build: superseded downloads removed (364 MB), index built
+  from the installed copy in 23 s, hybrid, no button; "anime about loneliness in a big city" answers. Debug build without
+  an installed copy: the corrupt file removed at launch, "Download 314 MB" offered, and pressed: hybrid in 54 s.
+- **Search order:** films and anime films are one group (as are series and anime series), in the engine's order: split,
+  an anime query put live-action films ahead of the anime films ranked above them (seen in the release build).
+
+**Decisions taken (none reserved):** the release installer is built by `npm run release` (the plain `tauri build` stays
+without the files, for development, and CI does not bundle); the launch-time build never downloads, so an existing
+install without the files is still only offered them; a corrupt download found at launch is removed so the offer states
+the real cost. **Spec amendments:** 4.6.0, A42.
+
+## 2026-11-18 — Phase 16, round 10, and the close
+
+The author installed the round 9 installer: search by meaning works, everything else is good, and one thing before
+Phase 17: the profile icon opened Who's watching? with no way back to the page it was clicked from.
+
+- **The way back** (f2dd945): opened from the avatar, Who's watching? carries the same link as every page, naming the
+  page it covers; it keeps whoever is watching and returns focus to the avatar. Launch's question has none. The arrow is
+  one design-system piece, `BackLink`. Seen to fail: three unit tests, and the pad audit on the old build ("has a way
+  back (null)"); 123 checks pass on the new one.
+- **E2 closed in the real window** (1863bcb): a generated clip, "Load a file…" clicked, Windows' picker answered with a
+  typed path: the cue on the picture. Two rough edges found there and fixed: the picker listed every file (it opened on
+  a pictures folder), and the track read "sin-e-phile". Now subtitle files first, the track named for its file.
+- **A first launch could leave no default profile** (803a1c4), found on the second launch of that scratch folder: two
+  simultaneous first asks, one demoting what the other made, then failing on the name; every later launch failed the
+  same way, and everything kept per profile with it. One statement per step now, and an install in that state mends
+  itself (seen: `(1, 'You', 0)` became `(1, 'You', 1)` on the next launch). The race test passed before the fix until
+  the pool was warmed; only then did it fail as the app had.
+- **Regression:** `cargo test --workspace` 862 passed (858 at round 9), `npm test` 273 (269), the pad audit 123 (120).
+
+**Decisions taken (none reserved):** E9 is met by the author's sign-off on the live app after ten rounds rather than a
+separate screenshot set; Phase 14 E4 (no-key state good-looking) and E6 (onboarding beautiful) are carried to Phase 19,
+because that sign-off was on an install with a TMDB key and an existing setup, and Phase 19's overhaul redesigns those
+screens and ends with a screenshot sign-off; Phase 7 E7 (the VPN cut) goes to that same batch. "Load a file" counts as
+met by pad as far as the app goes: the pad reaches and presses it, and Windows' own picker takes the keyboard or mouse
+(D91). Debt at the close: D87 to Phase 24, D88 to 22, D89 and D91 to 19. **Spec amendments:** none.
+
+#### Phase 16 retrospective
+
+**Went well.** Judging by the release build as a person uses it found what every test had missed: a fresh install
+that never built its search index, a meaning file corrupt mid-download and kept, a profile race on a first launch.
+Real-window runs (the probe, the window driver, a scratch data folder) became routine, and every fix was seen to fail
+first, including the pad audit against the old build.
+
+**Went badly.** The phase ran ten days and ten rounds. Most of its defects lived on paths only a fresh install, a
+resumed download or a second launch take, and fixtures start from states the real first run never produces. One race
+test passed before its fix, which a check that has never been seen to fail would have hidden.
+
+**Carry forward.** Before giving the author an installer: a fresh install and a second launch on a scratch folder, in
+the real window, as a standing step. To Phase 19's author batch: Phase 7 E7, Phase 14 E4 and E6, D89, D91.

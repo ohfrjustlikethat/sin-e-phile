@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/lib/toast";
 import { Button, Input, Select, Slider, Toggle } from "@/design-system";
 import { commands, type SubtitleSettings, type SubtitleSettingsView } from "@/lib/ipc";
 import { languageName } from "@/lib/playbackChoice";
+import { SETTINGS_HEADING } from "./heading";
 
 /**
  * Settings → Subtitles — SPEC.md Phase 10.
@@ -64,7 +66,9 @@ function Form({ view, onSaved }: { view: SubtitleSettingsView; onSaved: () => vo
     onSuccess: () => {
       setSaved(true);
       onSaved();
+      toast("Subtitle settings saved.");
     },
+    onError: (e) => toast(`Not saved: ${e.message}`, "danger"),
   });
   const parsed = parseLanguages(languages);
 
@@ -99,8 +103,9 @@ function Form({ view, onSaved }: { view: SubtitleSettingsView; onSaved: () => vo
         />
       </div>
       <p className="mt-1.5 text-[11px] leading-relaxed text-ink-faint">
-        For plain subtitles. A styled ASS/SSA file keeps the look it was made with. G and H (or the
-        bumpers) move subtitles a tenth of a second while watching, and the film remembers it.
+        For plain subtitles. A styled ASS/SSA file keeps the look it was made with. While watching, G and
+        H (or Timing in the player&apos;s panel, Menu on a controller) move subtitles a tenth of a second,
+        and the film remembers it; the panel also changes their look.
       </p>
 
       <div className="mt-4 flex items-center gap-3">
@@ -127,9 +132,17 @@ function OpenSubtitlesKey({ view, onChanged }: { view: SubtitleSettingsView; onC
     onSuccess: () => {
       setKey("");
       onChanged();
+      toast("OpenSubtitles key saved and checked: subtitles are found for you now.");
+    },
+    onError: (e) => toast(`The key was not saved: ${e.message}`, "danger"),
+  });
+  const remove = useMutation({
+    mutationFn: () => ok(commands.clearOpensubtitlesKey()),
+    onSuccess: () => {
+      onChanged();
+      toast("OpenSubtitles key removed.", "neutral");
     },
   });
-  const remove = useMutation({ mutationFn: () => ok(commands.clearOpensubtitlesKey()), onSuccess: onChanged });
   const left = Math.max(0, Math.min(view.budget - view.used_today, view.server_remaining ?? view.budget));
 
   return (
@@ -149,6 +162,14 @@ function OpenSubtitlesKey({ view, onChanged }: { view: SubtitleSettingsView; onC
           </Button>
         </div>
       ) : (
+        <>
+        <p className="mb-3 text-[12px] text-ink-muted">
+          A free OpenSubtitles account gives you a key in a minute.{" "}
+          <button type="button" className="underline hover:text-ink" onClick={() => void commands.openSignUp("opensubtitles")}>
+            Get a free key
+          </button>
+          , then paste it here. It is checked as you save it.
+        </p>
         <div className="flex items-end gap-3">
           <div className="flex-1">
             <Input
@@ -164,6 +185,7 @@ function OpenSubtitlesKey({ view, onChanged }: { view: SubtitleSettingsView; onC
             Save key
           </Button>
         </div>
+        </>
       )}
     </div>
   );
@@ -172,7 +194,7 @@ function OpenSubtitlesKey({ view, onChanged }: { view: SubtitleSettingsView; onC
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-9" aria-label={title}>
-      <h2 className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">{title}</h2>
+      <h2 className={SETTINGS_HEADING}>{title}</h2>
       {children}
     </section>
   );

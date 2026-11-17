@@ -184,6 +184,26 @@ impl<'a> LibraryRepository<'a> {
     // ---- folders ----------------------------------------------------------------
 
     /// Add a folder, or return the one already added at that path.
+    /// What is in the library, most recently identified first (Phase 16, Home's "Your
+    /// library"): each film once, and an episode as its series, once.
+    pub async fn recently_added(&self, limit: i64) -> Result<Vec<i64>, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT item FROM (
+                 SELECT COALESCE(e.series_id, m.media_item_id) AS item, MAX(m.matched_at) AS at
+                   FROM local_file_matches m
+                   JOIN local_files f ON f.id = m.local_file_id
+                   LEFT JOIN episodes e ON e.media_item_id = m.media_item_id
+                  WHERE f.missing_since IS NULL AND f.ignored_at IS NULL
+                    AND (m.is_confirmed = 1 OR m.confidence >= ?2)
+                  GROUP BY item)
+             ORDER BY at DESC, item LIMIT ?1",
+        )
+        .bind(limit)
+        .bind(crate::MATCH_ACCEPTED_AT)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
     pub async fn add_folder(&self, path: &str) -> Result<i64, DbError> {
         Ok(sqlx::query_scalar(
             "INSERT INTO library_folders (path) VALUES (?1)
@@ -593,15 +613,58 @@ impl<'a> LibraryRepository<'a> {
         Ok(())
     }
 
-    /// Present files matched to this item: the copies a film's page can play.
+    /// Everything on this PC the library stands behind, a show once however many of its
+    /// episodes are here: the shows (`shows`) or the films, by title. The Films and TV
+    /// Shows pages until Phase 19 adds the catalogue around them (Phase 16).
+    pub async fn library_titles(&self, shows: bool) -> Result<Vec<i64>, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT x.item FROM (
+                 SELECT COALESCE(e.series_id, m.media_item_id) AS item
+                   FROM local_file_matches m
+                   JOIN local_files f ON f.id = m.local_file_id
+                   LEFT JOIN episodes e ON e.media_item_id = m.media_item_id
+                  WHERE f.missing_since IS NULL AND f.ignored_at IS NULL
+                    AND (m.is_confirmed = 1 OR m.confidence >= ?1)
+                  GROUP BY item) x
+               JOIN media_items mi ON mi.id = x.item
+              WHERE (mi.kind IN ('series', 'anime_series')) = ?2
+              ORDER BY COALESCE(mi.sort_title, mi.primary_title) COLLATE NOCASE, mi.id",
+        )
+        .bind(crate::MATCH_ACCEPTED_AT)
+        .bind(shows)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
+    /// The series' episodes with a present file the library stands behind: what its page
+    /// marks "On this PC" (Phase 16).
+    pub async fn episodes_on_this_pc(&self, series_id: i64) -> Result<Vec<i64>, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT DISTINCT e.media_item_id FROM episodes e
+               JOIN local_file_matches m ON m.media_item_id = e.media_item_id
+               JOIN local_files f ON f.id = m.local_file_id
+              WHERE e.series_id = ?1 AND f.missing_since IS NULL AND f.ignored_at IS NULL
+                AND (m.is_confirmed = 1 OR m.confidence >= ?2)
+              ORDER BY e.media_item_id",
+        )
+        .bind(series_id)
+        .bind(crate::MATCH_ACCEPTED_AT)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
+    /// Present files matched to this item: the copies a film's page can play. Only matches
+    /// accepted or confirmed: a guess waiting in the review queue plays nothing.
     pub async fn files_for_item(&self, media_item_id: i64) -> Result<Vec<LocalFile>, DbError> {
         let rows = sqlx::query(&format!(
             "SELECT {FILE_COLUMNS} FROM local_files l
              WHERE l.missing_since IS NULL AND l.id IN (
-                 SELECT local_file_id FROM local_file_matches WHERE media_item_id = ?1)
+                 SELECT local_file_id FROM local_file_matches
+                  WHERE media_item_id = ?1 AND (is_confirmed = 1 OR confidence >= ?2))
              ORDER BY l.size_bytes DESC"
         ))
         .bind(media_item_id)
+        .bind(crate::MATCH_ACCEPTED_AT)
         .fetch_all(self.db.pool())
         .await?;
         Ok(rows.iter().map(file).collect::<Result<_, _>>()?)

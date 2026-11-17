@@ -1,20 +1,26 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Masthead } from "@/app/Masthead";
 import { PlayerScreen } from "@/features/player/PlayerScreen";
 import { DetailScreen } from "@/features/detail/DetailScreen";
 import { useDropToPlay } from "@/features/player/useDropToPlay";
 import { sendPlayerIntent } from "@/features/player/intentBus";
-import { moveFocus, startGamepad } from "@/lib/gamepad";
+import { adjustValue, moveFocus, startGamepad } from "@/lib/gamepad";
 import { Placeholder } from "@/app/Placeholder";
 import { PadKeyboard, closePadKeyboard } from "@/app/PadKeyboard";
+import { PadPicker, closePadPicker, openPadPicker } from "@/app/PadPicker";
 import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { ReviewScreen } from "@/features/library/ReviewScreen";
 import { DownloadsScreen } from "@/features/downloads/DownloadsScreen";
 import { TasteProfile } from "@/features/taste/TasteProfile";
 import { DownloadNotices } from "@/features/downloads/DownloadNotices";
+import { ToastStack } from "@/design-system";
+import { useToasts } from "@/lib/toast";
 import { ProfilePicker } from "@/features/profiles/ProfilePicker";
 import { Onboarding } from "@/features/onboarding/Onboarding";
+import { GettingReady, useCatalogueBuild } from "@/features/onboarding/CatalogueBuild";
 import { HomeScreen } from "@/features/home/HomeScreen";
+import { WatchlistScreen } from "@/features/watchlist/WatchlistScreen";
+import { LibraryShelf } from "@/features/library/LibraryShelf";
 import { commands as ipc } from "@/lib/ipc";
 import { useProfileSync, useProfiles } from "@/features/profiles/useProfiles";
 import { SearchScreen } from "@/features/search/SearchScreen";
@@ -24,17 +30,14 @@ import { DESTINATIONS, useUi, type Destination } from "@/lib/store";
 import { FocusLayer } from "@/design-system/focus/FocusLayer";
 import { play, rumble } from "@/design-system/focus/feedback";
 import { useControllerSettings } from "@/lib/controllerSettings";
+import { setWindowFullscreen } from "@/lib/fullscreen";
+import { useScrollMemory } from "@/lib/scrollMemory";
+import { BackBar, usePageName } from "./BackBar";
+import { handleBack } from "./backKey";
 
-function inTauri(): boolean {
-  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-}
-
-/** Full screen for the whole app window (ADR-0042: View, or picking the pad up). */
+/** Full screen for the whole app window (ADR-0042: View, or picking the pad up), from any window state. */
 async function fullscreen(on?: boolean) {
-  if (!inTauri()) return;
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  const w = getCurrentWindow();
-  await w.setFullscreen(on ?? !(await w.isFullscreen()));
+  await setWindowFullscreen(on);
 }
 
 /** The focused tile, if focus is on one (ADR-0042's tilt and press apply to tiles only). */
@@ -71,6 +74,8 @@ export function App() {
   useProfileSync();
   // First run (Phase 14): the wizard, once. `null` until asked.
   const [onboarding, setOnboarding] = useState<boolean | null>(null);
+  // A fresh install's catalogue (Phase 16): Home, Films, TV and search wait until it is built.
+  const build = useCatalogueBuild();
   useEffect(() => {
     // Inside a promise: outside the Tauri shell (the UI audit's browser) the call throws at
     // once, and that is "no wizard", not a crashed page.
@@ -81,22 +86,37 @@ export function App() {
   }, []);
   // ADR-0043: ask who is watching on launch only when there is more than one profile.
   useEffect(() => {
-    if (pickerOpen === null && !profilesLoading) setPickerOpen(profiles.length >= 2);
+    if (pickerOpen === null && !profilesLoading) setPickerOpen(profiles.length >= 2, true);
   }, [pickerOpen, profilesLoading, profiles.length, setPickerOpen]);
+  // Opened from the avatar, Who's watching? goes back to the page it covers (round 10).
+  const pickerAtLaunch = useUi((s) => s.pickerAtLaunch);
+  const pageName = usePageName();
   const mini = useUi((s) => s.mini);
   const detail = useUi((s) => s.detail);
   useDropToPlay();
   const [palette, setPalette] = useState(false);
-  const [searching, setSearching] = useState(false);
+  // Search keeps its own trail and words while away (Phase 16); see `Tab` in src/lib/store.ts.
+  const searching = useUi((s) => s.tab === "search");
   // Search opens from anywhere: over Settings and over a film's page, which would
   // otherwise take precedence and leave search switched on but invisible.
-  const openSearch = useCallback(() => {
-    const ui = useUi.getState();
-    ui.setSettingsOpen(false);
-    ui.setDownloadsOpen(false);
-    ui.closeDetail();
-    setSearching(true);
-  }, []);
+  const openSearch = useCallback(() => useUi.getState().searchNow(), []);
+  // What has its own Escape: the first run and the palette (the key handler reads this when a key comes).
+  const blocking = useRef(false);
+  blocking.current = Boolean(onboarding) || palette;
+  // One scroll area holds every page; each page's position is kept and put back (Phase 16).
+  const pageKey = useUi((s) =>
+    s.reviewOpen
+      ? "review"
+      : s.tasteOpen
+        ? "taste"
+        : s.settingsOpen
+          ? `settings|${s.settingsSection}`
+          : s.downloadsOpen
+            ? "downloads"
+            : `${s.tab}|${s.trails[s.tab].join(",")}`,
+  );
+  const navSeq = useUi((s) => s.navSeq);
+  const mainRef = useScrollMemory(pageKey, navSeq);
 
   // TV mode's scale must not apply while the player positions its native window.
   useEffect(() => {
@@ -113,18 +133,29 @@ export function App() {
         player: sendPlayerIntent,
         nav: (action) => {
           switch (action.kind) {
-            case "move":
-              play(moveFocus(action.direction) ? "move" : "edge");
+            case "move": {
+              // Left and Right set a focused slider rather than leave it (Phase 16).
+              const adjusted = adjustValue(action.direction);
+              if (adjusted) play(adjusted === "changed" ? "move" : "edge");
+              else play(moveFocus(action.direction) ? "move" : "edge");
               break;
-            case "activate":
+            }
+            case "activate": {
               play("select");
               rumble();
-              (document.activeElement as HTMLElement | null)?.click();
+              const el = document.activeElement;
+              // A select's own list cannot be opened from a script; the pad gets its own.
+              if (el instanceof HTMLSelectElement && openPadPicker(el)) break;
+              (el as HTMLElement | null)?.click();
               break;
+            }
             case "back":
+              if (closePadPicker()) break;
               if (closePadKeyboard()) break;
+              // Cancelable, as a real key's is: a screen that handles B marks it so, and the app's
+              // Back then leaves it alone (Phase 16: B in the streams panel also left the title page).
               window.dispatchEvent(
-                new KeyboardEvent("keydown", { key: "Escape" }),
+                new KeyboardEvent("keydown", { key: "Escape", cancelable: true }),
               );
               break;
             case "tab": {
@@ -135,8 +166,7 @@ export function App() {
                   (i + (action.next ? 1 : DESTINATIONS.length - 1)) %
                     DESTINATIONS.length
                 ];
-              if (next) ui.setDestination(next);
-              setSearching(false);
+              if (next) ui.goTab(next);
               break;
             }
             case "search":
@@ -184,10 +214,8 @@ export function App() {
         target?.tagName === "TEXTAREA" ||
         target?.isContentEditable;
 
-      if (event.key === "Escape" && searching) {
-        setSearching(false);
-        return;
-      }
+      // One step back (Phase 16): Escape, Backspace outside a field, and the pad's B. See backKey.ts.
+      if (handleBack(event, blocking.current)) return;
       if (typing) return;
       if (
         event.key === "/" ||
@@ -199,7 +227,7 @@ export function App() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [searching, openSearch]);
+  }, [openSearch]);
 
   // §3.1: the palette searches "media, actions, and settings". Phase 5 supplies
   // media; these are the actions and settings that exist today.
@@ -217,19 +245,13 @@ export function App() {
       id: "downloads",
       label: "Open downloads",
       group: "Navigate",
-      run: () => {
-        setSearching(false);
-        useUi.getState().setDownloadsOpen(true);
-      },
+      run: () => useUi.getState().setDownloadsOpen(true),
     },
     {
       id: "taste",
       label: "Your taste",
       group: "Navigate",
-      run: () => {
-        setSearching(false);
-        useUi.getState().setTasteOpen(true);
-      },
+      run: () => useUi.getState().setTasteOpen(true),
     },
     {
       id: "settings",
@@ -249,7 +271,7 @@ export function App() {
   if (DESIGN_ROUTE) {
     return (
       <div className="flex h-full flex-col bg-base text-ink">
-        <Masthead searching={false} onSearchChange={() => {}} />
+        <Masthead />
         <DesignGallery />
       </div>
     );
@@ -265,9 +287,13 @@ export function App() {
   return (
     <>
       {!full && (
-        <div className="flex h-full flex-col bg-base text-ink">
-          <Masthead searching={searching} onSearchChange={setSearching} />
-          <main className="min-h-0 min-w-0 flex-1 overflow-auto">
+        <div className="relative flex h-full flex-col bg-base text-ink">
+          <Masthead />
+          {/* Panels that slide over the page (the streams panel) render here: inside the app's frame and under
+              the masthead, so TV mode's scale and safe margin apply to them too. */}
+          <div id="panel-slot" className="pointer-events-none absolute inset-x-0 top-14 bottom-0 z-40" />
+          <main ref={mainRef} className="min-h-0 min-w-0 flex-1 overflow-auto">
+            <BackBar />
             {settingsOpen && reviewOpen ? (
               <ReviewScreen />
             ) : settingsOpen && tasteOpen ? (
@@ -278,10 +304,16 @@ export function App() {
               <DownloadsScreen />
             ) : detail !== null ? (
               <DetailScreen />
+            ) : !build.ready && (searching || ["home", "films", "tv"].includes(destination)) ? (
+              <GettingReady build={build} />
             ) : searching ? (
               <SearchScreen />
             ) : destination === "home" ? (
               <HomeScreen />
+            ) : destination === "watchlist" ? (
+              <WatchlistScreen />
+            ) : destination === "films" || destination === "tv" ? (
+              <LibraryShelf shows={destination === "tv"} />
             ) : (
               <Placeholder destination={destination} />
             )}
@@ -292,12 +324,16 @@ export function App() {
             onOpenChange={setPalette}
           />
           <PadKeyboard />
+          <PadPicker />
           <FocusLayer />
         </div>
       )}
       <DownloadNotices />
+      <Toaster />
       {onboarding && !full && <Onboarding onDone={() => setOnboarding(false)} />}
-      {pickerOpen && !onboarding && !full && <ProfilePicker onDone={() => setPickerOpen(false)} />}
+      {pickerOpen && !onboarding && !full && (
+        <ProfilePicker back={pickerAtLaunch ? null : pageName} onDone={() => setPickerOpen(false)} />
+      )}
       {playing && (
         <div
           className={
@@ -313,4 +349,11 @@ export function App() {
       )}
     </>
   );
+}
+
+/** Every add, save and connect, said where focus went (src/lib/toast.ts). */
+function Toaster() {
+  const toasts = useToasts((s) => s.toasts);
+  const dismiss = useToasts((s) => s.dismiss);
+  return <ToastStack toasts={toasts} onDismiss={dismiss} />;
 }

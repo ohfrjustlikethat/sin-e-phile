@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { DESTINATIONS, type Destination, useUi } from "@/lib/store";
 import { inProgress } from "@/features/downloads/format";
 import { useDownloads } from "@/features/downloads/useDownloads";
-import { Avatar } from "@/features/profiles/Avatar";
+import { ProfileAvatar } from "@/features/profiles/ProfileAvatar";
 import { useProfiles } from "@/features/profiles/useProfiles";
 
 /**
@@ -37,37 +37,55 @@ function inTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
-export function Masthead({
-  searching,
-  onSearchChange,
-}: {
-  searching: boolean;
-  onSearchChange: (open: boolean) => void;
-}) {
-  const { destination, settingsOpen, setDestination, setSettingsOpen, downloadsOpen, setDownloadsOpen } =
-    useUi();
+export function Masthead() {
+  const { destination, settingsOpen, setSettingsOpen, downloadsOpen, setDownloadsOpen, goTab } = useUi();
+  const searching = useUi((s) => s.tab === "search");
   const controls = useWindowControls();
   const downloads = useDownloads();
   const busy = inProgress(downloads.data ?? []).length;
   const { active } = useProfiles();
   const setPickerOpen = useUi((s) => s.setPickerOpen);
 
-  const go = (d: Destination) => {
-    setSettingsOpen(false);
-    onSearchChange(false);
-    setDestination(d);
-  };
+  // Each tab keeps its trail (Phase 16, the author): going to a tab shows the page it was left on, and
+  // pressing the tab already showing goes to its start. Settings and Downloads close on the way.
+  const go = (d: Destination) => goTab(d);
+
+  // Compact when the full masthead does not fit (Phase 16: at 1280 wide on a 150% display,
+  // and in TV mode's 125% zoom, "TV Shows" wrapped and the window buttons went off the
+  // edge). Measured rather than set by a breakpoint, because TV mode zooms the page without
+  // changing what a media query sees. The full width is learnt whenever the full masthead
+  // is showing; it goes compact when the space falls below it, and back when it returns.
+  const bar = useRef<HTMLElement>(null);
+  const full = useRef(0);
+  const [compact, setCompact] = useState(false);
+  useLayoutEffect(() => {
+    const el = bar.current;
+    if (!el) return;
+    const measure = () => {
+      if (!compact) full.current = el.scrollWidth;
+      const fits = el.clientWidth >= full.current;
+      if (compact === fits) setCompact(!fits);
+    };
+    measure();
+    // Absent in the test DOM; the full masthead is then all there is.
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [compact]);
 
   return (
     <header
+      ref={bar}
       data-tauri-drag-region
-      className="flex h-14 shrink-0 select-none items-stretch border-b border-line-subtle bg-void"
+      data-compact={compact || undefined}
+      className="group/bar flex h-14 shrink-0 select-none items-stretch border-b border-line-subtle bg-void"
     >
       <button
         type="button"
         onClick={() => go("home")}
         aria-label="sin·e·phile — Home"
-        className="flex items-center gap-2.5 pr-8 pl-6"
+        className={`flex shrink-0 items-center gap-2.5 ${compact ? "pr-4 pl-5" : "pr-8 pl-6"}`}
       >
         <span className="h-3 w-3 rounded-sm bg-oxblood" aria-hidden />
         <span className="font-display text-[17px] font-extrabold tracking-[-0.035em] text-ink">
@@ -87,7 +105,7 @@ export function Masthead({
                   type="button"
                   onClick={() => go(d)}
                   aria-current={active ? "page" : undefined}
-                  className={`relative px-4 text-[13px] transition-colors duration-[var(--dur-standard)] ${
+                  className={`relative whitespace-nowrap ${compact ? "px-2" : "px-4"} text-[13px] transition-colors duration-[var(--dur-standard)] ${
                     active ? "text-ink" : "text-ink-muted hover:text-ink"
                   }`}
                 >
@@ -109,14 +127,10 @@ export function Masthead({
 
       <div data-tauri-drag-region className="flex-1" />
 
-      <div className="flex items-center gap-2 pr-3">
+      <div className={`flex shrink-0 items-center pr-3 ${compact ? "gap-1.5" : "gap-2"}`}>
         <button
           type="button"
-          onClick={() => {
-            setSettingsOpen(false);
-            setDownloadsOpen(false);
-            onSearchChange(true);
-          }}
+          onClick={() => goTab("search")}
           aria-pressed={searching}
           className={`flex h-8 items-center gap-2.5 rounded-sm border px-3 text-[13px] transition-colors duration-[var(--dur-standard)] ${
             searching
@@ -129,20 +143,17 @@ export function Masthead({
             <path d="M9.5 9.5L13 13" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
           </svg>
           Search
-          <kbd className="rounded-sm border border-line px-1.5 font-mono text-[11px] leading-[18px] text-ink-faint">
+          <kbd className={`${compact ? "hidden" : ""} rounded-sm border border-line px-1.5 font-mono text-[11px] leading-[18px] text-ink-faint`}>
             /
           </kbd>
         </button>
 
         <button
           type="button"
-          onClick={() => {
-            onSearchChange(false);
-            setDownloadsOpen(true);
-          }}
+          onClick={() => setDownloadsOpen(true)}
           aria-pressed={downloadsOpen}
           aria-label={busy > 0 ? `Downloads, ${busy} in progress` : "Downloads"}
-          className={`flex h-8 items-center gap-2 px-3 text-[13px] transition-colors duration-[var(--dur-standard)] ${
+          className={`flex h-8 items-center gap-2 whitespace-nowrap ${compact ? "px-2.5" : "px-3"} text-[13px] transition-colors duration-[var(--dur-standard)] ${
             downloadsOpen ? "text-ink" : "text-ink-muted hover:text-ink"
           }`}
         >
@@ -161,16 +172,13 @@ export function Masthead({
             aria-label={`${active.name}: switch profile`}
             className="grid h-8 w-8 place-items-center"
           >
-            <Avatar name={active.name} colour={active.avatar_colour} />
+            <ProfileAvatar profile={active} />
           </button>
         )}
 
         <button
           type="button"
-          onClick={() => {
-            onSearchChange(false);
-            setSettingsOpen(true);
-          }}
+          onClick={() => setSettingsOpen(true)}
           aria-label="Settings"
           aria-pressed={settingsOpen}
           className={`grid h-8 w-8 place-items-center transition-colors duration-[var(--dur-standard)] ${
@@ -187,7 +195,7 @@ export function Masthead({
         </button>
       </div>
 
-      <div className="flex border-l border-line-subtle">
+      <div className="flex shrink-0 border-l border-line-subtle">
         <WindowButton label="Minimise" onClick={controls.minimize} disabled={!controls.shell}>
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
             <path d="M0 5h10" stroke="currentColor" strokeWidth="1" />
@@ -296,7 +304,7 @@ function WindowButton({
       onClick={onClick}
       disabled={disabled}
       className={[
-        "grid h-full w-12 place-items-center text-ink-muted transition-colors",
+        "grid h-full w-12 place-items-center text-ink-muted transition-colors group-data-[compact]/bar:w-10",
         "disabled:cursor-default disabled:opacity-40",
         // §9.1: destructive actions use --danger, never oxblood, and the two are never
         // adjacent. Close is the only red thing in the masthead, and only on hover.

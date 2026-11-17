@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Input } from "@/design-system";
 import { commands } from "@/lib/ipc";
 import { AVATAR_COLOURS, Avatar, colourOf, type AvatarColour } from "@/features/profiles/Avatar";
@@ -8,15 +8,28 @@ import { TasteInput } from "@/features/profiles/TasteInput";
 import { PROFILES, useProfiles } from "@/features/profiles/useProfiles";
 import { LibrarySection } from "@/features/settings/LibrarySection";
 import { SourcesSection } from "@/features/settings/SourcesSection";
+import { SubtitlesSection } from "@/features/settings/SubtitlesSection";
+import { NetworkSection } from "@/features/settings/NetworkSection";
+import { TmdbSection } from "@/features/settings/TmdbSection";
+import { ArtworkSection } from "@/features/settings/ArtworkSection";
+import { Settings as DownloadsSettings } from "@/features/downloads/DownloadsScreen";
 import { TitleCards } from "./TitleCards";
+import { PickStrip } from "./PickStrip";
+import type { TastePick } from "@/lib/ipc";
+import { ChoosePicture } from "@/features/profiles/ChoosePicture";
+import { PICTURE } from "@/features/profiles/ProfileAvatar";
+import { MeaningDownload } from "@/features/search/MeaningDownload";
+import { BuildStrip, useCatalogueBuild } from "./CatalogueBuild";
 
 /**
- * First run (SPEC.md Phase 14): three steps a non-technical person finishes in under two
- * minutes. 1, who this is for; 2, what they like (films to pick by name, statements that
- * are not genres, their own words, or an import); 3, where to watch (optional: the
- * Internet Archive works already, a folder of their own is one press). Every step can be
- * skipped and none is a dead end: skipping everything still lands on a Home with films on
- * it. No launch intro (ADR-0043): the first screen asks the first question.
+ * First run (SPEC.md Phase 14; Phase 16 makes it leave the viewer ready to watch): who this
+ * is for; what they like; their films on this PC; where films come from (add-ons by the
+ * address they chose — the app names none, §2.1); subtitles (their languages and their own
+ * OpenSubtitles key, checked as it is entered); and downloads (the built-in engine or their
+ * own qBittorrent, and the VPN adapter). Every step can be skipped and none is a dead end:
+ * skipping everything still lands on a Home with films on it. No launch intro (ADR-0043).
+ * The author found in Phase 15's review that skipping the old third step left nothing to
+ * play or download from, and nothing said so; each step now says what it is for.
  *
  * Pad: the D-pad moves, A chooses, B goes back a step.
  */
@@ -27,7 +40,15 @@ async function ok<T>(p: Promise<{ status: "ok"; data: T } | { status: "error"; e
   return r.data;
 }
 
-const STEPS = ["Who's this for?", "What do you like?", "Where to watch"] as const;
+const STEPS = [
+  "Who's this for?",
+  "What do you like?",
+  "Your films on this PC",
+  "Where films come from",
+  "Subtitles",
+  "Posters and what's on",
+  "Downloads",
+] as const;
 type Way = "cards" | "words" | "import";
 
 export function Onboarding({ onDone }: { onDone: () => void }) {
@@ -37,7 +58,21 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState("");
   const [colour, setColour] = useState<AvatarColour>("sage");
   const [way, setWay] = useState<Way>("cards");
+  // The films picked in "What do you like?", shown back in the steps after it (Phase 16: imagery from the picks).
+  const [picks, setPicks] = useState<TastePick[]>([]);
   const first = useRef<HTMLDivElement>(null);
+  // The profile's picture, if one is chosen here (Phase 16): the large avatar shows it.
+  const picture = useQuery({
+    queryKey: PICTURE(active?.id ?? 0),
+    queryFn: async () => {
+      const r = await commands.profilePicture(active?.id ?? 0);
+      return r.status === "ok" ? r.data : null;
+    },
+    enabled: active !== undefined && active !== null,
+    staleTime: Infinity,
+  });
+  // The catalogue builds while the viewer sets up (Phase 16): its progress is in the footer.
+  const build = useCatalogueBuild();
 
   // The profile made on install is "You": its name is the first question.
   useEffect(() => {
@@ -91,22 +126,36 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       role="dialog"
       aria-modal="true"
       aria-label="Setting up sin·e·phile"
-      className="fixed inset-0 z-50 overflow-auto bg-base text-ink"
+      // The footer stays on screen as the step scrolls, so whatever takes focus is kept clear
+      // of it (Phase 16): without this a long step put its last fields half under the footer,
+      // and the D-pad, finding nothing below them, could not reach Continue.
+      className="fixed inset-0 z-50 scroll-pb-32 overflow-auto bg-base text-ink"
     >
       <div className="mx-auto flex min-h-full max-w-[880px] flex-col px-10 py-14">
-        <p className="label" aria-label={`Step ${step + 1} of ${STEPS.length}`}>
-          {step + 1} of {STEPS.length}
-        </p>
-        <h1 className="mt-3 font-display text-[44px] font-extrabold leading-none tracking-[-0.03em]">
-          {STEPS[step]}
-        </h1>
+        {/* Where the first run is, at a glance: one segment a step, the done ones in oxblood. */}
+        <div aria-hidden className="flex gap-1.5">
+          {STEPS.map((s, i) => (
+            <span key={s} className={`h-[3px] flex-1 ${i <= step ? "bg-oxblood-bright" : "bg-line"}`} />
+          ))}
+        </div>
+        <div className="mt-6 flex items-end justify-between gap-8">
+          <div>
+            <p className="label" aria-label={`Step ${step + 1} of ${STEPS.length}`}>
+              {step + 1} of {STEPS.length}
+            </p>
+            <h1 className="mt-3 font-display text-[56px] font-extrabold leading-none tracking-[-0.03em]">
+              {STEPS[step]}
+            </h1>
+          </div>
+          {step >= 2 && <PickStrip picks={picks} />}
+        </div>
 
-        <div ref={first} className="mt-10 flex-1">
+        <div ref={first} key={step} className="mt-10 flex-1" style={{ animation: "step-in 240ms var(--ease-standard)" }}>
           {step === 0 && (
             <div className="flex flex-col gap-6">
               <div className="flex items-end gap-5">
-                <Avatar name={name || "?"} colour={colour} size="lg" />
-                <div className="w-80">
+                <Avatar name={name || "?"} colour={colour} size="lg" picture={picture.data ?? null} />
+                <div className="flex w-80 flex-col gap-3">
                   <Input
                     label="Your name"
                     placeholder="What should we call you?"
@@ -114,6 +163,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                     maxLength={40}
                     onChange={(e) => setName(e.target.value)}
                   />
+                  {active && <ChoosePicture profile={active.id} />}
                 </div>
               </div>
               <div role="radiogroup" aria-label="Colour" className="flex gap-2">
@@ -160,20 +210,69 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                   </Button>
                 ))}
               </div>
-              {way === "cards" && <TitleCards />}
+              {way === "cards" && <TitleCards onChosen={setPicks} />}
               {way === "words" && <TasteInput />}
               {way === "import" && <ImportHistory />}
+              {/* The author: the search model is downloaded during setup (ADR-0050). Said here with its size: it
+                  starts by itself once the catalogue can be searched; it is what "Where your taste points" ranks
+                  with. */}
+              <MeaningDownload setup />
             </div>
           )}
 
           {step === 2 && (
             <div className="flex flex-col gap-2">
-              <p className="mb-6 max-w-[62ch] text-[13px] leading-relaxed text-ink-muted">
-                Optional. Films from the Internet Archive play already, and anything on this PC can be added from a
-                folder. A source someone gave you is an address to paste. You can do all of this later in Settings.
+              <p className="mb-6 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
+                Choose the folders your films and shows are in. They are read at once, shows by their folders and
+                seasons, and appear on Home as soon as they are found.
               </p>
               <LibrarySection />
+            </div>
+          )}
+          {step === 3 && (
+            <div className="flex flex-col gap-2">
+              <p className="mb-3 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
+                sin·e·phile comes with no sources of its own: public-domain films from the Internet Archive play
+                already, and everything else comes from add-ons you choose. An add-on is a small service someone
+                else runs that knows where films can be watched; Stremio add-ons work here.
+              </p>
+              <p className="mb-6 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
+                Paste each one&apos;s address (or its stremio:// link), one at a time: it is checked, you see what it
+                offers, and once added it joins the list below. Add as many as you like. The app suggests none.
+                Without one, a film you do not have here has nothing to play or download from.
+              </p>
               <SourcesSection />
+            </div>
+          )}
+          {step === 4 && (
+            <div className="flex flex-col gap-2">
+              <p className="mb-6 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
+                Which languages you want subtitles in, and, if you like, your own OpenSubtitles key, so a film
+                without subtitles can find them.
+              </p>
+              <SubtitlesSection />
+            </div>
+          )}
+          {step === 5 && (
+            <div className="flex flex-col gap-2">
+              <p className="mb-6 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
+                Optional. Without either, every title is set in type, as designed. Posters with no key come from
+                Stremio&apos;s poster images, if you switch them on. A TMDB key is free and takes about a minute: it
+                adds posters, cast photos and what is in cinemas and on the air this week, so New releases is
+                really new.
+              </p>
+              <ArtworkSection />
+              <TmdbSection />
+            </div>
+          )}
+          {step === 6 && (
+            <div className="flex flex-col gap-2">
+              <p className="mb-6 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
+                Downloads use the built-in engine. If you already use qBittorrent, connect it here and it does the
+                downloading instead. If you use a VPN, choose its network adapter so downloads stop if it drops.
+              </p>
+              <DownloadsSettings />
+              <NetworkSection />
             </div>
           )}
         </div>
@@ -185,7 +284,9 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
               Back
             </Button>
           )}
-          <span className="flex-1" />
+          <div className="min-w-0 flex-1 px-4">
+            <BuildStrip build={build} />
+          </div>
           <Button variant="ghost" onClick={() => (step === STEPS.length - 1 ? finish.mutate() : setStep(step + 1))}>
             {step === STEPS.length - 1 ? "Skip, and start" : "Skip"}
           </Button>

@@ -2799,3 +2799,312 @@ Jeff Tremaine above all (Get Out, Saw, Super Size Me)", which says honestly that
 ### Regression check before merging Phase 15 (rule 13)
 
 2026-11-08, `cargo run --release -p eval -- all` (twice), `-- vector --report`, `-- import --from 600`, `-- taste`, `-- switch`, `-- modes`, `-- update`: E2 **43/43**; E3 meaning **0.0472**, filter **1.0000** (carried); p95 **15.6 ms** warm (16.4 at Phase 14: noise); recall@10 **0.9760**; subtitles **48/48** tuned, **32/32** held out, false accepts **0/10**; identify **99.05% / 0.39%** (held out 100% / 0%); import (fresh 600) **98.83% / 0 wrong**; taste **40.63%** against popularity 35.64%; switch **22.9 / 30.5 ms** p95; modes purity **96.6%**; update **125.5–133.2 ms**. Unchanged from Phase 14 and from this phase's own first runs.
+
+### D77: no console window from the release build (2026-11-08, ba98081)
+
+`npm run tauri build`, then: the release `sin-e-phile.exe` is a GUI-subsystem program (PE subsystem 2;
+the debug build is 3, console). Launched on the real `data/` and watched for 45 s (visible
+`ConsoleWindowClass` windows, sampled every 100 ms): **0** new console windows; it opened to the first-run
+wizard. A scan and an alignment were exercised from two temporary `#![windows_subsystem = "windows"]`
+programs calling the app's own code on an 8-second test video, five runs each, sampled every 20 ms:
+`sinephile_library::probe::ffprobe` **0** console windows, `sinephile_subtitles::plan::ffmpeg_speech`
+**0**. **Seen to fail**: the same FFprobe started without `CREATE_NO_WINDOW` opened **5**, one per run.
+The temporary programs were not committed.
+
+## Phase 16 — Ready to Watch
+
+### E4: TV layouts read from their folders (2026-11-08, 66be7cb plus the 16.1 change)
+
+`cargo run --release -p eval -- tvlayouts` over `fixtures/tv-layouts/layouts.psv` (184 files: the
+author's own Twin Peaks layout with its groups replaced, plus season folders, flat, anime fansub numbering
+and one show split across three folders). **Before** (`--before`, no extras rule; the scanner as it was):
+episodes 57/59 = 96.6%, and **105 of 105 extras searched for as titles** ("Cherry Pie", "The Log Lady 01",
+"Tim Hunter" …), which is what the author saw. **After**: episodes **59/59 = 100%**, **0** filed as films,
+the nested film 1/1, extras **105/105** kept out and **0** searched for. E4 MET.
+
+The two anime misses on the way were real: a fansub "- 05" had nothing to resolve against (no free source
+publishes absolute numbers; no AniList numbering is stored), and is now read as the fifth episode only when
+the show has exactly one season (the identity, not a sum, ADR-0031), and only to place the episode after the
+series is chosen. Used while scoring, it favoured one-season shows: `eval identify` went from 523 to 522 of
+528 ("Steins;Gate 0 - 03" to Steins;Gate) until it was confined to placement; now **523/528 = 99.05%,
+false-confident 2/510 = 0.39%, held out 108/108 and 0/103**, identical to Phase 12.
+
+On the author's real folder (`-- tvlayouts --folder <path>`, read-only): 151 videos, **102 extras left
+out**, 48 episodes all filed under Twin Peaks (1990) (30 on their episode; 18 from the 2017 season placed on
+the series, whose rows the catalogue lacks), Fire Walk with Me as the film, 0 to the review queue.
+
+### E5: the catalogue refreshes itself (2026-11-08)
+
+The author's catalogue before: a refresh job `running` since 2026-11-07 06:05 UTC, never resumed, every
+launch answering `AlreadyCurrent`; 2,734,015 titles, 539,817 episodes, 52,426 films of 2026.
+`target/release/ingest.exe keep` (the function the app's hourly timer calls,
+`freshness::refresh(…, force = false)`), on the real data: **finished the interrupted refresh — 885 titles
+added (300 of them 2026 films) and 7,951 episodes — in 86 s**; job 26 `complete`, job 28
+`refresh-episodes` `complete`; `catalogue.last_refresh` = `{"at":"2026-11-08T06:21:10Z","titles_added":885,
+"episodes_added":7951}`. After: 2,734,900 titles, 547,768 episodes, 52,726 films of 2026.
+
+Tests (`crates/catalogue/tests/refresh.rs`): `an_interrupted_refresh_is_finished_before_the_publisher_is_asked`
+(a new film and an episode of a 40-vote series on a watchlist, zero requests to the publisher) and
+`a_resumed_refresh_reads_past_the_watermark_it_started_from`. **Seen to fail**: without the resume branch
+the first returns `AlreadyCurrent`, the author's bug exactly; with the watermark taken afresh the second
+loses the title between the start and the stored maximum.
+
+### Home in the author's order (16.3, 2026-11-08)
+
+Rails: continue, **new episodes of your shows**, **your library**, **new releases**, taste, watchlist,
+widely loved (`crates/taste/tests/home.rs home_is_in_the_authors_order_…`, seen to fail with two rails
+swapped and with the new-release vote floor removed). New releases on the real catalogue, 2026 with at
+least 1,000 votes: Project Hail Mary, The Odyssey, Spider-Man: Brand New Day, A Knight of the Seven
+Kingdoms, Backrooms, Michael …
+
+**A regression caught and fixed before commit (rule 13).** The new-releases query walked the votes index
+and filtered by year: 92–98 ms on the real catalogue, and `eval switch` went from 22.9 / 30.5 ms to
+**111.7 / 118.2 ms p95, over its 100 ms target**. Migration 0027 adds `idx_media_items_year_votes`, named in
+the query because the planner otherwise still walked the votes index to avoid a sort: **10.9 ms**. `eval
+switch` now **30.3 / 40.7 ms p95** (E5 MET); the remaining ~10 ms over Phase 15's numbers is the three new
+rails' queries (new episodes 1 ms, library 0 ms, new releases 11 ms).
+
+### The pad in playback, and the right stick (16.4, 2026-11-08)
+
+**Measured first, because the first explanation was wrong.** A debug build with a `dev_log` probe
+(`SINEPHILE_AUTOPLAY`, the author's own film, 20 s of playback): every half second `visibility=visible
+focus=true frames=120`. The page was never hidden or unfocused behind the video window, so the pad was
+being read; the faults were in our handling. Found and fixed, each step in `node
+tools/uiaudit/controller.mjs` seen to fail first: Y opened nothing (the old mapping had Y for sound); with a
+quick menu open, Down turned the volume down instead of moving in the menu; a volume change said nothing.
+Now: Up 100 → 105 with "Volume 105%" on screen; Y opens the subtitles with focus on "Off"; Down stays in
+the menu; A picks and closes. Right stick: Settings scrolled 0 → 1,094 px in 0.6 s with focus following
+into view; the paused film's details 0 → 636 px in 0.4 s with focus left on Resume (0 px with the dialog
+fallback removed). Not yet covered: X (sound needs two audio tracks), LB/RB (needs a series), and a real
+controller in the author's hands.
+
+### The player, measured in its real window (16.5, 2026-11-08)
+
+Debug build, `SINEPHILE_AUTOPLAY` (the author's own film) and `SINEPHILE_PROBE` (timed player intents sent as
+the pad sends them); the page logs through `dev_log`, and the video window's region is read from Windows by
+process id (`GetWindowRgn`, sampled every 10 ms). PrintWindow cannot show what is seen through the holes, so the
+region is the evidence.
+
+- **The subtitles menu opened unseen beneath the video.** Before: with the menu open the page sent two holes
+  (the bars) and none for the menu above the bar. After (every overlay marked `data-cutout`, holes recomputed
+  when one comes or goes): three holes; Windows' region 39 rectangles with the bars, **49 with the menu**, 39 when
+  it closes, 1 when the bars hide. Pad flow: "the menu is cut out of the video: 2 -> 3 holes", seen to fail with
+  the menu's mark removed.
+- **Controls respond in about 14 ms**: intent logged at 08:21:00.033, region 1 rectangle at .017 and 49 at .046.
+- **Opening**: the video window stays hidden until the first frame (430 ms after open), so no black flash.
+- **Closing**: Back logged at 08:21:28.179, the video window hidden by .186 (7 ms), its region unchanged until then.
+- **The bar no longer moves in quarter-second steps**: between the backend's four reports a second the position
+  glides on at the playback speed, never more than 0.5 s past a report or past the end (`glide`, unit-tested).
+
+### Subtitles in the player (16.6, 2026-11-08)
+
+`crates/subtitles/tests/chain.rs the_viewer_chooses_among_the_offers_and_only_a_download_spends_the_budget`:
+offers come back best first (the preferred language, this file's own timing first) and searching spends nothing;
+the chosen offer is downloaded within the budget; a refused download gives its reservation back (seen to fail
+with the refund removed). `src/features/player/SubtitleTools.test.tsx`: size, colour and outline saved for the
+profile and applied at once (seen to fail with the size step changed); found subtitles named by language,
+release and "timed for this file"; "align again" on an embedded track says why it cannot. Pad flow: Menu, the
+D-pad to "Find subtitles", A, the D-pad to the first found, A downloads and shows it. Not yet seen in the real
+window: the style reaching mpv, and "Load a file" (Windows' file picker).
+
+**16.6 in the real window** (2026-11-08): the debug build playing the author's film, the probe's `style` step
+setting yellow and outline 5 exactly as the panel does, then reading mpv back through `dev_player_prop`:
+`sub-color=#FFFFD400 sub-border-size=5.000000`. The style reaches the playing film live. Still unseen in the
+real window: "Load a file" (Windows' file picker needs a hand).
+
+### First run and Home at three window sizes (16.9, 2026-11-08)
+
+A layout check (`src/lib/layoutCheck.ts`, the same rules in the pad-flow audit): the page must not scroll
+sideways, no text cut off in its box, nothing off the right edge outside a deliberate scroller. **Its control**:
+a 3,000 px paragraph injected into Home must be reported, and is ("the page scrolls sideways: p (3750px)"). The
+first version did not report it: it excused everything inside `main`, which scrolls, and so excused the page.
+
+**What it found, which the fake pages had not shown:** on the author's real Home through the debug probe,
+at 1280×720 on their 150% display (839 CSS px wide), the window scrolled sideways: "TV Shows" wrapped onto two
+lines and the window buttons were pushed off the edge; Home's rails had padding of their own on top of the
+rail's own margins, pushing the index column in and cutting the rail short. In the audit with a controller
+(TV mode's 125% zoom), the window buttons overflowed by 20 px at 1280. Fixed: the masthead measures whether it
+fits and goes compact when it does not (a breakpoint could not, since TV mode zooms without changing what a
+media query sees), and Home's extra padding went. **After**: the real app at 1280×720, 1600×900 and
+1920×1080, two runs: no problems; the pad-flow audit in TV mode, every first-run step and Home at all three
+sizes: no problems.
+
+### E1: every control in the player panel, by pad (16.10, 2026-11-16)
+
+`node tools/uiaudit/controller.mjs`, new step "the D-pad reaches every control in the player panel": Menu opens
+the panel, then the walk goes row by row as a thumb would (Left to the row's start, Right along it, Down to the
+next), marking each control focus lands on, and compares with every enabled control in the panel: **34/34, none
+missed**. Seen to fail: the Speed section made `inert` gives 20/34 (Slower … Close missed); restored, 34/34.
+With 16.5's real-window numbers (input to the video region changed in ~14 ms; the video window hidden until the
+first frame, 430 ms after open; hidden 7 ms after Back) E1 is met. The first version of the walk pressed Right
+on full-width rows, where spatial navigation correctly goes up and to the right, and looped; the walk was wrong,
+not the navigation.
+
+**Regression, 2026-11-16** (`cargo run --release -p eval -- all`, `tvlayouts`, `import --from 600`, `taste`,
+`switch`, `modes`, `update`): identify **99.05% / 0.39%** (held out 100% / 0%); tvlayouts **59/59**, 0 as films,
+extras 105/105; import **E2 MET**, 0 new on re-import; taste **40.63%** against 35.64%; switch **32.3 / 37.3 ms**
+p95 (30.3 / 40.7 at 16.3: noise); modes purity **96.6%**; update slowest **131.9 ms**. No regression.
+
+### E1 again, and E3: the controller in the player and the right stick (16.10, 2026-11-16)
+
+E1 was reopened the same day: the phase names the picture's **shape and zoom**, and the panel had neither. Built in
+7776473 (Shape cycles as filmed, 16:9, 4:3, 2.35:1, fill; Zoom 50-300%; `crates/player` `framing`, its tests, and
+`tests/playback.rs` `the_shape_and_zoom_reach_the_playing_film`, seen to fail first). `node tools/uiaudit/controller.mjs`
+at 2c1cd5b: every control in the panel by D-pad, **40/40**, none missed. With 16.5's real-window numbers, **E1 met**.
+
+E3, same run: Y and X quick menus (focus on the first choice, cut out of the video, the D-pad kept inside, A chooses and
+closes), **RB/LB by chapter** in a film (10:00, then 0:00) and said on screen, Right seeks once per press, Left held
+0.9 s scrubs **5 steps**, RT 30 s, Menu, A, B. The right stick: a 24-card rail **0 -> 970 px** with focus following onto
+a card in view; the player panel **349 -> 0**; the paused film's details **636**; Settings **0 -> 1095**.
+
+Pushing the stick where nothing had found three faults, each seen in the audit before its fix:
+
+| Fault | Before | After |
+|---|---|---|
+| A snapping rail undid every step of the stick | rail 0 -> 0 | 0 -> 970 (snap suspended while driven) |
+| The virtualised rail unmounted the focused card; focus fell to the page | focus on `body` | a card in view (600 ms grace) |
+| Down at the foot of the panel left the dialog for the bar | panel 349 -> 349, then 349 -> 318 | 349 -> 0 (a dialog holds the D-pad and the follow) |
+
+`npx vitest run src/lib/gamepad.test.ts`: four new jsdom tests, each seen to fail with its fix removed (the clipping
+test also fails with `onScreen`'s ancestor check removed; the grace test with the grace removed). **E3 met.** Frontend
+**193** tests (189 before).
+
+### E6: a finished scan on Home (16.10, 2026-11-16)
+
+Rail order: `crates/taste/tests/home.rs` `home_is_in_the_authors_order_with_new_episodes_the_library_and_new_releases`.
+
+Scan to Home, in the real app: the debug build on a **copy** of the 4 GB catalogue database (`SINEPHILE_DATA_DIR`, in
+scratch), its library folder pointed at films generated with FFmpeg (16x16, one frame a second) named and timed as real
+catalogue titles, and emptied before each launch so the launch rescan adds them. The probe (`SINEPHILE_PROBE`,
+`src/features/player/useDropToPlay.ts`) logs the scan's `done` event and checks every frame for the first card of the
+"Your library" rail, in the page's own clock.
+
+| Library | Scan | Identified | Shown on Home after the scan finished |
+|---|---|---|---|
+| 5 films | 103 ms | 5 of 5 | **28 ms** |
+| 200 films (the most voted) | 1,519 ms | 198, 2 to the review queue | **38 ms** |
+
+The page received `done` 0.4 ms after the backend logged the scan; half a second before, the rail was not there.
+Seen to fail: with Home's refetch on `done` disabled, "home library not shown within 10 s of the scan finishing".
+Budget 2 s; Tier 2 dev machine, debug build, so the ~50x margin is what Tier 0 has to spend. **E6 met.**
+
+### E7: the first run done only by pad (16.10, 2026-11-16)
+
+`node tools/uiaudit/controller.mjs` at af1be92, the first run with nothing but the pad: a library folder's
+path typed on the TV keyboard and added; an add-on's address typed, looked at, then added; the OpenSubtitles
+and TMDB keys typed and saved; the VPN's network adapter chosen from its list and saved. Each step says it
+took, and Home then has nothing left to set up. **104 checks**, all by pad. Filling it in found four faults
+the walk-through (Continue, Continue...) never touched, each seen in the flow before its fix:
+
+| Fault | Seen | Fix |
+|---|---|---|
+| No select could be changed by pad (A clicks; a script's click does not open a select) | timed out waiting for the adapter list | `PadPicker`: the options as a list the D-pad walks |
+| No slider could be changed by pad (Left and Right moved off it) | unit test | `adjustValue`: Left and Right step it |
+| "Add" disabled itself once pressed and dropped focus onto the page | "no button Continue" | `rescueFocus`: back near where it was, unless the screen went |
+| A long step's last fields sat half under the sticky footer; Down found nothing | "could not reach Start watching" | `scroll-pb-32` on the wizard's scroller |
+
+The real backend's checks behind "checked as saved" are the crates' tests (`a_key_is_checked_when_it_is_entered`,
+`a_key_is_checked_and_a_refused_one_says_so`, `paste_describe_install_find_resolve`,
+`bound_to_one_adapter_traffic_never_leaves_by_another`); "no source yet" on the title page is
+`DetailScreen.test.tsx` "says why nothing can play". Frontend **203** tests. **E7 met**; a real controller in
+hand is in the author batch as confirmation.
+
+### The author's second library (2026-11-16)
+
+The author's report: TV shows not grouped, episodes as separate titles. Their database (read only):
+Samurai Champloo (`2a. Samurai Champloo (2004)/... - Ep. 01 - ...`) and Monster (`Monster [2004-2005]
+DVDRip .../Monster - Chapter 01 - ...`) were not read as episodes, so each of 100 files was searched for
+as a film and kept at confidence 0.00-0.41 ("Afro Samurai Champloo", "Entrapment", "The Fugitive"), and
+Home's library rail showed every guess. Fixed in c00d4e5 (reading) and the commit after it (the show's
+page, Films and TV Shows).
+
+`cargo run --release -p eval -- tvlayouts`, with the author's layouts added (groups replaced): **71/71
+episodes, 0 filed as films, 106/106 extras kept out**. The same rows on the old code: 62/71, 9 filed as
+films, 1 extra searched for. `-- identify` unchanged: tuning **99.05% / 0.39%**, held out **100% / 0%**.
+Space Dandy's `S01E14`-`S01E26` (IMDb's first season has 13) and Twin Peaks' `S03` (IMDb: a 2017 series)
+match the show itself and are kept as their names number them (ADR-0031), listed under "Also on this PC".
+Rust **803** tests, frontend **211**.
+
+### First-run catalogue build (Phase 16, brief item 3) — 2026-11-17, on 5841b0b + working tree
+
+A copy of the author's installed database (2,735,153 non-episode titles, no index, nothing normalised),
+built with the release `ingest` binary and `--no-compact`, as the app's first run will build it.
+Command: `ingest <step> --data-dir <scratch copy> --no-compact`, each step timed with `date +%s`.
+
+| Step | Time | Result |
+|---|---|---|
+| Load (the app's refresh, from the copy's `ingest_jobs`) | 1,065 s titles + 342 s episodes | 3,167,536 items |
+| `akas` (523 MB download included) | 862 s | 6,456,057 title rows (+3.55 M) |
+| `normalise` | 123 s | 6,456,057 normalised, 0 left |
+| `search-index --trigram-core` | 127 s | 2,735,153 indexed, 881,027 in the typo index |
+
+After it: `search_index MATCH 'nosferatu'` 84 rows, `MATCH 'kyojin'` 62 (romaji, from the alternate titles).
+Database 1,392 MB → 2,440 MB. Alternate titles are 862 of the 2,519 s, so they move after search works
+(Home opens ~14 minutes sooner); the titles they touch are re-indexed by the catch-up.
+
+The same build in the real app (release, on a fresh copy of the author's install, 2026-11-17): the refresh
+ended at 19:17:27; stage A ran with the library held back; the scan was released at 19:21:11 (3 min 44 s).
+Files in the author's library folder matched at or above `MATCH_ACCEPTED_AT`: **0 of 200** in the installed
+database (no index), **199 of 200** after stage A. Command: `SELECT COUNT(DISTINCT local_file_id) FROM
+local_file_matches WHERE confidence >= 0.75` on each.
+The rest of that run, on 6c8d015's code: alternate titles and the catch-up finished at 19:38:34, 17 min 23 s
+after search opened; the catch-up re-indexed 880,187 titles. Afterwards `MATCH 'kyojin'` gives 62, the same
+as building alternate titles first, and no title is left without a normalised form. Job order in the copy:
+refresh, refresh-episodes, titles-normalise, search-index, imdb-akas, catalogue-catch-up, all complete.
+
+### Films and TV Shows catalogue rails (Phase 16, brief item 9) — 2026-11-17
+
+The rail query (`MediaRepository::most_voted_of`: the votes index walked, the genre checked per row), on the
+3,167,536-title copy of the author's install, `LIMIT 30`, Python `sqlite3`, read-only. Films: Drama 12 ms, Comedy
+4, Action 0, Thriller 2, Crime 1, Sci-Fi 1, Animation 2, Horror 87; most watched 0; new this year (`new_of`, year
+index) 113. Shows: Drama 4, Comedy 4, Crime 3, Animation 8, Sci-Fi 18, Mystery 7; new 8. Left out as too slow for
+a tab (walks far down the index): documentary films 507 ms, war series 856, western series 769.
+
+### Search by meaning on an install (Phase 16, round 8, 2026-11-17)
+
+| Metric | Value | Command / how |
+|---|---|---|
+| Key file for `embeddings-v3` | 119,874 of 858,170 positions named by IMDb id; 959,052 bytes | `cargo run -p sinephile-ingest --bin ingest -- artefact-keys` (dev catalogue; id digest `e66f698d…` matches the artefact) |
+| Index build on a copy of the author's install | 30 s, 60.9 MB; 119,833 of the 119,874 keyed titles found in that catalogue (41 absent), 761,194 core titles beyond the artefact | debug app, `SINEPHILE_DATA_DIR` = copy, Search → Build the index, timed to the `.usearch` file |
+| Before the fix, same copy | refused: "position 858169 is now id 2615642" | Search → Download |
+| "a heist where the plan goes wrong" | 20 results, titles, people and meaning: Tower Heist, Heist: Who Stole the American Dream?, Jimmywork, The Crew, Cash Out, Hell's Angels '69, Reindeer Games | same run, real window |
+| A new install, release build, fresh data folder (ADR-0050) | titles loaded in 18 min (2,735,153 titles, 432,462 episodes); stage A done, then `new install: fetching search by meaning` with no button pressed; download and index 79 s (indexed=119833); `search: hybrid` | `target/release/sin-e-phile.exe`, `SINEPHILE_DATA_DIR` = empty folder with stage A's three datasets; its log, 10:05:45 → 10:29:14 UTC |
+
+### Search by meaning, the author's broken install (Phase 16, round 9, 2026-11-18)
+
+Commit: c4c1fcc. Copy of the author's install made read-only with sqlite's backup API
+(9 s), their meaning files copied as they were.
+
+| Metric | Value | Command / how |
+|---|---|---|
+| The author's meaning file | 329,537,568 bytes, sha256 `6f92d2ae…`; the published file is `7f11415a…`. 5,128,192 bytes wrong from byte 69,422,516: the file's own data, 1,005,504 bytes late | `sha256sum`; byte compare with the dev copy and the fresh-install download (both `7f11415a…`) |
+| Its failure, reproduced and now logged | "checksum mismatch: the artefact is corrupt or was modified" | debug app on the copy, `target/debug/data/logs` |
+| Debug build, no installed copy: launch | corrupt file found and removed, nothing downloaded; Search offers "Download 314 MB" | same run, real window |
+| Debug build: press Download | downloaded, checked, 119,833 titles indexed, hybrid in 54 s | same run |
+| Release build with the installed copy (`npm run release`), the copy in the author's state | at launch: 364,263,390 bytes of superseded downloads removed, index built from the installed copy in 23 s (119,833 titles, 63.8 MB), hybrid, no button | `target/release/sin-e-phile.exe`, `SINEPHILE_DATA_DIR` = copy, `target/release/data/logs` |
+| `tools/bundle/check_meaning.py` | refuses the author's copy (exit 1), passes the published files (exit 0) | `python tools/bundle/check_meaning.py <dir>` |
+
+### Load a file, in the real window (Phase 16 E2, round 10, 2026-11-18)
+
+Debug build of this round's code, a scratch data folder, a generated 2-minute 1280x720 clip (ffmpeg `testsrc2`) and a
+one-cue `.srt`. The probe opened the panel (`SINEPHILE_PROBE=6000:player_menu`), "Load a file…" was clicked, and
+Windows' picker opened over the player, titled "Load subtitles". The path was typed and Enter pressed: the cue was on
+the picture, the track was listed as now showing, and the panel said "Showing the file (not aligned (no speech found in
+the audio); loaded as it is)". Before this round's fix the picker listed every file in the folder (it opened on a
+pictures folder) and the track read "sin-e-phile"; after it, the picker offers "Subtitles
+(*.srt;*.ass;*.ssa;*.vtt;*.sub)" and the track reads "clip-test". Unit: `src/features/player/SubtitleTools.test.tsx`
+"loads a file from disk…" (seen to fail with the button disconnected); `crates/subtitles` `files::tests::
+the_picker_offers_every_subtitle_kind_and_a_loaded_file_keeps_its_name` (seen to fail naming the track with its
+extension).
+
+**Found on the way: a first launch could leave no default profile.** The second launch on that folder logged
+"subtitles could not be prepared … UNIQUE constraint failed: profiles.name", and the panel had no Style section. The
+first launch's simultaneous `ensure_default` calls had each seen no default: one made "You", the other demoted it and
+failed on the name, leaving `(1, 'You', 0)`; every later ask failed the same way, and everything kept per profile with
+it. Fixed in `crates/persistence/src/repositories/profiles.rs`: each step is one statement, and an install with
+profiles but no default gives the first one the flag back. The same folder then launched with `(1, 'You', 1)`, no
+warning, and the Style section back. `cargo test -p sinephile-persistence --test profiles`: eight asks at once, ten
+rounds, one default profile each time (seen to fail before the fix: "round 0: … UNIQUE constraint failed:
+profiles.name"; it passed before the fix too until the pool was warmed to eight open connections);
+`an_install_left_without_a_default_gets_its_first_profile_back` and
+`a_new_default_that_cannot_be_made_leaves_the_old_one_the_default`, each seen to fail.

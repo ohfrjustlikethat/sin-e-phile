@@ -8,13 +8,14 @@ use std::sync::Arc;
 
 use sinephile_metadata_api::transport::ResponseFuture;
 use sinephile_metadata_api::{Request, Transport, TransportError};
-use source_protocol::{Manifest, SourceBackend};
+use source_protocol::{AddonManifest, SourceBackend};
 use url::Url;
 
 pub mod addon;
 pub mod archive;
 pub mod direct;
 pub mod local;
+pub mod stremio;
 
 /// What backends may draw on when they are built. The app fills it once at startup
 /// and again whenever the user changes something a backend reads.
@@ -26,7 +27,7 @@ pub struct Context {
     /// The user's own links (migration 0016).
     pub direct_links: Vec<direct::DirectLink>,
     /// Installed addons, already re-checked (`crate::addons::installed`).
-    pub addons: Vec<(Url, Manifest)>,
+    pub addons: Vec<(Url, AddonManifest)>,
     /// The library, for `LocalFileBackend` (Phase 12). `None` finds no local files.
     pub library: Option<sinephile_persistence::Db>,
 }
@@ -61,12 +62,14 @@ pub fn all(ctx: &Context) -> Vec<Arc<dyn SourceBackend>> {
         Arc::new(archive::InternetArchiveBackend::new(ctx.http.clone())),
         Arc::new(direct::DirectHttpBackend::new(ctx.direct_links.clone())),
     ];
-    // Addons are data, not code: one backend per installed manifest.
+    // Addons are data, not code: one backend per installed manifest, in whichever
+    // protocol it speaks (ADR-0047).
     for (_, manifest) in &ctx.addons {
-        backends.push(Arc::new(addon::AddonBackend::new(
-            manifest.clone(),
-            ctx.untrusted_http.clone(),
-        )));
+        let http = ctx.untrusted_http.clone();
+        backends.push(match manifest {
+            AddonManifest::Native(m) => Arc::new(addon::AddonBackend::new(m.clone(), http)),
+            AddonManifest::Stremio(m) => Arc::new(stremio::StremioBackend::new(m.clone(), http)),
+        });
     }
     backends
 }

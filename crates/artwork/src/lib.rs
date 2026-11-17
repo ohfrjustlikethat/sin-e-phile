@@ -9,10 +9,13 @@
 //! designed around, not an error to route past. This crate deliberately does not depend
 //! on the persistence crate, so it cannot reach for a key even accidentally.
 
+pub mod avatar;
 pub mod blurhash;
 pub mod cache;
 pub mod encode;
+pub mod posters;
 
 pub use blurhash::{encode as blurhash_encode, BlurhashError};
 pub use cache::{ArtworkCache, CacheError, Stored};
 pub use encode::{prepare, EncodeError, Prepared};
+pub use posters::{keyless_url, Art, Posters};

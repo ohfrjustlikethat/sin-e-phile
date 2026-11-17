@@ -19,6 +19,7 @@ const ROWS = [
 ];
 
 const commands = {
+  downloadShow: vi.fn((_id: number) => ok(null)),
   downloads: vi.fn(() => ok(ROWS)),
   downloadsStorage: vi.fn(() =>
     ok({
@@ -26,7 +27,7 @@ const commands = {
       free_bytes: 200 * 1024 * MB,
       budget_bytes: 20 * 1024 * MB,
       items: [
-        { download: view({ id: 9, title: "Nosferatu", state: "done" }), bytes: 4 * 1024 * MB, age_days: 12, watched: true },
+        { download: view({ id: 9, title: "Nosferatu", state: "done", file_path: "D:/Downloads/Nosferatu/Nosferatu.mkv" }), bytes: 4 * 1024 * MB, age_days: 12, watched: true },
         { download: view({ id: 10, title: "Faust", state: "done" }), bytes: 2 * 1024 * MB, age_days: 1, watched: false },
       ],
     }),
@@ -123,18 +124,23 @@ describe("Downloads (SPEC.md Phase 13)", () => {
     expect(await screen.findByText("Saved.")).toBeInTheDocument();
   });
 
-  it("goes back with Escape, but not from inside a field", async () => {
-    renderIt();
-    const field = await screen.findByLabelText("Web UI address");
-    fireEvent.keyDown(field, { key: "Escape" });
-    expect(useUi.getState().downloadsOpen).toBe(true);
-    fireEvent.keyDown(window, { key: "Escape" });
-    expect(useUi.getState().downloadsOpen).toBe(false);
-  });
-
   it("says what to do when nothing is downloading", async () => {
     commands.downloads.mockImplementationOnce(() => ok([]));
     renderIt();
     expect(await screen.findByText("Nothing downloading")).toBeInTheDocument();
+  });
+
+  it("plays a finished file, shows it in its folder, and opens its page (Phase 16)", async () => {
+    renderIt();
+    fireEvent.click(await screen.findByRole("button", { name: "Show Nosferatu in its folder" }));
+    await waitFor(() => expect(commands.downloadShow).toHaveBeenCalledWith(9));
+    fireEvent.click(screen.getByRole("button", { name: "Play Nosferatu" }));
+    expect(useUi.getState().playing).toEqual({
+      target: "D:/Downloads/Nosferatu/Nosferatu.mkv", title: "Nosferatu", mediaItemId: 7, start: null,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Open Nosferatu's page" }));
+    expect(useUi.getState().detail).toBe(7);
+    // Not finished, nothing to play: Faust has no file yet.
+    expect(screen.queryByRole("button", { name: "Play Faust" })).toBeNull();
   });
 });

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/design-system";
+import { BackLink, Button } from "@/design-system";
 import type { ProfileView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
-import { Avatar } from "./Avatar";
+import { ProfileAvatar } from "./ProfileAvatar";
 import { useProfiles } from "./useProfiles";
 
 /**
@@ -11,14 +11,25 @@ import { useProfiles } from "./useProfiles";
  * used first; a profile with a PIN asks for it on a pad the D-pad, the mouse and the
  * number keys all work.
  *
- * Escape (B) keeps whoever is watching.
+ * Escape (B) keeps whoever is watching. Opened from the avatar it also says so on screen, top left where every
+ * page's way back is: "← Home", the page it covers (`back`, round 10). Launch's question has none: `null`.
+ * Focus goes back to what opened it, so a pad carries on from the avatar.
  */
-export function ProfilePicker({ onDone }: { onDone: () => void }) {
+export function ProfilePicker({ onDone, back = null }: { onDone: () => void; back?: string | null | undefined }) {
   const { profiles, switchTo } = useProfiles();
   const openSettings = useUi((s) => s.setSettingsOpen);
   const setTasteOpen = useUi((s) => s.setTasteOpen);
   const [asking, setAsking] = useState<ProfileView | null>(null);
   const first = useRef<HTMLButtonElement>(null);
+
+  // Back to the opener when this closes: the masthead's avatar, unless it has gone. Before the effect below moves
+  // focus, so what it keeps is the opener.
+  useEffect(() => {
+    const opener = document.activeElement;
+    return () => {
+      if (opener instanceof HTMLElement && opener !== document.body && opener.isConnected) opener.focus();
+    };
+  }, []);
 
   useEffect(() => {
     if (!asking) first.current?.focus();
@@ -48,6 +59,11 @@ export function ProfilePicker({ onDone }: { onDone: () => void }) {
       aria-label="Who's watching?"
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-base text-ink"
     >
+      {back !== null && !asking && (
+        <div className="absolute top-0 left-0 px-16 pt-7">
+          <BackLink label={back} onClick={onDone} />
+        </div>
+      )}
       {asking ? (
         <PinPad
           profile={asking}
@@ -70,7 +86,7 @@ export function ProfilePicker({ onDone }: { onDone: () => void }) {
                   aria-label={`${p.name}${p.is_kids ? ", kids" : ""}${p.has_pin ? ", PIN" : ""}`}
                   className="group flex w-36 flex-col items-center gap-4 rounded-sm p-3"
                 >
-                  <Avatar name={p.name} colour={p.avatar_colour} size="lg" />
+                  <ProfileAvatar profile={p} size="lg" />
                   <span className="text-[15px] text-ink-muted group-hover:text-ink">{p.name}</span>
                   <span className="label h-4">
                     {[p.is_kids ? "Kids" : null, p.has_pin ? "PIN" : null].filter(Boolean).join(" · ")}
@@ -84,6 +100,8 @@ export function ProfilePicker({ onDone }: { onDone: () => void }) {
               variant="ghost"
               onClick={() => {
                 onDone();
+                // At Profile, whatever section Settings was last left on (the author: it opened at About).
+                useUi.getState().setSettingsSection("profile");
                 openSettings(true);
               }}
             >
@@ -134,12 +152,16 @@ export function PinPad({
   useEffect(() => {
     if (pin.length !== 4) return;
     setBusy(true);
-    onEnter(pin)
-      .catch((e: Error) => {
+    // The error, the cleared digits and the pad taking keys again land in ONE update: as
+    // separate ones, a digit pressed between them was swallowed (CI found it, 2026-11-17).
+    onEnter(pin).then(
+      () => setBusy(false),
+      (e: Error) => {
         setWrong(e.message);
         setPin("");
-      })
-      .finally(() => setBusy(false));
+        setBusy(false);
+      },
+    );
   }, [pin]);
 
   useEffect(() => {
@@ -154,7 +176,7 @@ export function PinPad({
 
   return (
     <div className="flex flex-col items-center">
-      <Avatar name={profile.name} colour={profile.avatar_colour} size="lg" />
+      <ProfileAvatar profile={profile} size="lg" />
       <h1 className="mt-6 font-display text-[28px] font-extrabold tracking-[-0.02em]">{profile.name}'s PIN</h1>
       <div className="mt-6 flex gap-3" aria-label={`${pin.length} of 4 digits entered`} role="status">
         {[0, 1, 2, 3].map((i) => (

@@ -26,6 +26,7 @@ What the repository contains instead is:
 
 - A **source addon protocol**: a documented, versioned interface that any source backend can implement.
 - A **declarative addon manifest format** (TOML/JSON, no executable code) so a source can be described as data rather than shipped as an implementation.
+- **Stremio's add-on protocol, spoken beside the app's own** (ADR-0047): a user can paste the address of a Stremio add-on they already use (or its `stremio://` link). It is asked by IMDb id, held to the same limits as any add-on, and named by the app as little as any other: not at all.
 - A **community addon catalogue browser** that fetches a catalogue from a URL the *user* supplies. No default URL ships.
 - Working reference backends against **unambiguously legal sources only**: the local filesystem, the Internet Archive's public-domain collection, and user-supplied M3U/direct HTTP.
 
@@ -81,7 +82,7 @@ The application must be fully functional with no paid services. Every external d
 
 Nothing leaves the machine except explicit user-initiated requests to APIs they configured. No analytics, no crash reporting to a server, no "anonymous usage statistics". Crash logs are written locally. State this in the README as a feature.
 
-**Static asset downloads are permitted and are not a violation** (ADR-0014). Fetching the ONNX model, the IMDb and MovieLens datasets, or a precomputed embedding artefact published as a versioned GitHub Release asset is not "a server component" in the sense §5 forbids: there is nothing operated, nothing paid for, and nothing whose downtime degrades a running installation. Every such download must be **consented to, with its size shown, before it happens** — never fetched in the background, never assumed.
+**Static asset downloads are permitted and are not a violation** (ADR-0014). Fetching the ONNX model, the IMDb and MovieLens datasets, or a precomputed embedding artefact published as a versioned GitHub Release asset is not "a server component" in the sense §5 forbids: there is nothing operated, nothing paid for, and nothing whose downtime degrades a running installation. A published embedding artefact is applied to an install **by IMDb id** (ADR-0051), never by the producer's row positions, which no install shares. Every such download must be **consented to, with its size shown, before it happens** — never fetched in the background, never assumed. **One stated exception** (ADR-0050, the author's decision): setting up a **new** install is consent to what setup says it fetches — the datasets, and the search model and meaning index, which setup starts once the catalogue is searchable and shows with their size. An existing install is offered them, never fetched unasked. **An installed copy fetches nothing for search by meaning** (ADR-0053, the author's request): the installer carries the model, its tokenizer and the published meaning file, checked against the published hashes when the installer is built, and the index is built on the machine once the catalogue is searchable.
 
 ### 2.8 This specification is amendable — deliberately, never casually
 
@@ -112,7 +113,7 @@ across the top of the window that is both title bar and navigation (§9.4, ADR-0
 2. **Films** — browsable film catalogue, with Continue Watching scoped to films.
 3. **TV Shows** — browsable series catalogue, Continue Watching scoped to series, with proper season/episode handling. Anime lives here and in Films depending on form, but is always identifiable and filterable as anime.
 4. **Watchlist** — saved items, with sub-organisation (lists, priority, "available now" vs "hard to find").
-5. **Live Channels** — added in Phase 24; the tab exists from Phase 18 with an honest empty state.
+5. **Live Channels** — added in Phase 25; the tab exists from Phase 19 with an honest empty state.
 
 **Search is always visible and always one action away**: a labelled **Search** button in
 the masthead, `/` or `Ctrl+F` from anywhere, and `Ctrl+K` for a command palette that
@@ -140,7 +141,7 @@ Derived directly from what the author dislikes in existing tools. Every phase sh
 |---|---|---|
 | Bland, undesigned UI | Stremio | Every screen gets deliberate visual design. No default-styled components ship. |
 | Search that only matches titles | Stremio | Search is semantic from Phase 5. "Slow films about loneliness" must work. |
-| No discovery, no algorithm | Stremio | The recommender is Phases 15–17, not an afterthought. |
+| No discovery, no algorithm | Stremio | The recommender is Phases 15–18, not an afterthought. |
 | Addon configuration hell | Stremio | Source setup is one paste-a-URL field with plain-language help. Never a raw JSON editor as the primary path. |
 | Hostile setup, server concepts | Plex | No servers, no libraries-to-configure-before-use, no ports. It's a desktop app. It opens and works. |
 | Content buried more than two levels deep | Netflix | Anything in the catalogue is reachable in ≤ 3 interactions from Home. Rails have "see all" that goes somewhere useful. |
@@ -538,7 +539,7 @@ grotesque; Circular), so the equivalents here must be **free and self-hostable**
   gap, a dark hairline outside it, and a tight `--oxblood-bright` halo** (ADR-0042) — the
   Netflix-on-Xbox rectangle, readable across a room and on light artwork. Keyboard and
   controller share it; mouse users see none. Full keyboard navigation is a Phase 2
-  requirement, not a Phase 27 retrofit.
+  requirement, not a Phase 28 retrofit.
 - **An Xbox controller is a remote** (ADR-0041). Over Bluetooth, the wireless adapter or
   USB, a controller drives the same focus system as the keyboard through the WebView's
   Gamepad API: D-pad and left stick move focus, A selects, B goes back, LB/RB change
@@ -548,7 +549,7 @@ grotesque; Circular), so the equivalents here must be **free and self-hostable**
   footer, quiet navigation ticks and a light rumble on select (both on by default, both
   switchable), and the View button toggles full screen (entered on picking the pad up,
   unless turned off). Built in Phase 8 with an on-screen keyboard; the TV focus language
-  in Phase 9; the whole-app audit in Phase 18.
+  in Phase 9; the whole-app audit in Phase 19.
 - **`PosterCard` has a designed artwork-free state** (ADR-0013): a typographic
   title card, not a grey rectangle. Given this brief it should be genuinely
   beautiful — for a film app a typographic card is arguably the better default.
@@ -598,7 +599,7 @@ This section governs how Claude Code operates. It matters more than any individu
     "configured_services": ["tmdb"]
   },
   "known_debt": [
-    { "id": "D2", "text": "Metadata cache eviction is naive LRU; revisit in Phase 21", "phase_raised": 4 }
+    { "id": "D2", "text": "Metadata cache eviction is naive LRU; revisit in Phase 22", "phase_raised": 4 }
   ]
 }
 ```
@@ -690,7 +691,7 @@ Equally: if something turns out to be much easier than expected, say so. Do not 
 
 ### 10.10 The understanding gate is active, not passive
 
-**The gate fires at tier boundaries, not every phase** (ADR-0016): the end of Phase 8, the end of Phase 18, the end of whatever tier the author stops at, and whenever the author asks for it. At those points Claude Code **asks the five self-check questions** from the relevant learning notes, in the chat — and **development continues while they are answered** (ADR-0040). A weak answer creates a task (rewrite the note, simplify the code), not a stop.
+**The gate fires at tier boundaries, not every phase** (ADR-0016): the end of Phase 8, the end of Phase 19, the end of whatever tier the author stops at, and whenever the author asks for it. At those points Claude Code **asks the five self-check questions** from the relevant learning notes, in the chat — and **development continues while they are answered** (ADR-0040). A weak answer creates a task (rewrite the note, simplify the code), not a stop.
 
 Every phase still *writes* its five questions (§13.2). They accumulate unasked until a gate, which is what makes a gate meaningful rather than a formality.
 
@@ -720,7 +721,7 @@ The suite only grows. Every phase's tests keep running in every later phase.
 
 Before merging any phase branch: the **full** test suite and **every** eval harness must run, and the results are compared against the previous phase's recorded numbers in `docs/PERFORMANCE.md` and the eval reports. A regression in a metric from an earlier phase blocks the merge, exactly as a failing test does.
 
-This matters most for the eval harnesses, which measure quality rather than correctness. A refactor in Phase 18 that quietly drops search nDCG from 0.78 to 0.61 would otherwise never be noticed.
+This matters most for the eval harnesses, which measure quality rather than correctness. A refactor in Phase 19 that quietly drops search nDCG from 0.78 to 0.61 would otherwise never be noticed.
 
 ---
 
@@ -739,7 +740,7 @@ Lean by default (ADR-0016). Per phase, only:
 - `docs/specs/*.md` algorithm specifications where the phase produces one. These are **build inputs**, not learning material, and are written in full.
 - ADRs for every non-obvious decision (§11.2), terse.
 
-**Deferred to Phase 27 or a tier boundary:** all five case studies, `INTERVIEW_PREP.md`, and the prose expansion of `HOW_IT_WORKS.md` and `GLOSSARY.md`.
+**Deferred to Phase 28 or a tier boundary:** all five case studies, `INTERVIEW_PREP.md`, and the prose expansion of `HOW_IT_WORKS.md` and `GLOSSARY.md`.
 
 **The exception that is never deferred — numbers.** Every eval-harness run and every performance measurement is recorded in `docs/eval-results.md` **at the moment it is produced**: metric, value, date, commit, and the command that produced it. Numbers cannot be reconstructed after the fact, and the regression policy (§10.12) is worthless without them. A measurement not written down is a measurement that did not happen.
 
@@ -771,7 +772,7 @@ The README is updated at the end of every phase that changes what the app can do
 
 ### 11.4 Case studies
 
-From Phase 16 onward, each major subsystem gets a long-form write-up in `docs/case-studies/`: the problem, the approaches considered, the approach taken, the maths or algorithm explained accessibly, the evaluation results with numbers, and what would be done differently. Target: 1,200–2,000 words each, with diagrams.
+From Phase 17 onward, each major subsystem gets a long-form write-up in `docs/case-studies/`: the problem, the approaches considered, the approach taken, the maths or algorithm explained accessibly, the evaluation results with numbers, and what would be done differently. Target: 1,200–2,000 words each, with diagrams.
 
 Priority case studies: the discovery engine; hybrid semantic search; the streaming torrent scheduler; subtitle auto-alignment; source scoring and selection.
 
@@ -800,7 +801,7 @@ Four harnesses live in `tools/eval/`, run in CI, and report metrics that get tra
 | **Search relevance** | `fixtures/search/` — 100+ queries with hand-graded relevant results, including semantic queries ("slow films about grief that aren't depressing"), lookalike queries ("like Wong Kar-wai but Korean"), and exact-title queries | nDCG@10; exact-title top-1 rate | nDCG@10 > 0.75; exact-title top-1 = 100% |
 | **Recommender quality** | Held-out split of a public ratings dataset, plus a synthetic cinephile profile | Recall@20, catalogue coverage, intra-list diversity, novelty (mean inverse popularity) | Recall@20 beats a popularity baseline by > 40% **relative** (ratio, not percentage points); coverage > 15% of catalogue |
 
-Building these corpora is real work and it is worth it. Phase 12, 10, 5, and 16 each include their corpus as a deliverable.
+Building these corpora is real work and it is worth it. Phase 12, 10, 5, and 17 each include their corpus as a deliverable.
 
 ### 12.3 Manual test plan
 
@@ -813,7 +814,7 @@ GitHub Actions on `windows-latest`, on every push and PR:
 
 ### 12.5 The posture guard — automated enforcement of §2.1
 
-A human rule that must hold across 28 phases and dozens of sessions will eventually be broken by accident. So automate it.
+A human rule that must hold across 29 phases and dozens of sessions will eventually be broken by accident. So automate it.
 
 `tools/guard/` contains a Python 3.12 script (ADR-0012), run in CI on every push and as a pre-commit hook, that fails the build on the findings below. It uses **two matchers with deliberately different visibility properties** (ADR-0009), plus an **allowlist** (ADR-0010).
 
@@ -912,7 +913,7 @@ All free. Phase 0 verifies current terms for each and records them in `docs/SETU
 | **MovieLens** | Item-item collaborative filtering signal | Free download, no account | GroupLens; use the largest set the machine can ingest. |
 | **OpenSubtitles.com** | Hash-matched subtitles | Free account, **heavily rate-limited** (single-digit downloads/day on the free tier) | **Design around this.** See below. |
 | **Fanart.tv** | High-quality logos, backgrounds, clearart | Free personal key | Optional; noticeably improves the UI. |
-| **Trakt** | Watch history sync, scrobbling | Free API key | Phase 19. |
+| **Trakt** | Watch history sync, scrobbling | Free API key | Phase 20. |
 | **Debrid** | Optional fast direct streaming | ~€3–4/month | Explicitly optional. Never required. |
 
 **Important consequence of the OpenSubtitles rate limit:** the free tier is too small to be the primary subtitle source. The pipeline in Phase 10 must therefore prioritise, in order:
@@ -929,15 +930,17 @@ Treat the quota as a scarce resource with a budget and a cache. This constraint 
 
 ## 15. The Phases
 
-28 phases, `0`–`27`. Each is scoped to one Claude Code session where possible; larger ones state their expected session count.
+29 phases, `0`–`28`. Each is scoped to one Claude Code session where possible; larger ones state their expected session count.
 
-**Every phase, 0–27, is finished at full depth** (ADR-0043): no tier is cut, and Tiers C and D get the same rigour as Tier B, within about two weeks of 2026-11-06. The tiers in Appendix E remain checkpoints for the understanding gate, not stopping points.
+**Every phase, 0–28, is finished at full depth** (ADR-0043): no tier is cut, and Tiers C and D get the same rigour as Tier B, within about two weeks of 2026-11-06. The tiers in Appendix E remain checkpoints for the understanding gate, not stopping points.
 
 **Session counts are historical estimates, not a plan** (ADR-0040). From Phase 7 the phases run back to back at the author's pace: as fast as the work can be done *and verified*. Speed comes from not waiting and from scoping each phase to its exit criteria — never from skipping a check, marking a criterion met without evidence, or carrying one that could be met now.
 
 **Phase 8 is the first demoable milestone** — a working vertical slice — and it exists that early on purpose.
 
 Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the start of the phase and gains a retrospective at the end.
+
+**Each phase also builds the Appendix F improvements assigned to it** (ADR-0046): deliverables, not exit criteria, each done or carried by name when the phase closes.
 
 ---
 
@@ -946,7 +949,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 **Goal.** Create a repository that already looks like a serious project before it does anything.
 
-**Deliverables.** Git repo initialised and pushed. Full directory skeleton from Section 7. `LICENSE` (GPL-3.0), `README.md` (skeleton with the pitch section drafted), `CONTRIBUTING.md`, `CHANGELOG.md`. `PROJECT_STATE.json` with all 28 phases enumerated and their exit criteria populated from this document, plus its JSON schema. `PROGRESS.md`, `SESSION_LOG.md` with entry one. `docs/SETUP.md` listing every prerequisite with verified current terms and step-by-step key acquisition. `docs/GLOSSARY.md` seeded with 30 terms. `docs/HOW_IT_WORKS.md` skeleton. ADRs 0001–0008 recording the decisions already locked in Section 5. `.github/` with CI workflow (initially: fmt, clippy, test on a hello-world), issue templates, PR template. `.gitignore` per §12.6. `.env.example`. Conventional-commit enforcement via a commit-msg hook.
+**Deliverables.** Git repo initialised and pushed. Full directory skeleton from Section 7. `LICENSE` (GPL-3.0), `README.md` (skeleton with the pitch section drafted), `CONTRIBUTING.md`, `CHANGELOG.md`. `PROJECT_STATE.json` with all 29 phases enumerated and their exit criteria populated from this document, plus its JSON schema. `PROGRESS.md`, `SESSION_LOG.md` with entry one. `docs/SETUP.md` listing every prerequisite with verified current terms and step-by-step key acquisition. `docs/GLOSSARY.md` seeded with 30 terms. `docs/HOW_IT_WORKS.md` skeleton. ADRs 0001–0008 recording the decisions already locked in Section 5. `.github/` with CI workflow (initially: fmt, clippy, test on a hello-world), issue templates, PR template. `.gitignore` per §12.6. `.env.example`. Conventional-commit enforcement via a commit-msg hook.
 
 **Also, and importantly — the safety rails:**
 - `tools/guard/` — the posture guard (§12.5), wired into CI and a pre-commit hook, with its denylist. Build this *before* there is anything to catch.
@@ -958,7 +961,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 **Exit criteria.**
 - [ ] `git clone` on a clean machine + following `docs/SETUP.md` produces a working dev environment.
 - [ ] CI passes on `phase/00-bootstrap`, and again on `main` after the merge. (§10.5 puts all phase work on a branch, so "green on `main`" can only be verified post-merge; both are required.)
-- [ ] `PROJECT_STATE.json` validates against its schema and enumerates all 28 phases with their exit criteria.
+- [ ] `PROJECT_STATE.json` validates against its schema and enumerates all 29 phases with their exit criteria.
 - [ ] Eight seed ADRs exist and are non-trivial.
 - [ ] **The posture guard fails CI when fed a deliberately-planted test string, and passes on the clean tree.** Verify it actually works — an unverified guard is worse than none, because it produces false confidence.
 - [ ] Secret scanning fails CI on a deliberately-planted fake key.
@@ -1020,7 +1023,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 **Goal.** The database schema everything else depends on, designed once, correctly.
 
-**Deliverables.** SQLite via `sqlx` with WAL mode, in portable `./data/` by default with an installed-mode option. A migration system with forward and backward migrations, tested. Core schema: `media_items` (the generic type from §6.2), `external_ids`, `titles` (multi-language, romaji/native/english variants), `people`, `credits`, `genres`, `keywords`, `series`, `seasons`, `episodes` (with both seasonal and absolute numbering columns and a reconciliation table), `collections`, `profiles`, `watch_events`, `playback_positions`, `watchlist_items`, `local_files`, `local_file_matches`, `sources_config`, `settings`. Repository-pattern access layer — no raw SQL outside `persistence/`. A generic `media_kind` discriminator with `film | episode | series | anime_film | anime_series | live_channel | manga_chapter | comic_issue` so Phases 24–25 need no migration. Backup-on-migrate, and an export/import of the whole profile as a portable archive.
+**Deliverables.** SQLite via `sqlx` with WAL mode, in portable `./data/` by default with an installed-mode option. A migration system with forward and backward migrations, tested. Core schema: `media_items` (the generic type from §6.2), `external_ids`, `titles` (multi-language, romaji/native/english variants), `people`, `credits`, `genres`, `keywords`, `series`, `seasons`, `episodes` (with both seasonal and absolute numbering columns and a reconciliation table), `collections`, `profiles`, `watch_events`, `playback_positions`, `watchlist_items`, `local_files`, `local_file_matches`, `sources_config`, `settings`. Repository-pattern access layer — no raw SQL outside `persistence/`. A generic `media_kind` discriminator with `film | episode | series | anime_film | anime_series | live_channel | manga_chapter | comic_issue` so Phases 25–26 need no migration. Backup-on-migrate, and an export/import of the whole profile as a portable archive.
 
 **Exit criteria.**
 - [ ] All migrations run forward and backward cleanly against a populated database.
@@ -1179,7 +1182,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 **Goal.** The player becomes better than the commercial ones.
 
-**Deliverables.** **Airing awareness** (ADR-0030): a series page must be able to show "S03E07 airs Thursday" **without an episode row existing**, because AniList knows an episode is scheduled before IMDb lists it. Next-episode UI reads from the schedule as well as the catalogue. **The pause overlay** — the signature feature. On pause, a Prime-X-Ray-inspired panel slides in **from the right** over a dimmed, blurred frame, the frame staying visible on the left and the D-pad moving into the panel (ADR-0043): full cast with headshots, director and key crew, ratings (IMDb, TMDB, and AniList for anime — **not** Rotten Tomatoes, which has no free API and whose scraping would violate its terms), runtime remaining, the current chapter, trivia and goofs, soundtrack, and "more like this". Clicking a cast member opens their filmography. It must be beautiful — this is the screenshot people will remember. (Face recognition arrives in Phase 22; until then it shows the full cast list, well-designed.) Next-episode handling with a countdown and a preview card. **When a film ends**, the credits play in full, then a calm end card: what you watched, rate it, what next (ADR-0043); a series keeps the countdown. **An in-app mini player**: keep watching in a corner while browsing, separate from Windows picture-in-picture (ADR-0043). **The TV keyboard** (ADR-0043): on every text field in the app, a Netflix-TV grid (a–z / 0–9 left, results live beside it) with title suggestions, recent searches and word completion from the catalogue; A types, B closes, X backspaces, Y types a space, LT/RT move the cursor, LB/RB switch letters and symbols, Menu submits; a voice key arrives with Phase 20. Episode navigation within the player. Chapter markers on the scrub bar. Thumbnail previews on scrub-bar hover, generated in the background via FFmpeg and cached. Picture-in-picture. Audio delay control. Video filter controls (brightness, contrast, saturation) for badly-encoded sources. Statistics-for-nerds overlay showing decode path, dropped frames, bitrate, and swarm state.
+**Deliverables.** **Airing awareness** (ADR-0030): a series page must be able to show "S03E07 airs Thursday" **without an episode row existing**, because AniList knows an episode is scheduled before IMDb lists it. Next-episode UI reads from the schedule as well as the catalogue. **The pause overlay** — the signature feature. On pause, a Prime-X-Ray-inspired panel slides in **from the right** over a dimmed, blurred frame, the frame staying visible on the left and the D-pad moving into the panel (ADR-0043): full cast with headshots, director and key crew, ratings (IMDb, TMDB, and AniList for anime — **not** Rotten Tomatoes, which has no free API and whose scraping would violate its terms), runtime remaining, the current chapter, trivia and goofs, soundtrack, and "more like this". Clicking a cast member opens their filmography. It must be beautiful — this is the screenshot people will remember. (Face recognition arrives in Phase 23; until then it shows the full cast list, well-designed.) Next-episode handling with a countdown and a preview card. **When a film ends**, the credits play in full, then a calm end card: what you watched, rate it, what next (ADR-0043); a series keeps the countdown. **An in-app mini player**: keep watching in a corner while browsing, separate from Windows picture-in-picture (ADR-0043). **The TV keyboard** (ADR-0043): on every text field in the app, a Netflix-TV grid (a–z / 0–9 left, results live beside it) with title suggestions, recent searches and word completion from the catalogue; A types, B closes, X backspaces, Y types a space, LT/RT move the cursor, LB/RB switch letters and symbols, Menu submits; a voice key arrives with Phase 21. Episode navigation within the player. Chapter markers on the scrub bar. Thumbnail previews on scrub-bar hover, generated in the background via FFmpeg and cached. Picture-in-picture. Audio delay control. Video filter controls (brightness, contrast, saturation) for badly-encoded sources. Statistics-for-nerds overlay showing decode path, dropped frames, bitrate, and swarm state.
 
 **Exit criteria.**
 - [ ] The pause overlay is visually excellent and appears in < 200 ms.
@@ -1270,8 +1273,30 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 ---
 
-### Phase 16 — Recommendation Engine
-**Depends on:** 15. **Sessions:** 2–3.
+### Phase 16 — Ready to Watch
+**Depends on:** 15. **Sessions:** 3–4.
+
+**Goal.** A person can install the app, set it up once, and watch anything they choose (from their own library, a stream, or a download) in a player and an interface that feel finished. This phase exists because the author used the release build after Phase 15 and found it was not usable yet, though every test passed (ADR-0045). It is judged by using the app, not only by fixtures.
+
+**Deliverables.** **The hybrid player** (ADR-0045): clean while watching, like Netflix or Apple TV; a full panel one button away with VLC's depth: subtitles, subtitle style, subtitle sync, audio, speed, picture (aspect, zoom, brightness). Controls answer in under 100 ms. Opening, closing, the bar and the panels move without jumps or flicker. **Subtitles in the player**: a style editor (size, font, colour, outline, background box, position) previewed live over the picture and kept per profile; find and download from OpenSubtitles without leaving playback (the profile's own key); sync in 0.1 s steps with "align again"; load a file from disk. **The controller in the player** (TV-standard): A play/pause; left/right seek 10 s, hold to scrub; up/down volume; LB/RB previous/next episode or chapter; Y a subtitles quick menu; X an audio quick menu; Menu the full panel; B back. **The right stick scrolls everything**: the page or panel under focus, a long rail, the paused film's details, at a speed set by how far it is pushed, with focus following what scrolls into view. **TV shows from folders**: `Show (Year)/Season N/episodes`, `Show (Year)/` with flat `S01E03` files, anime absolute numbering mapped per season where the data allows (never cumulated, ADR-0031), and one show split across folders or drives merged into one; the folder names the show, so no episode is ever filed as a film. **The catalogue keeps itself current** (ADR-0030 made automatic): once a day, in the background and while idle, new titles and episodes from IMDb's updated files; AniList airing schedules every few hours; TMDB now-playing and airing for a profile with a key; Settings says when it last ran. **Home, in this order**: Continue watching; New episodes of your shows; Your library (shown the moment a scan finishes); New releases, filtered by taste; then the taste rails. **A first run that leaves the viewer ready to watch**: library folders (the scan starts at once); add-ons by address, checked live (does it answer, what does it offer); the app suggests none (§2.1); optional TMDB and OpenSubtitles keys, each with a link to get one and a live test; where downloads go (built-in engine or the user's own qBittorrent) with the VPN check. When no stream source is configured, the app says so plainly wherever play or download would be. **`SETUP.md`**: every prerequisite with its official download link and how to add it to the app (WebView2, FFmpeg, the model files, the IMDb and MovieLens datasets, the keys, an optional qBittorrent, an optional VPN) and how to add any add-on by its address. It names no content source. **Polish**: Settings section headings made clear and larger in the display face; the taste screen with its example films as cards, a clearer hierarchy, a live preview of Home after a correction, fewer words; first run and Home audited for layout, clipping, focus jumps and content flashing, at three window sizes.
+
+**Exit criteria.**
+- [ ] The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.
+- [ ] Subtitles: the style editor applies live and persists per profile; find and download, sync in 0.1 s steps, and load from disk each work in the player, by pad.
+- [ ] The controller works in the player as specified, and the right stick scrolls pages, rails, panels and the paused details, each covered by the pad-flow audit.
+- [ ] A TV-layout corpus (season folders, flat, anime absolute, split across drives, including a real-world case like the author's) is identified with at least 98% of episodes right and no episode filed as a film.
+- [ ] The catalogue refreshes daily in the background: titles and episodes released since the last refresh appear without the user doing anything, and a run on the real data adds the recent releases it lacked.
+- [ ] Home's rails are in the specified order, and a finished library scan appears on Home within 2 s.
+- [ ] A first run done only by pad leaves library folders, an add-on the user chose, keys and a download backend configured and tested; with no source, the app says so wherever play or download would be.
+- [ ] `SETUP.md` lists every prerequisite with its official link and how to add it, and passes the posture guard.
+- [ ] The author signs off a screenshot set of the player, first run, Home, Settings and the taste screen, and confirms a download and a stream work with a source of their choosing.
+
+**Learning note.** Input latency and how to measure it; spatial scrolling with an analogue stick; how a TV library is laid out and why the folder names the show; scheduling background work without hurting the foreground; why tests passing is not the same as the app being usable.
+
+---
+
+### Phase 17 — Recommendation Engine
+**Depends on:** 15, 16. **Sessions:** 2–3.
 
 **Goal.** Recommendations that are right, that go beyond the obvious, and that can be explained.
 
@@ -1289,8 +1314,8 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 ---
 
-### Phase 17 — Discovery Engine
-**Depends on:** 16. **Sessions:** 2.
+### Phase 18 — Discovery Engine
+**Depends on:** 17. **Sessions:** 2.
 
 **Goal.** The thing that makes this app worth using: recommendations that are *surprising and right*.
 
@@ -1308,12 +1333,12 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 ---
 
-### Phase 18 — Browsing Surfaces
-**Depends on:** 17. **Sessions:** 4–5.
+### Phase 19 — Browsing Surfaces
+**Depends on:** 18. **Sessions:** 4–5.
 
 **Goal.** Home, Films, and TV Shows become the beautiful, navigable front of the whole system, and the whole app is brought to one design standard before the phase closes.
 
-**Deliverables.** **Idle in TV mode** (ADR-0043): after 5 minutes, an ambient screen (a slow slideshow of artwork, or typographic title cards without artwork, with the clock); any button returns where the viewer was. **No launch intro** (ADR-0043): the first painted frame is Home. **Leaving the player** (ADR-0044): the picture shrinks (about 350 ms, a critically damped spring) into the tile it was launched from while the page fades in behind it; with no tile on screen it shrinks to the centre and dissolves; reduced motion makes it a 200 ms dissolve. **Shared-element motion** (ADR-0044): a poster grows into its film page and the page's artwork into the player, inside `src/design-system/focus/`. **Seamless resume** (ADR-0044): relaunching restores the page, its scroll and focus, and offers the film at its position; after a crash the same state returns and the crash is said plainly, once. **Home**: Continue Watching first (with progress, next episode, and a remove option), then adaptive rails generated by the discovery engine, ordered by predicted engagement, with an optional hero for a single strong recommendation. **Films** and **TV Shows**: Continue Watching scoped to that kind, then browsable structure — by genre, decade, country, language, director, movement, collection, awards, and curated lists — with real filtering and sorting. **Every rail has a "see all"** that opens a proper browsable grid with filters, honouring the anti-pattern rule that nothing is more than three interactions from Home. Detail pages: hero artwork, synopsis, cast and crew with links, ratings, availability badges (local / streamable / downloadable, with quality and language), episode lists with progress for series, related and "more like this", and a prominent play button with the language and quality selectors from Phase 9. Hover previews: muted, 400 ms dwell, still-frame-then-motion, disableable. A Live Channels tab with an honest, well-designed empty state pointing to Phase 24. **The TV billboard** (ADR-0042): the top of Home is a typographic billboard for the focused or featured film — title in the display face, year, director, one line of why — and behind it **the focused film's full artwork backdrop** when the user has a TMDB key, cross-fading as focus moves; with no key, a dim tint (designed first, since it is the default). Everything virtualised, everything keyboard-navigable, everything at 60 fps.
+**Deliverables.** **Idle in TV mode** (ADR-0043): after 5 minutes, an ambient screen (a slow slideshow of artwork, or typographic title cards without artwork, with the clock); any button returns where the viewer was. **No launch intro** (ADR-0043): the first painted frame is Home. **Leaving the player** (ADR-0044): the picture shrinks (about 350 ms, a critically damped spring) into the tile it was launched from while the page fades in behind it; with no tile on screen it shrinks to the centre and dissolves; reduced motion makes it a 200 ms dissolve. **Shared-element motion** (ADR-0044): a poster grows into its film page and the page's artwork into the player, inside `src/design-system/focus/`. **Seamless resume** (ADR-0044): relaunching restores the page, its scroll and focus, and offers the film at its position; after a crash the same state returns and the crash is said plainly, once. **Home**: Continue Watching first (with progress, next episode, and a remove option), then adaptive rails generated by the discovery engine, ordered by predicted engagement, with an optional hero for a single strong recommendation. **Films** and **TV Shows**: Continue Watching scoped to that kind, then browsable structure — by genre, decade, country, language, director, movement, collection, awards, and curated lists — with real filtering and sorting. **Every rail has a "see all"** that opens a proper browsable grid with filters, honouring the anti-pattern rule that nothing is more than three interactions from Home. Detail pages: hero artwork, synopsis, cast and crew with links, ratings, availability badges (local / streamable / downloadable, with quality and language), episode lists with progress for series, related and "more like this", and a prominent play button with the language and quality selectors from Phase 9. Hover previews: muted, 400 ms dwell, still-frame-then-motion, disableable. A Live Channels tab with an honest, well-designed empty state pointing to Phase 25. **The TV billboard** (ADR-0042): the top of Home is a typographic billboard for the focused or featured film — title in the display face, year, director, one line of why — and behind it **the focused film's full artwork backdrop** when the user has a TMDB key, cross-fading as focus moves; with no key, a dim tint (designed first, since it is the default). Everything virtualised, everything keyboard-navigable, everything at 60 fps.
 
 **The final design overhaul** (ADR-0037). The phase ends by bringing **every** surface to one standard: Home, Films, TV Shows, Watchlist, Live, Search, Settings, Downloads, the detail page, and every empty, loading and error state. In order:
 1. **The masthead** (§9.4), if it has not already been built ahead of the phase: tabs on top, a labelled Search button, the left rail and its collapse state removed.
@@ -1343,8 +1368,8 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 ---
 
-### Phase 19 — Watchlist and External Sync
-**Depends on:** 18. **Sessions:** 1–2.
+### Phase 20 — Watchlist and External Sync
+**Depends on:** 19. **Sessions:** 1–2.
 
 **Goal.** The watchlist becomes a tool a cinephile actually uses, connected to the services they already use.
 
@@ -1361,8 +1386,8 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 ---
 
-### Phase 20 — Windows Platform Integration
-**Depends on:** 12, 18. **Sessions:** 2–3.
+### Phase 21 — Windows Platform Integration
+**Depends on:** 12, 19. **Sessions:** 2–3.
 
 **Goal.** It stops feeling like a web app in a window and starts feeling like a Windows application.
 
@@ -1379,10 +1404,10 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 ---
 
-### Phase 21 — Performance Engineering and the Low-End Path
-**Depends on:** 18 (20 optional). **Sessions:** 2.
+### Phase 22 — Performance Engineering and the Low-End Path
+**Depends on:** 19 (21 optional). **Sessions:** 2.
 
-> Phase 20 is a *soft* dependency: with no shell integration built, there is simply no shell-integration cost to profile. This keeps Tier B (Appendix E) reachable without Tier C.
+> Phase 21 is a *soft* dependency: with no shell integration built, there is simply no shell-integration cost to profile. This keeps Tier B (Appendix E) reachable without Tier C.
 
 **Goal.** Meet every budget in Section 2.3 on a genuinely weak machine.
 
@@ -1399,7 +1424,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 ---
 
-### Phase 22 — Vision Layer (Tier 2)
+### Phase 23 — Vision Layer (Tier 2)
 **Depends on:** 11. **Sessions:** 1–2.
 
 **Goal.** The pause overlay knows who is on screen.
@@ -1417,7 +1442,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 ---
 
-### Phase 23 — Binge Intelligence
+### Phase 24 — Binge Intelligence
 **Depends on:** 11, 12. **Sessions:** 1–2.
 
 **Goal.** Watching a series feels as smooth as it does on a commercial streamer.
@@ -1434,8 +1459,8 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 ---
 
-### Phase 24 — Live Channels
-**Depends on:** 18. **Sessions:** 2.
+### Phase 25 — Live Channels
+**Depends on:** 19. **Sessions:** 2.
 
 **Goal.** The fifth tab becomes real.
 
@@ -1452,12 +1477,12 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 ---
 
-### Phase 25 — Manga and Comics
-**Depends on:** 3, 5, 16. **Sessions:** 2–3.
+### Phase 26 — Manga and Comics
+**Depends on:** 3, 5, 17. **Sessions:** 2–3.
 
 **Goal.** The unified taste model extends to reading, using the generic data model built in Phase 3 — with no schema migration.
 
-**Deliverables.** A sixth navigation destination, **Reading**. Format support: CBZ, CBR, CB7, PDF, folders of images, **EPUB** (fixed-layout comics in the comic reader; reflowable books and light novels in a typographic reader with font, size, margins, line height, night and sepia themes, and chapter navigation), and **MOBI and AZW3**, DRM-free only — DRM is never removed or circumvented (ADR-0044). A reader UI with single page, double page, and webtoon continuous-scroll modes; **Guided View**, panel by panel with a smooth zoom to each, panels detected automatically and falling back to page view where detection is unsure; right-to-left support for manga; zoom and pan; page-fit modes; and a genuinely good keyboard and mouse experience. **The controller reads as well as it browses** (ADR-0044): A turns or steps, LB/RB move by page, the triggers by chapter, the right stick zooms and pans, the left stick scrolls a webtoon, B returns to the shelf, Menu opens the reader's options; the bar is Webtoon, Marvel Unlimited and ComiXology. Progress tracking per chapter and per volume. Local library scanning and matching for comics and manga files, reusing the Phase 12 machinery with a reading-specific parser. Metadata from AniList and MangaDex-style schemas; MAL/AniList reading-list sync via the Phase 19 infrastructure. Online sources via the same `SourceBackend` protocol — the reader is just another consumer of the resolver. The taste model, recommender, and semantic search extended to reading with no architectural change, delivering genuine cross-media recommendations ("you loved this manga; here's the anime, and here's a live-action film with the same preoccupations").
+**Deliverables.** A sixth navigation destination, **Reading**. Format support: CBZ, CBR, CB7, PDF, folders of images, **EPUB** (fixed-layout comics in the comic reader; reflowable books and light novels in a typographic reader with font, size, margins, line height, night and sepia themes, and chapter navigation), and **MOBI and AZW3**, DRM-free only — DRM is never removed or circumvented (ADR-0044). A reader UI with single page, double page, and webtoon continuous-scroll modes; **Guided View**, panel by panel with a smooth zoom to each, panels detected automatically and falling back to page view where detection is unsure; right-to-left support for manga; zoom and pan; page-fit modes; and a genuinely good keyboard and mouse experience. **The controller reads as well as it browses** (ADR-0044): A turns or steps, LB/RB move by page, the triggers by chapter, the right stick zooms and pans, the left stick scrolls a webtoon, B returns to the shelf, Menu opens the reader's options; the bar is Webtoon, Marvel Unlimited and ComiXology. Progress tracking per chapter and per volume. Local library scanning and matching for comics and manga files, reusing the Phase 12 machinery with a reading-specific parser. Metadata from AniList and MangaDex-style schemas; MAL/AniList reading-list sync via the Phase 20 infrastructure. Online sources via the same `SourceBackend` protocol — the reader is just another consumer of the resolver. The taste model, recommender, and semantic search extended to reading with no architectural change, delivering genuine cross-media recommendations ("you loved this manga; here's the anime, and here's a live-action film with the same preoccupations").
 
 **Exit criteria.**
 - [ ] All listed formats open correctly, including malformed archives, without crashing.
@@ -1473,7 +1498,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 ---
 
-### Phase 26 — Connected Playback
+### Phase 27 — Connected Playback
 **Depends on:** 11. **Sessions:** 2.
 
 **Goal.** Playback leaves the desktop.
@@ -1491,7 +1516,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 ---
 
-### Phase 27 — Hardening, Packaging, and Portfolio Finalisation
+### Phase 28 — Hardening, Packaging, and Portfolio Finalisation
 **Depends on:** everything. **Sessions:** 2–3.
 
 **Goal.** Turn a working app into a project that gets someone hired.
@@ -1545,22 +1570,24 @@ Regenerated from the `Depends on:` line of each phase, which is authoritative. W
                                  13   (needs 7, 9, 12)
 
 
-  3 ─┬─→ 14 ──→ 15 ──→ 16 ──→ 17 ──→ 18 ─┬──→ 19
-  5 ─┘                                   ├──→ 20 ──┐
-                                         ├──→ 21 ◄─┘  (20 optional)
-                                         ├──→ 23      (also needs 11, 12)
-                                         ├──→ 24
-                                         └──→ 25      (also needs 3, 5, 16)
+  3 ─┬─→ 14 ──→ 15 ──→ 16 ──→ 17 ──→ 18 ──→ 19 ─┬──→ 20
+  5 ─┘                                           ├──→ 21 ──┐
+                                                 ├──→ 22 ◄─┘  (21 optional)
+                                                 ├──→ 24      (also needs 11, 12)
+                                                 ├──→ 25
+                                                 └──→ 26      (also needs 3, 5, 17)
 
-  11 ─┬──→ 22
-      └──→ 26
+  11 ─┬──→ 23
+      └──→ 27
 
-  27 ← everything (run it whenever you stop — see Appendix E)
+  28 ← everything (run it whenever you stop — see Appendix E)
+
+  16 (Ready to Watch) was inserted by spec 4.0.0 (ADR-0045); phases after it moved up by one.
 ```
 
-**Corrections made in this regeneration.** Phase 8 depends on **5 and 7**; the previous diagram implied a hard `2 → 8` edge that no phase header states (Phase 2 is a practical prerequisite for a good-looking Phase 8, not a declared one). Phase 14 depends on **3 and 5**; the previous diagram drew `14 → 15 → …` as a disconnected root. Phase 21 depends on **18, with 20 optional** (see its header). Phases 22 and 26 depend on **11**; 23 on **11 and 12**; 25 on **3, 5 and 16**.
+**Corrections made in this regeneration.** Phase 8 depends on **5 and 7**; the previous diagram implied a hard `2 → 8` edge that no phase header states (Phase 2 is a practical prerequisite for a good-looking Phase 8, not a declared one). Phase 14 depends on **3 and 5**; the previous diagram drew `14 → 15 → …` as a disconnected root. Phase 22 depends on **18, with 20 optional** (see its header). Phases 23 and 27 depend on **11**; 23 on **11 and 12**; 25 on **3, 5 and 16**.
 
-Phases 9–13 can be reordered if a session's energy suits one better. Phases 22–26 are genuinely independent of one another and can be tackled in any order, or deferred indefinitely without harming the project — 27 is reachable from 21.
+Phases 9–13 can be reordered if a session's energy suits one better. Phases 23–27 are genuinely independent of one another and can be tackled in any order, or deferred indefinitely without harming the project — 27 is reachable from 21.
 
 ### B. What "done" means
 
@@ -1596,38 +1623,236 @@ Maintained in `docs/RISKS.md` from Phase 0. Reviewed at the start of any phase w
 | **R2** | **librqbit's streaming control is insufficient** to build the Phase 7 deadline scheduler. | Medium | Severe — the "8 seconds to first frame" promise | Spike B in Phase 1 measures real numbers and audits the API surface. | libtorrent-rasterbar via FFI. Costs a C++ toolchain and binding work, roughly a week, but it is the proven path and every serious client uses it. |
 | **R3** | **ONNX Runtime is painful to build on Windows, or too slow on Tier 0.** | Low–Medium | **Moderate/Severe** — semantic search and the taste model. Raised from Moderate by ADR-0015: query embedding now runs on *all* tiers, so an unusable `ort` breaks semantic search everywhere, not only on Tier 0. Spike C gates Phase 5. | Spike C in Phase 1 measures latency and memory on the dev machine, then on a constrained VM. | Ship precomputed embeddings for the whole catalogue and never embed on device (already the Tier 0 design). New items get embeddings on next catalogue refresh. Semantic search survives; on-the-fly embedding of free-text queries would need a smaller model or a hash-based fallback. |
 | **R4** | **Catalogue ingestion is far larger or slower than expected** — IMDb plus TMDB plus MovieLens is a lot of data. | Medium | Moderate — first-run experience | Measure in Phase 4 before committing to a shape. Scope by a vote/popularity threshold rather than ingesting everything. | Tiered catalogue: ship a core index of ~200k well-known titles, fetch the long tail live on demand and cache. The "vastest library" promise is met by the source layer, not by the local index. |
-| **R5** | **Windows shell integration hits platform limits.** Windows 11 context-menu entries require a packaged (sparse MSIX) app; icon overlay handlers are limited to roughly 15 slots system-wide and cloud-storage apps have already taken them. | **High** | Low — these are enhancements | Research the constraints in Phase 20 *before* implementing, not after. | Ship the legacy context menu (still reachable via "Show more options"), or produce a sparse package purely for shell registration. Drop icon overlays and document why — knowing *why* a platform limit exists is itself a good interview answer. |
+| **R5** | **Windows shell integration hits platform limits.** Windows 11 context-menu entries require a packaged (sparse MSIX) app; icon overlay handlers are limited to roughly 15 slots system-wide and cloud-storage apps have already taken them. | **High** | Low — these are enhancements | Research the constraints in Phase 21 *before* implementing, not after. | Ship the legacy context menu (still reachable via "Show more options"), or produce a sparse package purely for shell registration. Drop icon overlays and document why — knowing *why* a platform limit exists is itself a good interview answer. |
 | **R6** | **Subtitle alignment doesn't reach 90%** on the fixture corpus. | Medium | Low–Moderate | Build the corpus first, in Phase 10, so the target is measured rather than assumed. | Lower the target *with evidence*, and lean harder on the embedded-track path (which is already the primary route and needs no alignment at all). Report the honest number in the case study — a measured 76% with an explanation beats an unverified claim of 95%. |
-| **R7** | **The project is abandoned partway.** 28 phases is months of solo work. This is the most likely failure mode of all, and it is not technical. | **High** | Severe | The Tier structure in Appendix E: every tier is a legitimate stopping point that still produces a portfolio project. Phase 8 is demoable. Phase 18 is a complete product. | Stop at a tier boundary, run Phase 27's portfolio work against what exists, and ship it. **A finished Tier B project beats an abandoned Tier D one, always.** |
+| **R7** | **The project is abandoned partway.** 29 phases is months of solo work. This is the most likely failure mode of all, and it is not technical. | **High** | Severe | The Tier structure in Appendix E: every tier is a legitimate stopping point that still produces a portfolio project. Phase 8 is demoable. Phase 19 is a complete product. | Stop at a tier boundary, run Phase 28's portfolio work against what exists, and ship it. **A finished Tier B project beats an abandoned Tier D one, always.** |
 | **R8** | **Dependency drift over a long project** — a crate is abandoned, a breaking release lands, an API's free tier changes. | Medium | Low–Moderate | Lockfiles committed. `cargo audit`/`npm audit` in CI. The cold-resume ritual (§10.11) checks for drift after a gap. | Pin the working version and defer upgrading. Never upgrade a dependency mid-phase for its own sake. |
 | **R9** | **The author falls behind and stops understanding the code** — at which point the project has failed at its actual purpose even if the app works. | Medium | **Severe** | The active understanding gate (§10.10). Learning notes as a hard deliverable. The 400-line explanation rule. | Stop feature work entirely. Spend a session or more on a code tour and a rewrite of the weak learning notes. Simplify implementations that can't be explained. This is always worth doing over adding a feature. |
 | **R10** | **The §2.1 posture erodes** — a source URL appears in a fixture, a doc example, or a "temporary" default across dozens of sessions. | Medium | **Severe** — takedown, and the portfolio piece disappears | The automated posture guard (§12.5), scanning working tree *and* history, in CI and pre-commit, verified in Phase 0. | Remove, rewrite history before pushing, and strengthen the denylist. Never suppress the guard. |
 
 ### E. Tiers — where you can legitimately stop
 
-Not all 28 phases are equal, and pretending otherwise is how projects die at phase 19. Each tier boundary is a real stopping point.
+Not all 29 phases are equal, and pretending otherwise is how projects die at phase 20. Each tier boundary is a real stopping point.
 
 **Tier A — Vertical slice (Phases 0–8).**
 Search for a film, press play, watch it, from a local file or a configured source. You have something to show a person. Not yet a portfolio project, but proof the hard parts work.
 
-**Tier B — The product (Phases 9–18, then 21, then 27).**
+**Tier B — The product (Phases 9–19, then 22, then 28).**
 Intelligent source selection, subtitles that sync themselves, the full player with the pause overlay, the local library matcher, the download advisor, profiles and onboarding, the taste model, the recommender, the discovery engine, all the browsing surfaces, performance work, and the portfolio finalisation.
 
 **This is the project.** If you complete Tier B and stop, you have a genuinely impressive, complete, coherent piece of work with measured results and five case studies. Everything after this is breadth, not depth. **Treat Tier B as the definition of done and everything beyond it as a bonus.**
 
-**Tier C — Depth (Phases 19, 20, 23).**
-External sync, Windows platform integration, binge intelligence. Each meaningfully strengthens the project. Phase 20 in particular is a strong differentiator, since almost nobody does real shell integration.
+**Tier C — Depth (Phases 20, 21, 24).**
+External sync, Windows platform integration, binge intelligence. Each meaningfully strengthens the project. Phase 21 in particular is a strong differentiator, since almost nobody does real shell integration.
 
-**Tier D — Breadth (Phases 22, 24, 25, 26).**
+**Tier D — Breadth (Phases 23, 25, 26, 27).**
 Face recognition, live TV, manga and comics, casting and watch-together. Fully independent of one another; do any, all, or none, in any order. Each is a good self-contained project in its own right.
 
-**Rule:** Phase 27 (portfolio finalisation) is run **whenever you decide to stop**, against whatever exists at that point. It is not the last phase — it is the phase you run when you're done. Run it at the end of Tier B even if you intend to continue; a project that is always presentable is a project you can send to an employer the day an opportunity appears.
+**Rule:** Phase 28 (portfolio finalisation) is run **whenever you decide to stop**, against whatever exists at that point. It is not the last phase — it is the phase you run when you're done. Run it at the end of Tier B even if you intend to continue; a project that is always presentable is a project you can send to an employer the day an opportunity appears.
 
 ---
 
+### F. Improvement backlog (ADR-0046)
+
+Seventy-eight improvements found by reviewing the app as a person uses it (2026-11-16), each scheduled into the phase that already touches the same code. **Rules:**
+
+- An item is a **deliverable of its phase, not an exit criterion**. The phase's plan lists its items, and `tools/phasedoc` prints them in the phase doc.
+- At phase close each item is **done** (its commit in the Done column) or **carried** to a named later phase with the reason in the retrospective. Never dropped silently. Filling Done, or moving an item to another phase, is bookkeeping and not an amendment.
+- A small item may be built earlier when the same file is already open.
+- **⚑** marks a taste call or a change to an earlier decision: shown both ways in Phase 19's mockups, the author chooses, and the default is no change.
+- **Constraints win**: no item may breach §2.1, §9.0, a locked technology or a budget. One that would is cut with a note.
+
+Size: **S** one commit · **M** a subtask · **L** several subtasks.
+
+**The player**
+
+| ID | Improvement | Phase | Size | Done |
+|---|---|---|---|---|
+| I01 | "Start over" beside "Resume from 42:10", on the film page and on episode rows | 16 | S | 7776473 |
+| I02 | Sleep timer: stop in 30, 60 or 90 minutes, or at the end of this episode | 24 | S | |
+| I03 | "Still watching?" after three episodes played with no input | 24 | S | |
+| I04 | Night mode: the volume levelled so speech is audible and loud scenes are not, per profile | 24 | S | |
+| I05 | Per-series memory of the audio track, the subtitle track and the subtitle delay | 24 | S | |
+| I06 | Two subtitle languages at once | 24 | M | |
+| I07 | What is buffered shown on the seek bar for streams and torrents; a stall says why (peers, speed against what is needed) and offers "Download instead" | 24 | M | |
+| I08 | Chapter marks on the seek bar and a chapter list in the panel | 24 | S | |
+| I09 | A–B repeat | 24 | S | |
+| I10 | Automatic deinterlacing | 24 | S | |
+| I11 | "Try the next subtitle": one press when the chosen one is wrong | 24 | S | |
+| I12 | Play a random episode of a show | 24 | S | |
+| I13 | A whole season downloaded in one press; optionally the next N unwatched episodes of a followed show kept downloaded, from the user's own sources | 24 | M | |
+| I14 | The mouse in the player, verified and completed: a click pauses, a double-click is full screen, the wheel is volume, the pointer hides when idle | 19 | S | |
+| I15 | Extras (featurettes, deleted scenes) offered under "Extras" on the film or show's page instead of being left out | 19 | M | |
+| I16 | A screenshot key, saved to Pictures, with or without subtitles | 21 | S | |
+| I17 | A choice of audio output device, and passthrough to a receiver | 21 | M | |
+| I18 | The display kept awake while playing and allowed to sleep when paused ten minutes, verified with `powercfg /requests` | 21 | S | |
+| I19 | HDR handled deliberately: passed through on an HDR display, tone-mapped on SDR; the display and decoder probed (D67) | 22 | M | |
+| I20 | A busy sound device does not delay the picture, and the player says the device is in use (D64) | 22 | S | |
+
+**The library**
+
+| ID | Improvement | Phase | Size | Done |
+|---|---|---|---|---|
+| I21 | Mark watched and unwatched: a film, an episode, a season, a show | 16 | M | 643e750 |
+| I22 | A menu on every tile (hold A, right-click, or the Menu key): Play, Start over, Watchlist, Mark watched, Not interested, Show in Explorer, Fix the match | 19 | M | |
+| I23 | Fix a wrong match from the film's own page | 19 | S | |
+| I24 | Pictures without a key: `poster.jpg`, `folder.jpg` or `fanart.jpg` beside the file, cover art inside the file, else a frame from the film | 19 | M | |
+| I25 | Scan progress in the masthead | 19 | S | |
+| I26 | `.nfo` files (an IMDb or TMDB id inside) read as the strongest identification signal | 21 | M | |
+| I27 | Library health: duplicates (keep the better copy), episodes missing from a season, files that will not play | 21 | M | |
+| I28 | A drive that is not connected shows its films as "drive not connected", not gone; missing files purged after a quiet period (D74) | 21 | S | |
+| I29 | A file holding two episodes is offered for both (D73) | 21 | S | |
+| I30 | A show IMDb splits where others do not (D85), mapped with TMDB's numbering when a key is present | 21 | M | |
+| I31 | Optional rename-and-organise: off by default, a preview first, an undo log | 21 | L | |
+| I32 | Library statistics: hours, size by resolution and codec | 20 | S | |
+
+**Search**
+
+| ID | Improvement | Phase | Size | Done |
+|---|---|---|---|---|
+| I33 | Result rows: the number and the match label padded inside the focus ring | 16 | S | 7776473 |
+| I34 | Filter chips under the search field: films, series, in my library, playable now, decade | 19 | M | |
+| I35 | Example searches in the empty search state | 19 | S | |
+| I36 | Typo tolerance that works: a weak keyword hit no longer blocks a good fuzzy one (D31), within the budget (D30) | 22 | M | |
+| I37 | Exact-title searches skip the embedding (D35); the indices warmed after launch (D34, D82) | 22 | S | |
+
+**Home and browsing**
+
+| ID | Improvement | Phase | Size | Done |
+|---|---|---|---|---|
+| I38 | A "Finish setting up" card on Home until it is done: library, a source, subtitles, downloads; each line opens its setting | 16 | M | 6000ceb |
+| I39 | A working Watchlist page now (a grid of what was saved); Phase 20 deepens it | 16 | S | 2cd797f |
+| I40 | Films and TV Shows show a simple working grid (the library first, then widely loved) until Phase 19 builds them | 17 | M | |
+| I41 | "Playable now": a rail of public-domain films from the built-in Internet Archive source, so a fresh install can play something at once | 17 | M | |
+| I42 | "I have 90 minutes": a length limit on Surprise me and on Home | 18 | S | |
+| I43 | A mark on every tile for "on this PC" and "can stream" | 19 | S | |
+| I44 | Home per profile: hide, pin and reorder rails | 19 | M | |
+| I45 | Jump by letter (LB/RB) and by page (LT/RT) in long grids | 19 | S | |
+| I46 | A person's page: the filmography in order, with "seen 4 of 23" | 19 | S | |
+| I47 | Follow a show, and an Upcoming page: new episodes of followed shows by date | 20 | M | |
+
+**Downloads and the network**
+
+| ID | Improvement | Phase | Size | Done |
+|---|---|---|---|---|
+| I48 | A storage rule: keep downloads under N GB, delete watched first, automatically | 21 | S | |
+| I49 | Seeding rules: by ratio or by time, a default and per download | 21 | S | |
+| I50 | Ask before quitting mid-download; optionally keep downloading in the tray | 21 | M | |
+| I51 | Connection health in Downloads: port reachable, DHT nodes, the bound adapter | 22 | S | |
+| I52 | Faster torrent starts: DHT state saved sooner and the best copy pre-started (D61, D63); an abandoned swarm removed (D69) | 22 | M | |
+| I53 | Subtitle files inside a torrent used (D70); a stream hashed for subtitle lookup (D71) | 24 | M | |
+
+**Settings and the system**
+
+| ID | Improvement | Phase | Size | Done |
+|---|---|---|---|---|
+| I54 | A System status page: catalogue age, FFmpeg, libmpv, model files, each add-on, keys, subtitle quota, VPN binding, disk; each line with its fix | 19 | M | |
+| I55 | Search inside Settings; a one-line explanation of each setting; reset a section | 19 | M | |
+| I56 | Run the first run again from Settings | 19 | S | |
+| I57 | Button hints fade after a few sessions, with a setting to keep them | 19 | S | |
+| I58 | Back up and restore: one file of profiles, history, ratings, watchlist and settings (never the catalogue); a daily backup kept seven days; an integrity check at launch | 20 | M | |
+| I59 | Private session: watch without recording history or changing taste; hide a title from history | 20 | S | |
+| I60 | Import a Netflix viewing-activity CSV, and watched state from Kodi and Jellyfin | 20 | M | |
+| I61 | A share card: a film with your rating, or your year in film, saved as an image | 20 | S | |
+| I62 | Remap keys and pad buttons | 21 | M | |
+| I63 | Start in TV mode: a `--tv` flag, and when a controller is connected at launch | 21 | S | |
+| I64 | A pad system menu (hold Menu): switch profile, Settings, exit, sleep or shut down the PC | 21 | S | |
+| I65 | Database care: `PRAGMA optimize` on exit, a WAL checkpoint, a weekly integrity check | 22 | S | |
+| I66 | Text size (90–150%) independent of TV mode; a high-contrast option | 28 | M | |
+| I67 | Copy a diagnostic report (versions, tier, what was found, last errors, no file names); open the log folder | 28 | S | |
+| I68 | An opt-in notice that a newer version exists, off by default | 28 | S | |
+| I69 | Interface text in one place, so a translation is possible later | 28 | L | |
+| I70 | A demo profile: one press fills the app with public-domain films and sample history, so a reviewer sees a living app in a minute | 28 | M | |
+
+**The look**
+
+| ID | Improvement | Phase | Size | Done |
+|---|---|---|---|---|
+| I71 | One title face: the pause panel and the player use the display face, as the film page does | 16 | S | 7776473 |
+| I72 | Home's rail descriptors on one line under the rail title | 16 | S | 7776473 |
+| I73 | The film page without artwork: a second column of facts (ratings, leading cast, genres, where it plays) so the page is not half empty | 19 | M | |
+| I74 | Every page's skeleton matches its final layout; nothing jumps when content arrives | 19 | S | |
+| I75 | Dates and numbers in the viewer's locale; tabular figures for every time | 19 | S | |
+| I76 | ⚑ Typographic cards tinted by kind (film, series, anime) in flat tones | 19 | S | |
+| I77 | ⚑ A true-black option for OLED screens | 19 | S | |
+| I78 | ⚑ A tab hidden until its phase builds it (Live until Phase 25) | 19 | S | |
+
+**From the author's fix list** (ADR-0049, 2026-11-17: Phase 16 built the usable core; these deepen it)
+
+| ID | Improvement | Phase | Size | Done |
+|---|---|---|---|---|
+| I79 | Films and TV Shows browsed by decade, country and director; the genres too slow for the votes index today (documentaries, westerns, war) from a genre-and-votes index | 19 | M | |
+| I80 | Backdrops on title pages, from the poster sources (ADR-0052; built in Phase 16, round 9), and with the profile's TMDB key cast photos (posters are built, ADR-0048) | 19 | M | backdrops: Phase 16 (ADR-0052); cast photos open |
+| I81 | Add-on logos on the add-on cards, fetched by the backend like posters (a monogram stands in) | 19 | S | |
+| I82 | TMDB's poster address cached per title on disk (one `find` call per title per session today) | 22 | S | |
+| I83 | HEIC and AVIF profile pictures, through Windows' own decoder | 22 | S | |
+| I84 | Two episodes of one season pack downloading at once (D87) | 22 | M | |
+| I85 | Logs and Downloads follow the data folder the app opened (D88) | 22 | S | |
+| I86 | The keyless poster switch and the TMDB key as one "Artwork" choice in the first run, after Phase 19's mockups | 19 | S | |
+
+---
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 4.6.0 — 2026-11-17 (search by meaning in the installer)
+
+Minor: a download replaced by a file the installer carries, at the author's request; no exit criterion changes.
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A42 | §2.7 | **Search by meaning ships inside the installer** (the author, round 9, after their install downloaded it and never built it: the meaning file was corrupt mid-file from a resume answered from the wrong byte, and the bad file was kept and judged by its header). The installer carries the three files, checked against the published hashes; the index builds on the machine once the catalogue is searchable; downloads that remain check where a resume starts, delete what fails, and are checked in full before use. | 0053 |
+
+### spec_version 4.5.0 — 2026-11-17 (a title's backdrop)
+
+Minor: an Appendix F item brought forward and widened, decided by the author; no exit criterion changes.
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A41 | Appendix F (I80) | **A title's page has a backdrop and its poster** (the author, round 9: empty space where the poster should be). Backdrops come from the same two sources as posters (the profile's TMDB key, or the keyless poster switch), not TMDB alone, and are built in Phase 16; cast photos stay in Phase 19. | 0052 |
+
+### spec_version 4.4.0 — 2026-11-17 (search by meaning on a new install)
+
+Minor: one stated exception to a consent rule, decided by the author; no exit criterion changes.
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A40 | §2.7 | **The meaning index is keyed by IMDb id** (found pressing Download on a copy of the author's install): the published artefact was addressed by the producer's row ids, which no install shares, so search by meaning had never worked anywhere else. A key file compiled into the app names each vector by IMDb id; nothing is republished. | 0051 |
+| A39 | §2.7 | **A new install fetches search by meaning during setup** (the author, round 8: their install never had it, the offer having come after their setup and sitting below search results). Setup says so with the size; an existing install is offered it at the top of Search and in Settings. | 0050 |
+
+### spec_version 4.3.0 — 2026-11-17 (the author's fix list)
+
+Minor: it adds backlog items; no exit criterion changes.
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A38 | Appendix F | **Eight improvements from the author's fix list** (I79–I86): where Phase 16 built the usable core of something a later phase owns (Films and TV browsing, artwork, add-on cards, season packs, the data folder), what that phase adds. The fifteen fixes themselves are in Phase 16 (`docs/design/author-brief-2026-11-17.md`). | 0049 |
+
+### spec_version 4.2.0 — 2026-11-17 (Stremio add-ons)
+
+Minor: it adds a capability; no exit criterion changes. A decision ADR-0040 reserves, taken by the author.
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A37 | §2.1 | **Stremio's add-on protocol beside the app's own.** A pasted Stremio manifest (or `stremio://` link) installs like any add-on; it is asked by IMDb id; streams the player cannot open are left out; torrents it returns can be downloaded. The app still ships, suggests and names no add-on. | [0047](docs/adr/0047-stremio-addon-protocol.md) |
+
+### spec_version 4.1.0 — 2026-11-16 (an improvement backlog)
+
+Minor: it adds deliverables; no decision is reversed and no exit criterion changes.
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A36 | §15 (preamble), new Appendix F | **The improvement backlog**, asked for by the author: 78 improvements to function, look and usability, each with an id (I01–I78), a size and the phase that builds it. They are deliverables of their phases, not exit criteria; at phase close each is done or carried by name. Seven are built in Phase 16 (I01, I21, I33, I38, I39, I71, I72). Three taste calls are marked ⚑ and wait for Phase 19's mockups. `tools/phasedoc` prints a phase's items in its doc. | 0046 |
+
+### spec_version 4.0.0 — 2026-11-08 (Ready to Watch, and the phases renumbered)
+
+Major, because every phase from 16 on changes its number. Text above this section uses the new
+numbers; the entries below, and every document written before this date, use the old ones (old 16–27
+are now 17–28).
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A35 | §15 (new Phase 16; Phases 17–28 renumbered), Appendix A, Appendix E, §3, §10, §11, §12 | **Ready to Watch**, inserted before the recommendation engine after the author used the release build and found it not yet usable: the hybrid player with subtitle style, download, sync and file loading; the controller in the player and the right stick everywhere; TV shows read from their folders; a catalogue that refreshes itself daily; Home in a fixed order with the library shown at once; a first run that leaves the viewer ready to watch; `SETUP.md`; polish. 29 phases, 0–28; tiers and gates move with the numbers. | [0045](docs/adr/0045-ready-to-watch.md) |
 
 ### spec_version 3.3.0 — 2026-11-07 (release polish, reading formats, an unsigned release)
 

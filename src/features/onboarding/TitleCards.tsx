@@ -18,7 +18,15 @@ async function ok<T>(p: Promise<{ status: "ok"; data: T } | { status: "error"; e
 
 export const ROUNDS = 4;
 
-export function TitleCards({ onPicked }: { onPicked?: (count: number) => void }) {
+export function TitleCards({
+  onPicked,
+  onChosen,
+}: {
+  onPicked?: (count: number) => void;
+  /** The titles picked so far, across rounds (Phase 16: the first run shows them back). */
+  onChosen?: (picks: TastePick[]) => void;
+}) {
+  const [chosen, setChosen] = useState<Map<number, TastePick>>(new Map());
   const [round, setRound] = useState(1);
   const [cards, setCards] = useState<TastePick[]>([]);
   const [shown, setShown] = useState<number[]>([]);
@@ -47,6 +55,11 @@ export function TitleCards({ onPicked }: { onPicked?: (count: number) => void })
     else next.add(c.id);
     setPicked(next);
     onPicked?.(next.size);
+    const kept = new Map(chosen);
+    if (on) kept.delete(c.id);
+    else kept.set(c.id, c);
+    setChosen(kept);
+    onChosen?.([...kept.values()]);
   };
 
   return (

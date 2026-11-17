@@ -165,14 +165,68 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: "F", pad: "View", does: "Full screen", sample: k("f"), intent: { kind: "fullscreen" } },
   { keys: ", / .", pad: null, does: "One frame back or forward, paused", sample: k(","), intent: { kind: "frame", forward: false } },
   { keys: "[ / ]", pad: null, does: "Slower or faster", sample: k("]"), intent: { kind: "speed", faster: true } },
-  { keys: "C", pad: "X", does: "Subtitles", sample: k("c"), intent: { kind: "subtitles_menu" } },
-  { keys: "G / H", pad: "LB / RB", does: "Subtitles earlier or later, remembered", sample: k("g"), intent: { kind: "subtitle_delay", ms: -100 } },
+  { keys: "C", pad: "Y", does: "Subtitles", sample: k("c"), intent: { kind: "subtitles_menu" } },
+  { keys: "G / H", pad: null, does: "Subtitles earlier or later, remembered (on the pad: Menu, Timing)", sample: k("g"), intent: { kind: "subtitle_delay", ms: -100 } },
   { keys: "Ctrl + [ / ]", pad: null, does: "Sound earlier or later", sample: k("[", { ctrlKey: true }), intent: { kind: "audio_delay", ms: -100 } },
-  { keys: "N / P", pad: "Click right / left stick", does: "Next or previous episode", sample: k("n"), intent: { kind: "episode", next: true } },
+  { keys: "N / P", pad: "RB / LB", does: "Next or previous episode", sample: k("n"), intent: { kind: "episode", next: true } },
   { keys: "I", pad: null, does: "Statistics", sample: k("i"), intent: { kind: "stats" } },
   { keys: "Ctrl + M", pad: null, does: "Keep watching in a corner while you browse", sample: k("m", { ctrlKey: true }), intent: { kind: "mini" } },
   { keys: "Ctrl + P", pad: null, does: "Picture in picture, over other windows", sample: k("p", { ctrlKey: true }), intent: { kind: "pip" } },
   { keys: "?", pad: null, does: "This list", sample: k("?"), intent: { kind: "shortcuts" } },
   { keys: "Esc", pad: "B", does: "Back", sample: k("Escape"), intent: { kind: "back" } },
+  { keys: "", pad: "X", does: "Sound", sample: k(""), intent: { kind: "audio_menu" } },
   { keys: "", pad: "Menu", does: "The player menu: everything above, by pad", sample: k(""), intent: { kind: "player_menu" } },
 ];
+
+/** What the player last reported, and when (ms on the page's clock). */
+export interface Reported {
+  position: number;
+  at: number;
+  speed: number;
+  playing: boolean;
+  duration: number | null;
+}
+
+/** The longest the bar runs ahead of a report: a stall then shows as a stall. */
+export const GLIDE_MAX_S = 0.5;
+
+/**
+ * Where playback is now, between reports (Phase 16): the backend reports four times a
+ * second, and a bar drawn from the reports alone moves in quarter-second jumps. Playing,
+ * the position runs on at the playback speed from the last report, at most `GLIDE_MAX_S`
+ * past it and never past the end; paused, it is the report.
+ */
+export function glide(r: Reported, now: number): number {
+  if (!r.playing) return r.position;
+  const ahead = Math.min(GLIDE_MAX_S, Math.max(0, (now - r.at) / 1000) * r.speed);
+  const p = r.position + ahead;
+  return r.duration != null && r.duration > 0 ? Math.min(p, r.duration) : p;
+}
+
+/** Within this many seconds of a chapter's start, "previous" means the chapter before. */
+export const CHAPTER_BACK_S = 3;
+
+/**
+ * Where the bumpers go in a film (Phase 16: "LB/RB previous/next episode or chapter"), in
+ * seconds, or `null` when there is no chapter that way.
+ *
+ * Forward is the next chapter's start. Back is this chapter's start, unless playback is
+ * within `CHAPTER_BACK_S` of it, when it is the one before: what every player's "previous"
+ * does, so one press restarts the scene and two go back a scene.
+ */
+export function chapterTarget(
+  chapters: { time: number | null }[],
+  position: number,
+  next: boolean,
+): number | null {
+  const starts = chapters
+    .map((c) => c.time)
+    .filter((t): t is number => t !== null)
+    .sort((a, b) => a - b);
+  if (next) return starts.find((t) => t > position + 0.5) ?? null;
+  const here = starts.filter((t) => t <= position);
+  const current = here.at(-1);
+  if (current === undefined) return null;
+  if (position - current > CHAPTER_BACK_S) return current;
+  return here.at(-2) ?? null;
+}

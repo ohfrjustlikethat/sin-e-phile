@@ -77,3 +77,42 @@ fn titles_compare_without_case_accents_or_punctuation() {
     );
     assert_eq!(comparable("Fast & Furious"), "fast and furious");
 }
+
+#[test]
+fn ep_dot_and_chapter_number_a_series_episodes() {
+    // The author's library (2026-11-16), groups replaced.
+    let ep = parse(
+        "Samurai Champloo - Ep. 01 - Tempestuous Temperaments (1080p TRI Audio - BluRay).mkv",
+    );
+    assert_eq!(ep.title, "Samurai Champloo");
+    assert_eq!(ep.absolute_episodes, vec![1]);
+    assert_eq!(
+        ep.episode_title.as_deref(),
+        Some("Tempestuous Temperaments")
+    );
+    let ch =
+        parse("Monster - Chapter 13 - Petra And Schumann DVDRip x265 AC-3 DD 2.0 GRPX [GRPY].mkv");
+    assert_eq!(ch.title, "Monster");
+    assert_eq!(ch.absolute_episodes, vec![13]);
+    assert!(ch.is_episode());
+}
+
+#[test]
+fn a_chapter_with_a_year_is_a_films_title() {
+    let film = parse("John.Wick.Chapter.2.2017.1080p.BluRay.x264-GROUP.mkv");
+    assert!(!film.is_episode(), "{film:?}");
+    assert_eq!(film.title, "John Wick Chapter 2");
+    assert_eq!(film.year, Some(2017));
+}
+
+#[test]
+fn a_year_range_is_dated_by_its_first_year() {
+    let show = parse("Monster [2004-2005] DVDRip x265 AC-3 DD 2.0 GRPX [GRPY]");
+    assert_eq!(show.title, "Monster");
+    assert_eq!(show.year, Some(2004));
+    // One year in brackets is still that year.
+    assert_eq!(
+        parse("Twin Peaks (1990) Season 1-3 S01-S03").year,
+        Some(1990)
+    );
+}

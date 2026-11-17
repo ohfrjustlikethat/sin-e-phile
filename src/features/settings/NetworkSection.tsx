@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/lib/toast";
 import { Button, Input, Select, Toggle } from "@/design-system";
 import { commands, type TorrentSettingsView } from "@/lib/ipc";
+import { SETTINGS_HEADING } from "./heading";
 
 /**
  * Settings → Network — SPEC.md Phase 7.
@@ -65,7 +67,9 @@ function Form({ initial, onSaved }: { initial: TorrentSettingsView; onSaved: () 
     onSuccess: () => {
       setSaved(true);
       onSaved();
+      toast("Network settings saved; downloads use them now.");
     },
+    onError: (e) => toast(`Not saved: ${e.message}`, "danger"),
   });
 
   const chosen = initial.adapters.find((a) => a.name === adapter);
@@ -132,8 +136,8 @@ function Form({ initial, onSaved }: { initial: TorrentSettingsView; onSaved: () 
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mb-9">
-      <h2 className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
+    <section className="mb-9" aria-label={title}>
+      <h2 className={SETTINGS_HEADING}>
         {title}
       </h2>
       {children}

@@ -89,3 +89,39 @@ Migration 0021: `library_folders` (the user's own paths, allowed by the portabil
 with `local_files.path`), `local_files.folder_id` (a trigger, not a foreign key, so the down
 migration can drop it), `missing_since`, probe columns, `local_file_matches.covers`,
 `review_candidates`, `match_memory`. Migration 0022: `local_files.ignored_at`.
+
+## TV layouts and extras (Phase 16)
+
+A release's extras are not library items. A file under an extras folder (Featurettes, Extras, Behind the
+Scenes, Deleted Scenes, Interviews, Trailers, Menu Art, Bonus, Special Features …) or named as one (gag reel,
+NCOP, NCED, creditless, featurette) is left out by `scan::walk`, so it is never searched for as a film
+(`folders::is_extra`). The show is named by its nearest naming folder, the season by a `Season N` folder, the
+episode by the file. A fansub absolute number is placed as season 1's episode only when the chosen series has
+exactly one season, and never counts while scoring candidates. Measured by `eval tvlayouts` over
+`fixtures/tv-layouts/` (E4); a real folder can be checked read-only with `eval tvlayouts --folder <path>`.
+
+## The author's second library (Phase 16, 2026-11-16)
+
+Shows reached Home one episode at a time, as films ("Afro Samurai Champloo", "Entrapment",
+"The Fugitive"), because their names were not read as episodes and every guess was shown.
+
+- **More numbering read** (`crates/filename-parser`): `Ep. 01` (a dot and a space); `Chapter 01`,
+  except in a name with a year, where it is a film's title ("John Wick Chapter 2 2017"); a year
+  range dates by its first year (`Monster [2004-2005]` is 2004).
+- **Folders**: a shelf-order prefix (`2a. `, `01. `, `3) `) is dropped before the folder names the
+  show; a title that starts with a number ("2001 A Space Odyssey") has no such punctuation after it.
+- **Extras**: `Extra 1` in a name is a release's extra, never searched for ("Extra Ordinary" and
+  "Extras" are not: no number).
+- **A guess is the review queue's only.** Below `MATCH_ACCEPTED_AT` (0.75, in `sinephile_persistence`;
+  the library's `ACCEPT_AT` is it) a match is the best guess the queue shows. Home's library rail, a
+  title's Play (`files_for_item`), "new episodes" and the Films and TV Shows pages use only matches
+  accepted or confirmed.
+- **Waiting files are tried again** at every scan: a better reading of names, or a catalogue
+  refresh, fixes them without a click.
+- **A show's own files** (matched to the show because the catalogue has no such episode: Space
+  Dandy's `S01E14` where IMDb's first season has 13, Twin Peaks' third season, which IMDb lists as a
+  2017 series) are listed on its page under "Also on this PC", in the season and episode their names
+  give (`crates/library/src/shelf.rs`), never renumbered across seasons (ADR-0031). Episodes with a
+  file are marked "On this PC".
+- **Films and TV Shows** list what is on this PC, by title, a show once (`library_titles`), until
+  Phase 19 adds the catalogue around them.

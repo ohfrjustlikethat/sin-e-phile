@@ -434,11 +434,50 @@ impl Engine {
             .map_err(engine_err)
     }
 
-    /// Stop the session, saving its state for the next start.
+    /// Stop the session, saving its state for the next start, and return only once it has
+    /// ended. librqbit's own `stop` pauses every torrent and waits a fixed second; the
+    /// torrents' files and their record of finished pieces are released, and that record
+    /// written, only when the last reference to the session goes, from background tasks.
+    /// A start that follows too soon (an app restart, or a slow machine) could find the
+    /// files still held and the record unwritten, and lose the download's progress (D83).
     pub async fn stop(self) {
         self.watcher.abort();
+        let _ = self.watcher.await;
         self.session.stop().await;
+        let gone = Arc::downgrade(&self.session);
+        let bitv = bitv_files(&self.config.session_dir());
+        drop(self.session);
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        // The session's tasks end once cancelled; each torrent's record is written as it drops.
+        while std::time::Instant::now() < deadline {
+            let written = bitv.iter().all(|(path, before)| {
+                std::fs::metadata(path)
+                    .and_then(|m| m.modified())
+                    .map_or(true, |now| Some(now) != *before)
+            });
+            if gone.upgrade().is_none() && written {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        tracing::warn!("the torrent session took over 5 s to end; progress may be re-checked");
     }
+}
+
+/// Each torrent's record of finished pieces (`<info hash>.bitv`) with when it was last written.
+fn bitv_files(dir: &std::path::Path) -> Vec<(PathBuf, Option<std::time::SystemTime>)> {
+    std::fs::read_dir(dir)
+        .map(|it| {
+            it.filter_map(Result::ok)
+                .map(|e| e.path())
+                .filter(|p| p.extension().is_some_and(|x| x == "bitv"))
+                .map(|p| {
+                    let m = std::fs::metadata(&p).and_then(|m| m.modified()).ok();
+                    (p, m)
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// librqbit's speed unit, in bytes per second.

@@ -6,7 +6,7 @@ source URL — not in code, config, fixtures, documentation, or git history.
 
 `SPEC.md` §12.5 explains why this is automated rather than trusted to discipline:
 
-> A human rule that must hold across 28 phases and dozens of sessions will
+> A human rule that must hold across 29 phases and dozens of sessions will
 > eventually be broken by accident. So automate it.
 
 Risk **R10** in `docs/RISKS.md` rates the consequence as Severe — a takedown, and

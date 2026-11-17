@@ -31,11 +31,48 @@ export type NavAction =
   | { kind: "search" }
   | { kind: "settings" };
 
-/** One frame of a pad: which buttons are down, and the left stick. */
+/** One frame of a pad: which buttons are down, and the sticks. */
 export interface PadFrame {
   pressed: boolean[];
   stickX: number;
   stickY: number;
+  /** The right stick, which scrolls (Phase 16). */
+  rightX?: number;
+  rightY?: number;
+}
+
+/** Below this the right stick is resting, not scrolling. */
+export const SCROLL_FROM = 0.2;
+/** The fastest scroll, the stick pushed all the way, in pixels a second. */
+export const SCROLL_MAX = 2400;
+
+/**
+ * The right stick's scroll speed, in pixels a second (Phase 16): nothing inside the dead
+ * zone, then rising with the square of how far it is pushed past it, so a gentle push reads
+ * a line at a time and a full push crosses a page in about a third of a second.
+ */
+export function scrollSpeed(v: number): number {
+  const a = Math.abs(v);
+  if (a <= SCROLL_FROM) return 0;
+  const t = Math.min(1, (a - SCROLL_FROM) / (1 - SCROLL_FROM));
+  return Math.sign(v) * t * t * SCROLL_MAX;
+}
+
+/** Of `boxes`, the one nearest `from` (centre to centre), or -1: where focus goes when
+ * the box it was in has scrolled out of view. */
+export function nearestBox(from: Box, boxes: Box[]): number {
+  const cx = from.x + from.width / 2;
+  const cy = from.y + from.height / 2;
+  let best = -1;
+  let bestD = Infinity;
+  boxes.forEach((b, i) => {
+    const d = Math.hypot(b.x + b.width / 2 - cx, b.y + b.height / 2 - cy);
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  });
+  return best;
 }
 
 const DEADZONE = 0.5;
@@ -82,25 +119,24 @@ export function playerIntent(button: number): Intent | null {
     // The player menu: every control the keyboard has, reachable by D-pad (ADR-0041).
     case BUTTON.MENU:
       return { kind: "player_menu" };
+    // View: full screen, as ADR-0045's table says, through the player so it knows.
+    case BUTTON.VIEW:
+      return { kind: "fullscreen" };
     case BUTTON.B:
       return { kind: "back" };
-    case BUTTON.X:
-      return { kind: "subtitles_menu" };
+    // ADR-0045's TV-standard mapping: Y the subtitles, X the sound, the bumpers the
+    // episode. Moving the subtitles in time is the panel's (Menu), as G and H are the keys'.
     case BUTTON.Y:
+      return { kind: "subtitles_menu" };
+    case BUTTON.X:
       return { kind: "audio_menu" };
     case BUTTON.LT:
       return { kind: "seek", seconds: -30 };
     case BUTTON.RT:
       return { kind: "seek", seconds: 30 };
-    // The bumpers nudge the subtitles, as G and H do (SPEC.md Phase 10).
     case BUTTON.LB:
-      return { kind: "subtitle_delay", ms: -100 };
-    case BUTTON.RB:
-      return { kind: "subtitle_delay", ms: 100 };
-    // Clicking a stick changes episode: left for the previous, right for the next.
-    case BUTTON.LS:
       return { kind: "episode", next: false };
-    case BUTTON.RS:
+    case BUTTON.RB:
       return { kind: "episode", next: true };
     case BUTTON.LEFT:
       return { kind: "seek", seconds: -10 };
@@ -268,8 +304,22 @@ export function moveFocus(direction: Direction): boolean {
     all[0]?.focus();
     return !!all[0];
   }
-  const others = all.filter((el) => el !== current);
+  // A page may name where a direction goes (`data-pad-down="<id>"`) when the nearest box is not what a person
+  // means: Down from the title page's wide Play is the first round button, not the one under Play's middle
+  // (Phase 16). Honoured only when that element is on screen to be focused.
+  const named = current.dataset[`pad${direction[0]!.toUpperCase()}${direction.slice(1)}`];
+  const hinted = named ? document.getElementById(named) : null;
+  if (hinted && all.includes(hinted)) {
+    hinted.focus({ preventScroll: true });
+    hinted.scrollIntoView({ block: "nearest", inline: "nearest" });
+    return true;
+  }
   const mine = region(current);
+  // A dialog holds the D-pad (Phase 16): Down at the foot of the player's panel went to the
+  // bar beneath it, where A then opened a menu over the panel. Elsewhere a region is only
+  // preferred, so a page's edge still leads to the masthead.
+  const trapped = mine?.getAttribute("role") === "dialog";
+  const others = all.filter((el) => el !== current && (!trapped || region(el) === mine));
   const i = nearestInRegion(
     box(current),
     others.map(box),
@@ -283,6 +333,219 @@ export function moveFocus(direction: Direction): boolean {
   const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   target.scrollIntoView({ block: "nearest", inline: "nearest", behavior: reduce ? "auto" : "smooth" });
   return true;
+}
+
+/**
+ * Set a form control's value as a person would, so React's `onChange` runs: through the
+ * prototype's setter, because React tracks an input's value through the element's own setter
+ * and ignores an event when that says nothing changed; then the event React listens for
+ * (`input` for a slider, `change` for a select).
+ */
+export function setControlValue(el: HTMLInputElement | HTMLSelectElement, value: string): void {
+  const proto = el instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, value);
+  el.dispatchEvent(new Event(el instanceof HTMLSelectElement ? "change" : "input", { bubbles: true }));
+}
+
+/**
+ * Left and Right on a focused slider change its value by one step, as the arrow keys do
+ * (Phase 16, ADR-0041): the D-pad moved focus off it instead, so a slider could not be set
+ * by pad at all. Up and Down still move between controls. Returns `"changed"`, `"end"` (at
+ * its minimum or maximum: focus stays, nothing changes), or `null` when there is no slider
+ * to adjust and focus should move.
+ */
+export function adjustValue(direction: Direction): "changed" | "end" | null {
+  const el = document.activeElement;
+  if (!(el instanceof HTMLInputElement) || el.type !== "range") return null;
+  if (direction !== "left" && direction !== "right") return null;
+  const step = Number(el.step) || 1;
+  const min = el.min === "" ? 0 : Number(el.min);
+  const max = el.max === "" ? 100 : Number(el.max);
+  const now = Number(el.value);
+  const next = Math.min(max, Math.max(min, now + (direction === "right" ? step : -step)));
+  if (next === now) return "end";
+  setControlValue(el, String(next));
+  return "changed";
+}
+
+/** Whether `el` scrolls along an axis: it overflows, and its style lets it. */
+function scrolls(el: Element, vertical: boolean): boolean {
+  const style = getComputedStyle(el);
+  const overflow = vertical ? style.overflowY : style.overflowX;
+  if (overflow !== "auto" && overflow !== "scroll") return false;
+  return vertical ? el.scrollHeight > el.clientHeight + 1 : el.scrollWidth > el.clientWidth + 1;
+}
+
+/** What the right stick scrolls: the nearest scrolling ancestor of the focused element
+ * along that axis; else what scrolls in the open dialog (the paused film's details beside
+ * its Resume button); else the page. */
+function scrollTarget(vertical: boolean): Element | null {
+  for (let el = document.activeElement; el && el !== document.body; el = el.parentElement) {
+    if (scrolls(el, vertical)) return el;
+  }
+  const dialogs = document.querySelectorAll('[role="dialog"]');
+  const dialog = dialogs[dialogs.length - 1];
+  if (dialog) {
+    // The dialog itself first: the player's panel is the dialog, and it is what scrolls.
+    const inside = [dialog, ...dialog.querySelectorAll("*")].find((el) => scrolls(el, vertical));
+    if (inside) return inside;
+  }
+  if (!vertical) return null;
+  const main = document.querySelector("main");
+  if (main && scrolls(main, true)) return main;
+  return document.scrollingElement;
+}
+
+/**
+ * Scroll snapping, suspended while the stick drives an element. A rail snaps its cards
+ * (`scroll-snap-type: x proximity`), and the stick moves it a few pixels a frame, each of
+ * which snapped straight back to the card it started on: the stick could not move a rail
+ * at all. The inline value each element had is kept here and put back at rest, when the
+ * rail settles on the nearest card as a TV's does.
+ */
+const unsnapped = new Map<HTMLElement, string>();
+
+function suspendSnap(el: Element): void {
+  if (!(el instanceof HTMLElement) || unsnapped.has(el)) return;
+  if (getComputedStyle(el).scrollSnapType === "none") return;
+  unsnapped.set(el, el.style.scrollSnapType);
+  el.style.scrollSnapType = "none";
+}
+
+/** The stick is at rest: everything it scrolled snaps again. */
+export function releaseSnap(): void {
+  for (const [el, inline] of unsnapped) el.style.scrollSnapType = inline;
+  unsnapped.clear();
+}
+
+/**
+ * Scroll by the right stick for `dtMs` (Phase 16, ADR-0045), then, if the focused element
+ * has left the view, move focus to the visible control nearest where it was, so the next
+ * D-pad press starts from what is on screen.
+ */
+export function scrollByStick(x: number, y: number, dtMs: number): boolean {
+  noteFocus();
+  const dy = (scrollSpeed(y) * dtMs) / 1000;
+  const dx = (scrollSpeed(x) * dtMs) / 1000;
+  let moved = false;
+  if (dy !== 0) {
+    const t = scrollTarget(true);
+    if (t) {
+      suspendSnap(t);
+      const before = t.scrollTop;
+      t.scrollTop += dy;
+      moved ||= t.scrollTop !== before;
+    }
+  }
+  if (dx !== 0) {
+    const t = scrollTarget(false);
+    if (t) {
+      suspendSnap(t);
+      const before = t.scrollLeft;
+      t.scrollLeft += dx;
+      moved ||= t.scrollLeft !== before;
+    }
+  }
+  if (moved) lastScrollAt = performance.now();
+  if (moved || focusLost()) followFocus();
+  return moved;
+}
+
+/** Where focus last was, for when the element holding it is gone. */
+let lastFocusBox: Box | null = null;
+let lastFocusRegion: Element | null = null;
+/** The element that last held focus, and everything it sat in, nearest first. */
+let lastFocusChain: Element[] = [];
+
+/** Remember where focus is, while it is somewhere. */
+export function noteFocus(): void {
+  const el = document.activeElement;
+  if (!el || el === document.body || !el.isConnected) return;
+  lastFocusBox = box(el);
+  lastFocusRegion = region(el);
+  if (lastFocusChain[0] !== el) {
+    lastFocusChain = [];
+    for (let p: Element | null = el; p; p = p.parentElement) lastFocusChain.push(p);
+  }
+}
+
+/**
+ * Whether what held focus went with its whole screen: nothing it sat in is left on the page
+ * below the main area or the masthead. A button that disabled itself, a form replaced by
+ * what it saved, a card a rail dropped: each leaves its section behind. Opening another
+ * screen does not, and that screen decides where focus starts.
+ */
+function wentWithItsScreen(): boolean {
+  const left = lastFocusChain.find((el) => el.isConnected);
+  return !left || left.matches("main, header, body, html");
+}
+/** When the stick last moved something (ms, `performance.now`). */
+let lastScrollAt = -Infinity;
+/** With the mouse, how long after the stick stops a lost focus is still the stick's doing. */
+export const FOLLOW_GRACE_MS = 600;
+
+// A virtualised rail unmounts the card that held focus once it scrolls away, and focus
+// falls to the page itself: that is lost, not "in view" (Phase 16).
+function focusLost(): boolean {
+  const current = document.activeElement;
+  return !current || current === document.body || !current.isConnected;
+}
+
+/**
+ * Whether an element can be seen: inside the window and inside every scrolling box around
+ * it. A rail keeps a few cards mounted either side of what shows; they have a size and a
+ * place, but are clipped by the rail, and focus must not go to them.
+ */
+export function onScreen(el: Element): boolean {
+  const r = el.getBoundingClientRect();
+  if (!(r.width > 0 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth)) return false;
+  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    const s = getComputedStyle(p);
+    if (s.overflowX === "visible" && s.overflowY === "visible") continue;
+    const c = p.getBoundingClientRect();
+    // Half of it showing counts, so a card cut at the rail's edge is still a place to land.
+    const midX = r.left + r.width / 2;
+    const midY = r.top + r.height / 2;
+    if (midX < c.left || midX > c.right || midY < c.top || midY > c.bottom) return false;
+  }
+  return true;
+}
+
+/** If focus has left the view, or the page, put it on the visible control nearest where it was. */
+function followFocus(): void {
+  const current = document.activeElement as HTMLElement | null;
+  if (current && !focusLost() && onScreen(current)) return;
+  const r = focusLost() || !current ? null : current.getBoundingClientRect();
+  // Inside a dialog, focus follows within it, as the D-pad does (see `moveFocus`).
+  const fromRegion = r && current ? region(current) : lastFocusRegion;
+  const trapped = fromRegion?.getAttribute("role") === "dialog" && fromRegion.isConnected;
+  const all = visibleFocusables().filter((el) => onScreen(el) && (!trapped || region(el) === fromRegion));
+  const from: Box = r
+    ? { x: r.x, y: r.y, width: r.width, height: r.height }
+    : (lastFocusBox ?? { x: innerWidth / 2, y: innerHeight / 2, width: 0, height: 0 });
+  const i = nearestBox(from, all.map(box));
+  all[i]?.focus({ preventScroll: true });
+}
+
+/**
+ * Focus that fell to the page is put back near where it was (Phase 16). It falls when the
+ * element holding it goes: a virtualised rail drops a card a frame or two after the stick
+ * scrolled it away; a button disables itself once pressed ("Add", its field cleared); a
+ * form gives way to what it saved ("Save key" becomes "Your key is saved"). With the pad
+ * driving, focus on the page itself is never wanted: the D-pad has nowhere to start from.
+ * Otherwise it is left alone (a click put it there), except within `FOLLOW_GRACE_MS` of
+ * the stick moving something. While a film plays the player owns the buttons, so only a
+ * focus lost inside a dialog still open over it (the panel, a quick menu: choosing a found
+ * subtitle closes the list it was in) is put back, and only within it. Never when a whole
+ * screen went (`wentWithItsScreen`).
+ */
+export function rescueFocus(now: number): void {
+  if (!focusLost() || wentWithItsScreen()) return;
+  const inOpenDialog = lastFocusRegion?.getAttribute("role") === "dialog" && lastFocusRegion.isConnected;
+  if (document.documentElement.dataset["playing"] !== undefined && !inOpenDialog) return;
+  const padDriving = document.documentElement.dataset["input"] === "pad";
+  if (!padDriving && now - lastScrollAt > FOLLOW_GRACE_MS) return;
+  followFocus();
 }
 
 /** Mark the document as driven by a pad (or not), for the ten-foot focus treatment. */
@@ -312,6 +575,8 @@ function frameOf(pad: Gamepad): PadFrame {
     pressed: pad.buttons.map((b) => b.pressed || b.value > 0.6),
     stickX: pad.axes[0] ?? 0,
     stickY: pad.axes[1] ?? 0,
+    rightX: pad.axes[2] ?? 0,
+    rightY: pad.axes[3] ?? 0,
   };
 }
 
@@ -336,6 +601,7 @@ export function startGamepad(handlers: GamepadHandlers): () => void {
   let raf = 0;
   let pickedUp = false;
   let lastTilt = { rx: 0, ry: 0 };
+  let lastTick = 0;
 
   const fireDirection = (d: Direction) => {
     const asButton = { up: BUTTON.UP, down: BUTTON.DOWN, left: BUTTON.LEFT, right: BUTTON.RIGHT }[d];
@@ -350,7 +616,10 @@ export function startGamepad(handlers: GamepadHandlers): () => void {
       const pressed = newlyPressed(prev, frame).filter((b) => b < BUTTON.UP || b > BUTTON.RIGHT);
       const dirs = heldDirections(frame);
       const tilt = tiltFor(frame.stickX, frame.stickY);
-      const active = pressed.length > 0 || dirs.size > 0 || tilt.rx !== 0 || tilt.ry !== 0;
+      const rx = frame.rightX ?? 0;
+      const ry = frame.rightY ?? 0;
+      const scrolling = scrollSpeed(rx) !== 0 || scrollSpeed(ry) !== 0;
+      const active = pressed.length > 0 || dirs.size > 0 || tilt.rx !== 0 || tilt.ry !== 0 || scrolling;
       if (active) {
         travel = 0;
         setPadMode(true);
@@ -365,13 +634,26 @@ export function startGamepad(handlers: GamepadHandlers): () => void {
       }
       const aNow = !!frame.pressed[BUTTON.A];
       if (aNow !== !!prev?.pressed[BUTTON.A] && (aNow || prev)) handlers.press?.(aNow);
-      if (pressed.includes(BUTTON.VIEW)) handlers.view?.();
+      // The right stick scrolls whatever holds focus (Phase 16). A frame's time, capped so
+      // a stall does not throw the page.
+      if (scrolling) scrollByStick(rx, ry, Math.min(50, lastTick ? now - lastTick : 16));
+      else {
+        releaseSnap();
+        rescueFocus(now);
+        noteFocus();
+      }
       for (const b of pressed) {
         // Something on screen may own a button outright: the on-screen keyboard's X, Y,
         // triggers, bumpers and Menu (ADR-0043).
         if (claim?.(b)) continue;
         const intent = playerIntent(b);
         if (intent && handlers.player(intent)) continue;
+        // View: the player's own full screen while it plays (so it knows, and says "Exit
+        // full screen"), the window's everywhere else. Never both.
+        if (b === BUTTON.VIEW) {
+          handlers.view?.();
+          continue;
+        }
         const action = navAction(b);
         if (action) handlers.nav(action);
       }
@@ -391,6 +673,7 @@ export function startGamepad(handlers: GamepadHandlers): () => void {
       }
       prev = frame;
     }
+    lastTick = now;
     raf = requestAnimationFrame(tick);
   };
   raf = requestAnimationFrame(tick);

@@ -216,6 +216,26 @@ async fn a_download_survives_a_restart() {
     let before = leech.status(&id).unwrap();
     assert!(!before.finished, "too fast to test a restart: {before:?}");
     leech.stop().await;
+    // The record of which pieces are done is on disk the moment stop returns. librqbit
+    // writes it from a background task, every 16 MiB and when a torrent is dropped; the
+    // 10 MiB here never reached the first, so the restart below depended on winning a race
+    // with the second (D83: lost twice on CI).
+    let saved: u32 = std::fs::read_dir(dir.path().join("torrent-session"))
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter(|e| e.path().extension().is_some_and(|x| x == "bitv"))
+        .map(|e| {
+            std::fs::read(e.path())
+                .unwrap()
+                .iter()
+                .map(|b| b.count_ones())
+                .sum::<u32>()
+        })
+        .sum();
+    assert!(
+        saved > 0,
+        "no finished piece was on disk when stop returned"
+    );
 
     let mut config = offline_config(dir.path());
     config.seeding = SeedingPolicy::KeepSeeding;
@@ -228,7 +248,7 @@ async fn a_download_survives_a_restart() {
     let resumed = again.status(&id).unwrap();
     assert!(
         resumed.progress_bytes >= before.progress_bytes && resumed.progress_bytes > 0,
-        "progress lost: {} before the stop, {} after",
+        "progress lost: {} before the stop, {} after ({resumed:?})",
         before.progress_bytes,
         resumed.progress_bytes
     );

@@ -48,6 +48,9 @@ jikan.moe
 # SPEC.md §14. Free account, heavily rate-limited; quota is budgeted and cached.
 opensubtitles.com
 
+# Stremio's poster images — keyless posters by IMDb id, only when the person switches
+# "Show posters" on (ADR-0048). Images, not films: fetched by the backend, re-encoded, cached.
+metahub.space
 # Fanart.tv — logos, clearart, backgrounds. SPEC.md §14. Free personal key, optional.
 fanart.tv
 
