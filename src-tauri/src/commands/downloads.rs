@@ -127,6 +127,21 @@ async fn manager(app: &AppHandle) -> Result<Arc<Manager>, String> {
     Ok(m)
 }
 
+/// Show a finished download's file in Explorer (Phase 16, the author: finished files could not
+/// be found from the page). By the download's id, so only the app's own downloads are shown.
+#[tauri::command]
+#[specta::specta]
+pub async fn download_show(state: State<'_, AppState>, id: i32) -> Result<(), String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let d = DownloadRepository::new(&db)
+        .get(i64::from(id))
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or("that download is gone")?;
+    let path = d.file_path.ok_or("it has not finished yet")?;
+    crate::shell::show_in_explorer(std::path::Path::new(&path))
+}
+
 /// Build the manager again on the next tick (the qBittorrent settings changed).
 pub async fn rebuild_manager() {
     *MANAGER.lock().await = None;

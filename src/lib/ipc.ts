@@ -306,6 +306,11 @@ export const commands = {
 	downloadsStorage: () => typedError<StorageView, string>(__TAURI_INVOKE("downloads_storage")),
 	/**  Delete a finished download from disk and from the library. */
 	downloadClear: (id: number) => typedError<null, string>(__TAURI_INVOKE("download_clear", { id })),
+	/**
+	 *  Show a finished download's file in Explorer (Phase 16, the author: finished files could not
+	 *  be found from the page). By the download's id, so only the app's own downloads are shown.
+	 */
+	downloadShow: (id: number) => typedError<null, string>(__TAURI_INVOKE("download_show", { id })),
 	/**  Every profile, the most recently used first. */
 	profiles: () => typedError<ProfileView[], string>(__TAURI_INVOKE("profiles")),
 	createProfile: (name: string, avatarColour: string | null, isKids: boolean, pin: string | null) => typedError<ProfileView, string>(__TAURI_INVOKE("create_profile", { name, avatarColour, isKids, pin })),

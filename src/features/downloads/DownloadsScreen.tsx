@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge, Button, EmptyState, Input, ProgressBar, Select } from "@/design-system";
 import { commands, type DownloadRow, type DownloadsSettingsView, type StoredView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
+import { toast } from "@/lib/toast";
 import { age, fraction, inProgress, n, rate, reorder, size, status } from "./format";
 import { DOWNLOADS, STORAGE, useDownloads } from "./useDownloads";
 
@@ -74,7 +75,7 @@ export function DownloadsScreen() {
         {rows.length === 0 && list.isSuccess ? (
           <EmptyState
             title="Nothing downloading"
-            body="Download from a film's page. The page says whether it would stream smoothly or is better downloaded first."
+            body="Download from a title's page: its round Download takes the best stream, and Streams lets you choose one."
           />
         ) : (
           <ol className="flex flex-col">
@@ -242,7 +243,7 @@ function DownloadItem({
 function Kept({ items, used, budget }: { items: StoredView[]; used: number; budget: number | null }) {
   return (
     <section aria-label="Kept on this PC" className="mt-16">
-      <h2 className="label mb-2 border-t border-line-strong pt-3">Kept on this PC</h2>
+      <h2 className="label mb-2 border-t border-line-strong pt-3">Finished · kept on this PC</h2>
       <p className="mb-4 text-sm text-ink-muted">
         {size(used)}
         {budget ? ` of the ${size(budget)} you set aside` : " in downloads"}. Watched films come first.
@@ -261,13 +262,48 @@ function Kept({ items, used, budget }: { items: StoredView[]; used: number; budg
   );
 }
 
+/**
+ * A finished download (Phase 16, the author: finished files could not be found from the page): play it, show it in
+ * Explorer, open its title's page, or delete it.
+ */
 function KeptItem({ item }: { item: StoredView }) {
   const act = useAct();
   const [confirm, setConfirm] = useState(false);
+  const play = useUi((s) => s.play);
+  const openDetail = useUi((s) => s.openDetail);
+  const show = useMutation({
+    mutationFn: () => ok(commands.downloadShow(item.download.id)),
+    onError: (e) => toast(e.message, "danger"),
+  });
   const d = item.download;
   return (
     <li className="flex items-center gap-4 border-b border-line-subtle py-3">
-      <span className="min-w-0 flex-1 truncate font-serif text-[19px] text-ink">{d.title}</span>
+      {d.media_item_id !== null ? (
+        <button
+          type="button"
+          onClick={() => openDetail(d.media_item_id as number)}
+          aria-label={`Open ${d.title}'s page`}
+          className="min-w-0 flex-1 truncate text-left font-serif text-[19px] text-ink hover:text-ink-muted"
+        >
+          {d.title}
+        </button>
+      ) : (
+        <span className="min-w-0 flex-1 truncate font-serif text-[19px] text-ink">{d.title}</span>
+      )}
+      {d.file_path && (
+        <>
+          <Button
+            size="sm"
+            aria-label={`Play ${d.title}`}
+            onClick={() => play({ target: d.file_path as string, title: d.title, mediaItemId: d.media_item_id, start: null })}
+          >
+            Play
+          </Button>
+          <Button size="sm" variant="ghost" aria-label={`Show ${d.title} in its folder`} onClick={() => show.mutate()}>
+            Show in folder
+          </Button>
+        </>
+      )}
       {item.watched && <Badge tone="neutral">Watched</Badge>}
       <span className="w-20 text-right text-sm text-ink-muted">{size(n(item.bytes))}</span>
       <span className="w-28 text-right text-sm text-ink-faint">{age(n(item.age_days))}</span>

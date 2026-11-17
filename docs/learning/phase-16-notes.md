@@ -64,6 +64,9 @@ test passed. Four sections per ADR-0016 (A4).
   by drag and zoom, kept as a 256 px WebP; shown next to Downloads, in the profile picker and in Settings.
 - **The first run, polished** (2026-11-17): a bar of seven segments, larger titles, each step rising in (not under
   reduced motion), the films picked shown back as you go, and the add-on step said in plain words.
+- **The library follows its folders, and finished downloads can be found** (2026-11-17): a folder is watched even
+  after a failed scan (a new file is in within two seconds); each finished download has Play, Show in folder, and its
+  title's page.
 - **Full screen from a maximised window** (2026-11-17): it kept the maximised height, so the player's bar
   floated 80 px up with black beneath; the window is now un-maximised first and maximised again after.
 

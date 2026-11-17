@@ -129,6 +129,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::downloads::qbittorrent_check,
             commands::downloads::downloads_storage,
             commands::downloads::download_clear,
+            commands::downloads::download_show,
             commands::profiles::profiles,
             commands::profiles::create_profile,
             commands::profiles::update_profile,

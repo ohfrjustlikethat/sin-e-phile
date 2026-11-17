@@ -18,3 +18,23 @@ pub fn open_in_browser(url: &str) -> Result<(), String> {
         .map(|_| ())
         .map_err(|e| format!("could not open the browser: {e}"))
 }
+
+/// Show a file in Explorer, selected (a finished download, Phase 16). The path must be a
+/// file that exists, so Explorer is only ever asked to point at that one file.
+pub fn show_in_explorer(path: &std::path::Path) -> Result<(), String> {
+    if !path.is_file() {
+        return Err("the file is no longer where it was downloaded".into());
+    }
+    // Explorer wants `/select,"<path>"` exactly; Rust would quote the whole argument, which
+    // it misreads. Raw is safe: a Windows path cannot contain a quote.
+    use std::os::windows::process::CommandExt;
+    let path = path.to_string_lossy();
+    if path.contains('"') {
+        return Err("that path cannot be shown".into());
+    }
+    Command::new("explorer")
+        .raw_arg(format!("/select,\"{path}\""))
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("could not open Explorer: {e}"))
+}
