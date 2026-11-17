@@ -239,3 +239,34 @@ work (found: the install never downloaded it; setup was finished before it was o
 
 **For the author to try:** the new installer on your install, then Search: "Download 347 MB" at the top, and a
 description such as "a heist where the plan goes wrong" once it is done (the index builds in about 30 s).
+
+## Round 9 (2026-11-17, after testing the round 8 installer)
+
+**Reported:** everything from round 8 works except search by meaning: it downloads everything, but pressing "Build the
+index" does not build it ("it doesnt or it cant"). The author wants it **shipped inside the installer**, and pinned it
+until the end of this round. Search as a whole: results show only films, and the other kinds only after scrolling;
+films first is fine, but it should be a grid so more titles fit. A title's page has empty space where its poster could
+be; posters show everywhere else.
+
+**Found (the installed copy's log and files, read only):** the model (34 MB), tokenizer and meaning file (329.5 MB, all
+858,170 vectors) downloaded in about 35 s at 19:17 local, and no index file was ever written. The button's path
+(`download_optional_assets`) returns its error to the screen without logging it, so the log is silent on why; only the
+setup path logs a failure. First step when this is picked up: log the error, then reproduce the build on a fresh copy of
+the author's database (its write-ahead log was 3.7 GB at the time).
+
+**Answers:**
+- **Search layout:** one grid, films first, then series, anime and episodes in the same grid, each tile marked with its
+  kind. No section breaks.
+- **Tile size:** about 8 posters across on the author's screen, a step smaller than Home's cards, title and year under
+  each.
+- **Top match:** none. A pure grid: every result the same size, in rank order.
+- **A title's page:** a wide, faded still (backdrop) behind the top of the page, with the poster on the right beside
+  the title, buttons and synopsis. Without a still, the poster alone; without a poster, the lettered card the rails use.
+- **Search by meaning:** ships with the installer; pinned until the other round 9 items are done.
+
+### Round 9 plan (decided 2026-11-17, ADR-0040)
+
+1. Search as one poster grid (the cards Home uses, so posters, focus memory and the lettered card come with it), films
+   first, about 8 across, a kind mark on everything that is not a film, more results per search.
+2. A title's page: backdrop and poster, from the same poster sources the cards use (ADR-0048).
+3. Last: search by meaning inside the installer, and the index build that did not happen.
