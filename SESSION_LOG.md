@@ -2526,3 +2526,21 @@ section 15 with the subtasks authored before ADR-0045's renumbering, the receive
 whose coverage clears 15%); the matrix is built from every MovieLens user in the app, and only the evaluation splits
 them; the first run will fetch ml-25m as enrichment (the brief's item 3 named MovieLens in stage B) and delete it once
 built. **Spec amendments:** none.
+
+## 2026-11-18 — Spec 4.7.0: current on every launch (ADR-0054)
+
+The author asked whether recommendations and what MovieLens gives them stay current, for films, shows and anime,
+and set the rule: "THIS APP NEEDS TO BE UPDATED ALL THE TIME ON EVERY LAUNCH". Checked against the code: the catalogue
+already refreshes at every launch and hourly (Phase 16, ADR-0030); everything derived from it did not: the meaning index
+holds the published file's 119,874 titles and nothing embeds a newer one (R3 promised it), and the item-item matrix is
+ml-25m's ratings, which end in 2019.
+
+ADR-0054 and A43: after each launch's catalogue check, new titles get a synopsis and a vector on every tier (Tier 0
+capped at 2,000 a launch); AniList's and TMDB's recommendations stand beside MovieLens in the neighbour graph, refreshed
+weekly; the matrix follows MovieLens' newest release; a title nobody has rated gets neighbours by meaning and people;
+IMDb's votes give a rising signal; rails re-rank; Settings shows each source's last update. Phase 17 gains E7 and
+subtask 17.6. CLAUDE.md resynced.
+
+**Decisions taken (none reserved):** the app builds from MovieLens' rolling release while the evaluation keeps ml-25m;
+Tier 0 embeds a launch's new titles, capped, which ADR-0015's reasoning (scale) allows; the new criterion is placed
+last so E1-E6 keep their numbers. **Spec amendments:** 4.7.0, A43.

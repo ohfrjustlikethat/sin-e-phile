@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 4.6.0** · 21 session(s) completed · last updated 2026-11-18
+**Spec version 4.7.0** · 21 session(s) completed · last updated 2026-11-18
 
 ---
 
@@ -12,16 +12,17 @@
 
 **Phase 17 — Recommendation Engine** (`in_progress`, branch `phase/17-recommendation-engine`)
 
-0 of 6 exit criteria met with evidence.
+0 of 7 exit criteria met with evidence.
 
 > Builds on Phase 15's taste modes and axes. The author checks once batched for this phase (before ADR-0045 renumbered it) now sit with Phase 19's sign-off: Phase 7 E7, Phase 14 E4 and E6.
 
-### Subtasks — 0/5 complete
+### Subtasks — 0/6 complete
 
 - [~] **17.1** Layer 2, item-item collaborative filtering (crates/recommend, new): built on this machine from the MovieLens ratings streamed from the archive (never stored or shipped, ADR-0019/ADR-0044), positive co-occurrence normalised against popularity (cosine with shrinkage, or lift damped by log popularity, chosen on a tuning split) so an obscure favourite can outrank a blockbuster; the top neighbours per title persisted (migration 0029, repository methods with surface lines); titles with no ratings fall back to content neighbours (cold start).
 - [ ] **17.2** Layer 1 and Layer 3, the hybrid ranker: about 1,000 candidates cheaply (each taste mode's nearest in embedding space, the CF neighbours of what was liked, the popularity pool), scored by a blend of content similarity, CF, the popularity prior, the axes (boosts) and avoids (penalties), availability and freshness; maximal marginal relevance with caps per director, franchise and year; ranking 1,000 candidates timed (E5, under 150 ms).
 - [ ] **17.3** Explanations: every recommendation carries a reason built from the signal that put it there (the liked titles behind a CF score, the mode behind a content score, the axis behind a boost), tested so that every reason names something true of the profile (E4); Home's taste rails use the ranker and show the reasons, pad-complete.
 - [ ] **17.4** fixtures/recommender/ and eval recommend: Recall@20 against popularity on a held-out split (E1, more than 40% relative), catalogue coverage over the users (E2, above 15%), intra-list diversity against a documented target and no rail dominated by one director, franchise or year (E3), ranking time (E5); seen to fail for each.
+- [ ] **17.6** Staying current (ADR-0054), on every launch after the catalogue check: the titles it added get a synopsis (TMDB with the profile's key, AniList for anime, else Wikipedia through Wikidata) and a meaning vector inserted into the index (every tier, capped at 2,000 a launch); AniList's and TMDB's recommendations stored beside MovieLens' neighbours by source and asked again when a week old; the matrix built from MovieLens' newest release and rebuilt when its Last-Modified changes; neighbours by meaning and shared people for a title nobody has rated; IMDb's previous votes kept for a rising signal; rails re-ranked; Settings shows each source's last update (E7, tested end to end with a fixture refresh).
 - [ ] **17.5** The case study (docs/case-studies/recommender.md) with real numbers (E6); docs/specs/recommender.md, learning note, README and HOW_IT_WORKS, regression, close.
 
 ### Exit criteria
@@ -32,12 +33,13 @@
 - [ ] **E4** Every recommendation has a truthful explanation.
 - [ ] **E5** Ranking 1,000 candidates completes in < 150 ms on Tier 0.
 - [ ] **E6** Case study written with real numbers.
+- [ ] **E7** A title the catalogue gains at a launch can be recommended on that same launch with a truthful reason, and each source (catalogue, meaning, MovieLens, AniList, TMDB) says when it last updated.
 
 ---
 
 ## What's next
 
-Phase 17, 17.1 (the rest; the matrix itself is built, stored and measured: c5a501d, 516d2c9): add it to the first run's enrichment in crates/catalogue/src/bootstrap.rs. A NEIGHBOURS step after ANIME in `run` that fetches ml-25m.zip (Downloader, then movielens::verify_md5 against ML25M_MD5), writes the join (links + catalogue_by_imdb + load, moved out of tools/ingest/src/main.rs `movielens` into crates/catalogue so both share it), builds with crates/catalogue/src/neighbours.rs `build`, and adds ml-25m.zip to SPARE so tidy deletes it after. A failed fetch (files.grouplens.org has served an expired certificate, movielens.rs) is logged and leaves the step owed rather than failing the run; label() names it for the setup bar; a bootstrap test with a local archive. Then 17.2: the ranker in crates/recommend/src/rank.rs (candidates from the taste modes' nearest, NeighbourRepository::of_many over liked titles, and popularity; MMR with caps; timed).
+Phase 17, 17.1 (the rest; the matrix itself is built, stored and measured: c5a501d, 516d2c9): add it to the first run's enrichment in crates/catalogue/src/bootstrap.rs. A NEIGHBOURS step after ANIME in `run` that fetches ml-25m.zip (Downloader, then movielens::verify_md5 against ML25M_MD5), writes the join (links + catalogue_by_imdb + load, moved out of tools/ingest/src/main.rs `movielens` into crates/catalogue so both share it), builds with crates/catalogue/src/neighbours.rs `build`, and adds ml-25m.zip to SPARE so tidy deletes it after. A failed fetch (files.grouplens.org has served an expired certificate, movielens.rs) is logged and leaves the step owed rather than failing the run; label() names it for the setup bar; a bootstrap test with a local archive. Build it from MovieLens' newest release (ml-latest, checked by Last-Modified at launch; ADR-0054), keeping ml-25m for eval recommend. Then 17.2: the ranker in crates/recommend/src/rank.rs (candidates from the taste modes' nearest, NeighbourRepository::of_many over liked titles, and popularity; MMR with caps; timed).
 
 ---
 
@@ -70,7 +72,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 14 | Profiles and First-Run Onboarding | B | 3, 5 | 2 | 3/6 |
 | [x] | 15 | Taste Model | B | 5, 14 | 2 | 4/5 |
 | [x] | 16 | Ready to Watch | B | 15 | 3–4 | 9/9 |
-| [~] | 17 | Recommendation Engine | B | 15, 16 | 2–3 | 0/6 |
+| [~] | 17 | Recommendation Engine | B | 15, 16 | 2–3 | 0/7 |
 | [ ] | 18 | Discovery Engine 🏁 | B | 17 | 2 | 0/6 |
 | [ ] | 19 | Browsing Surfaces | B | 18 | 4–5 | 0/13 |
 | [ ] | 20 | Watchlist and External Sync | C | 19 | 1–2 | 0/5 |

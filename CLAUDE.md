@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **4.6.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **4.7.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -291,6 +291,13 @@ stored, AniList airing schedules (no key), **search-triggered backfill** when a 
 finds a source anyway, and full re-ingest. Backfill is the one that stops an
 out-of-date catalogue being a dead end.
 
+**Current on every launch** (ADR-0054, the author's rule): the catalogue check at launch (ADR-0030) triggers
+everything derived from it, in the background: meaning vectors for the titles it added (every tier, Tier 0 capped at
+2,000 a launch), AniList's and TMDB's recommendations beside MovieLens in the neighbour graph (refreshed weekly), the
+matrix rebuilt from MovieLens' newest release when GroupLens publishes one (ml-25m stays the evaluation set), cold-start
+neighbours by meaning and people, a rising signal from IMDb's votes, rails re-ranked, and each source's last update
+shown in Settings. Nothing the app derives may be a snapshot that never moves.
+
 **No free source publishes an absolute episode number** (ADR-0031). AniList publishes
 per-entry numbering and an entry is one cour, so its numbers restart each season where
 IMDb's do. `absolute_number` is NULL by design, and **must never be derived by
@@ -370,7 +377,7 @@ typographic treatment rather than breaking.
   < 200MB are **Tier 2 dev-machine** targets, not these.
 - **Tier gating** goes through `tiers.rs` only. No feature checks hardware directly.
   Every gated feature degrades to something *good*, never to something broken or
-  empty. **Tier 0 embeds queries but never catalogue documents** (ADR-0015); ONNX
+  empty. **Tier 0 embeds queries but never catalogue documents** (ADR-0015), except a launch's new titles, capped (ADR-0054); ONNX
   Runtime is required at runtime on all tiers.
 
 ---

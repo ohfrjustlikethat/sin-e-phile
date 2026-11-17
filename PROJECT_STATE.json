@@ -1,5 +1,5 @@
 {
-  "spec_version": "4.6.0",
+  "spec_version": "4.7.0",
   "project": "sin-e-phile",
   "last_updated": "2026-11-18",
   "sessions_completed": 21,
@@ -33,6 +33,12 @@
       {
         "id": "17.4",
         "text": "fixtures/recommender/ and eval recommend: Recall@20 against popularity on a held-out split (E1, more than 40% relative), catalogue coverage over the users (E2, above 15%), intra-list diversity against a documented target and no rail dominated by one director, franchise or year (E3), ranking time (E5); seen to fail for each.",
+        "status": "not_started",
+        "commit": null
+      },
+      {
+        "id": "17.6",
+        "text": "Staying current (ADR-0054), on every launch after the catalogue check: the titles it added get a synopsis (TMDB with the profile's key, AniList for anime, else Wikipedia through Wikidata) and a meaning vector inserted into the index (every tier, capped at 2,000 a launch); AniList's and TMDB's recommendations stored beside MovieLens' neighbours by source and asked again when a week old; the matrix built from MovieLens' newest release and rebuilt when its Last-Modified changes; neighbours by meaning and shared people for a title nobody has rated; IMDb's previous votes kept for a rising signal; rails re-ranked; Settings shows each source's last update (E7, tested end to end with a fixture refresh).",
         "status": "not_started",
         "commit": null
       },
@@ -77,6 +83,12 @@
       {
         "id": "E6",
         "text": "Case study written with real numbers.",
+        "met": false,
+        "evidence": null
+      },
+      {
+        "id": "E7",
+        "text": "A title the catalogue gains at a launch can be recommended on that same launch with a truthful reason, and each source (catalogue, meaning, MovieLens, AniList, TMDB) says when it last updated.",
         "met": false,
         "evidence": null
       }
@@ -1983,6 +1995,12 @@
           "text": "Case study written with real numbers.",
           "met": false,
           "evidence": null
+        },
+        {
+          "id": "E7",
+          "text": "A title the catalogue gains at a launch can be recommended on that same launch with a truthful reason, and each source (catalogue, meaning, MovieLens, AniList, TMDB) says when it last updated.",
+          "met": false,
+          "evidence": null
         }
       ],
       "subtasks": [
@@ -2007,6 +2025,12 @@
         {
           "id": "17.4",
           "text": "fixtures/recommender/ and eval recommend: Recall@20 against popularity on a held-out split (E1, more than 40% relative), catalogue coverage over the users (E2, above 15%), intra-list diversity against a documented target and no rail dominated by one director, franchise or year (E3), ranking time (E5); seen to fail for each.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "17.6",
+          "text": "Staying current (ADR-0054), on every launch after the catalogue check: the titles it added get a synopsis (TMDB with the profile's key, AniList for anime, else Wikipedia through Wikidata) and a meaning vector inserted into the index (every tier, capped at 2,000 a launch); AniList's and TMDB's recommendations stored beside MovieLens' neighbours by source and asked again when a week old; the matrix built from MovieLens' newest release and rebuilt when its Last-Modified changes; neighbours by meaning and shared people for a title nobody has rated; IMDb's previous votes kept for a rising signal; rails re-ranked; Settings shows each source's last update (E7, tested end to end with a fixture refresh).",
           "status": "not_started",
           "commit": null
         },
@@ -2543,7 +2567,7 @@
       ]
     }
   ],
-  "next_action": "Phase 17, 17.1 (the rest; the matrix itself is built, stored and measured: c5a501d, 516d2c9): add it to the first run's enrichment in crates/catalogue/src/bootstrap.rs. A NEIGHBOURS step after ANIME in `run` that fetches ml-25m.zip (Downloader, then movielens::verify_md5 against ML25M_MD5), writes the join (links + catalogue_by_imdb + load, moved out of tools/ingest/src/main.rs `movielens` into crates/catalogue so both share it), builds with crates/catalogue/src/neighbours.rs `build`, and adds ml-25m.zip to SPARE so tidy deletes it after. A failed fetch (files.grouplens.org has served an expired certificate, movielens.rs) is logged and leaves the step owed rather than failing the run; label() names it for the setup bar; a bootstrap test with a local archive. Then 17.2: the ranker in crates/recommend/src/rank.rs (candidates from the taste modes' nearest, NeighbourRepository::of_many over liked titles, and popularity; MMR with caps; timed).",
+  "next_action": "Phase 17, 17.1 (the rest; the matrix itself is built, stored and measured: c5a501d, 516d2c9): add it to the first run's enrichment in crates/catalogue/src/bootstrap.rs. A NEIGHBOURS step after ANIME in `run` that fetches ml-25m.zip (Downloader, then movielens::verify_md5 against ML25M_MD5), writes the join (links + catalogue_by_imdb + load, moved out of tools/ingest/src/main.rs `movielens` into crates/catalogue so both share it), builds with crates/catalogue/src/neighbours.rs `build`, and adds ml-25m.zip to SPARE so tidy deletes it after. A failed fetch (files.grouplens.org has served an expired certificate, movielens.rs) is logged and leaves the step owed rather than failing the run; label() names it for the setup bar; a bootstrap test with a local archive. Build it from MovieLens' newest release (ml-latest, checked by Last-Modified at launch; ADR-0054), keeping ml-25m for eval recommend. Then 17.2: the ranker in crates/recommend/src/rank.rs (candidates from the taste modes' nearest, NeighbourRepository::of_many over liked titles, and popularity; MMR with caps; timed).",
   "blockers": [
     {
       "id": "B16",
@@ -2855,6 +2879,11 @@
       "id": "0053",
       "title": "Search by meaning ships inside the installer",
       "date": "2026-11-17"
+    },
+    {
+      "id": "0054",
+      "title": "Current on every launch: the catalogue, what it means, and what to recommend",
+      "date": "2026-11-18"
     }
   ],
   "environment": {
