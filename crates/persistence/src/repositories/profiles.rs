@@ -89,21 +89,24 @@ impl<'a> ProfileRepository<'a> {
 
     pub async fn create(&self, name: &str, is_default: bool) -> Result<i64, DbError> {
         // A partial unique index makes two defaults impossible, so demote the
-        // incumbent first rather than letting the insert fail.
+        // incumbent first rather than letting the insert fail. In one transaction: an
+        // insert that fails (a name already taken) must not leave the demotion behind,
+        // and no profile the default (round 10).
+        let mut tx = self.db.pool().begin().await?;
         if is_default {
             sqlx::query("UPDATE profiles SET is_default = 0 WHERE is_default = 1")
-                .execute(self.db.pool())
+                .execute(&mut *tx)
                 .await?;
         }
-        Ok(
-            sqlx::query_scalar(
-                "INSERT INTO profiles (name, is_default) VALUES (?, ?) RETURNING id",
-            )
-            .bind(name)
-            .bind(i64::from(is_default))
-            .fetch_one(self.db.pool())
-            .await?,
+        let id = sqlx::query_scalar(
+            "INSERT INTO profiles (name, is_default) VALUES (?, ?) RETURNING id",
         )
+        .bind(name)
+        .bind(i64::from(is_default))
+        .fetch_one(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(id)
     }
 
     pub async fn default_profile(&self) -> Result<Option<Profile>, DbError> {
@@ -221,11 +224,34 @@ impl<'a> ProfileRepository<'a> {
     /// The default profile's id, creating one if there is none. Profiles proper arrive
     /// in Phase 14; until then everything personal — resume points first — belongs to
     /// this one, and Phase 14's first real profile can adopt it.
+    ///
+    /// Safe to ask from many places at once, and it mends an install left without a
+    /// default (round 10): two first asks at once each saw none; one made "You", the
+    /// other demoted it and failed on the name, and every later launch failed the same
+    /// way. Each step is now one statement, so asks at once cannot undo each other.
     pub async fn ensure_default(&self) -> Result<i64, DbError> {
         if let Some(p) = self.default_profile().await? {
             return Ok(p.id);
         }
-        self.create("You", true).await
+        // Profiles but no default: the first profile has it back.
+        sqlx::query(
+            "UPDATE profiles SET is_default = 1
+             WHERE id = (SELECT MIN(id) FROM profiles)
+               AND NOT EXISTS (SELECT 1 FROM profiles WHERE is_default = 1)",
+        )
+        .execute(self.db.pool())
+        .await?;
+        // No profiles at all: "You", made once however many ask.
+        sqlx::query(
+            "INSERT OR IGNORE INTO profiles (name, is_default)
+             SELECT 'You', 1 WHERE NOT EXISTS (SELECT 1 FROM profiles)",
+        )
+        .execute(self.db.pool())
+        .await?;
+        self.default_profile()
+            .await?
+            .map(|p| p.id)
+            .ok_or(DbError::Sqlx(sqlx::Error::RowNotFound))
     }
 
     pub async fn all(&self) -> Result<Vec<Profile>, DbError> {
