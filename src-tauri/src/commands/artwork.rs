@@ -109,3 +109,139 @@ pub async fn poster(state: State<'_, AppState>, id: i32) -> Result<Option<String
     });
     Ok(posters.first(&urls).await.map(|webp| data_url(&webp)))
 }
+
+// ── Profile pictures (Phase 16, brief item 11) ─────────────────────────────────────────
+// **Thin**: decoding, the automatic square and the cut are `sinephile_artwork::avatar`'s.
+
+/// A picture being chosen: its preview, its size, and the square chosen automatically.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct PicturePreview {
+    /// A `data:` URL of the preview.
+    pub url: String,
+    pub width: u32,
+    pub height: u32,
+    pub crop: CropView,
+}
+
+/// A square in fractions of the picture: `x` and `side` of its width, `y` of its height.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, specta::Type)]
+pub struct CropView {
+    pub x: f64,
+    pub y: f64,
+    pub side: f64,
+}
+
+fn read_picture(path: &str) -> Result<Vec<u8>, String> {
+    let size = std::fs::metadata(path)
+        .map_err(|e| format!("could not read it: {e}"))?
+        .len();
+    if size > sinephile_artwork::avatar::MAX_FILE_BYTES {
+        return Err("that file is too large to be a picture".into());
+    }
+    std::fs::read(path).map_err(|e| format!("could not read it: {e}"))
+}
+
+fn picture_path(dir: &std::path::Path, profile: i32) -> std::path::PathBuf {
+    dir.join("profiles").join(format!("{profile}.webp"))
+}
+
+/// Windows' file picker, for a profile picture.
+#[tauri::command]
+#[specta::specta]
+pub async fn pick_picture(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri::Manager;
+    let owner = app
+        .get_webview_window("main")
+        .and_then(|w| w.hwnd().ok())
+        .map(|h| h.0 as isize);
+    tauri::async_runtime::spawn_blocking(move || {
+        std::thread::spawn(move || {
+            crate::commands::library::picker::file(owner, "Choose a picture for this profile")
+        })
+        .join()
+        .unwrap_or(None)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// The chosen picture, ready for the crop to be adjusted.
+#[tauri::command]
+#[specta::specta]
+pub async fn picture_preview(path: String) -> Result<PicturePreview, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes = read_picture(&path)?;
+        let p = sinephile_artwork::avatar::preview(&bytes)
+            .map_err(|_| "that file is not a picture this app can read".to_string())?;
+        Ok(PicturePreview {
+            url: data_url(&p.webp),
+            width: p.width,
+            height: p.height,
+            crop: CropView {
+                x: p.crop.x,
+                y: p.crop.y,
+                side: p.crop.side,
+            },
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Cut the chosen square from the picture and keep it as `profile`'s picture.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_profile_picture(
+    state: State<'_, AppState>,
+    profile: i32,
+    path: String,
+    crop: CropView,
+) -> Result<(), String> {
+    let dir = state.data_dir().ok_or("the data folder is not open")?;
+    let to = picture_path(&dir, profile);
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes = read_picture(&path)?;
+        let made = sinephile_artwork::avatar::avatar(
+            &bytes,
+            sinephile_artwork::avatar::Crop {
+                x: crop.x,
+                y: crop.y,
+                side: crop.side,
+            },
+        )
+        .map_err(|_| "that file is not a picture this app can read".to_string())?;
+        if let Some(parent) = to.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(&to, made).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// `profile`'s picture as a `data:` URL, or `None`: it has none.
+#[tauri::command]
+#[specta::specta]
+pub async fn profile_picture(
+    state: State<'_, AppState>,
+    profile: i32,
+) -> Result<Option<String>, String> {
+    let Some(dir) = state.data_dir() else {
+        return Ok(None);
+    };
+    Ok(std::fs::read(picture_path(&dir, profile))
+        .ok()
+        .map(|webp| data_url(&webp)))
+}
+
+/// Take `profile`'s picture away: its coloured initial shows again.
+#[tauri::command]
+#[specta::specta]
+pub async fn clear_profile_picture(state: State<'_, AppState>, profile: i32) -> Result<(), String> {
+    let dir = state.data_dir().ok_or("the data folder is not open")?;
+    match std::fs::remove_file(picture_path(&dir, profile)) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
+}

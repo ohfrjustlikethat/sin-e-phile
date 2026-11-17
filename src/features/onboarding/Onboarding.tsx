@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Input } from "@/design-system";
 import { commands } from "@/lib/ipc";
 import { AVATAR_COLOURS, Avatar, colourOf, type AvatarColour } from "@/features/profiles/Avatar";
@@ -14,6 +14,8 @@ import { TmdbSection } from "@/features/settings/TmdbSection";
 import { ArtworkSection } from "@/features/settings/ArtworkSection";
 import { Settings as DownloadsSettings } from "@/features/downloads/DownloadsScreen";
 import { TitleCards } from "./TitleCards";
+import { ChoosePicture } from "@/features/profiles/ChoosePicture";
+import { PICTURE } from "@/features/profiles/ProfileAvatar";
 import { MeaningDownload } from "@/features/search/MeaningDownload";
 import { BuildStrip, useCatalogueBuild } from "./CatalogueBuild";
 
@@ -55,6 +57,16 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const [colour, setColour] = useState<AvatarColour>("sage");
   const [way, setWay] = useState<Way>("cards");
   const first = useRef<HTMLDivElement>(null);
+  // The profile's picture, if one is chosen here (Phase 16): the large avatar shows it.
+  const picture = useQuery({
+    queryKey: PICTURE(active?.id ?? 0),
+    queryFn: async () => {
+      const r = await commands.profilePicture(active?.id ?? 0);
+      return r.status === "ok" ? r.data : null;
+    },
+    enabled: active !== undefined && active !== null,
+    staleTime: Infinity,
+  });
   // The catalogue builds while the viewer sets up (Phase 16): its progress is in the footer.
   const build = useCatalogueBuild();
 
@@ -127,8 +139,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           {step === 0 && (
             <div className="flex flex-col gap-6">
               <div className="flex items-end gap-5">
-                <Avatar name={name || "?"} colour={colour} size="lg" />
-                <div className="w-80">
+                <Avatar name={name || "?"} colour={colour} size="lg" picture={picture.data ?? null} />
+                <div className="flex w-80 flex-col gap-3">
                   <Input
                     label="Your name"
                     placeholder="What should we call you?"
@@ -136,6 +148,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                     maxLength={40}
                     onChange={(e) => setName(e.target.value)}
                   />
+                  {active && <ChoosePicture profile={active.id} />}
                 </div>
               </div>
               <div role="radiogroup" aria-label="Colour" className="flex gap-2">

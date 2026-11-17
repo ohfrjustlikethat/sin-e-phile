@@ -375,6 +375,16 @@ export const commands = {
 	setShowPosters: (on: boolean) => typedError<null, string>(__TAURI_INVOKE("set_show_posters", { on })),
 	/**  A title's poster as a `data:` URL, or `None`: no source chosen, no IMDb id, or no poster. */
 	poster: (id: number) => typedError<string | null, string>(__TAURI_INVOKE("poster", { id })),
+	/**  Windows' file picker, for a profile picture. */
+	pickPicture: () => typedError<string | null, string>(__TAURI_INVOKE("pick_picture")),
+	/**  The chosen picture, ready for the crop to be adjusted. */
+	picturePreview: (path: string) => typedError<PicturePreview, string>(__TAURI_INVOKE("picture_preview", { path })),
+	/**  Cut the chosen square from the picture and keep it as `profile`'s picture. */
+	setProfilePicture: (profile: number, path: string, crop: CropView) => typedError<null, string>(__TAURI_INVOKE("set_profile_picture", { profile, path, crop })),
+	/**  `profile`'s picture as a `data:` URL, or `None`: it has none. */
+	profilePicture: (profile: number) => typedError<string | null, string>(__TAURI_INVOKE("profile_picture", { profile })),
+	/**  Take `profile`'s picture away: its coloured initial shows again. */
+	clearProfilePicture: (profile: number) => typedError<null, string>(__TAURI_INVOKE("clear_profile_picture", { profile })),
 	/**  Whether a title is on this profile's watchlist. */
 	titleWatchlisted: (id: number) => typedError<boolean, string>(__TAURI_INVOKE("title_watchlisted", { id })),
 	/**  Save a title to the watchlist, or take it off. */
@@ -585,6 +595,13 @@ export type CreditView = {
 	character: string | null,
 };
 
+/**  A square in fractions of the picture: `x` and `side` of its width, `y` of its height. */
+export type CropView = {
+	x: number | null,
+	y: number | null,
+	side: number | null,
+};
+
 /**  A chrome panel's silhouette in CSS pixels; the page converts nothing, this does. */
 export type CutoutRect = {
 	x: number | null,
@@ -753,6 +770,15 @@ export type PersonView = {
 	name: string,
 	/**  For the cast: who they play. For the crew: what they did. */
 	part: string | null,
+};
+
+/**  A picture being chosen: its preview, its size, and the square chosen automatically. */
+export type PicturePreview = {
+	/**  A `data:` URL of the preview. */
+	url: string,
+	width: number,
+	height: number,
+	crop: CropView,
 };
 
 /**  What Play will open, decided now (see `sinephile_playback::plan`). */

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { DESTINATIONS, type Destination, useUi } from "@/lib/store";
 import { inProgress } from "@/features/downloads/format";
 import { useDownloads } from "@/features/downloads/useDownloads";
-import { Avatar } from "@/features/profiles/Avatar";
+import { ProfileAvatar } from "@/features/profiles/ProfileAvatar";
 import { useProfiles } from "@/features/profiles/useProfiles";
 
 /**
@@ -172,7 +172,7 @@ export function Masthead() {
             aria-label={`${active.name}: switch profile`}
             className="grid h-8 w-8 place-items-center"
           >
-            <Avatar name={active.name} colour={active.avatar_colour} />
+            <ProfileAvatar profile={active} />
           </button>
         )}
 

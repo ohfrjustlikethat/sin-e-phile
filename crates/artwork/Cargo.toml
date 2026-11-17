@@ -13,7 +13,8 @@ description = "Artwork cache: lazy fetch, disk budget, WebP re-encoding, blurhas
 # Decoding only. `image` is pure Rust and handles the JPEG and PNG that TMDB serves.
 # Its WebP support is DECODE plus LOSSLESS encode, which is the wrong tool for
 # photographs — see `encode.rs`.
-image = { version = "=0.25.10", default-features = false, features = ["jpeg", "png"] }
+# Profile pictures (Phase 16) are any picture file: the common formats' decoders too.
+image = { version = "=0.25.10", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp", "tiff", "ico"] }
 # Lossy WebP. Wraps libwebp, so it needs the C toolchain this project already
 # requires for FFmpeg and librqbit.
 webp = "=0.3.1"

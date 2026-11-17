@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/design-system";
 import type { ProfileView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
-import { Avatar } from "./Avatar";
+import { ProfileAvatar } from "./ProfileAvatar";
 import { useProfiles } from "./useProfiles";
 
 /**
@@ -70,7 +70,7 @@ export function ProfilePicker({ onDone }: { onDone: () => void }) {
                   aria-label={`${p.name}${p.is_kids ? ", kids" : ""}${p.has_pin ? ", PIN" : ""}`}
                   className="group flex w-36 flex-col items-center gap-4 rounded-sm p-3"
                 >
-                  <Avatar name={p.name} colour={p.avatar_colour} size="lg" />
+                  <ProfileAvatar profile={p} size="lg" />
                   <span className="text-[15px] text-ink-muted group-hover:text-ink">{p.name}</span>
                   <span className="label h-4">
                     {[p.is_kids ? "Kids" : null, p.has_pin ? "PIN" : null].filter(Boolean).join(" · ")}
@@ -158,7 +158,7 @@ export function PinPad({
 
   return (
     <div className="flex flex-col items-center">
-      <Avatar name={profile.name} colour={profile.avatar_colour} size="lg" />
+      <ProfileAvatar profile={profile} size="lg" />
       <h1 className="mt-6 font-display text-[28px] font-extrabold tracking-[-0.02em]">{profile.name}'s PIN</h1>
       <div className="mt-6 flex gap-3" aria-label={`${pin.length} of 4 digits entered`} role="status">
         {[0, 1, 2, 3].map((i) => (

@@ -97,6 +97,9 @@ const FAKE = `(() => {
     artwork_settings: () => ({ posters: !!window.__posters, tmdb: !!window.__tmdbSet }),
     set_show_posters: (a) => { window.__posters = a.on; return null; },
     poster: () => null,
+    // Phase 16: profile pictures; none chosen in the flow.
+    profile_picture: () => null,
+    pick_picture: () => null,
     // Phase 16: the catalogue under Films and TV Shows, so neither tab is empty.
     catalogue_rails: (a) => [{ key: "most", title: a.shows ? "Most watched shows" : "Most watched films",
       items: [{ id: 7, title: "Sunrise", year: 1927, made_by: "F. W. Murnau", runtime_minutes: 94, note: null }] }],

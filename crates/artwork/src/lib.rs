@@ -9,6 +9,7 @@
 //! designed around, not an error to route past. This crate deliberately does not depend
 //! on the persistence crate, so it cannot reach for a key even accidentally.
 
+pub mod avatar;
 pub mod blurhash;
 pub mod cache;
 pub mod encode;
