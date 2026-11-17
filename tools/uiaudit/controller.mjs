@@ -1269,6 +1269,21 @@ try {
   check(Math.abs(again - after) < 4, `Settings opens again where it was left (${Math.round(after)} -> ${Math.round(again)})`);
   await press(B.B);
 
+  // Round 10 (the author): Who's watching?, opened from the avatar, has a way back that says where it goes,
+  // reached by the D-pad; it keeps whoever is watching and puts focus back on the avatar.
+  const switches = (await calls("switch_profile")).length;
+  await steerToButton("Jon: switch profile");
+  await press(B.A);
+  await waitFor(() => evalJs(`document.body.textContent.includes("Who's watching?")`), "the picker from the avatar", 25);
+  const backTo = await evalJs(`[...document.querySelectorAll('[role="dialog"] button')]
+    .map((b) => b.getAttribute("aria-label") || "").find((l) => l.startsWith("Back to ")) ?? null`);
+  check(backTo !== null, `opened from the avatar, Who's watching? has a way back (${backTo})`);
+  await steerToButton(backTo);
+  await press(B.A);
+  await waitFor(() => evalJs(`!document.body.textContent.includes("Who's watching?")`), "the picker to close by its way back", 25);
+  check((await calls("switch_profile")).length === switches, "A on it goes back, keeping whoever is watching");
+  check((await active())?.text === "Jon: switch profile", "and focus is back on the avatar");
+
   // Reduced motion: every transform goes, the ring stops gliding.
   await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
   const still = await tileProbe();

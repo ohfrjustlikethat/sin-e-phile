@@ -3,6 +3,7 @@
 export { Button } from "./primitives/Button";
 export type { ButtonVariant, ButtonSize } from "./primitives/Button";
 export { IconButton } from "./primitives/IconButton";
+export { BackLink } from "./primitives/BackLink";
 export { Input } from "./primitives/Input";
 export { Select } from "./primitives/Select";
 export { Toggle } from "./primitives/Toggle";

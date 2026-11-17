@@ -91,7 +91,12 @@ interface UiState {
   setDownloadsOpen: (open: boolean) => void;
   /** Who's watching? (Phase 14): `null` until launch has decided whether to ask. */
   pickerOpen: boolean | null;
-  setPickerOpen: (open: boolean) => void;
+  /**
+   * Whether launch asked (ADR-0043), rather than the masthead's avatar: launch's question has no way back but an
+   * answer; the avatar's says where back goes (round 10).
+   */
+  pickerAtLaunch: boolean;
+  setPickerOpen: (open: boolean, atLaunch?: boolean) => void;
   playing: Playing | null;
   /** The in-app mini player (ADR-0043): watching in a corner while browsing. */
   mini: boolean;
@@ -175,7 +180,8 @@ export const useUi = create<UiState>()(
         set(tasteOpen ? { tasteOpen, settingsOpen: true, reviewOpen: false, downloadsOpen: false, detail: null } : { tasteOpen }),
       downloadsOpen: false,
       pickerOpen: null,
-      setPickerOpen: (pickerOpen) => set({ pickerOpen }),
+      pickerAtLaunch: false,
+      setPickerOpen: (pickerOpen, atLaunch = false) => set({ pickerOpen, pickerAtLaunch: pickerOpen && atLaunch }),
       setDownloadsOpen: (downloadsOpen) =>
         set(
           downloadsOpen

@@ -32,7 +32,7 @@ import { play, rumble } from "@/design-system/focus/feedback";
 import { useControllerSettings } from "@/lib/controllerSettings";
 import { setWindowFullscreen } from "@/lib/fullscreen";
 import { useScrollMemory } from "@/lib/scrollMemory";
-import { BackBar } from "./BackBar";
+import { BackBar, usePageName } from "./BackBar";
 import { handleBack } from "./backKey";
 
 /** Full screen for the whole app window (ADR-0042: View, or picking the pad up), from any window state. */
@@ -86,8 +86,11 @@ export function App() {
   }, []);
   // ADR-0043: ask who is watching on launch only when there is more than one profile.
   useEffect(() => {
-    if (pickerOpen === null && !profilesLoading) setPickerOpen(profiles.length >= 2);
+    if (pickerOpen === null && !profilesLoading) setPickerOpen(profiles.length >= 2, true);
   }, [pickerOpen, profilesLoading, profiles.length, setPickerOpen]);
+  // Opened from the avatar, Who's watching? goes back to the page it covers (round 10).
+  const pickerAtLaunch = useUi((s) => s.pickerAtLaunch);
+  const pageName = usePageName();
   const mini = useUi((s) => s.mini);
   const detail = useUi((s) => s.detail);
   useDropToPlay();
@@ -328,7 +331,9 @@ export function App() {
       <DownloadNotices />
       <Toaster />
       {onboarding && !full && <Onboarding onDone={() => setOnboarding(false)} />}
-      {pickerOpen && !onboarding && !full && <ProfilePicker onDone={() => setPickerOpen(false)} />}
+      {pickerOpen && !onboarding && !full && (
+        <ProfilePicker back={pickerAtLaunch ? null : pageName} onDone={() => setPickerOpen(false)} />
+      )}
       {playing && (
         <div
           className={

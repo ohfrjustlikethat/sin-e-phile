@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { useCallback, type ReactElement } from "react";
-import { backLabel } from "./BackBar";
+import { backLabel, hereLabel } from "./BackBar";
 import { forgetScroll, useScrollMemory } from "@/lib/scrollMemory";
 import type { Tab } from "@/lib/store";
 
@@ -28,6 +28,16 @@ describe("The back arrow says where it goes (Phase 16)", () => {
     expect(backLabel({ ...base, settingsOpen: true, trails: { ...empty, home: [2] } }, titleOf)).toBe("Thief");
     expect(backLabel({ ...base, downloadsOpen: true, tab: "tv" }, titleOf)).toBe("TV Shows");
     expect(backLabel({ ...base, settingsOpen: true, reviewOpen: true }, titleOf)).toBe("Settings");
+  });
+
+  it("names the page showing now, for a screen over it to go back to (Who's watching?, round 10)", () => {
+    expect(hereLabel(base, titleOf)).toBe("Home");
+    expect(hereLabel({ ...base, trails: { ...empty, home: [1, 2] } }, titleOf)).toBe("Thief");
+    expect(hereLabel({ ...base, tab: "search" }, titleOf)).toBe("Search results");
+    expect(hereLabel({ ...base, settingsOpen: true, trails: { ...empty, home: [2] } }, titleOf)).toBe("Settings");
+    expect(hereLabel({ ...base, settingsOpen: true, reviewOpen: true }, titleOf)).toBe("Check your library");
+    expect(hereLabel({ ...base, settingsOpen: true, tasteOpen: true }, titleOf)).toBe("Your taste");
+    expect(hereLabel({ ...base, downloadsOpen: true, tab: "tv" }, titleOf)).toBe("Downloads");
   });
 });
 

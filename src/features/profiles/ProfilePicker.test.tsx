@@ -21,14 +21,14 @@ vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(() => Promise.resolve(()
 const { ProfilePicker } = await import("./ProfilePicker");
 const { initialOf, colourOf } = await import("./Avatar");
 
-function renderIt(onDone = vi.fn()) {
+function renderIt(onDone = vi.fn(), back: string | null = null) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
+  const view = render(
     <QueryClientProvider client={client}>
-      <ProfilePicker onDone={onDone} />
+      <ProfilePicker onDone={onDone} back={back} />
     </QueryClientProvider>,
   );
-  return onDone;
+  return Object.assign(onDone, { unmount: view.unmount });
 }
 
 describe("Who's watching? (Phase 14)", () => {
@@ -73,6 +73,29 @@ describe("Who's watching? (Phase 14)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Manage profiles" }));
     expect(useUi.getState().settingsOpen).toBe(true);
     expect(useUi.getState().settingsSection).toBe("profile");
+  });
+
+  it("opened from the avatar, it says where back goes, and goes there keeping whoever is watching (round 10)", async () => {
+    // The avatar that opened it: focus comes back to it, so a pad carries on from where it was.
+    const avatar = document.createElement("button");
+    avatar.textContent = "Jon: switch profile";
+    document.body.appendChild(avatar);
+    avatar.focus();
+    const done = renderIt(vi.fn(), "Home");
+    const back = await screen.findByRole("button", { name: "Back to Home" });
+    expect(back).toHaveTextContent("Home");
+    fireEvent.click(back);
+    expect(done).toHaveBeenCalledTimes(1);
+    expect(commands.switchProfile).not.toHaveBeenCalled();
+    done.unmount();
+    expect(document.activeElement).toBe(avatar);
+    avatar.remove();
+  });
+
+  it("at launch it is a question with no way back but an answer (or Escape)", async () => {
+    renderIt();
+    await screen.findByRole("button", { name: "Mina, kids" });
+    expect(screen.queryByRole("button", { name: /^Back to / })).toBeNull();
   });
 
   it("an avatar is an initial on a known colour", () => {

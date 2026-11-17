@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/design-system";
+import { BackLink, Button } from "@/design-system";
 import type { ProfileView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
 import { ProfileAvatar } from "./ProfileAvatar";
@@ -11,14 +11,25 @@ import { useProfiles } from "./useProfiles";
  * used first; a profile with a PIN asks for it on a pad the D-pad, the mouse and the
  * number keys all work.
  *
- * Escape (B) keeps whoever is watching.
+ * Escape (B) keeps whoever is watching. Opened from the avatar it also says so on screen, top left where every
+ * page's way back is: "← Home", the page it covers (`back`, round 10). Launch's question has none: `null`.
+ * Focus goes back to what opened it, so a pad carries on from the avatar.
  */
-export function ProfilePicker({ onDone }: { onDone: () => void }) {
+export function ProfilePicker({ onDone, back = null }: { onDone: () => void; back?: string | null | undefined }) {
   const { profiles, switchTo } = useProfiles();
   const openSettings = useUi((s) => s.setSettingsOpen);
   const setTasteOpen = useUi((s) => s.setTasteOpen);
   const [asking, setAsking] = useState<ProfileView | null>(null);
   const first = useRef<HTMLButtonElement>(null);
+
+  // Back to the opener when this closes: the masthead's avatar, unless it has gone. Before the effect below moves
+  // focus, so what it keeps is the opener.
+  useEffect(() => {
+    const opener = document.activeElement;
+    return () => {
+      if (opener instanceof HTMLElement && opener !== document.body && opener.isConnected) opener.focus();
+    };
+  }, []);
 
   useEffect(() => {
     if (!asking) first.current?.focus();
@@ -48,6 +59,11 @@ export function ProfilePicker({ onDone }: { onDone: () => void }) {
       aria-label="Who's watching?"
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-base text-ink"
     >
+      {back !== null && !asking && (
+        <div className="absolute top-0 left-0 px-16 pt-7">
+          <BackLink label={back} onClick={onDone} />
+        </div>
+      )}
       {asking ? (
         <PinPad
           profile={asking}
