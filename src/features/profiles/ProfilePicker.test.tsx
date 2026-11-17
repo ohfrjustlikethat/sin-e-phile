@@ -68,8 +68,11 @@ describe("Who's watching? (Phase 14)", () => {
     fireEvent.keyDown(window, { key: "Escape" });
     expect(done).toHaveBeenCalledTimes(1);
     expect(commands.switchProfile).not.toHaveBeenCalled();
+    // Left on About last time (the author's case): Manage profiles still opens at Profile.
+    useUi.setState({ settingsSection: "about" });
     fireEvent.click(screen.getByRole("button", { name: "Manage profiles" }));
     expect(useUi.getState().settingsOpen).toBe(true);
+    expect(useUi.getState().settingsSection).toBe("profile");
   });
 
   it("an avatar is an initial on a known colour", () => {

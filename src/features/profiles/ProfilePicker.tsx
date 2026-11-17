@@ -84,6 +84,8 @@ export function ProfilePicker({ onDone }: { onDone: () => void }) {
               variant="ghost"
               onClick={() => {
                 onDone();
+                // At Profile, whatever section Settings was last left on (the author: it opened at About).
+                useUi.getState().setSettingsSection("profile");
                 openSettings(true);
               }}
             >
