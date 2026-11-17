@@ -95,7 +95,14 @@ static CURRENT: Mutex<Option<(String, String, i64)>> = Mutex::new(None);
 /// What is playing (the player's target), and the subtitle file showing with its language,
 /// for the player's own subtitle controls (Phase 16): find, choose, load, align again.
 static PLAYING: Mutex<Option<String>> = Mutex::new(None);
-static SHOWING: Mutex<Option<(std::path::PathBuf, Option<String>)>> = Mutex::new(None);
+static SHOWING: Mutex<Option<Showing>> = Mutex::new(None);
+
+/// The subtitle file showing: its path, language, and the name the player's list gives it.
+type Showing = (std::path::PathBuf, Option<String>, String);
+
+/// The name of a track the app chose by itself (the chain's pick). A file a person loads or
+/// chooses is named for itself (round 10).
+const CHOSEN_BY_THE_APP: &str = "sin-e-phile";
 
 fn err(e: impl std::fmt::Display) -> String {
     e.to_string()
@@ -321,9 +328,14 @@ pub(crate) async fn open_for(
                 note,
             } => {
                 tracing::info!(path = %path.display(), %note, "subtitles: a file");
-                p.add_subtitle(&path.to_string_lossy(), "sin-e-phile", language.as_deref())
-                    .map_err(err)?;
-                *SHOWING.lock().expect("showing") = Some((path.clone(), language.clone()));
+                p.add_subtitle(
+                    &path.to_string_lossy(),
+                    CHOSEN_BY_THE_APP,
+                    language.as_deref(),
+                )
+                .map_err(err)?;
+                *SHOWING.lock().expect("showing") =
+                    Some((path.clone(), language.clone(), CHOSEN_BY_THE_APP.into()));
             }
         }
         if let Some(sub) = decided.subtitle_key.clone() {
@@ -395,6 +407,7 @@ async fn show_file(
     state: &AppState,
     path: std::path::PathBuf,
     language: Option<String>,
+    title: String,
 ) -> Result<String, String> {
     let rt = state.player().ok_or("nothing is playing")?;
     let target = PLAYING
@@ -433,9 +446,9 @@ async fn show_file(
             return Err("that subtitle could not be prepared".to_string());
         };
         rt.player
-            .add_subtitle(&path.to_string_lossy(), "sin-e-phile", language.as_deref())
+            .add_subtitle(&path.to_string_lossy(), &title, language.as_deref())
             .map_err(err)?;
-        *SHOWING.lock().expect("showing") = Some((path, language));
+        *SHOWING.lock().expect("showing") = Some((path, language, title));
         Ok(note)
     })
     .await
@@ -473,6 +486,12 @@ pub async fn subtitle_choose(
     let db = state.db().ok_or("the library is still opening")?;
     let hash = playing_hash().await?;
     let os = provider(&state).await?;
+    // Listed in the player by the release the person chose.
+    let title = offer
+        .release
+        .clone()
+        .filter(|r| !r.trim().is_empty())
+        .unwrap_or_else(|| "OpenSubtitles".into());
     let chosen = sinephile_subtitles::fetch::Offer {
         file_id: offer.file_id,
         language: offer.language,
@@ -488,7 +507,13 @@ pub async fn subtitle_choose(
     let sinephile_subtitles::Origin::Downloaded { relative_path, .. } = &found.origin else {
         return Err("that subtitle could not be saved".into());
     };
-    show_file(&state, data.join(relative_path), found.language.clone()).await
+    show_file(
+        &state,
+        data.join(relative_path),
+        found.language.clone(),
+        title,
+    )
+    .await
 }
 
 /// A subtitle file from disk, chosen in Windows' file picker, aligned and shown.
@@ -504,28 +529,35 @@ pub async fn subtitle_load(
         .and_then(|w| w.hwnd().ok())
         .map(|h| h.0 as isize);
     let picked = tauri::async_runtime::spawn_blocking(move || {
-        std::thread::spawn(move || crate::commands::library::picker::file(owner, "Load subtitles"))
-            .join()
-            .unwrap_or(None)
+        std::thread::spawn(move || {
+            let pattern = sinephile_subtitles::files::picker_pattern();
+            crate::commands::library::picker::file(
+                owner,
+                "Load subtitles",
+                Some(("Subtitles", &pattern)),
+            )
+        })
+        .join()
+        .unwrap_or(None)
     })
     .await
     .map_err(err)?;
     let Some(path) = picked else {
         return Ok(None);
     };
-    show_file(&state, std::path::PathBuf::from(path), None)
-        .await
-        .map(Some)
+    let path = std::path::PathBuf::from(path);
+    let title = sinephile_subtitles::files::track_title(&path);
+    show_file(&state, path, None, title).await.map(Some)
 }
 
 /// Align the showing subtitle file again, from its original.
 #[tauri::command]
 #[specta::specta]
 pub async fn subtitle_realign(state: State<'_, AppState>) -> Result<String, String> {
-    let (path, language) = SHOWING
+    let (path, language, title) = SHOWING
         .lock()
         .expect("showing")
         .clone()
         .ok_or("Only a subtitle file can be aligned again; this one is part of the film.")?;
-    show_file(&state, path, language).await
+    show_file(&state, path, language, title).await
 }

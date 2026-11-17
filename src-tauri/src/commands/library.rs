@@ -354,18 +354,22 @@ pub async fn library_loop(app: AppHandle) {
 pub(crate) mod picker {
     use windows::core::w;
     use windows::core::HSTRING;
+    use windows::core::PCWSTR;
     use windows::Win32::Foundation::HWND;
     use windows::Win32::System::Com::{
         CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, CLSCTX_INPROC_SERVER,
         COINIT_APARTMENTTHREADED,
     };
+    use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
     use windows::Win32::UI::Shell::{
         FileOpenDialog, IFileOpenDialog, FOS_FILEMUSTEXIST, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS,
         SIGDN_FILESYSPATH,
     };
 
     /// Windows' file picker, titled `title`, owned by the app's window (Phase 14 imports).
-    pub fn file(owner: Option<isize>, title: &str) -> Option<String> {
+    /// `kind`, when given, is a name and a pattern ("Subtitles", "*.srt;*.ass"): those files
+    /// are offered first, with "All files" beside them.
+    pub fn file(owner: Option<isize>, title: &str, kind: Option<(&str, &str)>) -> Option<String> {
         // SAFETY: as `folder`: COM for exactly the dialog's lifetime, the one COM string
         // freed with CoTaskMemFree.
         unsafe {
@@ -380,6 +384,18 @@ pub(crate) mod picker {
                     .SetOptions(options | FOS_FILEMUSTEXIST | FOS_FORCEFILESYSTEM)
                     .ok()?;
                 dialog.SetTitle(&HSTRING::from(title)).ok()?;
+                if let Some((name, pattern)) = kind {
+                    // The strings outlive the call: the dialog copies them.
+                    let (name, pattern) = (HSTRING::from(name), HSTRING::from(pattern));
+                    let spec = |n: &HSTRING, p: &HSTRING| COMDLG_FILTERSPEC {
+                        pszName: PCWSTR(n.as_ptr()),
+                        pszSpec: PCWSTR(p.as_ptr()),
+                    };
+                    let (all, every) = (HSTRING::from("All files"), HSTRING::from("*.*"));
+                    dialog
+                        .SetFileTypes(&[spec(&name, &pattern), spec(&all, &every)])
+                        .ok()?;
+                }
                 dialog.Show(owner.map(|h| HWND(h as *mut _))).ok()?;
                 let item = dialog.GetResult().ok()?;
                 let name = item.GetDisplayName(SIGDN_FILESYSPATH).ok()?;
@@ -427,7 +443,7 @@ pub(crate) mod picker {
     pub fn folder(_: Option<isize>) -> Option<String> {
         None
     }
-    pub fn file(_: Option<isize>, _: &str) -> Option<String> {
+    pub fn file(_: Option<isize>, _: &str, _: Option<(&str, &str)>) -> Option<String> {
         None
     }
 }

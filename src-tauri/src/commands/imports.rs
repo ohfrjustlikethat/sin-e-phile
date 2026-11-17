@@ -40,6 +40,7 @@ pub async fn pick_import_file(app: AppHandle) -> Result<Option<String>, String> 
             crate::commands::library::picker::file(
                 owner,
                 "Choose your Letterboxd, Trakt, IMDb or MyAnimeList export",
+                None,
             )
         })
         .join()

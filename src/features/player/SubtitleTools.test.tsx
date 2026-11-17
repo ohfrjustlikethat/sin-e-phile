@@ -52,6 +52,16 @@ describe("Subtitles in the player (Phase 16)", () => {
     expect(await screen.findByText(/Showing the chosen subtitles \(aligned: offset \+1200 ms\)/)).toBeInTheDocument();
   });
 
+  it("loads a file from disk: Windows' picker, then says what it shows; a cancelled pick says nothing", async () => {
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Load a file…" }));
+    await waitFor(() => expect(commands.subtitleLoad).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("status")).toBeNull();
+    commands.subtitleLoad.mockImplementationOnce(() => ok("aligned: offset -400 ms") as never);
+    fireEvent.click(screen.getByRole("button", { name: "Load a file…" }));
+    expect(await screen.findByText("Showing the file (aligned: offset -400 ms).")).toBeInTheDocument();
+  });
+
   it("says plainly why aligning again cannot be done", async () => {
     mount();
     fireEvent.click(await screen.findByRole("button", { name: "Align again" }));

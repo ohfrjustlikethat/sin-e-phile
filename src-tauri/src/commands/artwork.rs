@@ -173,7 +173,7 @@ pub async fn pick_picture(app: tauri::AppHandle) -> Result<Option<String>, Strin
         .map(|h| h.0 as isize);
     tauri::async_runtime::spawn_blocking(move || {
         std::thread::spawn(move || {
-            crate::commands::library::picker::file(owner, "Choose a picture for this profile")
+            crate::commands::library::picker::file(owner, "Choose a picture for this profile", None)
         })
         .join()
         .unwrap_or(None)
