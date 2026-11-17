@@ -32,6 +32,15 @@ pub fn has_capability(state: State<'_, AppState>, capability: Capability) -> boo
 }
 
 /// Where portable data lives, for the Settings screen to show honestly.
+/// An interface error, written to the log in every build (Phase 16: the author saw "something broke in the
+/// interface" and the error itself went only to the page's console, so nothing could be read afterwards).
+#[tauri::command]
+#[specta::specta]
+pub fn log_ui_error(message: String, stack: Option<String>) {
+    let cut = |s: &str| s.chars().take(4000).collect::<String>();
+    tracing::error!(message = %cut(&message), stack = %cut(stack.as_deref().unwrap_or("")), "interface error");
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn get_data_dir() -> String {

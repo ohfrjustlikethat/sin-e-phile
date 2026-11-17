@@ -389,6 +389,25 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
       await waitFor(() => expect(useUi.getState().playing?.target).toBe("http://127.0.0.1:9/stream/0"));
     });
 
+    it("opens after Settings has listed the add-ons (the author's crash: one cache key, two shapes)", async () => {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      // What Settings' add-on list leaves in the cache under the same key.
+      client.setQueryData(["sources"], { sources: [{ name: "Internet Archive" }, { name: "Torrents Add-on" }], refused_addons: [] });
+      render(
+        <QueryClientProvider client={client}>
+          <DetailScreen />
+        </QueryClientProvider>,
+      );
+      await screen.findByText("Sunrise");
+      resolvePlan({ status: "ok", data: { ...PLAN, ...NO_OFFERS, candidates: STREAMS } });
+      fireEvent.click(await screen.findByRole("button", { name: "Streams · 3" }));
+      const panel = await screen.findByRole("dialog", { name: "Streams" });
+      expect(within(panel).getAllByRole("region").map((r) => r.getAttribute("aria-label"))).toEqual([
+        "Internet Archive",
+        "Torrents Add-on",
+      ]);
+    });
+
     it("Escape (and the pad's B) closes the panel and leaves the title page where it is", async () => {
       // The app's one Back, as App wires it: the open panel is its first step (found by the pad audit,
       // where B closed the panel and also left the film's page).

@@ -52,11 +52,15 @@ interface Props {
 
 export function StreamsPanel(p: Props) {
   const panel = useRef<HTMLDivElement>(null);
+  // The same key and the same shape as Settings' add-on list (src/features/settings/SourcesSection.tsx): a cache
+  // entry is shared, and this once stored a list of names under that key while Settings stored the overview, so
+  // the panel broke on every title once Settings had been opened (the author's report).
   const sources = useQuery({
     queryKey: ["sources"],
     queryFn: async () => {
       const r = await commands.sourcesOverview();
-      return r.status === "ok" ? r.data.sources.map((s) => s.name) : [];
+      if (r.status === "error") throw new Error(r.error);
+      return r.data;
     },
   });
 
@@ -74,7 +78,7 @@ export function StreamsPanel(p: Props) {
   }, []);
 
   // One section per add-on, in Settings' order; best first within each (the ranking's own order).
-  const order = sources.data ?? [];
+  const order = (sources.data?.sources ?? []).map((s) => s.name);
   const groups = new Map<string, CandidateView[]>();
   for (const c of p.candidates) groups.set(c.from, [...(groups.get(c.from) ?? []), c]);
   const named = [...groups.keys()].sort((a, b) => {

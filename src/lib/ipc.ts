@@ -35,8 +35,13 @@ export const commands = {
 	 *  The ONLY way a feature may ask about hardware (§8).
 	 */
 	hasCapability: (capability: Capability) => __TAURI_INVOKE<boolean>("has_capability", { capability }),
-	/**  Where portable data lives, for the Settings screen to show honestly. */
 	getDataDir: () => __TAURI_INVOKE<string>("get_data_dir"),
+	/**
+	 *  Where portable data lives, for the Settings screen to show honestly.
+	 *  An interface error, written to the log in every build (Phase 16: the author saw "something broke in the
+	 *  interface" and the error itself went only to the page's console, so nothing could be read afterwards).
+	 */
+	logUiError: (message: string, stack: string | null) => __TAURI_INVOKE<void>("log_ui_error", { message, stack }),
 	/**
 	 *  Deliberately panic, to prove the crash handler works.
 	 * 

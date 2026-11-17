@@ -43,6 +43,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::system::set_tier_override,
             commands::system::has_capability,
             commands::system::get_data_dir,
+            commands::system::log_ui_error,
             commands::system::debug_trigger_panic,
             commands::system::frontend_ready,
             commands::search::search,
