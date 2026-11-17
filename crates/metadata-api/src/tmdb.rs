@@ -48,6 +48,22 @@ struct External {
     imdb_id: Option<String>,
 }
 
+#[derive(Deserialize)]
+struct Found {
+    #[serde(default)]
+    movie_results: Vec<Posted>,
+    #[serde(default)]
+    tv_results: Vec<Posted>,
+}
+
+#[derive(Deserialize)]
+struct Posted {
+    poster_path: Option<String>,
+}
+
+/// TMDB's image server, at a width that suits a 176–236 px card at 125% (Phase 16).
+pub const POSTER_BASE: &str = "https://image.tmdb.org/t/p/w342";
+
 pub struct Tmdb {
     transport: Arc<dyn Transport>,
     key: String,
@@ -107,6 +123,25 @@ impl Tmdb {
         let e: External = serde_json::from_str(&body)
             .map_err(|e| TmdbError::Unavailable(format!("external ids: {e}")))?;
         Ok(e.imdb_id.filter(|i| i.starts_with("tt")))
+    }
+
+    /// The poster of a title, by its IMDb id, as an address on TMDB's image server (Phase 16,
+    /// artwork with the profile's own key). `None` when TMDB has the title but no poster.
+    pub async fn poster_url(&self, imdb_id: &str) -> Result<Option<String>, TmdbError> {
+        if !imdb_id.starts_with("tt") || !imdb_id[2..].chars().all(|c| c.is_ascii_digit()) {
+            return Ok(None);
+        }
+        let body = self
+            .get(&format!("/find/{imdb_id}?external_source=imdb_id"))
+            .await?;
+        let f: Found = serde_json::from_str(&body)
+            .map_err(|e| TmdbError::Unavailable(format!("find: {e}")))?;
+        Ok(f.movie_results
+            .into_iter()
+            .chain(f.tv_results)
+            .find_map(|p| p.poster_path)
+            .filter(|p| p.starts_with('/') && !p.contains(".."))
+            .map(|p| format!("{POSTER_BASE}{p}")))
     }
 
     /// What is showing now, as IMDb ids, in TMDB's order (most popular first).
@@ -170,5 +205,26 @@ mod tests {
             asked[0].starts_with("https://api.themoviedb.org/3/movie/now_playing?page=1&api_key=")
         );
         assert!(asked[1].contains("/movie/11/external_ids?api_key="));
+    }
+
+    #[tokio::test]
+    async fn a_poster_is_found_by_imdb_id_and_nothing_else_is_asked() {
+        let fake = Arc::new(FakeTransport::new());
+        fake.push(Response::new(
+            200,
+            r#"{"movie_results":[],"tv_results":[{"poster_path":"/abc.jpg"}]}"#,
+        ));
+        let got = client(&fake).poster_url("tt0098936").await.unwrap();
+        assert_eq!(
+            got.as_deref(),
+            Some("https://image.tmdb.org/t/p/w342/abc.jpg")
+        );
+        let asked = fake.requests.lock().unwrap()[0].url.clone();
+        assert!(asked.starts_with(
+            "https://api.themoviedb.org/3/find/tt0098936?external_source=imdb_id&api_key="
+        ));
+        // Not an IMDb id: nothing is asked at all.
+        assert_eq!(client(&fake).poster_url("../config").await.unwrap(), None);
+        assert_eq!(fake.requests.lock().unwrap().len(), 1);
     }
 }

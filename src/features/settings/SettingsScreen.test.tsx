@@ -8,6 +8,7 @@ vi.mock("./ProfilesSection", () => ({ ProfilesSection: () => <p>profiles here</p
 vi.mock("./LibrarySection", () => ({ LibrarySection: () => <section aria-label="Library">library here</section> }));
 vi.mock("./CatalogueSection", () => ({ CatalogueSection: () => <p>catalogue here</p> }));
 vi.mock("./TmdbSection", () => ({ TmdbSection: () => <p>tmdb here</p> }));
+vi.mock("./ArtworkSection", () => ({ ArtworkSection: () => <p>posters here</p> }));
 vi.mock("./SourcesSection", () => ({ SourcesSection: () => <section aria-label="Add a source">add-ons here</section> }));
 vi.mock("./PlaybackSection", () => ({ PlaybackSection: () => <p>playback here</p> }));
 vi.mock("./SubtitlesSection", () => ({ SubtitlesSection: () => <p>subtitles here</p> }));

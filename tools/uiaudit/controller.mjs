@@ -93,6 +93,10 @@ const FAKE = `(() => {
     library_folders: () => window.__folders,
     // The Films and TV Shows pages (Phase 16), passed through on the way to Watchlist.
     library_titles: () => [],
+    // ADR-0048: posters, off until chosen; the fake has none to show.
+    artwork_settings: () => ({ posters: !!window.__posters, tmdb: !!window.__tmdbSet }),
+    set_show_posters: (a) => { window.__posters = a.on; return null; },
+    poster: () => null,
     // Phase 16: the catalogue under Films and TV Shows, so neither tab is empty.
     catalogue_rails: (a) => [{ key: "most", title: a.shows ? "Most watched shows" : "Most watched films",
       items: [{ id: 7, title: "Sunrise", year: 1927, made_by: "F. W. Murnau", runtime_minutes: 94, note: null }] }],
@@ -642,7 +646,12 @@ try {
       await waitFor(() => evalJs(`document.body.textContent.includes("Your key is saved.")`), "the OpenSubtitles key saved", 25);
       check((await calls("set_opensubtitles_key"))[0]?.key === "k3y", "first run, by pad: an OpenSubtitles key typed, checked and saved");
     },
-    "What's showing now": async () => {
+    "Posters and what's on": async () => {
+      // ADR-0048: posters are off until chosen; the switch is reached and turned on by pad.
+      await steerToEl(`(() => document.querySelector('section[aria-label="Posters"] [role="switch"]'))`, "the posters switch");
+      await press(B.A);
+      await waitFor(async () => (await calls("set_show_posters")).length === 1, "posters switched on", 25);
+      check((await calls("set_show_posters"))[0].on === true, "first run, by pad: posters switched on, and the switch says what it sends");
       await fillByPad("TMDB API key", "t9");
       await steerToButton("Save key");
       await press(B.A);
@@ -674,7 +683,7 @@ try {
     ["Your films on this PC", "Add a folder"],
     ["Where films come from", "comes with no sources of its own"],
     ["Subtitles", "Get a free key"],
-    ["What's showing now", "your own TMDB key"],
+    ["Posters and what's on", "sees which titles you look at"],
     ["Downloads", "choose its network adapter"],
   ]) {
     await waitFor(() => evalJs(`[...document.querySelectorAll("h1")].some((h) => h.textContent === ${JSON.stringify(title)})`), title, 25);

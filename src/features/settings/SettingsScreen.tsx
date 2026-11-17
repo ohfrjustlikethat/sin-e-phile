@@ -11,6 +11,7 @@ import { SubtitlesSection } from "./SubtitlesSection";
 import { LibrarySection } from "./LibrarySection";
 import { CatalogueSection } from "./CatalogueSection";
 import { TmdbSection } from "./TmdbSection";
+import { ArtworkSection } from "./ArtworkSection";
 import { ProfilesSection } from "./ProfilesSection";
 import { SETTINGS_HEADING } from "./heading";
 
@@ -84,6 +85,7 @@ export function SettingsScreen() {
           <>
             <LibrarySection />
             <CatalogueSection />
+            <ArtworkSection />
             <TmdbSection />
           </>
         )}

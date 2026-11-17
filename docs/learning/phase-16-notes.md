@@ -58,6 +58,8 @@ test passed. Four sections per ADR-0016 (A4).
   said on the spot and in a toast, with what actually happened. Specified in `docs/specs/settings.md`.
 - **Films and TV Shows are never empty** (2026-11-17): what is on this PC first, then the catalogue: most watched,
   new this year, and the main genres.
+- **Posters** (2026-11-17, ADR-0048): with the profile's TMDB key, or with "Show posters" switched on (Stremio's
+  poster images by IMDb id, said plainly); fetched once, kept as WebP, shown as titles come into view.
 - **Full screen from a maximised window** (2026-11-17): it kept the maximised height, so the player's bar
   floated 80 px up with black beneath; the window is now un-maximised first and maximised again after.
 
@@ -142,6 +144,8 @@ test passed. Four sections per ADR-0016 (A4).
 - **One small store for app-wide notices, called from anywhere** (`toast(...)`) — `src/lib/toast.ts`.
 - **Opening only what the app vouches for** (an add-on's settings page by its id, not an address; `rundll32 url.dll`) — `src-tauri/src/commands/sources.rs` `addon_configure`, `src-tauri/src/shell.rs`.
 - **Choosing a query's shape by measuring it on real data** (walk the votes index and check the genre per row; drop the genres that walk too far) — `crates/persistence/src/repositories/media.rs` `most_voted_of`, `crates/taste/src/shelf.rs`.
+- **Fetching in the backend so the page's security policy can stay strict** (remote images become `data:` URLs; only `image/*` under 4 MB; misses remembered) — `crates/artwork/src/posters.rs`, `src-tauri/src/commands/artwork.rs`.
+- **Loading only what comes into view** (`IntersectionObserver` with a margin) — `src/features/home/TitleCard.tsx` `useNear`.
 - **A double click recognised from two clicks that arrive from different places** (the native window, then the page's still frame) — `src/features/player/PlayerScreen.tsx:531` `clickPicture`.
 
 ## 4. Five questions

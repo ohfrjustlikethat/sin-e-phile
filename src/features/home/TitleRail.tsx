@@ -1,4 +1,5 @@
-import { PosterCard, Rail } from "@/design-system";
+import { Rail } from "@/design-system";
+import { TitleCard } from "./TitleCard";
 import type { HomeCard, RailView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
 
@@ -20,7 +21,8 @@ export function TitleRail({ rail, lead, why }: { rail: RailView; lead: boolean; 
         itemWidth={194}
         leadWidth={lead ? 254 : 194}
         render={(c, i) => (
-          <PosterCard
+          <TitleCard
+            id={c.id}
             size={lead && i === 0 ? "lead" : "md"}
             film={{
               id: String(c.id),

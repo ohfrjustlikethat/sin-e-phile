@@ -5348,6 +5348,7 @@ dependencies = [
  "notify",
  "serde",
  "serde_json",
+ "sinephile-artwork",
  "sinephile-catalogue",
  "sinephile-downloads",
  "sinephile-embedder",
@@ -5387,9 +5388,12 @@ dependencies = [
 name = "sinephile-artwork"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "image",
+ "reqwest 0.12.24",
  "tempfile",
  "thiserror 2.0.20",
+ "tokio",
  "webp",
 ]
 

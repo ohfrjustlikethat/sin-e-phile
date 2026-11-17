@@ -2840,6 +2840,11 @@
       "id": "0047",
       "title": "Stremio add-ons speak to the app too",
       "date": "2026-11-17"
+    },
+    {
+      "id": "0048",
+      "title": "Posters: a keyless image service, opted into, and TMDB with the profile's own key",
+      "date": "2026-11-17"
     }
   ],
   "environment": {

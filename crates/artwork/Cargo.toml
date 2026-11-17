@@ -18,8 +18,14 @@ image = { version = "=0.25.10", default-features = false, features = ["jpeg", "p
 # requires for FFmpeg and librqbit.
 webp = "=0.3.1"
 thiserror = "2"
+# Fetching posters (Phase 16, ADR-0048): binary bodies, size-capped. The versions the
+# workspace already locks.
+reqwest = { version = "=0.12.24", default-features = false, features = ["rustls-tls"] }
+tokio = { version = "1", features = ["sync", "rt"] }
+base64 = "=0.22.1"
 
 [dev-dependencies]
 tempfile = "3"
 # The integration tests build their own JPEGs rather than committing binaries.
 image = { version = "=0.25.10", default-features = false, features = ["jpeg", "png"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

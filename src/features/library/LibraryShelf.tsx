@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, PosterCard, Skeleton } from "@/design-system";
+import { Button, Skeleton } from "@/design-system";
+import { TitleCard } from "@/features/home/TitleCard";
 import { TitleRail } from "@/features/home/TitleRail";
 import { onEvent } from "@/lib/events";
 import { commands } from "@/lib/ipc";
@@ -83,7 +84,8 @@ export function LibraryShelf({ shows }: { shows: boolean }) {
             <ul className="grid gap-x-6 gap-y-10" style={{ gridTemplateColumns: "repeat(auto-fill, 194px)" }}>
               {titles.data!.map((c, i) => (
                 <li key={c.id}>
-                  <PosterCard
+                  <TitleCard
+                    id={c.id}
                     size="md"
                     film={{ id: String(c.id), title: c.title, year: c.year ?? 0, director: c.made_by ?? "", spine: i + 1 }}
                     onOpen={() => openDetail(c.id)}

@@ -370,6 +370,11 @@ export const commands = {
 	 *  (Phase 16, brief item 9): most watched, new this year, and the main genres.
 	 */
 	catalogueRails: (shows: boolean) => typedError<RailView[], string>(__TAURI_INVOKE("catalogue_rails", { shows })),
+	artworkSettings: () => typedError<ArtworkView, string>(__TAURI_INVOKE("artwork_settings")),
+	/**  Switch the keyless posters on or off for this profile (onboarding, Settings → Library). */
+	setShowPosters: (on: boolean) => typedError<null, string>(__TAURI_INVOKE("set_show_posters", { on })),
+	/**  A title's poster as a `data:` URL, or `None`: no source chosen, no IMDb id, or no poster. */
+	poster: (id: number) => typedError<string | null, string>(__TAURI_INVOKE("poster", { id })),
 	/**  Whether a title is on this profile's watchlist. */
 	titleWatchlisted: (id: number) => typedError<boolean, string>(__TAURI_INVOKE("title_watchlisted", { id })),
 	/**  Save a title to the watchlist, or take it off. */
@@ -427,6 +432,13 @@ export type AiringView = {
 	episode: number,
 	/**  Unix seconds. */
 	airs_at: number | null,
+};
+
+export type ArtworkView = {
+	/**  The keyless posters are switched on for this profile. */
+	posters: boolean,
+	/**  This profile has a TMDB key, so TMDB's posters are used. */
+	tmdb: boolean,
 };
 
 /**

@@ -11,6 +11,7 @@ import { SourcesSection } from "@/features/settings/SourcesSection";
 import { SubtitlesSection } from "@/features/settings/SubtitlesSection";
 import { NetworkSection } from "@/features/settings/NetworkSection";
 import { TmdbSection } from "@/features/settings/TmdbSection";
+import { ArtworkSection } from "@/features/settings/ArtworkSection";
 import { Settings as DownloadsSettings } from "@/features/downloads/DownloadsScreen";
 import { TitleCards } from "./TitleCards";
 import { MeaningDownload } from "@/features/search/MeaningDownload";
@@ -41,7 +42,7 @@ const STEPS = [
   "Your films on this PC",
   "Where films come from",
   "Subtitles",
-  "What's showing now",
+  "Posters and what's on",
   "Downloads",
 ] as const;
 type Way = "cards" | "words" | "import";
@@ -223,10 +224,12 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           {step === 5 && (
             <div className="flex flex-col gap-2">
               <p className="mb-6 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
-                Optional, about thirty seconds. The catalogue on this PC knows each film&apos;s year; your own TMDB key
-                tells it what is in cinemas and on the air this week, so New releases is really new. Skip it and
-                everything still works.
+                Optional. Without either, every title is set in type, as designed. Posters with no key come from
+                Stremio&apos;s poster images, if you switch them on. A TMDB key is free and takes about a minute: it
+                adds posters, cast photos and what is in cinemas and on the air this week, so New releases is
+                really new.
               </p>
+              <ArtworkSection />
               <TmdbSection />
             </div>
           )}
