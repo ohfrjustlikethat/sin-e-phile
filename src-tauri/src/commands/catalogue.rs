@@ -166,7 +166,8 @@ fn start(app: AppHandle, force: bool) -> bool {
                         // Files named by their romaji or English titles are worth another look.
                         crate::commands::library::scan_all(&app).await;
                     }
-                    if refreshed || r.built || r.akas || r.indexed > 0 {
+                    // A rebuilt item-item matrix changes what Home recommends (ADR-0054).
+                    if refreshed || r.built || r.akas || r.indexed > 0 || r.neighbours {
                         let _ = app.emit("catalogue-refreshed", ());
                     }
                 }

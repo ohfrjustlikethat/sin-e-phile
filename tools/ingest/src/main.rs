@@ -693,7 +693,6 @@ async fn movielens(
     release: sinephile_catalogue::movielens::Release,
 ) -> Result<(), JobError> {
     use sinephile_catalogue::movielens as ml;
-    use std::sync::Arc;
     use std::time::Instant;
 
     let started = Instant::now();
@@ -724,34 +723,9 @@ async fn movielens(
         }
     }
 
-    let links = ml::links(&path)?;
-    tracing::info!("{} films in links.csv", links.len());
-    let catalogue = ml::catalogue_by_imdb(db).await?;
-
-    let mut measurement = ml::Measurement {
-        links: links.len() as i64,
-        ..Default::default()
-    };
-    let mut pairs: Vec<(i64, i64)> = Vec::new();
-    for link in &links {
-        match catalogue.get(&link.imdb_id) {
-            Some(media_item_id) => {
-                measurement.matched += 1;
-                pairs.push((*media_item_id, link.movielens_id));
-            }
-            None => measurement.unmatched += 1,
-        }
-    }
-
-    let mut job = Job::begin(db, "movielens").await?;
-    if job.is_resuming().await? {
-        tracing::info!("resuming a previous run");
-    }
-    ml::load(&mut job, Arc::new(pairs)).await?;
-    let children = ml::children(&path)?;
-    tracing::info!("{} films filed under Children", children.len());
-    ml::load_children(&mut job, Arc::new(children)).await?;
-    job.finish().await?;
+    // The same join the app runs at launch (ADR-0054).
+    let mut measurement = ml::join(db, &path).await?;
+    tracing::info!("{} films in links.csv", measurement.links);
 
     // The number ADR-0019 requires Phase 4 to produce: streaming every rating is the
     // floor on what the on-device item-item matrix costs on first run.

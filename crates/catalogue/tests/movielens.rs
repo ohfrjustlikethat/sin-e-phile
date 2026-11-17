@@ -29,6 +29,16 @@ fn archive(dir: &std::path::Path, links: &str, ratings: &str) -> std::path::Path
     zip.start_file("ml-test/ratings.csv", options)
         .expect("entry");
     zip.write_all(ratings.as_bytes()).expect("write");
+    // Every real archive has one; the join reads its Children's films.
+    zip.start_file("ml-test/movies.csv", options)
+        .expect("entry");
+    zip.write_all(
+        b"movieId,title,genres
+1,Toy Story (1995),Animation|Children
+2,Jumanji (1995),Adventure
+",
+    )
+    .expect("write");
     zip.finish().expect("finish");
     path
 }
@@ -335,4 +345,106 @@ async fn the_matrix_is_built_over_the_films_we_hold_and_stored() {
     assert_eq!(toy_row[0].0, jumanji);
     assert!(toy_row[0].1 > 0.0);
     assert_eq!(repo.of(jumanji, 10).await.expect("of")[0].0, toy);
+}
+
+/// Serve `body` to every GET on a thread, counting the GETs. HEAD is not served here: the
+/// launch check asks through the transport, which the test fakes.
+fn serve(body: Vec<u8>) -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+    use std::io::{BufRead, BufReader};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+    let url = format!("http://{}/ml-latest.zip", listener.local_addr().unwrap());
+    let gets = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counted = gets.clone();
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { return };
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut line = String::new();
+            while reader.read_line(&mut line).unwrap_or(0) > 0 && line != "\r\n" {
+                line.clear();
+            }
+            counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let head = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = stream.write_all(head.as_bytes());
+            let _ = stream.write_all(&body);
+        }
+    });
+    (url, gets)
+}
+
+#[tokio::test]
+async fn the_matrix_follows_movielens_newest_release_at_every_launch() {
+    // ADR-0054: one HEAD when nothing changed; a new release is fetched, joined and built;
+    // offline keeps what there is; no validator, no download.
+    use sinephile_catalogue::neighbours::{keep_current_from, Outcome};
+    use sinephile_metadata_api::{FakeTransport, Response, TransportError};
+    use std::sync::atomic::Ordering;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let db = Db::open_in(dir.path()).await.expect("open");
+    film(&db, "tt0114709", "Toy Story").await;
+    film(&db, "tt0113497", "Jumanji").await;
+    let mut csv = String::from("userId,movieId,rating,timestamp\n");
+    for user in 1..=6 {
+        csv.push_str(&format!("{user},1,4.5,1\n{user},2,4.0,2\n"));
+    }
+    let archive_path = archive(dir.path(), &links_csv(), &csv);
+    let (url, gets) = serve(std::fs::read(&archive_path).expect("read"));
+    let datasets = dir.path().join("datasets");
+    std::fs::create_dir_all(&datasets).unwrap();
+    let head = |modified: &str| Response::new(200, "").with_header("last-modified", modified);
+    let builds = std::sync::atomic::AtomicUsize::new(0);
+    let on_build = || {
+        builds.fetch_add(1, Ordering::SeqCst);
+    };
+
+    // No validator to be had: nothing fetched.
+    let offline = FakeTransport::new();
+    offline.push_error(TransportError::Network("offline".into()));
+    let outcome = keep_current_from(&db, &datasets, &offline, &url, &on_build).await;
+    assert_eq!(outcome, Outcome::Unreachable);
+    assert_eq!(gets.load(Ordering::SeqCst), 0);
+
+    // The first launch that can ask: fetched, joined, built, and the archive not kept.
+    let first = FakeTransport::new();
+    first.push(head("Tue, 01 Jul 2025 00:00:00 GMT"));
+    let outcome = keep_current_from(&db, &datasets, &first, &url, &on_build).await;
+    let Outcome::Built(built) = outcome else {
+        panic!("expected a build, got {outcome:?}");
+    };
+    assert_eq!((built.titles, built.rows), (2, 2));
+    assert_eq!(
+        (gets.load(Ordering::SeqCst), builds.load(Ordering::SeqCst)),
+        (1, 1)
+    );
+    assert!(
+        !datasets.join("ml-latest.zip").exists(),
+        "the archive is not kept"
+    );
+
+    // The next launch, the same release: one HEAD, nothing fetched.
+    let same = FakeTransport::new();
+    same.push(head("Tue, 01 Jul 2025 00:00:00 GMT"));
+    let outcome = keep_current_from(&db, &datasets, &same, &url, &on_build).await;
+    assert_eq!(outcome, Outcome::Current);
+    assert_eq!((same.request_count(), gets.load(Ordering::SeqCst)), (1, 1));
+
+    // GroupLens publishes anew: built again.
+    let newer = FakeTransport::new();
+    newer.push(head("Mon, 01 Jun 2026 00:00:00 GMT"));
+    let outcome = keep_current_from(&db, &datasets, &newer, &url, &on_build).await;
+    assert!(matches!(outcome, Outcome::Built(_)), "{outcome:?}");
+    assert_eq!(
+        (gets.load(Ordering::SeqCst), builds.load(Ordering::SeqCst)),
+        (2, 2)
+    );
+
+    // Offline, with a matrix: it stays.
+    let gone = FakeTransport::new();
+    gone.push_error(TransportError::Network("offline".into()));
+    let outcome = keep_current_from(&db, &datasets, &gone, &url, &on_build).await;
+    assert_eq!(outcome, Outcome::Unreachable);
+    assert_eq!(gets.load(Ordering::SeqCst), 2);
 }

@@ -10,11 +10,100 @@
 use std::path::Path;
 use std::time::Instant;
 
+use sinephile_metadata_api::Transport;
 use sinephile_persistence::repositories::NeighbourRepository;
 use sinephile_persistence::Db;
 use sinephile_recommend::cf::{self, Likes, Rating};
 
+use crate::freshness::{self, Freshness};
 use crate::job::JobError;
+use crate::movielens::Release;
+
+/// What the launch step found (ADR-0054).
+#[derive(Debug, Clone, PartialEq)]
+pub enum Outcome {
+    /// The matrix is built from the release GroupLens publishes now.
+    Current,
+    /// GroupLens could not be asked; the matrix that exists stays.
+    Unreachable,
+    /// A new release (or the first): fetched, joined, built.
+    Built(Built),
+    /// It did not finish; the next launch tries again. Never stops the rest of the app.
+    Failed(String),
+}
+
+/// At every launch, after the catalogue: is the matrix built from MovieLens' newest
+/// release? One HEAD request when it is. When GroupLens has published a new release, or
+/// there is no matrix yet: fetch it (resumable), join it onto the catalogue, build, store,
+/// remember the release's validator, and delete the archive (nothing reads it again until
+/// the next release). Never an error: a launch must not fail on a dataset host.
+///
+/// `on_build` is called once it is known there is something to fetch and build, for the
+/// setup bar; a launch with nothing to do shows nothing.
+pub async fn keep_current(
+    db: &Db,
+    datasets: &Path,
+    transport: &dyn Transport,
+    on_build: &(dyn Fn() + Sync),
+) -> Outcome {
+    keep_current_from(db, datasets, transport, &Release::Latest.url(), on_build).await
+}
+
+/// [`keep_current`] with the release's address given: a test serves it from this machine.
+pub async fn keep_current_from(
+    db: &Db,
+    datasets: &Path,
+    transport: &dyn Transport,
+    url: &str,
+    on_build: &(dyn Fn() + Sync),
+) -> Outcome {
+    match current(db, datasets, transport, url, on_build).await {
+        Ok(outcome) => outcome,
+        Err(e) => Outcome::Failed(e.to_string()),
+    }
+}
+
+async fn current(
+    db: &Db,
+    datasets: &Path,
+    transport: &dyn Transport,
+    url: &str,
+    on_build: &(dyn Fn() + Sync),
+) -> Result<Outcome, JobError> {
+    let have = NeighbourRepository::new(db).titles().await? > 0;
+    let validator = match freshness::check_url(db, transport, url).await {
+        Freshness::UpToDate if have => return Ok(Outcome::Current),
+        Freshness::Unknown if have => return Ok(Outcome::Unreachable),
+        Freshness::Stale { validator } => validator,
+        // Remembered but nothing stored, or never asked: build.
+        Freshness::UpToDate | Freshness::Unknown => None,
+    };
+    // No download without the release's validator: without it the next launch could not
+    // tell this release from a new one, and would fetch it again every time.
+    let validator = match validator {
+        Some(v) => v,
+        None => match freshness::current_validator(transport, url).await {
+            Some(v) => v,
+            None => return Ok(Outcome::Unreachable),
+        },
+    };
+    on_build();
+    let path = datasets.join(Release::Latest.filename());
+    crate::download::Downloader::new()
+        .fetch(url, &path, |_| {})
+        .await?;
+    let built = async {
+        crate::movielens::join(db, &path).await?;
+        build(db, &path).await
+    }
+    .await;
+    // Whatever happened, the archive goes: a corrupt one would fail the same way again,
+    // and a good one is not read again until GroupLens publishes the next.
+    let _ = std::fs::remove_file(&path);
+    let built = built?;
+    freshness::remember_url(db, "movielens", url, &validator).await?;
+    Ok(Outcome::Built(built))
+}
 
 /// Neighbours kept per title.
 pub const TOP: usize = 50;

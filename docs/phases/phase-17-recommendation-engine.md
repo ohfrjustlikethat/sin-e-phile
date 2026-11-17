@@ -65,4 +65,10 @@ Collaborative versus content-based filtering; the item-item matrix and why it wo
 - Cold start (a title with no ratings gets content neighbours) lands with the ranker's candidate generation in 17.2,
   where the vector index already is.
 
+**Amended 2026-11-18 (ADR-0054, spec 4.7.0):** the app builds from MovieLens' rolling release (`ml-latest`), checked by
+its validator at every launch and rebuilt when GroupLens publishes anew; ml-25m stays the evaluation set. GroupLens'
+certificate fails Windows' own root store (curl: untrusted root) but passes the Mozilla roots rustls carries: the app's
+downloader fetched `ml-latest-small.zip` over verified HTTPS on 2026-11-18. Subtask 17.6 and E7 carry the rest of
+"current on every launch".
+
 ## Work log

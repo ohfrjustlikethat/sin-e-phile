@@ -2544,3 +2544,21 @@ subtask 17.6. CLAUDE.md resynced.
 **Decisions taken (none reserved):** the app builds from MovieLens' rolling release while the evaluation keeps ml-25m;
 Tier 0 embeds a launch's new titles, capped, which ADR-0015's reasoning (scale) allows; the new criterion is placed
 last so E1-E6 keep their numbers. **Spec amendments:** 4.7.0, A43.
+
+## 2026-11-18 — 17.1: the matrix follows MovieLens at every launch
+
+- **`bootstrap::run` asks every run** (launch, then hourly) whether MovieLens' rolling release has changed: one HEAD
+  through the app's transport; when it has, or there is no matrix yet, `neighbours::keep_current` fetches it, joins it
+  (`movielens::join`, now shared with `ingest movielens`), builds, remembers the validator only after success, and
+  deletes the archive. Offline, or with no validator, nothing is fetched and the matrix stays. A rebuilt matrix tells
+  Home to re-rank. Tested end to end with a local server and a faked transport (first build, unchanged, new release,
+  offline), the "already current" answer seen to fail by removing it.
+- **GroupLens' certificate**: curl through Windows' root store refuses it (untrusted root); the app's rustls downloader,
+  with Mozilla's roots, fetched `ml-latest-small.zip` over verified HTTPS. A check that would have retried without
+  verification was refused by the session's safety layer, rightly; it was not needed.
+- **Found and fixed: line endings.** Text-mode writes from Windows Python had turned SPEC.md, Cargo.toml, both tools'
+  `main.rs` and four catalogue sources from LF to CRLF, two of them inside Phase 17 commits; converted back, so the
+  next commit's diff shows the real changes. Recorded as a working rule.
+
+**Decisions taken (none reserved):** no download without the release's validator (otherwise every launch would
+download again); the archive is deleted after a build, whatever its outcome. **Spec amendments:** none since 4.7.0.

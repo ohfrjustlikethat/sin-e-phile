@@ -72,12 +72,17 @@ fn cache_key() -> String {
 ///
 /// Cheap by construction: one HEAD, a string comparison, no body.
 pub async fn check(db: &Db, transport: &dyn Transport) -> Freshness {
+    check_url(db, transport, &cache_key()).await
+}
+
+/// [`check`] for any published file whose validator was kept with [`remember_url`]:
+/// MovieLens' rolling release as well as IMDb's (ADR-0054).
+pub async fn check_url(db: &Db, transport: &dyn Transport, url: &str) -> Freshness {
     let store = CacheStore::new(db);
-    let url = cache_key();
 
     // `include_stale`, because this entry is deliberately kept for a year and its age
     // is irrelevant: it is a validator to compare against, not a body to serve.
-    let known = match store.get(&url, Resource::Detail, false, true).await {
+    let known = match store.get(url, Resource::Detail, false, true).await {
         Ok(Some(cached)) => cached.etag.clone().or(cached.last_modified.clone()),
         // Never ingested, or the entry was purged. A refresh is due and no request is
         // needed to know it — which is also what makes the very first launch free.
@@ -88,7 +93,7 @@ pub async fn check(db: &Db, transport: &dyn Transport) -> Freshness {
         return Freshness::Stale { validator: None };
     };
 
-    let response = match transport.send(Request::head(&url)).await {
+    let response = match transport.send(Request::head(url)).await {
         Ok(response) => response,
         Err(_) => return Freshness::Unknown,
     };
@@ -122,10 +127,18 @@ pub async fn check(db: &Db, transport: &dyn Transport) -> Freshness {
 /// failed or interrupted refresh look like a completed one, and the catalogue would then
 /// never update again.
 pub async fn remember(db: &Db, validator: &str) -> Result<(), crate::job::JobError> {
-    let store = CacheStore::new(db);
-    let url = cache_key();
-    store
-        .put(Store::ok(&url, "imdb", Resource::Detail, "").with_etag(Some(validator)))
+    remember_url(db, "imdb", &cache_key(), validator).await
+}
+
+/// [`remember`] for any published file, under its own source name.
+pub async fn remember_url(
+    db: &Db,
+    source: &str,
+    url: &str,
+    validator: &str,
+) -> Result<(), crate::job::JobError> {
+    CacheStore::new(db)
+        .put(Store::ok(url, source, Resource::Detail, "").with_etag(Some(validator)))
         .await
         .map_err(|e| crate::job::JobError::step("freshness", e.to_string()))
 }
@@ -251,7 +264,7 @@ async fn finish(db: &Db, datasets: &std::path::Path) -> Outcome {
     }
 }
 
-async fn current_validator(transport: &dyn Transport, url: &str) -> Option<String> {
+pub(crate) async fn current_validator(transport: &dyn Transport, url: &str) -> Option<String> {
     let response = transport.send(Request::head(url)).await.ok()?;
     if !(200..300).contains(&response.status) {
         return None;

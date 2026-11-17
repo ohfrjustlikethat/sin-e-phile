@@ -51,6 +51,10 @@ pub const CREDITS: &str = "imdb-credits";
 /// AniList's anime: last, in the background.
 pub const ANIME: &str = "anilist";
 
+/// The item-item matrix from MovieLens' newest release (Phase 17, ADR-0054): not a job done
+/// once but a check on every run, which builds only when GroupLens has published anew.
+pub const NEIGHBOURS: &str = "movielens-neighbours";
+
 /// The jobs that load titles: the app's refresh, or `ingest imdb` for a development copy.
 pub const LOAD: [&str; 2] = ["refresh", "imdb"];
 
@@ -73,6 +77,7 @@ pub fn label(step: &str) -> &'static str {
         CATCH_UP => "Making new titles searchable",
         CREDITS => "Adding cast and crew",
         ANIME => "Adding anime from AniList",
+        NEIGHBOURS => "Learning which films are loved together",
         _ => "Getting ready",
     }
 }
@@ -355,6 +360,8 @@ pub struct Report {
     pub anime: bool,
     /// Titles that reached the word index in the catch-ups.
     pub indexed: i64,
+    /// The item-item matrix was built from a MovieLens release new to this install.
+    pub neighbours: bool,
 }
 
 /// After every refresh: whatever is left of stage A; then, each only if it never finished,
@@ -365,7 +372,7 @@ pub async fn run(
     db: &Db,
     datasets: &Path,
     transport: Arc<dyn Transport>,
-    on_step: impl Fn(&str),
+    on_step: impl Fn(&str) + Sync,
 ) -> Result<Report, JobError> {
     let mut report = Report::default();
     if !loaded(db).await? {
@@ -402,6 +409,14 @@ pub async fn run(
         }
         tidy(db, datasets).await?;
     }
+    // ADR-0054: every run asks whether MovieLens has published anew (one HEAD), and builds
+    // only when it has, or when there is no matrix yet. A failure is logged and left for
+    // the next run; it never stops the rest.
+    let outcome =
+        crate::neighbours::keep_current(db, datasets, transport.as_ref(), &|| on_step(NEIGHBOURS))
+            .await;
+    tracing::info!(?outcome, "item-item matrix");
+    report.neighbours = matches!(outcome, crate::neighbours::Outcome::Built(_));
     Ok(report)
 }
 

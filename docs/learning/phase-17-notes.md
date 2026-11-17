@@ -10,6 +10,9 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
 - **One score with two numbers**, tuned on users set aside for it: `alpha` 0.65 trades 3% of recall for reaching 16%
   of the catalogue instead of 10%. On users it never learned from, it finds 74% more of their held-out favourites
   than "the most popular" does.
+- **The matrix keeps up with MovieLens** (ADR-0054, the author's rule that the app is current on every launch): every
+  launch asks GroupLens, with one HEAD request, whether its rolling release has changed; when it has, or when there is
+  no matrix yet, it is fetched, joined onto the catalogue, built and stored, and the archive deleted.
 - **The evaluation** (`eval recommend`): an 80/10/10 split of users by hash, a fifth of each judged user's likes held
   out, Recall@20 against popularity, and coverage.
 
@@ -44,6 +47,13 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
 - **Recall@K and coverage**, and why a popularity baseline is the honest one — `tools/eval/src/recommend.rs`.
 - **CPU work off the async runtime** (`spawn_blocking`) — `crates/catalogue/src/neighbours.rs:39`.
 - **`WITHOUT ROWID` tables** keyed by their primary key — `crates/persistence/migrations/0029_item_neighbours.up.sql:10`.
+- **A validator** (`Last-Modified`/`ETag`) asked by HEAD: "has it changed?" for a few hundred bytes — 
+  `crates/catalogue/src/freshness.rs:80`.
+- **Remember only after success**: a validator stored before the build would make a failed build look finished —
+  `crates/catalogue/src/neighbours.rs:81`.
+- **A launch step that can never fail the launch**: every error becomes an outcome to log —
+  `crates/catalogue/src/neighbours.rs:43`.
+- **`Sync` callbacks held across `.await`** in a future that must be `Send` — `crates/catalogue/src/bootstrap.rs:415`.
 - **Replacing a table whole in one transaction**, so a reader never sees half — 
   `crates/persistence/src/repositories/neighbours.rs:22`.
 
