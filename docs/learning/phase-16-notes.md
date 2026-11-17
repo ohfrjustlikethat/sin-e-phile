@@ -70,7 +70,9 @@ test passed. Four sections per ADR-0016 (A4).
 - **Round 8** (2026-11-17, after the author tried the installer): Streams no longer crashes once Settings has been
   opened; Manage profiles opens at Profile; the player's bars and pointer hide after 3 s in a window and in full
   screen; Continue watching is one card per show, also atop Films and TV Shows; a show's page resumes its episode;
-  the pause screen names the show, the episode and what is next.
+  the pause screen names the show, the episode and what is next. Search by meaning: a new install fetches it in
+  setup (ADR-0050), an existing one is offered it at the top of Search and in Settings; and it could never have
+  loaded after a download (the tokenizer's file name), now one name in one place.
 - **Focus where it was** (2026-11-17): back from a title page, focus is on the card that opened it; Settings opens on
   its side list (now sticky) without losing its place.
 - **Full screen from a maximised window** (2026-11-17): it kept the maximised height, so the player's bar
@@ -166,6 +168,12 @@ test passed. Four sections per ADR-0016 (A4).
   UI thread may hold (it froze the app) — `src-tauri/src/commands/player.rs` `player_cursor`.
 - **One cache key, one shape**: two screens storing different data under `["sources"]` crashed the second to read
   it; share the hook instead (`useSeries`) — `src/features/detail/SeriesSection.tsx`.
+- **One name, in one place, for a file two programs touch**: the download and the loader each spelled the tokenizer's
+  file name, differently — `crates/catalogue/src/assets.rs` `TOKENIZER_FILE`, `tokenizer_path`.
+- **Tailwind v4 class names can mean two things**: `text-base` was a colour here, not a size — checked by
+  `src/design-system/ambiguousClasses.test.ts`.
+- **A test can read the app's own sources through the bundler** (`import.meta.glob` with `?raw`), no Node APIs —
+  `src/design-system/ambiguousClasses.test.ts`.
 - **What to continue is derived, not stored**: the latest position per show, then the next episode —
   `crates/taste/src/continuing.rs` `resolve`.
 - **Remembering focus by meaning, not by element** (`data-focus-key="title-<id>"`: the element is gone when the page comes back, the title is not) — `src/lib/scrollMemory.ts` `refocus`.

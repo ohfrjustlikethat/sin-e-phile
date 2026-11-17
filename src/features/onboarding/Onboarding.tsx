@@ -213,9 +213,10 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
               {way === "cards" && <TitleCards onChosen={setPicks} />}
               {way === "words" && <TasteInput />}
               {way === "import" && <ImportHistory />}
-              {/* The author: the search model is downloaded during setup. Offered here, with its size, and
-                  started only by its button (ADR-0014); it is what "Where your taste points" ranks with. */}
-              <MeaningDownload />
+              {/* The author: the search model is downloaded during setup (ADR-0050). Said here with its size: it
+                  starts by itself once the catalogue can be searched; it is what "Where your taste points" ranks
+                  with. */}
+              <MeaningDownload setup />
             </div>
           )}
 

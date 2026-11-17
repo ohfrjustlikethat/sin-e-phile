@@ -173,3 +173,14 @@ async fn the_committed_fixture_parses_and_covers_the_categories_e5_names() {
         }
     }
 }
+
+#[test]
+fn what_is_downloaded_is_what_is_loaded() {
+    // Phase 16: the download saved the tokenizer under one name and everything loaded
+    // another, so search by meaning never worked on an install that downloaded it.
+    use sinephile_catalogue::assets::{model_path, optional_assets, tokenizer_path};
+    let dir = std::path::Path::new("C:/data");
+    let paths: Vec<_> = optional_assets(dir).into_iter().map(|a| a.path).collect();
+    assert!(paths.contains(&model_path(dir)), "{paths:?}");
+    assert!(paths.contains(&tokenizer_path(dir)), "{paths:?}");
+}

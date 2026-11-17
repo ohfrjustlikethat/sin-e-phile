@@ -82,7 +82,7 @@ The application must be fully functional with no paid services. Every external d
 
 Nothing leaves the machine except explicit user-initiated requests to APIs they configured. No analytics, no crash reporting to a server, no "anonymous usage statistics". Crash logs are written locally. State this in the README as a feature.
 
-**Static asset downloads are permitted and are not a violation** (ADR-0014). Fetching the ONNX model, the IMDb and MovieLens datasets, or a precomputed embedding artefact published as a versioned GitHub Release asset is not "a server component" in the sense §5 forbids: there is nothing operated, nothing paid for, and nothing whose downtime degrades a running installation. Every such download must be **consented to, with its size shown, before it happens** — never fetched in the background, never assumed.
+**Static asset downloads are permitted and are not a violation** (ADR-0014). Fetching the ONNX model, the IMDb and MovieLens datasets, or a precomputed embedding artefact published as a versioned GitHub Release asset is not "a server component" in the sense §5 forbids: there is nothing operated, nothing paid for, and nothing whose downtime degrades a running installation. A published embedding artefact is applied to an install **by IMDb id** (ADR-0051), never by the producer's row positions, which no install shares. Every such download must be **consented to, with its size shown, before it happens** — never fetched in the background, never assumed. **One stated exception** (ADR-0050, the author's decision): setting up a **new** install is consent to what setup says it fetches — the datasets, and the search model and meaning index, which setup starts once the catalogue is searchable and shows with their size. An existing install is offered them, never fetched unasked.
 
 ### 2.8 This specification is amendable — deliberately, never casually
 
@@ -1794,6 +1794,15 @@ Size: **S** one commit · **M** a subtask · **L** several subtasks.
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 4.4.0 — 2026-11-17 (search by meaning on a new install)
+
+Minor: one stated exception to a consent rule, decided by the author; no exit criterion changes.
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A40 | §2.7 | **The meaning index is keyed by IMDb id** (found pressing Download on a copy of the author's install): the published artefact was addressed by the producer's row ids, which no install shares, so search by meaning had never worked anywhere else. A key file compiled into the app names each vector by IMDb id; nothing is republished. | 0051 |
+| A39 | §2.7 | **A new install fetches search by meaning during setup** (the author, round 8: their install never had it, the offer having come after their setup and sitting below search results). Setup says so with the size; an existing install is offered it at the top of Search and in Settings. | 0050 |
 
 ### spec_version 4.3.0 — 2026-11-17 (the author's fix list)
 

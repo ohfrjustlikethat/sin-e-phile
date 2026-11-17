@@ -21,7 +21,7 @@ const FOUND: SearchResponse = {
 const commands = {
   search: vi.fn(),
   searchBackfill: vi.fn(),
-  optionalAssets: vi.fn(() => Promise.resolve({ missing: [], total_bytes: 0 })),
+  optionalAssets: vi.fn(() => Promise.resolve({ assets: [], outstanding_bytes: 0, complete: true, running: false })),
 };
 vi.mock("@/lib/ipc", () => ({ commands }));
 const { SearchScreen } = await import("./SearchScreen");
@@ -81,5 +81,27 @@ describe("SearchScreen backfill", () => {
     fireEvent.change(screen.getByLabelText("Search the catalogue"), { target: { value: "zzzz" } });
     expect(await screen.findByText("Still building the catalogue")).toBeInTheDocument();
     expect(commands.searchBackfill).not.toHaveBeenCalled();
+  });
+
+  it("offers search by meaning at the top of the empty page, with its size (round 8)", async () => {
+    // The author's install: never downloaded, and the offer under the results went unseen.
+    commands.optionalAssets.mockImplementation(() =>
+      Promise.resolve({
+        assets: [{ name: "Meaning index", purpose: "by meaning", bytes: 329_537_568, state: "absent", unusable_reason: null }],
+        outstanding_bytes: 329_537_568, complete: false, running: false,
+      } as never),
+    );
+    // The query is kept in the store between visits (Phase 16); this page is the empty one.
+    useUi.setState({ searchQuery: "" });
+    try {
+      render(<SearchScreen />);
+      expect(await screen.findByRole("region", { name: "Search by meaning" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Download 314 MB" })).toBeInTheDocument();
+      expect(commands.search).not.toHaveBeenCalled();
+    } finally {
+      commands.optionalAssets.mockImplementation(() =>
+        Promise.resolve({ assets: [], outstanding_bytes: 0, complete: true, running: false }),
+      );
+    }
   });
 });

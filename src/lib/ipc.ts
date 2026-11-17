@@ -488,6 +488,11 @@ export type AssetPlan = {
 	outstanding_bytes: number,
 	/**  Is the semantic half already working? If so there is nothing to consent to. */
 	complete: boolean,
+	/**
+	 *  It is downloading or being built now: a new install's setup started it (ADR-0050),
+	 *  or someone pressed the button. The screens show that download, not a second.
+	 */
+	running: boolean,
 };
 
 /**  Progress, emitted as it happens. One event per asset per chunk. */

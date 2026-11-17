@@ -1,5 +1,5 @@
 {
-  "spec_version": "4.3.0",
+  "spec_version": "4.4.0",
   "project": "sin-e-phile",
   "last_updated": "2026-11-17",
   "sessions_completed": 21,
@@ -2849,6 +2849,16 @@
     {
       "id": "0049",
       "title": "The author's fix list: what Phase 16 built, and what later phases deepen",
+      "date": "2026-11-17"
+    },
+    {
+      "id": "0050",
+      "title": "Search by meaning downloads itself on a new install",
+      "date": "2026-11-17"
+    },
+    {
+      "id": "0051",
+      "title": "The meaning index is keyed by IMDb id, not by position",
       "date": "2026-11-17"
     }
   ],

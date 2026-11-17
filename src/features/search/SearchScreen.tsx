@@ -291,6 +291,14 @@ export function SearchScreen() {
       <p className="label mt-3 h-4" aria-live="polite">
         {status(response, searching)}
       </p>
+      {/* At the top while nothing is typed (the author, round 8: under the results it went unseen); once there is a
+          query it goes under the results, so Down from the field still reaches the first result (the pad audit). It
+          hides itself once search by meaning works. */}
+      {!query.trim() && (
+        <div className="mt-6">
+          <MeaningDownload />
+        </div>
+      )}
 
       <div className="mt-10">
         {searching && !response && (

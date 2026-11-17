@@ -11,7 +11,8 @@ import { SETTINGS_HEADING } from "./heading";
  * This says when it last did something and offers to do it now.
  */
 
-export const CATALOGUE = ["catalogue-status"] as const;
+import { CATALOGUE } from "./catalogueKey";
+export { CATALOGUE };
 
 async function ok<T>(p: Promise<{ status: "ok"; data: T } | { status: "error"; error: string }>) {
   const r = await p;

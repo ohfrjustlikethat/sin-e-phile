@@ -121,8 +121,8 @@ pub async fn compare(data_dir: &Path, query: &str, ids: &[i64]) -> Result<bool, 
 
     let models = Path::new("models");
     let mut embedder = sinephile_embedder::Embedder::pinned(
-        &models.join("bge-small-en-v1.5-int8.onnx"),
-        &models.join("bge-small-en-v1.5-tokenizer.json"),
+        &models.join(sinephile_catalogue::assets::MODEL_FILE),
+        &models.join(sinephile_catalogue::assets::TOKENIZER_FILE),
     )
     .map_err(|e| EvalError::Missing(e.to_string()))?;
 
@@ -235,8 +235,8 @@ fn ranking(scores: &[f32]) -> Vec<usize> {
 
 pub async fn run(data_dir: &Path, report: bool) -> Result<bool, EvalError> {
     let models = Path::new("models");
-    let model = models.join("bge-small-en-v1.5-int8.onnx");
-    let tokenizer = models.join("bge-small-en-v1.5-tokenizer.json");
+    let model = models.join(sinephile_catalogue::assets::MODEL_FILE);
+    let tokenizer = models.join(sinephile_catalogue::assets::TOKENIZER_FILE);
     for path in [&model, &tokenizer] {
         if !path.is_file() {
             return Err(EvalError::Missing(format!(

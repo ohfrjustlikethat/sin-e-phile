@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **4.3.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **4.4.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -298,6 +298,10 @@ cumulating episode counts across seasons** — that arithmetic is wrong for exac
 long-running series the feature exists for, and a confidently wrong number is worse
 than a NULL. AniList also paginates only to 5,000 entries, so its catalogue is swept
 per `seasonYear`.
+
+**Search by meaning arrives with a new install** (ADR-0050): setup starts the 364 MB model and meaning index once the
+catalogue is searchable, and says so with the size; an existing install is offered it (Search, Settings), never fetched
+unasked. Every other optional download stays behind a button with its size (ADR-0014).
 
 **TMDB is optional, and no key ever ships** (ADR-0013, ADR-0027). The app is fully
 functional on the offline IMDb + MovieLens catalogue with no key. Each user supplies

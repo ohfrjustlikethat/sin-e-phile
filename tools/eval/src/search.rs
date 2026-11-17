@@ -25,8 +25,8 @@ use crate::error::EvalError;
 /// which one it got.
 pub(crate) fn engine(data_dir: &Path) -> Result<(Engine, bool), EvalError> {
     let models = Path::new("models");
-    let model = models.join("bge-small-en-v1.5-int8.onnx");
-    let tokenizer = models.join("bge-small-en-v1.5-tokenizer.json");
+    let model = models.join(sinephile_catalogue::assets::MODEL_FILE);
+    let tokenizer = models.join(sinephile_catalogue::assets::TOKENIZER_FILE);
     let index = index_path(data_dir);
 
     if !model.is_file() || !tokenizer.is_file() || !index.exists() {

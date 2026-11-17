@@ -40,6 +40,7 @@
 
 use std::path::Path;
 
+use sinephile_embedding::keys::Keys;
 use sinephile_embedding::{quantise, Artefact};
 use sinephile_persistence::repositories::CatalogueRepository;
 use sinephile_persistence::Db;
@@ -47,6 +48,18 @@ use sinephile_vector_index::VectorIndex;
 
 use crate::embed::DocumentEmbedder;
 use crate::job::JobError;
+
+/// The published artefact's key file (ADR-0051): which IMDb title each of its vectors is,
+/// for the vectors worth indexing. Written from the producer's catalogue by
+/// `ingest artefact-keys`, compiled in, and used only with the artefact it names.
+const PUBLISHED_KEYS: &[u8] = include_bytes!("../assets/embeddings-bge-small-en-v1.5-int8.keys");
+
+/// The key file this build carries, when it names anything.
+pub fn published_keys() -> Option<Keys> {
+    Keys::read(PUBLISHED_KEYS)
+        .ok()
+        .filter(|k| !k.pairs.is_empty())
+}
 
 /// Positions re-embedded before the artefact is trusted.
 ///
@@ -82,17 +95,7 @@ pub async fn verify_prefix(
     artefact: &Artefact,
     ids: &[i64],
 ) -> Result<(), JobError> {
-    if artefact.header.model != embedder.identity() {
-        return Err(JobError::step(
-            "vector-index",
-            format!(
-                "the artefact was built with {} and this build embeds with {} — \
-                 the two are different spaces and comparing them is meaningless",
-                artefact.header.model,
-                embedder.identity()
-            ),
-        ));
-    }
+    same_model(embedder, artefact)?;
 
     let count = artefact.header.count as usize;
     if ids.len() < count {
@@ -169,6 +172,25 @@ pub async fn verify_prefix(
     Ok(())
 }
 
+/// The artefact's vectors and this build's queries must come from the same model.
+fn same_model(
+    embedder: &(dyn DocumentEmbedder + Send),
+    artefact: &Artefact,
+) -> Result<(), JobError> {
+    if artefact.header.model != embedder.identity() {
+        return Err(JobError::step(
+            "vector-index",
+            format!(
+                "the artefact was built with {} and this build embeds with {} — \
+                 the two are different spaces and comparing them is meaningless",
+                artefact.header.model,
+                embedder.identity()
+            ),
+        ));
+    }
+    Ok(())
+}
+
 /// Evenly spaced positions, always including the first and the last.
 fn sample_positions(count: usize, samples: usize) -> Vec<usize> {
     if count == 0 {
@@ -195,22 +217,55 @@ pub async fn build(
     db: &Db,
     embedder: &mut (dyn DocumentEmbedder + Send),
     data_dir: &Path,
+    progress: impl FnMut(usize, usize),
+) -> Result<Built, JobError> {
+    build_with(db, embedder, data_dir, published_keys().as_ref(), progress).await
+}
+
+/// [`build`], with the key file given rather than the one compiled in.
+///
+/// **With keys that name this artefact** (every install): each vector goes to the title
+/// with its IMDb id in *this* catalogue, whatever id that title has here, and only the
+/// vectors the producer judged worth indexing. Without them (the producer's own machine,
+/// or an artefact the keys do not name): positions, checked by [`verify_prefix`], as before.
+pub async fn build_with(
+    db: &Db,
+    embedder: &mut (dyn DocumentEmbedder + Send),
+    data_dir: &Path,
+    keys: Option<&Keys>,
     mut progress: impl FnMut(usize, usize),
 ) -> Result<Built, JobError> {
     let artefact_path = sinephile_embedding::artefact_path(data_dir);
     let mut file = std::fs::File::open(&artefact_path)?;
     let artefact =
         Artefact::read(&mut file).map_err(|e| JobError::step("vector-index", e.to_string()))?;
+    same_model(embedder, &artefact)?;
 
     let repository = CatalogueRepository::new(db);
-    let all = repository.core_ids().await?;
-    verify_prefix(db, embedder, &artefact, &all).await?;
-
-    // Positions line up with `core_ids` because both order by id over the same predicate;
-    // `None` marks a title with too little text to embed well, which is skipped WITHOUT
-    // shifting anything after it.
-    let ids = repository.core_ids_for_vectors().await?;
-    let beyond_artefact = ids.len().saturating_sub(artefact.header.count as usize);
+    let count = artefact.header.count as usize;
+    let (ids, beyond_artefact) = match keys.filter(|k| k.pairs_with(&artefact.header)) {
+        Some(keys) => {
+            let numbers: Vec<u32> = keys.pairs.iter().map(|(_, n)| *n).collect();
+            let here = repository.ids_for_imdb(&numbers).await?;
+            let mut ids: Vec<Option<i64>> = vec![None; count];
+            for (position, number) in &keys.pairs {
+                ids[*position as usize] = here.get(number).copied();
+            }
+            let core = repository.core_ids().await?.len();
+            let mapped = ids.iter().flatten().count();
+            (ids, core.saturating_sub(mapped))
+        }
+        None => {
+            let all = repository.core_ids().await?;
+            verify_prefix(db, embedder, &artefact, &all).await?;
+            // Positions line up with `core_ids` because both order by id over the same
+            // predicate; `None` marks a title with too little text to embed well, which is
+            // skipped WITHOUT shifting anything after it.
+            let ids = repository.core_ids_for_vectors().await?;
+            let beyond = ids.len().saturating_sub(count);
+            (ids, beyond)
+        }
+    };
 
     let final_path = sinephile_vector_index::index_path(data_dir);
     let building = final_path.with_extension("usearch.part");

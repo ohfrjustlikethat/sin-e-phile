@@ -144,6 +144,10 @@ fn start(app: AppHandle, force: bool) -> bool {
                     use sinephile_catalogue::bootstrap::{label, STAGE_A};
                     if !STAGE_A.contains(&step) {
                         // Stage A is behind it: search works, and the library can be matched.
+                        // On a new install, search by meaning starts now too (ADR-0050).
+                        if FIRST_BUILD.load(Ordering::SeqCst) {
+                            crate::commands::assets::fetch_meaning_for_setup(&progress);
+                        }
                         release_waiting_scans(&progress);
                     }
                     *BUILDING.lock().expect("building") = Some(label(step).to_string());

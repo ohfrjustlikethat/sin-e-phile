@@ -2398,3 +2398,25 @@ held by a check.
 
 **A mistake to record.** The guard refused a commit: a doc comment wrote Explorer's `"select"` in quotes, which its
 SQL pattern reads as a statement under `src-tauri`. The comment was reworded; the guard was not touched.
+
+**Round 8 (2026-11-17, Opus): the author tried the new installer.** Their report and eight answers are in the brief's
+"Round 8". Fixed, each checked in the real window where a window was the question:
+- **Streams crashed on every title** (b34ee3f): the panel and Settings shared the cache key `["sources"]` with two
+  shapes; reproduced in a test as exactly `order.indexOf is not a function`. Interface errors now reach the log file.
+- **Manage profiles opened Settings at About** (bb4ecb6).
+- **The bars never hid in full screen** (d5d6689): reproduced (6 s still, bars still up). Hiding the bars reshapes the
+  video window and Windows reports the still pointer as a move, which woke them. A move now counts only if the pointer
+  is somewhere new. The pointer hides with the bars after 3 s. The first version of `player_cursor` was a sync command
+  and froze the app (UI thread waiting on a lock held by a thread waiting on the UI thread); it is async.
+- **Continue watching by show** (a021a35): one card per show with the episode and a bar, atop Films and TV Shows too;
+  the show's page resumes that episode; the pause screen names the show, season, episode, time left and what is next.
+  Checked on a copy of the author's data: Monster S1 E1, Twin Peaks S1 E2, Project Hail Mary; Resume played Twin Peaks
+  E2 from 1:16.
+- **Search by meaning**: the author's install never had it. A new install now fetches it in setup (ADR-0050,
+  spec 4.4.0, A39); an existing one is offered it at the top of Search and in Settings. Pressing it on a copy of the
+  author's data found the real bug: **the download saved the tokenizer under a name nothing loads**, so no install that
+  downloaded it could ever have used it. One name now, in one place, with a test. The offer's heading was invisible
+  (`text-base` is a colour in this theme); a test now refuses the class.
+
+**Decisions taken (none reserved):** chapter titles that are only a time are hidden; the show's page gets the same wide
+Resume as a film's Play; "Build the index" when everything is downloaded but the index is not.

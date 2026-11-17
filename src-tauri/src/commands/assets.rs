@@ -1,7 +1,9 @@
 //! The optional-download IPC surface (ADR-0014, subtask 5.9). Thin, per §7.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use serde::{Deserialize, Serialize};
-use tauri::{Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use sinephile_catalogue::assets;
 
@@ -32,6 +34,20 @@ pub struct AssetPlan {
     pub outstanding_bytes: i64,
     /// Is the semantic half already working? If so there is nothing to consent to.
     pub complete: bool,
+    /// It is downloading or being built now: a new install's setup started it (ADR-0050),
+    /// or someone pressed the button. The screens show that download, not a second.
+    pub running: bool,
+}
+
+/// One download of search by meaning at a time.
+static RUNNING: AtomicBool = AtomicBool::new(false);
+
+/// Clears [`RUNNING`] however the download ends.
+struct Running;
+impl Drop for Running {
+    fn drop(&mut self) {
+        RUNNING.store(false, Ordering::SeqCst);
+    }
 }
 
 fn data_dir() -> std::path::PathBuf {
@@ -74,9 +90,12 @@ pub fn optional_assets() -> AssetPlan {
         .collect();
 
     AssetPlan {
-        complete: outstanding == 0,
+        // Every file here *and* the index built over them: files without the index are a
+        // search that still matches only words (D44), and the button is what builds it.
+        complete: outstanding == 0 && sinephile_vector_index::index_path(&dir).is_file(),
         assets: described,
         outstanding_bytes: outstanding,
+        running: RUNNING.load(Ordering::SeqCst),
     }
 }
 
@@ -105,10 +124,9 @@ pub struct AssetProgress {
 /// keyword-only path is not a convenience fallback; it is the Tier 0 floor (SPEC.md §8,
 /// ADR-0014) taking the same code path as everything else.
 pub fn engine_for(dir: &std::path::Path) -> sinephile_search_engine::Engine {
-    let models = dir.join("models");
     match sinephile_embedder::Embedder::pinned(
-        &models.join("bge-small-en-v1.5-int8.onnx"),
-        &models.join("bge-small-en-v1.5-tokenizer.json"),
+        &assets::model_path(dir),
+        &assets::tokenizer_path(dir),
     ) {
         Ok(embedder) => match sinephile_vector_index::VectorIndex::view(
             &sinephile_vector_index::index_path(dir),
@@ -149,10 +167,40 @@ pub fn engine_for(dir: &std::path::Path) -> sinephile_search_engine::Engine {
 /// — without it the user would have to restart the app to use what they just fetched.
 #[tauri::command]
 #[specta::specta]
-pub async fn download_optional_assets(
-    app: tauri::AppHandle,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn download_optional_assets(app: AppHandle) -> Result<(), String> {
+    fetch_meaning(&app).await
+}
+
+/// A new install's setup (ADR-0050): once the catalogue is searchable, search by meaning is
+/// fetched without a button, as setup says it will be. In the background; its progress is
+/// the same `asset-progress` the button's would be.
+pub(crate) fn fetch_meaning_for_setup(app: &AppHandle) {
+    if optional_assets().complete {
+        return;
+    }
+    tracing::info!("new install: fetching search by meaning (ADR-0050)");
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = fetch_meaning(&app).await {
+            tracing::warn!(error = %e, "search by meaning: the setup download did not finish");
+        }
+    });
+}
+
+/// Download what is missing and build the index, once at a time. Ends with
+/// `meaning-ready` (true when search by meaning works now) for every screen showing it.
+async fn fetch_meaning(app: &AppHandle) -> Result<(), String> {
+    if RUNNING.swap(true, Ordering::SeqCst) {
+        return Err("search by meaning is already downloading".into());
+    }
+    let _running = Running;
+    let state = app.state::<AppState>();
+    let result = fetch(app, &state).await;
+    let _ = app.emit("meaning-ready", result.is_ok());
+    result
+}
+
+async fn fetch(app: &AppHandle, state: &State<'_, AppState>) -> Result<(), String> {
     let dir = data_dir();
     for asset in assets::optional_assets(&dir) {
         if matches!(assets::state_of(&asset), assets::AssetState::Present) {
@@ -175,7 +223,7 @@ pub async fn download_optional_assets(
         .map_err(|e| format!("{}: {e}", asset.name))?;
     }
 
-    build_index(&app, &state, &dir).await?;
+    build_index(app, state, &dir).await?;
     state.set_engine(engine_for(&dir));
     Ok(())
 }
@@ -196,10 +244,9 @@ async fn build_index(
         return Err("the catalogue is not open yet".into());
     };
 
-    let models = dir.join("models");
     let mut embedder = sinephile_embedder::Embedder::pinned(
-        &models.join("bge-small-en-v1.5-int8.onnx"),
-        &models.join("bge-small-en-v1.5-tokenizer.json"),
+        &assets::model_path(dir),
+        &assets::tokenizer_path(dir),
     )
     .map_err(|e| format!("the language model could not be loaded: {e}"))?;
 

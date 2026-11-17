@@ -84,9 +84,26 @@ pub enum AssetState {
     Unusable(String),
 }
 
+/// The language model's file, in `models/`: one name for the download and every loader.
+pub const MODEL_FILE: &str = "bge-small-en-v1.5-int8.onnx";
+/// The tokenizer's file, in `models/`. The download once saved it as
+/// `bge-small-en-v1.5-int8-tokenizer.json` while the app and the tools loaded this name, so
+/// no install that downloaded search by meaning could load it (Phase 16, found on a copy of
+/// the author's install); only a machine whose file was placed by hand worked.
+pub const TOKENIZER_FILE: &str = "bge-small-en-v1.5-tokenizer.json";
+
+/// Where the language model is, for a data directory.
+pub fn model_path(data_dir: &Path) -> std::path::PathBuf {
+    data_dir.join("models").join(MODEL_FILE)
+}
+
+/// Where the tokenizer is, for a data directory.
+pub fn tokenizer_path(data_dir: &Path) -> std::path::PathBuf {
+    data_dir.join("models").join(TOKENIZER_FILE)
+}
+
 /// Everything the semantic half needs and does not ship with.
 pub fn optional_assets(data_dir: &Path) -> Vec<Asset> {
-    let models = data_dir.join("models");
     vec![
         Asset {
             name: "Meaning index",
@@ -103,7 +120,7 @@ pub fn optional_assets(data_dir: &Path) -> Vec<Asset> {
             name: "Language model",
             purpose: "Turns what you type into something the meaning index can match.",
             url: "https://huggingface.co/Xenova/bge-small-en-v1.5/resolve/main/onnx/model_quantized.onnx".into(),
-            path: models.join(format!("{MODEL}.onnx")),
+            path: model_path(data_dir),
             bytes: 33_961_249,
             sha256: Some("6c9c6101a956d62dfb5e7190c538226c0c5bb9cb27b651234b6df063ee7dbfe4"),
         },
@@ -111,7 +128,7 @@ pub fn optional_assets(data_dir: &Path) -> Vec<Asset> {
             name: "Tokenizer",
             purpose: "Splits your words the same way the index was built.",
             url: "https://huggingface.co/Xenova/bge-small-en-v1.5/resolve/main/tokenizer.json".into(),
-            path: models.join(format!("{MODEL}-tokenizer.json")),
+            path: tokenizer_path(data_dir),
             bytes: 711_661,
             sha256: Some("d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66"),
         },

@@ -10,6 +10,7 @@
 
 pub mod artefact;
 pub mod document;
+pub mod keys;
 pub mod quantise;
 
 /// The model this build's vectors were produced with, quantisation included.

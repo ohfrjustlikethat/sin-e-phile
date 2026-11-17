@@ -3059,3 +3059,12 @@ The rail query (`MediaRepository::most_voted_of`: the votes index walked, the ge
 4, Action 0, Thriller 2, Crime 1, Sci-Fi 1, Animation 2, Horror 87; most watched 0; new this year (`new_of`, year
 index) 113. Shows: Drama 4, Comedy 4, Crime 3, Animation 8, Sci-Fi 18, Mystery 7; new 8. Left out as too slow for
 a tab (walks far down the index): documentary films 507 ms, war series 856, western series 769.
+
+### Search by meaning on an install (Phase 16, round 8, 2026-11-17)
+
+| Metric | Value | Command / how |
+|---|---|---|
+| Key file for `embeddings-v3` | 119,874 of 858,170 positions named by IMDb id; 959,052 bytes | `cargo run -p sinephile-ingest --bin ingest -- artefact-keys` (dev catalogue; id digest `e66f698d…` matches the artefact) |
+| Index build on a copy of the author's install | 30 s, 60.9 MB | debug app, `SINEPHILE_DATA_DIR` = copy, Search → Build the index, timed to the `.usearch` file |
+| Before the fix, same copy | refused: "position 858169 is now id 2615642" | Search → Download |
+| "a heist where the plan goes wrong" | 20 results, titles, people and meaning: Tower Heist, Heist: Who Stole the American Dream?, Jimmywork, The Crew, Cash Out, Hell's Angels '69, Reindeer Games | same run, real window |

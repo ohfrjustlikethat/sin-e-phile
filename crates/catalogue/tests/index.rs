@@ -347,3 +347,150 @@ async fn build_writes_an_index_and_leaves_no_part_file() {
         "a .part left behind is a half-built graph the app would open and search"
     );
 }
+
+#[tokio::test]
+async fn an_install_that_numbers_its_titles_differently_indexes_each_vector_on_its_own_title() {
+    // ADR-0051, found on a copy of the author's install: ids are row numbers, so an
+    // install never has the producer's, and it has no synopses to judge text by. The
+    // published artefact was refused by every install but the machine that made it.
+    use sinephile_embedding::keys::Keys;
+    use sinephile_persistence::repositories::MediaRepository;
+    use sinephile_persistence::IdSource;
+
+    // The producer: six core films with text, each with an IMDb id.
+    let made = tempfile::tempdir().expect("tempdir");
+    let producer = Db::open_in(made.path()).await.expect("open");
+    catalogue(&producer, 6, 0).await;
+    let core = CatalogueRepository::new(&producer)
+        .core_ids()
+        .await
+        .expect("core");
+    for (n, id) in core.iter().enumerate() {
+        MediaRepository::new(&producer)
+            .add_external_id(*id, IdSource::Imdb, &format!("tt{:07}", 100 + n), 1.0)
+            .await
+            .expect("imdb");
+    }
+    let artefact_path = sinephile_embedding::artefact_path(made.path());
+    produce(&producer, &mut Fake { dimension: 8 }, &artefact_path).await;
+    let artefact = artefact_at(&artefact_path);
+    // The keys, as `ingest artefact-keys` writes them.
+    let repository = CatalogueRepository::new(&producer);
+    let with_text = repository.core_ids_for_vectors().await.expect("text");
+    let imdb = repository
+        .imdb_for_ids(&with_text.iter().flatten().copied().collect::<Vec<_>>())
+        .await
+        .expect("imdb");
+    let keys = Keys {
+        artefact_digest: artefact.header.id_digest,
+        count: artefact.header.count,
+        pairs: with_text
+            .iter()
+            .enumerate()
+            .filter_map(|(p, id)| id.and_then(|id| imdb.get(&id)).map(|n| (p as u32, *n)))
+            .collect(),
+    };
+
+    // The install: the same films loaded in the opposite order after other titles, so
+    // every id differs, and no synopses at all.
+    let home = tempfile::tempdir().expect("tempdir");
+    let install = Db::open_in(home.path()).await.expect("open");
+    let media = MediaRepository::new(&install);
+    for i in 0..3 {
+        media
+            .insert(&NewMediaItem::film(format!("Something else {i}"), 1990))
+            .await
+            .expect("insert");
+    }
+    let mut here = std::collections::HashMap::new();
+    for n in (0..6).rev() {
+        let id = media
+            .insert(&NewMediaItem::film(format!("Film {n:03}"), 1950 + n as i64))
+            .await
+            .expect("insert");
+        sqlx::query("UPDATE media_items SET in_core = 1 WHERE id = ?")
+            .bind(id)
+            .execute(install.pool())
+            .await
+            .expect("core");
+        media
+            .add_external_id(id, IdSource::Imdb, &format!("tt{:07}", 100 + n), 1.0)
+            .await
+            .expect("imdb");
+        here.insert(100 + n as u32, id);
+    }
+    std::fs::copy(
+        &artefact_path,
+        sinephile_embedding::artefact_path(home.path()),
+    )
+    .expect("copy");
+
+    // By position, as before: refused, rightly — position n is not this install's nth title.
+    assert!(
+        index::build_with(
+            &install,
+            &mut Fake { dimension: 8 },
+            home.path(),
+            None,
+            |_, _| {}
+        )
+        .await
+        .is_err(),
+        "positions cannot name this install's titles"
+    );
+
+    // By IMDb id: every vector on its own film.
+    let built = index::build_with(
+        &install,
+        &mut Fake { dimension: 8 },
+        home.path(),
+        Some(&keys),
+        |_, _| {},
+    )
+    .await
+    .expect("build with keys");
+    assert_eq!(built.indexed, 6);
+    let index =
+        sinephile_vector_index::VectorIndex::view(&sinephile_vector_index::index_path(home.path()))
+            .expect("view");
+    for (position, number) in &keys.pairs {
+        let nearest = index
+            .search(artefact.vector(u64::from(*position)).expect("vector"), 1)
+            .expect("search");
+        assert_eq!(
+            nearest[0].media_item_id, here[number],
+            "position {position} is tt{number:07}"
+        );
+    }
+
+    // Keys for another artefact are never applied to this one.
+    let other = Keys {
+        artefact_digest: [9; 32],
+        ..keys.clone()
+    };
+    assert!(
+        index::build_with(
+            &install,
+            &mut Fake { dimension: 8 },
+            home.path(),
+            Some(&other),
+            |_, _| {}
+        )
+        .await
+        .is_err(),
+        "falls back to positions, which refuse"
+    );
+}
+
+#[test]
+fn the_published_keys_name_the_published_artefact() {
+    // The key file compiled in is the one `ingest artefact-keys` wrote for the artefact
+    // the app downloads: 858,170 vectors, of which 119,874 are worth indexing.
+    let keys = index::published_keys().expect("a key file that names something");
+    assert_eq!(keys.count, 858_170);
+    assert_eq!(keys.pairs.len(), 119_874);
+    assert!(
+        keys.pairs.windows(2).all(|w| w[0].0 < w[1].0),
+        "ascending by position"
+    );
+}

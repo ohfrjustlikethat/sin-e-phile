@@ -1318,6 +1318,23 @@ async fn db_surface() {
         .add_external_id(probe, IdSource::Imdb, "tt0000001", 1.0)
         .await
         .expect("probe imdb id");
+
+    // ids_for_imdb / imdb_for_ids (ADR-0051) — both ways, and a number nobody holds is
+    // simply absent
+    let by_imdb = catalogue
+        .ids_for_imdb(&[1, 9_999_999])
+        .await
+        .expect("ids_for_imdb");
+    assert_eq!(by_imdb.get(&1), Some(&probe));
+    assert_eq!(by_imdb.len(), 1);
+    assert_eq!(
+        catalogue
+            .imdb_for_ids(&[probe, 999_999])
+            .await
+            .expect("imdb_for_ids")
+            .get(&probe),
+        Some(&1)
+    );
     assert!(wiki.map("tt0000001", "Probe Article").await.expect("map"));
     // Re-mapping after an article was moved updates the title and must NOT re-queue.
     assert!(wiki
