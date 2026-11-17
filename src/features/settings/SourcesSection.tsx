@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, IconButton, Input, Toggle } from "@/design-system";
 import { commands, type AddonPreview, type CatalogueView, type SourceInfo } from "@/lib/ipc";
 import { SETTINGS_HEADING } from "./heading";
+import { toast } from "@/lib/toast";
 
 /**
  * Settings → Sources — SPEC.md Phase 6.
@@ -29,10 +30,20 @@ export function SourcesSection() {
   const client = useQueryClient();
   const refresh = () => client.invalidateQueries({ queryKey: KEY });
   const view = useQuery({ queryKey: KEY, queryFn: () => ok(commands.sourcesOverview()) });
+  // The add-on just added: its card says "Added ✓" for a few seconds (Phase 16, the author: every add says so).
+  const [justAdded, setJustAdded] = useState<string | null>(null);
+  useEffect(() => {
+    if (!justAdded) return;
+    const t = window.setTimeout(() => setJustAdded(null), 8000);
+    return () => window.clearTimeout(t);
+  }, [justAdded]);
+  const nameOf = (id: string) => view.data?.sources.find((s) => s.id === id)?.name ?? "The add-on";
 
   const toggle = useMutation({
     mutationFn: ({ id, on }: { id: string; on: boolean }) =>
       ok(commands.sourcesSetEnabled(id, on)),
+    onSuccess: (_, v) => toast(`${nameOf(v.id)} is ${v.on ? "on" : "off"}.`),
+    onError: (e) => toast(`Could not change it: ${e.message}`, "danger"),
     onSettled: refresh,
   });
   const reorder = useMutation({
@@ -41,7 +52,14 @@ export function SourcesSection() {
   });
   const remove = useMutation({
     mutationFn: (id: string) => ok(commands.addonRemove(id)),
+    onSuccess: (_, id) => toast(`${nameOf(id)} was removed.`),
+    onError: (e) => toast(`Could not remove it: ${e.message}`, "danger"),
     onSettled: refresh,
+  });
+  const configure = useMutation({
+    mutationFn: (id: string) => ok(commands.addonConfigure(id)),
+    onSuccess: (_, id) => toast(`${nameOf(id)}'s own settings page is open in your browser.`, "neutral"),
+    onError: (e) => toast(e.message, "danger"),
   });
 
   const sources = view.data?.sources ?? [];
@@ -57,11 +75,11 @@ export function SourcesSection() {
 
   return (
     <>
-      <Section title="Sources">
+      <Section title="Add-ons">
         <p className="mb-4 text-xs leading-relaxed text-ink-faint">
-          Where films come from. Every search asks the sources that are on, in this order,
-          and none of them waits for another. Out of the box that is your own files and the
-          Internet Archive's public-domain films — nothing else is included.
+          Where films come from. Every search asks the ones that are on, all at once; their streams are listed in
+          this order. Out of the box that is your own files and the Internet Archive's public-domain films —
+          nothing else is included.
         </p>
         {/* Phase 16: the author could not tell how to try streaming or downloading. */}
         <p className="mb-4 text-xs leading-relaxed text-ink-muted" aria-label="Try it">
@@ -71,18 +89,20 @@ export function SourcesSection() {
         </p>
         {view.isPending && <p className="text-sm text-ink-muted">Reading sources…</p>}
         {view.isError && <p className="text-sm text-danger">{String(view.error.message)}</p>}
-        <ol aria-label="Sources, in the order they are asked">
+        <ol aria-label="Sources, in the order they are asked" className="flex flex-col gap-3">
           {sources.map((s, i) => (
-            <SourceRow
+            <AddonCard
               key={s.id}
               number={i + 1}
               source={s}
               first={i === 0}
               last={i === sources.length - 1}
+              added={justAdded === s.name}
               busy={toggle.isPending || reorder.isPending || remove.isPending}
               onToggle={(on) => toggle.mutate({ id: s.id, on })}
               onMove={(by) => move(i, by)}
               onRemove={() => remove.mutate(s.id)}
+              onConfigure={() => configure.mutate(s.id)}
             />
           ))}
         </ol>
@@ -95,61 +115,95 @@ export function SourcesSection() {
         )}
       </Section>
 
-      <AddSource onAdded={refresh} />
+      <AddSource
+        onAdded={(name) => {
+          setJustAdded(name);
+          toast(`Add-on added: ${name}. It is on, and its streams are listed on every title's page.`);
+          void refresh();
+        }}
+      />
       <YourLinks />
     </>
   );
 }
 
-function SourceRow({
-  number, source, first, last, busy, onToggle, onMove, onRemove,
+/**
+ * One add-on as a card (Phase 16, the author's round 4): a monogram (the add-on's own logo comes with artwork,
+ * item 10: the app loads no remote images), its name and version, what it serves and how it speaks, the health
+ * line, on/off, earlier/later (the order its streams are listed in), its own settings page, and remove.
+ */
+function AddonCard({
+  number, source, first, last, added, busy, onToggle, onMove, onRemove, onConfigure,
 }: {
   number: number;
   source: SourceInfo;
   first: boolean;
   last: boolean;
+  added: boolean;
   busy: boolean;
   onToggle: (on: boolean) => void;
   onMove: (by: -1 | 1) => void;
   onRemove: () => void;
+  onConfigure: () => void;
 }) {
-  // The order IS the setting, so it is shown as a number, the way search numbers its
-  // results; moving is two quiet arrows rather than two more labelled buttons per row.
+  const facts = [source.protocol, source.serves, source.addon_host && `asks ${source.addon_host}`].filter(Boolean);
   return (
-    <li className="grid grid-cols-[2rem_1fr_auto] gap-x-3 border-b border-line-subtle py-3 last:border-b-0">
-      <span className="label pt-3.5 tabular-nums" aria-hidden>
-        {String(number).padStart(2, "0")}
+    <li
+      aria-label={source.name}
+      className={`grid grid-cols-[3.25rem_1fr_auto] gap-x-4 rounded-sm border px-4 py-4 transition-colors ${
+        added ? "border-success" : "border-line-subtle"
+      }`}
+    >
+      <span
+        aria-hidden
+        className="grid h-12 w-12 place-items-center rounded-sm border border-line-strong font-display text-[20px] font-bold text-ink"
+      >
+        {source.name.trim().charAt(0).toUpperCase() || "?"}
       </span>
       <div className="min-w-0">
+        <div className="flex items-baseline gap-3">
+          <span className="label tabular-nums text-ink-faint" aria-hidden>
+            {String(number).padStart(2, "0")}
+          </span>
+          {added && <span className="text-[12px] text-success">Added ✓</span>}
+          {source.version && <span className="font-mono text-[11px] text-ink-faint">v{source.version}</span>}
+        </div>
         <Toggle
           checked={source.enabled}
           onChange={onToggle}
           disabled={busy}
           label={source.name}
-          description={
-            source.addon_host
-              ? `${source.blurb ? source.blurb + " " : ""}Sends your searches to ${source.addon_host}.`
-              : source.blurb
-          }
+          {...(source.blurb ? { description: source.blurb } : {})}
         />
-        <p className="text-[11px] leading-relaxed text-ink-faint">
+        {facts.length > 0 && <p className="text-[12px] text-ink-muted">{facts.join(" · ")}</p>}
+        <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
           {source.health}
           {source.last_error && <> Last problem: {source.last_error}.</>}
-          {source.addon_host && (
-            <>
-              {" "}
+        </p>
+        {source.addon_host && (
+          <div className="mt-2 flex gap-4">
+            {source.configurable && (
               <button
                 type="button"
                 disabled={busy}
-                onClick={onRemove}
-                aria-label={`Remove ${source.name}`}
-                className="text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink disabled:opacity-45"
+                onClick={onConfigure}
+                aria-label={`Configure ${source.name}`}
+                className="label hover:text-ink disabled:opacity-45"
               >
-                Remove
+                Configure
               </button>
-            </>
-          )}
-        </p>
+            )}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onRemove}
+              aria-label={`Remove ${source.name}`}
+              className="label hover:text-ink disabled:opacity-45"
+            >
+              Remove
+            </button>
+          </div>
+        )}
       </div>
       <div className="flex flex-col pt-1.5">
         <IconButton size="sm" label={`Ask ${source.name} earlier`} disabled={busy || first}
@@ -175,7 +229,7 @@ function Chevron({ up = false }: { up?: boolean }) {
 }
 
 /** Paste an address, see what it says it does, confirm. Or browse a catalogue first. */
-function AddSource({ onAdded }: { onAdded: () => void }) {
+function AddSource({ onAdded }: { onAdded: (name: string) => void }) {
   const [address, setAddress] = useState("");
   const [catalogueAddress, setCatalogueAddress] = useState("");
   const [preview, setPreview] = useState<AddonPreview | null>(null);
@@ -192,11 +246,13 @@ function AddSource({ onAdded }: { onAdded: () => void }) {
   const install = useMutation({
     mutationFn: (pasted: string) => ok(commands.addonInstall(pasted)),
     onSuccess: () => {
-      setAdded(preview?.name ?? "The source");
+      const name = preview?.name ?? "The add-on";
+      setAdded(name);
       setPreview(null);
       setAddress("");
-      onAdded();
+      onAdded(name);
     },
+    onError: (e) => toast(`It was not added: ${e.message}`, "danger"),
   });
   const open = useMutation({
     mutationFn: (url: string) => ok(commands.catalogueOpen(url)),

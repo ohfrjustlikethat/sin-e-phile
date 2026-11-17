@@ -16,6 +16,20 @@ export type Destination = (typeof DESTINATIONS)[number];
  * (Phase 16, the author: "each tab remembers its place").
  */
 export type Tab = Destination | "search";
+
+/** Settings' sections, in the side list's order (Phase 16, the author's answer). */
+export const SETTINGS_SECTIONS = [
+  "profile",
+  "library",
+  "addons",
+  "playback",
+  "subtitles",
+  "downloads",
+  "network",
+  "controller",
+  "about",
+] as const;
+export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 const TABS: readonly Tab[] = [...DESTINATIONS, "search"];
 const NO_TRAILS = Object.fromEntries(TABS.map((t) => [t, [] as number[]])) as unknown as Record<Tab, number[]>;
 
@@ -33,6 +47,9 @@ export interface Playing {
 }
 
 interface UiState {
+  /** The Settings section shown beside the side list. */
+  settingsSection: SettingsSection;
+  setSettingsSection: (section: SettingsSection) => void;
   /** The last destination shown; what the masthead marks, and what leaving search returns to. */
   destination: Destination;
   /** Where the main area is now. */
@@ -95,6 +112,8 @@ interface UiState {
 export const useUi = create<UiState>()(
   persist(
     (set, get) => ({
+      settingsSection: "profile",
+      setSettingsSection: (settingsSection) => set({ settingsSection }),
       destination: "home",
       tab: "home",
       trails: NO_TRAILS,

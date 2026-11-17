@@ -56,6 +56,22 @@ impl AddonManifest {
         }
     }
 
+    /// Its own settings page, if it has one: a Stremio add-on that says it is configurable.
+    pub fn configure_url(&self) -> Option<Url> {
+        match self {
+            Self::Native(_) => None,
+            Self::Stremio(m) => m.configure_url(),
+        }
+    }
+
+    /// Which protocol it speaks, in words.
+    pub fn protocol(&self) -> &'static str {
+        match self {
+            Self::Native(_) => "sin·e·phile add-on",
+            Self::Stremio(_) => "Stremio add-on",
+        }
+    }
+
     pub fn homepage(&self) -> Option<&str> {
         match self {
             Self::Native(m) => m.homepage.as_deref(),

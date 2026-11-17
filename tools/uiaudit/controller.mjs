@@ -1104,8 +1104,21 @@ try {
   // the pad types with upper case. (The OpenSubtitles key this used to type into is saved
   // by the first run now, so its field has gone: Phase 16 E7.)
   const FIELD = "Or browse a catalogue";
+  const settingsOpen = () => evalJs(`!!document.querySelector('nav[aria-label="Settings sections"]')`);
+  // Phase 16 (the author): Settings is a side list of sections, one shown at a time.
+  const openSection = async (name, shows) => {
+    await steerToButton(name);
+    await press(B.A);
+    await waitFor(() => evalJs(`document.body.textContent.includes(${JSON.stringify(shows)})`), `the ${name} section`, 25);
+    await press(B.RIGHT); // into the section
+  };
   await press(B.MENU);
-  await waitFor(() => evalJs(`document.body.textContent.includes("OpenSubtitles")`), "Settings", 25);
+  await waitFor(settingsOpen, "Settings", 25);
+  check(await evalJs(`!!document.activeElement?.closest('nav[aria-label="Settings sections"]')`),
+    "Menu opens Settings with focus on its side list");
+  await openSection("Add-ons", "Add a source");
+  check(await evalJs(`!document.body.textContent.includes("OpenSubtitles")`),
+    "A on Add-ons in the side list shows that section alone");
   const onKeyField = () => evalJs(`document.activeElement === ${fieldByLabel(FIELD)}()`);
   let onField = false;
   let popped = false;
@@ -1135,15 +1148,18 @@ try {
   await waitFor(() => evalJs(`!document.querySelector('[aria-label="On-screen keyboard"]')`), "the keyboard to close", 20);
   check(await onKeyField(), "Menu closes the keyboard (Done), and focus stays on the field");
 
-  // Phase 12 E5: the review queue by pad alone. From the key field the D-pad climbs to
+  // Phase 12 E5: the review queue by pad alone. The side list's Library, then down to
   // "Check them"; then each A answers the focused (first) card, twenty times.
+  await openSection("Library", "Add a folder");
   let onCheck = false;
   const walked = [];
-  for (let i = 0; i < 60 && !onCheck; i++) {
-    await press(B.UP);
-    const at = (await active())?.text;
-    walked.push(at);
-    onCheck = at === "Check them";
+  for (const dir of [B.DOWN, B.UP]) {
+    for (let i = 0; i < 40 && !onCheck; i++) {
+      await press(dir);
+      const at = (await active())?.text;
+      walked.push(at);
+      onCheck = at === "Check them";
+    }
   }
   if (!onCheck) console.log("  walked up through: " + walked.slice(-12).join(" | "));
   check(onCheck, "the D-pad reaches the review queue's 'Check them' in Settings");
@@ -1164,11 +1180,13 @@ try {
   const answered = (await calls("resolve_review")).length;
   check(answered === 20 && seconds < 60, `20 answers by A alone in ${seconds.toFixed(1)} s (E5: under a minute)`);
   await press(B.B);
-  await waitFor(() => evalJs(`document.body.textContent.includes("OpenSubtitles")`), "Settings again", 25);
+  await waitFor(settingsOpen, "Settings again", 25);
   check(true, "B returns from the queue to Settings");
 
   // Phase 15: the taste profile by pad. The D-pad finds "See Jon's taste" in Settings,
   // A opens it, and a mode is corrected with A alone.
+  if (!(await evalJs(`!!document.activeElement && document.activeElement !== document.body`))) await press(B.LEFT);
+  await openSection("Profile", "See Jon's taste");
   let onTaste = false;
   for (let i = 0; i < 80 && !onTaste; i++) {
     await press(B.DOWN);
@@ -1196,8 +1214,11 @@ try {
   const fixed = await waitFor(async () => (await calls("correct_taste"))[0], "the correction", 25);
   check(fixed.anchor === 31 && fixed.correction === "less", "A on Less corrects the first mode");
   await press(B.B);
-  await waitFor(() => evalJs(`document.body.textContent.includes("OpenSubtitles")`), "Settings after the taste", 25);
+  await waitFor(settingsOpen, "Settings after the taste", 25);
   check(true, "B returns from the taste profile to Settings");
+  // The longest section, for the right stick.
+  if (!(await evalJs(`!!document.activeElement && document.activeElement !== document.body`))) await press(B.LEFT);
+  await openSection("Add-ons", "Add a source");
 
   // Phase 16: the right stick scrolls the page under focus, and focus follows onto what is
   // in view, so the next D-pad press starts from where the eye is.
@@ -1216,7 +1237,7 @@ try {
   await press(B.B); // leave Settings
   // Phase 16: a page comes back where it was left, in real layout (Settings is long).
   await press(B.MENU);
-  await waitFor(() => evalJs(`document.body.textContent.includes("OpenSubtitles")`), "Settings again", 25);
+  await waitFor(settingsOpen, "Settings again", 25);
   await sleep(150);
   const again = await scrolled();
   check(Math.abs(again - after) < 4, `Settings opens again where it was left (${Math.round(after)} -> ${Math.round(again)})`);

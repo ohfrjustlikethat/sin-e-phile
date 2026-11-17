@@ -38,6 +38,12 @@ pub struct SourceInfo {
     pub enabled: bool,
     pub health: String,
     pub last_error: Option<String>,
+    /// An add-on's version; "Films and series"; "Stremio add-on" (Phase 16's add-on cards).
+    pub version: Option<String>,
+    pub serves: Option<String>,
+    pub protocol: Option<String>,
+    /// It has its own settings page, which `addon_configure` opens.
+    pub configurable: bool,
 }
 
 /// Everything the Sources section needs at once.
@@ -67,6 +73,10 @@ pub async fn sources_overview(state: State<'_, AppState>) -> Result<SourcesView,
                 enabled: r.enabled,
                 health: r.health,
                 last_error: r.last_error,
+                version: r.version,
+                serves: r.serves,
+                protocol: r.protocol,
+                configurable: r.configurable,
             })
             .collect(),
         refused_addons: refused,
@@ -165,6 +175,23 @@ pub async fn addon_remove(state: State<'_, AppState>, id: String) -> Result<(), 
         .remove_addon(&id)
         .await
         .map_err(|e| e.to_string())
+}
+
+/// Open an installed add-on's own settings page in the browser (Settings → Add-ons, Phase 16).
+/// By id, never by address: the app opens only the page of an add-on the person installed,
+/// as its manifest names it.
+#[tauri::command]
+#[specta::specta]
+pub async fn addon_configure(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    let db = db(&state)?;
+    let (ctx, _) = context(&state, &db).await?;
+    let url = ctx
+        .addons
+        .iter()
+        .find(|(_, m)| sinephile_sources::backends::addon::backend_id(m) == id)
+        .and_then(|(_, m)| m.configure_url())
+        .ok_or("this add-on has no settings page of its own")?;
+    crate::shell::open_in_browser(url.as_str())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]

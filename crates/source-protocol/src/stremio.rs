@@ -49,6 +49,9 @@ pub struct StremioManifest {
     /// Where requests go: the manifest's address without `manifest.json`. Configured
     /// add-ons keep their settings in this path, so it is kept whole.
     pub base: Url,
+    /// It has its own settings page (`behaviorHints.configurable`), at `<base>/configure`:
+    /// Settings → Add-ons offers to open it (Phase 16).
+    pub configurable: bool,
 }
 
 fn field(name: &'static str, problem: impl Into<String>) -> ManifestError {
@@ -115,6 +118,10 @@ impl StremioManifest {
         let description = display(text_of("description"), MAX_DESCRIPTION_CHARS);
 
         let hints = obj.get("behaviorHints").and_then(Value::as_object);
+        let configurable = hints
+            .and_then(|h| h.get("configurable"))
+            .and_then(Value::as_bool)
+            == Some(true);
         if hints
             .and_then(|h| h.get("configurationRequired"))
             .and_then(Value::as_bool)
@@ -186,6 +193,7 @@ impl StremioManifest {
             stream_types,
             id_prefixes,
             base,
+            configurable,
         })
     }
 
@@ -205,8 +213,22 @@ impl StremioManifest {
             "description": self.description,
             "types": self.stream_types,
             "resources": [Value::Object(stream)],
+            "behaviorHints": { "configurable": self.configurable },
         })
         .to_string()
+    }
+
+    /// Its own settings page, when it has one.
+    pub fn configure_url(&self) -> Option<Url> {
+        if !self.configurable {
+            return None;
+        }
+        let mut url = self.base.clone();
+        url.path_segments_mut()
+            .ok()?
+            .pop_if_empty()
+            .push("configure");
+        Some(url)
     }
 
     /// The kinds of item it can be asked for.
@@ -550,9 +572,16 @@ mod tests {
         // A configured add-on keeps its settings in the path: the base keeps them.
         assert_eq!(m.base.as_str(), "https://addon.example/abc%3D%3D/");
         assert_eq!(m.media(), vec![MediaKind::Film, MediaKind::Episode]);
-        // Stored and read back, it is the same.
+        // Stored and read back, it is the same, its settings page included.
         let again = StremioManifest::parse(m.to_json().as_bytes(), &origin()).unwrap();
         assert_eq!(again, m);
+        assert_eq!(
+            m.configure_url().map(String::from).as_deref(),
+            Some("https://addon.example/abc%3D%3D/configure")
+        );
+        let plain =
+            manifest(&BASIC.replace(r#""configurable":true"#, r#""configurable":false"#)).unwrap();
+        assert_eq!(plain.configure_url(), None);
     }
 
     #[test]

@@ -53,6 +53,9 @@ test passed. Four sections per ADR-0016 (A4).
   panel from the right, by add-on, each with its quality, size, seeders, release name and languages, to play or
   download exactly that one; Play picks the healthiest stream at the preferred quality (a new Settings choice).
   Specified in `docs/specs/title-page.md`.
+- **Settings, rebuilt** (2026-11-17): a side list of nine sections, one shown at a time; add-ons as cards with
+  their version, what they serve, on/off, order, their own settings page and remove; every add, save and remove
+  said on the spot and in a toast, with what actually happened. Specified in `docs/specs/settings.md`.
 - **Full screen from a maximised window** (2026-11-17): it kept the maximised height, so the player's bar
   floated 80 px up with black beneath; the window is now un-maximised first and maximised again after.
 
@@ -134,6 +137,8 @@ test passed. Four sections per ADR-0016 (A4).
 - **A rule added to a lexicographic order, not a weight** ("starts smoothly" before points) — `crates/selection/src/lib.rs` `compare`, `weakness`, `off_preferred`.
 - **Rendering into a slot elsewhere in the page** (`createPortal`), so a panel lives inside the app's frame — `src/features/detail/StreamsPanel.tsx`, `src/app/App.tsx` `#panel-slot`.
 - **A synthetic key event must be `cancelable` for `preventDefault` to mean anything** — `src/app/App.tsx` the pad's `back`.
+- **One small store for app-wide notices, called from anywhere** (`toast(...)`) — `src/lib/toast.ts`.
+- **Opening only what the app vouches for** (an add-on's settings page by its id, not an address; `rundll32 url.dll`) — `src-tauri/src/commands/sources.rs` `addon_configure`, `src-tauri/src/shell.rs`.
 - **A double click recognised from two clicks that arrive from different places** (the native window, then the page's still frame) — `src/features/player/PlayerScreen.tsx:531` `clickPicture`.
 
 ## 4. Five questions

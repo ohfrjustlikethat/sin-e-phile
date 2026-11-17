@@ -234,6 +234,30 @@ async fn a_stremio_add_on_installs_and_answers_by_imdb_id() {
     let resolver = resolver_from(&db, all(&ctx)).await.unwrap();
     assert!(resolver.ids().contains(&"addon:org.example.loopback"));
 
+    // Its card in Settings → Add-ons (Phase 16): version, what it serves, its protocol.
+    let cards = sinephile_sources::overview::overview(&db, &all(&ctx), &ctx.addons)
+        .await
+        .unwrap();
+    let card = cards
+        .iter()
+        .find(|c| c.id == "addon:org.example.loopback")
+        .expect("its card");
+    assert_eq!(card.version.as_deref(), Some("2.0.0"));
+    assert_eq!(card.serves.as_deref(), Some("Films and series"));
+    assert_eq!(card.protocol.as_deref(), Some("Stremio add-on"));
+    assert!(
+        card.configurable,
+        "its manifest says it has a settings page"
+    );
+    let built_in = cards
+        .iter()
+        .find(|c| c.addon_host.is_none())
+        .expect("a built-in");
+    assert_eq!(
+        (built_in.version.as_ref(), built_in.protocol.as_ref()),
+        (None, None)
+    );
+
     let mut query = MediaQuery::film("Nosferatu", Some(1922));
     query.ids.imdb = Some("tt0013442".into());
     let found = resolver.find_all(&query).await;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/lib/toast";
 import { Button, Input, Select, Toggle } from "@/design-system";
 import { commands, type TorrentSettingsView } from "@/lib/ipc";
 import { SETTINGS_HEADING } from "./heading";
@@ -66,7 +67,9 @@ function Form({ initial, onSaved }: { initial: TorrentSettingsView; onSaved: () 
     onSuccess: () => {
       setSaved(true);
       onSaved();
+      toast("Network settings saved; downloads use them now.");
     },
+    onError: (e) => toast(`Not saved: ${e.message}`, "danger"),
   });
 
   const chosen = initial.adapters.find((a) => a.name === adapter);

@@ -6,6 +6,7 @@
 pub mod commands;
 pub mod logging;
 pub mod persistence;
+pub mod shell;
 pub mod state;
 pub mod tiers;
 
@@ -53,6 +54,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::sources::addon_preview,
             commands::sources::addon_install,
             commands::sources::addon_remove,
+            commands::sources::addon_configure,
             commands::sources::catalogue_open,
             commands::sources::links_list,
             commands::sources::links_import,

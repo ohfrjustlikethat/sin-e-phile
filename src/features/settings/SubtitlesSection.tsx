@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/lib/toast";
 import { Button, Input, Select, Slider, Toggle } from "@/design-system";
 import { commands, type SubtitleSettings, type SubtitleSettingsView } from "@/lib/ipc";
 import { languageName } from "@/lib/playbackChoice";
@@ -65,7 +66,9 @@ function Form({ view, onSaved }: { view: SubtitleSettingsView; onSaved: () => vo
     onSuccess: () => {
       setSaved(true);
       onSaved();
+      toast("Subtitle settings saved.");
     },
+    onError: (e) => toast(`Not saved: ${e.message}`, "danger"),
   });
   const parsed = parseLanguages(languages);
 
@@ -129,9 +132,17 @@ function OpenSubtitlesKey({ view, onChanged }: { view: SubtitleSettingsView; onC
     onSuccess: () => {
       setKey("");
       onChanged();
+      toast("OpenSubtitles key saved and checked: subtitles are found for you now.");
+    },
+    onError: (e) => toast(`The key was not saved: ${e.message}`, "danger"),
+  });
+  const remove = useMutation({
+    mutationFn: () => ok(commands.clearOpensubtitlesKey()),
+    onSuccess: () => {
+      onChanged();
+      toast("OpenSubtitles key removed.", "neutral");
     },
   });
-  const remove = useMutation({ mutationFn: () => ok(commands.clearOpensubtitlesKey()), onSuccess: onChanged });
   const left = Math.max(0, Math.min(view.budget - view.used_today, view.server_remaining ?? view.budget));
 
   return (

@@ -13,6 +13,8 @@ import { ReviewScreen } from "@/features/library/ReviewScreen";
 import { DownloadsScreen } from "@/features/downloads/DownloadsScreen";
 import { TasteProfile } from "@/features/taste/TasteProfile";
 import { DownloadNotices } from "@/features/downloads/DownloadNotices";
+import { ToastStack } from "@/design-system";
+import { useToasts } from "@/lib/toast";
 import { ProfilePicker } from "@/features/profiles/ProfilePicker";
 import { Onboarding } from "@/features/onboarding/Onboarding";
 import { GettingReady, useCatalogueBuild } from "@/features/onboarding/CatalogueBuild";
@@ -105,7 +107,7 @@ export function App() {
       : s.tasteOpen
         ? "taste"
         : s.settingsOpen
-          ? "settings"
+          ? `settings|${s.settingsSection}`
           : s.downloadsOpen
             ? "downloads"
             : `${s.tab}|${s.trails[s.tab].join(",")}`,
@@ -324,6 +326,7 @@ export function App() {
         </div>
       )}
       <DownloadNotices />
+      <Toaster />
       {onboarding && !full && <Onboarding onDone={() => setOnboarding(false)} />}
       {pickerOpen && !onboarding && !full && <ProfilePicker onDone={() => setPickerOpen(false)} />}
       {playing && (
@@ -341,4 +344,11 @@ export function App() {
       )}
     </>
   );
+}
+
+/** Every add, save and connect, said where focus went (src/lib/toast.ts). */
+function Toaster() {
+  const toasts = useToasts((s) => s.toasts);
+  const dismiss = useToasts((s) => s.dismiss);
+  return <ToastStack toasts={toasts} onDismiss={dismiss} />;
 }

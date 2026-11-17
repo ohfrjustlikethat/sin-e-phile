@@ -89,6 +89,12 @@ export const commands = {
 	 */
 	addonInstall: (pasted: string) => typedError<string, string>(__TAURI_INVOKE("addon_install", { pasted })),
 	addonRemove: (id: string) => typedError<null, string>(__TAURI_INVOKE("addon_remove", { id })),
+	/**
+	 *  Open an installed add-on's own settings page in the browser (Settings → Add-ons, Phase 16).
+	 *  By id, never by address: the app opens only the page of an add-on the person installed,
+	 *  as its manifest names it.
+	 */
+	addonConfigure: (id: string) => typedError<null, string>(__TAURI_INVOKE("addon_configure", { id })),
 	/**  Open a catalogue from an address the user supplied. No default exists. */
 	catalogueOpen: (url: string) => typedError<CatalogueView, string>(__TAURI_INVOKE("catalogue_open", { url })),
 	linksList: () => typedError<LinkInfo[], string>(__TAURI_INVOKE("links_list")),
@@ -945,6 +951,12 @@ export type SourceInfo = {
 	enabled: boolean,
 	health: string,
 	last_error: string | null,
+	/**  An add-on's version; "Films and series"; "Stremio add-on" (Phase 16's add-on cards). */
+	version: string | null,
+	serves: string | null,
+	protocol: string | null,
+	/**  It has its own settings page, which `addon_configure` opens. */
+	configurable: boolean,
 };
 
 /**  Everything the Sources section needs at once. */

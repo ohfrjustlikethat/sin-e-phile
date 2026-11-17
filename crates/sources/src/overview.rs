@@ -20,6 +20,14 @@ pub struct SourceSummary {
     pub blurb: String,
     /// The host an addon sends queries to; `None` for a built-in.
     pub addon_host: Option<String>,
+    /// An add-on's version, as its manifest states it.
+    pub version: Option<String>,
+    /// What it offers streams for, in words: "Films and series", "Films".
+    pub serves: Option<String>,
+    /// "Stremio add-on" or "sin·e·phile add-on"; `None` for a built-in.
+    pub protocol: Option<String>,
+    /// It has its own settings page (Settings → Add-ons offers to open it).
+    pub configurable: bool,
     pub enabled: bool,
     /// "Answered 12 of 14 searches, usually in 340 ms." and the like.
     pub health: String,
@@ -57,6 +65,18 @@ pub fn display_name(id: &str, addons: &[(Url, AddonManifest)]) -> String {
         .find(|(_, m)| backend_id(m) == id)
         .map(|(_, m)| m.name().to_string())
         .unwrap_or_else(|| id.to_string())
+}
+
+/// What an add-on offers streams for, in words.
+pub fn serves(media: &[source_protocol::MediaKind]) -> String {
+    use source_protocol::MediaKind::{Episode, Film};
+    match (media.contains(&Film), media.contains(&Episode)) {
+        (true, true) => "Films and series",
+        (true, false) => "Films",
+        (false, true) => "Series",
+        (false, false) => "Nothing this app plays",
+    }
+    .to_string()
 }
 
 /// The health line. Counts, phrased: no score, because a score would need a meaning
@@ -127,6 +147,10 @@ pub async fn overview(
                     })
                     .unwrap_or_else(|| (row.id.clone(), String::new(), None)),
             };
+            let manifest = addons
+                .iter()
+                .find(|(_, m)| backend_id(m) == row.id)
+                .map(|(_, m)| m);
             SourceSummary {
                 health: health_line(&row),
                 last_error: row
@@ -137,6 +161,10 @@ pub async fn overview(
                 name,
                 blurb,
                 addon_host: host,
+                version: manifest.map(|m| m.version().to_string()),
+                serves: manifest.map(|m| serves(&m.media())),
+                protocol: manifest.map(|m| m.protocol().to_string()),
+                configurable: manifest.is_some_and(|m| m.configure_url().is_some()),
                 enabled: row.enabled,
             }
         })

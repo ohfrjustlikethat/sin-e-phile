@@ -102,4 +102,29 @@ describe("Settings → Library (SPEC.md Phase 12)", () => {
     await waitFor(() => expect(commands.rescanLibraryFolder).toHaveBeenCalledWith(1));
     await waitFor(() => expect(commands.removeLibraryFolder).toHaveBeenCalledWith(1));
   });
+
+  it("says a folder was added, on its row and in a toast with what its scan found (Phase 16)", async () => {
+    const { useToasts } = await import("@/lib/toast");
+    const w = window as unknown as Record<string, unknown>;
+    w.__TAURI_INTERNALS__ = {};
+    try {
+      const added = { id: 2, path: "E:\\TV", files: 0, scanned_at: "2026-11-17T10:00:00Z", scanning: true };
+      renderIt();
+      await screen.findByText("Films");
+      await waitFor(() => expect(handlers["library-scan"]).toBeDefined());
+      commands.libraryFolders.mockImplementation(() => ok([FOLDER, added]));
+      fireEvent.click(screen.getByRole("button", { name: "Add a folder…" }));
+      await waitFor(() => expect(commands.addLibraryFolder).toHaveBeenCalledWith("E:\\TV"));
+      expect(await screen.findByText("Added ✓")).toBeInTheDocument();
+      act(() =>
+        handlers["library-scan"]!({ payload: { folder_id: 2, phase: "done", done: 203, total: 203, files: 203, accepted: 199, asked: 4 } }),
+      );
+      await waitFor(() =>
+        expect(useToasts.getState().toasts.at(-1)?.text).toBe("Library folder added: 203 files found, 199 recognised, 4 to check."),
+      );
+    } finally {
+      delete w.__TAURI_INTERNALS__;
+      commands.libraryFolders.mockImplementation(() => ok([FOLDER]));
+    }
+  });
 });

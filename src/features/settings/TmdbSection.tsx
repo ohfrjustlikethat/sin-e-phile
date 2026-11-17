@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/lib/toast";
 import { Button, Input } from "@/design-system";
 import { commands } from "@/lib/ipc";
 import { SETTINGS_HEADING } from "./heading";
@@ -32,9 +33,17 @@ export function TmdbSection() {
     onSuccess: () => {
       setKey("");
       changed();
+      toast("TMDB key saved and checked: posters, cast and what is showing now come from it.");
+    },
+    onError: (e) => toast(`The key was not saved: ${e.message}`, "danger"),
+  });
+  const remove = useMutation({
+    mutationFn: () => ok(commands.clearTmdbKey()),
+    onSuccess: () => {
+      changed();
+      toast("TMDB key removed. Nothing is asked of TMDB now.", "neutral");
     },
   });
-  const remove = useMutation({ mutationFn: () => ok(commands.clearTmdbKey()), onSuccess: changed });
 
   return (
     <section aria-label="TMDB" className="mb-12">
