@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 4.4.0** · 21 session(s) completed · last updated 2026-11-17
+**Spec version 4.5.0** · 21 session(s) completed · last updated 2026-11-17
 
 ---
 
@@ -53,7 +53,7 @@
 
 ## What's next
 
-Phase 16, round 9 (docs/design/author-brief-2026-11-17.md, "Round 9"). BUILT, committed locally, NOT pushed: search as one poster grid (src/features/search/SearchScreen.tsx: films first within each match tier, 48 results, kind mark and why note under each card) and the title page's backdrop and poster (src/features/detail/DetailScreen.tsx; backdrop command in src-tauri/src/commands/artwork.rs; Tmdb::backdrop_url; posters::Art). TODO before pushing: screenshot 'twin peaks' search and a title page in the real window on the scratch copy (round8, posters switched on); write ADR-0052 (backdrops from ADR-0048's two sources) and SPEC amendment A41 (spec 4.5.0: Appendix F I80's backdrops done in Phase 16, cast photos stay Phase 19; CLAUDE.md resync, and fix its '364 MB' to 347 MB); run the full pre-push suite and read the controller audit's new grid checks in full. Then item 3: search by meaning inside the installer and the index build that never ran (D90). Then close Phase 16.
+Phase 16, round 9 (docs/design/author-brief-2026-11-17.md, "Round 9"; do not re-ask). Items 1 and 2 are done (search grid, title backdrop and poster; ADR-0052, spec 4.5.0). Next, item 3, pinned by the author: search by meaning (D90). (a) Log the error in download_optional_assets (src-tauri/src/commands/assets.rs) and reproduce the build on a fresh read-only copy of the author's database (C:/Users/hashi/AppData/Local/sin-e-phile/data, via sqlite's backup API) with the release exe; (b) ship the model, tokenizer and meaning file inside the installer (src-tauri/tauri.conf.json bundle resources; crates/catalogue/src/assets.rs looks beside the exe first) and build the index on first launch; amend ADR-0050 with an ADR. Then give the author the installer and close Phase 16 (exit criteria and Appendix F items in docs/phases/phase-16-ready-to-watch.md, evidence into PROJECT_STATE.json, carry E9 sign-off and Load a file by name, /closephase).
 
 ---
 

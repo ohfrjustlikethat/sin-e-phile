@@ -270,3 +270,11 @@ the author's database (its write-ahead log was 3.7 GB at the time).
    first, about 8 across, a kind mark on everything that is not a film, more results per search.
 2. A title's page: backdrop and poster, from the same poster sources the cards use (ADR-0048).
 3. Last: search by meaning inside the installer, and the index build that did not happen.
+
+### Round 9 status (2026-11-17)
+
+| Report | Fix | Commit |
+|---|---|---|
+| Search shows films, other kinds only after scrolling | One poster grid, about 8 across, 48 results; films first among equally good matches (strictly first buried the Twin Peaks series under 40 films found only by meaning, seen in the real window); kind marked, a quiet note where the match is not visible | aebfb44 |
+| A title's page: empty space where the poster should be | A faded still behind the top and the poster on the right, from the poster sources chosen (ADR-0052, spec 4.5.0, A41); the lettered card without a poster | aebfb44 |
+| Search by meaning does not build | Pinned by the author until the end of the round (D90) | |

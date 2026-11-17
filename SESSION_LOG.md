@@ -2420,3 +2420,22 @@ SQL pattern reads as a statement under `src-tauri`. The comment was reworded; th
 
 **Decisions taken (none reserved):** chapter titles that are only a time are hidden; the show's page gets the same wide
 Resume as a film's Play; "Build the index" when everything is downloaded but the index is not.
+
+## 2026-11-17 — Phase 16, round 9 of the author's fix list: a search grid, a title's backdrop
+
+The author tested the round 8 installer: everything works except search by meaning, which downloads but never builds
+its index; they want it inside the installer and pinned it until the end of this round (D90: the button's failure is
+never logged, so the log is silent; the files on their install are complete). Asked four questions: one grid with films
+first, about 8 across, every result the same size; a title's page with a backdrop and the poster on the right.
+
+- **Search as one poster grid** (aebfb44): Home's cards, so posters, the lettered card and focus memory come with them;
+  48 results; each other kind marked, and a quiet note where the match is not visible. **Films first only among equally
+  good matches**: sorted strictly, "peaks" put the Twin Peaks series after forty films that matched only in meaning, off
+  the screen, which was the complaint. Seen in the real window on a copy of the author's data: "twin peaks" shows both
+  series in the first row.
+- **A title's backdrop and poster** (aebfb44, ADR-0052, spec 4.5.0, A41): the same two sources as posters; the still is
+  faded behind the top of the page, the poster stands on the right. Seen on Twin Peaks and Fire Walk with Me.
+
+**Decisions taken (none reserved):** films first within match tiers rather than over the whole page (above); the "why"
+note shown only for meaning, near spelling, filters, and title-and-meaning; the backdrop's top edge faded with a mask.
+**Spec amendments:** 4.5.0, A41 (Appendix F's I80: backdrops now, from both sources; cast photos stay Phase 19).

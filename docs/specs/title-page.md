@@ -36,3 +36,12 @@ watched, Streams, the Audio row inside the panel, B closing it with the film's p
 - **The pause screen** names the show first, then "Season 1 · Episode 2 — <name>", the time left, and "Next: S1 E3";
   the side panel is the show's cast. The top bar says "Twin Peaks · S1 E2". An unnamed episode ("Episode #1.2") is
   given by its numbers alone, by one rule (`episode_name`, mirrored in `src/features/player/place.ts`).
+
+## Round 9 (2026-11-17): the backdrop and the poster
+
+- **A still behind the top of the page** (`Backdrop` in `src/features/detail/DetailScreen.tsx`): the `backdrop`
+  command's image at 45%, 640 px tall, faded in at its top (a mask) and into the page below and to the left (two
+  scrims), so the title, buttons and synopsis stay legible. Only when a poster source is on (ADR-0048, ADR-0052).
+- **The poster on the right** (`TitlePoster`): 300 px, 2:3, the same query as the cards' poster, so a poster seen in a
+  rail is not fetched again. Without a poster (or no source on), the lettered card. Hidden below 1024 px, from
+  assistive technology and from the D-pad.

@@ -133,13 +133,15 @@ impl Tmdb {
     /// The poster of a title, by its IMDb id, as an address on TMDB's image server (Phase 16,
     /// artwork with the profile's own key). `None` when TMDB has the title but no poster.
     pub async fn poster_url(&self, imdb_id: &str) -> Result<Option<String>, TmdbError> {
-        self.image_url(imdb_id, |p| p.poster_path, POSTER_BASE).await
+        self.image_url(imdb_id, |p| p.poster_path, POSTER_BASE)
+            .await
     }
 
     /// A title's backdrop, a wide still, by its IMDb id (round 9, ADR-0052). `None` when TMDB
     /// has the title but no still.
     pub async fn backdrop_url(&self, imdb_id: &str) -> Result<Option<String>, TmdbError> {
-        self.image_url(imdb_id, |p| p.backdrop_path, BACKDROP_BASE).await
+        self.image_url(imdb_id, |p| p.backdrop_path, BACKDROP_BASE)
+            .await
     }
 
     /// One of a title's images, found by IMDb id: only an IMDb id goes into the request, and

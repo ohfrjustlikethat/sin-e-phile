@@ -77,6 +77,8 @@ test passed. Four sections per ADR-0016 (A4).
   its side list (now sticky) without losing its place.
 - **Full screen from a maximised window** (2026-11-17): it kept the maximised height, so the player's bar
   floated 80 px up with black beneath; the window is now un-maximised first and maximised again after.
+- **Search as one poster grid** (round 9): Home's cards, about eight across, films first among equally good matches,
+  each other kind marked; a title's page has a faded still behind its top and the poster on the right (ADR-0052).
 
 ## 2. Why
 
@@ -178,6 +180,13 @@ test passed. Four sections per ADR-0016 (A4).
   `crates/taste/src/continuing.rs` `resolve`.
 - **Remembering focus by meaning, not by element** (`data-focus-key="title-<id>"`: the element is gone when the page comes back, the title is not) — `src/lib/scrollMemory.ts` `refocus`.
 - **A double click recognised from two clicks that arrive from different places** (the native window, then the page's still frame) — `src/features/player/PlayerScreen.tsx:531` `clickPicture`.
+- **Ordering by tiers with a stable sort**: compare the match tier, then the kind; `Array.prototype.sort` keeps rank
+  within a tie — `src/features/search/SearchScreen.tsx` `filmsFirst`.
+- **A named D-pad target** (`data-pad-down="<id>"`) when the nearest box is the wrong one: Down from the wide search
+  field goes to the first result — `src/features/search/SearchScreen.tsx` `FIRST`, `src/lib/gamepad.ts` `moveFocus`.
+- **One function choosing a field by a function pointer**: `fn(Posted) -> Option<String>` picks poster or backdrop
+  from one TMDB answer — `crates/metadata-api/src/tmdb.rs` `image_url`.
+- **A CSS mask to fade an image's edge** without painting over it — `src/features/detail/DetailScreen.tsx` `Backdrop`.
 
 ## 4. Five questions
 

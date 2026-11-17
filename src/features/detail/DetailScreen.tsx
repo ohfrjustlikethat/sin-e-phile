@@ -359,7 +359,13 @@ function Backdrop({ id }: { id: number }) {
   const still = useTitleImage("backdrop", id, on);
   if (!on || !still.data) return null;
   return (
-    <div aria-hidden data-backdrop className="pointer-events-none absolute inset-x-0 top-0 h-[640px] overflow-hidden">
+    <div
+      aria-hidden
+      data-backdrop
+      className="pointer-events-none absolute inset-x-0 top-0 h-[640px] overflow-hidden"
+      // Its top edge fades in too: a hard line under the back arrow read as a band laid over the page.
+      style={{ maskImage: "linear-gradient(to bottom, transparent, black 160px)" }}
+    >
       <img src={still.data} alt="" className="h-full w-full object-cover object-top opacity-45" />
       <span className="absolute inset-0 bg-gradient-to-b from-base/10 via-base/55 to-base" />
       <span className="absolute inset-0 bg-gradient-to-r from-base/90 via-base/45 to-transparent" />

@@ -1,5 +1,5 @@
 {
-  "spec_version": "4.4.0",
+  "spec_version": "4.5.0",
   "project": "sin-e-phile",
   "last_updated": "2026-11-17",
   "sessions_completed": 21,
@@ -2558,7 +2558,7 @@
       ]
     }
   ],
-  "next_action": "Phase 16, round 9 (docs/design/author-brief-2026-11-17.md, \"Round 9\"). BUILT, committed locally, NOT pushed: search as one poster grid (src/features/search/SearchScreen.tsx: films first within each match tier, 48 results, kind mark and why note under each card) and the title page's backdrop and poster (src/features/detail/DetailScreen.tsx; backdrop command in src-tauri/src/commands/artwork.rs; Tmdb::backdrop_url; posters::Art). TODO before pushing: screenshot 'twin peaks' search and a title page in the real window on the scratch copy (round8, posters switched on); write ADR-0052 (backdrops from ADR-0048's two sources) and SPEC amendment A41 (spec 4.5.0: Appendix F I80's backdrops done in Phase 16, cast photos stay Phase 19; CLAUDE.md resync, and fix its '364 MB' to 347 MB); run the full pre-push suite and read the controller audit's new grid checks in full. Then item 3: search by meaning inside the installer and the index build that never ran (D90). Then close Phase 16.",
+  "next_action": "Phase 16, round 9 (docs/design/author-brief-2026-11-17.md, \"Round 9\"; do not re-ask). Items 1 and 2 are done (search grid, title backdrop and poster; ADR-0052, spec 4.5.0). Next, item 3, pinned by the author: search by meaning (D90). (a) Log the error in download_optional_assets (src-tauri/src/commands/assets.rs) and reproduce the build on a fresh read-only copy of the author's database (C:/Users/hashi/AppData/Local/sin-e-phile/data, via sqlite's backup API) with the release exe; (b) ship the model, tokenizer and meaning file inside the installer (src-tauri/tauri.conf.json bundle resources; crates/catalogue/src/assets.rs looks beside the exe first) and build the index on first launch; amend ADR-0050 with an ADR. Then give the author the installer and close Phase 16 (exit criteria and Appendix F items in docs/phases/phase-16-ready-to-watch.md, evidence into PROJECT_STATE.json, carry E9 sign-off and Load a file by name, /closephase).",
   "blockers": [
     {
       "id": "B16",
@@ -2859,6 +2859,11 @@
     {
       "id": "0051",
       "title": "The meaning index is keyed by IMDb id, not by position",
+      "date": "2026-11-17"
+    },
+    {
+      "id": "0052",
+      "title": "A title's backdrop, from the poster sources the person chose",
       "date": "2026-11-17"
     }
   ],

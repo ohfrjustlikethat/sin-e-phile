@@ -1782,7 +1782,7 @@ Size: **S** one commit · **M** a subtask · **L** several subtasks.
 | ID | Improvement | Phase | Size | Done |
 |---|---|---|---|---|
 | I79 | Films and TV Shows browsed by decade, country and director; the genres too slow for the votes index today (documentaries, westerns, war) from a genre-and-votes index | 19 | M | |
-| I80 | With the profile's TMDB key: backdrops on title pages and cast photos (posters are built, ADR-0048) | 19 | M | |
+| I80 | Backdrops on title pages, from the poster sources (ADR-0052; built in Phase 16, round 9), and with the profile's TMDB key cast photos (posters are built, ADR-0048) | 19 | M | backdrops: Phase 16 (ADR-0052); cast photos open |
 | I81 | Add-on logos on the add-on cards, fetched by the backend like posters (a monogram stands in) | 19 | S | |
 | I82 | TMDB's poster address cached per title on disk (one `find` call per title per session today) | 22 | S | |
 | I83 | HEIC and AVIF profile pictures, through Windows' own decoder | 22 | S | |
@@ -1794,6 +1794,14 @@ Size: **S** one commit · **M** a subtask · **L** several subtasks.
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 4.5.0 — 2026-11-17 (a title's backdrop)
+
+Minor: an Appendix F item brought forward and widened, decided by the author; no exit criterion changes.
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A41 | Appendix F (I80) | **A title's page has a backdrop and its poster** (the author, round 9: empty space where the poster should be). Backdrops come from the same two sources as posters (the profile's TMDB key, or the keyless poster switch), not TMDB alone, and are built in Phase 16; cast photos stay in Phase 19. | 0052 |
 
 ### spec_version 4.4.0 — 2026-11-17 (search by meaning on a new install)
 
