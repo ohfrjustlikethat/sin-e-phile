@@ -247,6 +247,10 @@ pub fn start_scan(app: AppHandle, id: i64, root: PathBuf) {
             Err(error) => {
                 tracing::error!(folder = id, %error, "library scan failed");
                 emit(&app, event("failed", 0, 0));
+                // Watched whatever the scan did (Phase 16): on the author's install the first scan
+                // failed ("database is locked", during the catalogue load), the folder was never
+                // watched, and new files went unnoticed until a restart.
+                ensure_watched(id, &root);
             }
         }
     });
