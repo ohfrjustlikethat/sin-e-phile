@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **4.2.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **4.3.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -346,7 +346,7 @@ typographic treatment rather than breaking.
 - **Stremio add-ons** (ADR-0047): the app speaks Stremio's add-on protocol beside its own. A user pastes a
   Stremio add-on's address (or `stremio://` link); it is asked by IMDb id, under the same limits as any add-on.
   This changes nothing in rule 5: the app ships, suggests and names no add-on, anywhere.
-- **The improvement backlog** (ADR-0046): `SPEC.md` Appendix F lists 78 improvements (I01–I78), each
+- **The improvement backlog** (ADR-0046): `SPEC.md` Appendix F lists 86 improvements (I01–I86; I79–I86 from the author's fix list, ADR-0049), each
   assigned to a phase. They are that phase's deliverables, not exit criteria, and the phase doc prints
   them. At phase close each is done (commit in the Done column) or carried to a named phase with a
   reason, never dropped. ⚑ items are taste calls for Phase 19's mockups; the default is no change.

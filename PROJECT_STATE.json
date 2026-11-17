@@ -1,5 +1,5 @@
 {
-  "spec_version": "4.2.0",
+  "spec_version": "4.3.0",
   "project": "sin-e-phile",
   "last_updated": "2026-11-17",
   "sessions_completed": 21,
@@ -2558,7 +2558,7 @@
       ]
     }
   ],
-  "next_action": "Phase 16: build the author's 15-item plan in docs/design/author-brief-2026-11-17.md, in its order (their answers to 7 rounds of questions are there; do not re-ask). Item 1 (season packs) is done. Items 1 and 2 (season packs, direct downloads) are done. Items 1-14 are done (SESSION_LOG.md; docs/design/author-brief-2026-11-17.md; latest: the library watcher 7ae1608, Downloads 46f868c). Item 15 now, controller focus (brief round 7: Home rails, the title page, Settings, and after closing anything focus is not where it was): src/lib/scrollMemory.ts remembers each page's focused element by a data-focus-key (title cards, search results) and puts focus back when the page returns; check by pad in tools/uiaudit/controller.mjs (B from a title page lands on the card opened). Then close the item list: a session log entry, the author's batch of manual checks (Explorer, the native picture picker, a real pad), and Phase 16's remaining exit criteria. ",
+  "next_action": "Phase 16: build the author's 15-item plan in docs/design/author-brief-2026-11-17.md, in its order (their answers to 7 rounds of questions are there; do not re-ask). Item 1 (season packs) is done. Items 1 and 2 (season packs, direct downloads) are done. All fifteen items of the author's fix list are done (status table at the end of docs/design/author-brief-2026-11-17.md; later-phase depth in SPEC.md Appendix F I79-I86, ADR-0049). Next: give the author the new installer (src-tauri/target/release/bundle/) and their manual checks (listed in the brief), then close Phase 16: go through docs/phases/phase-16-ready-to-watch.md's exit criteria and Appendix F items, record evidence for each in PROJECT_STATE.json, carry what waits on the author (E9 sign-off, Load a file) by name, and run /closephase. ",
   "blockers": [
     {
       "id": "B16",
@@ -2844,6 +2844,11 @@
     {
       "id": "0048",
       "title": "Posters: a keyless image service, opted into, and TMDB with the profile's own key",
+      "date": "2026-11-17"
+    },
+    {
+      "id": "0049",
+      "title": "The author's fix list: what Phase 16 built, and what later phases deepen",
       "date": "2026-11-17"
     }
   ],

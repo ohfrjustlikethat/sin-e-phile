@@ -176,3 +176,30 @@ so its search index was empty. The first run becomes a pipeline in two stages, i
   MovieLens (taste), and search by meaning (the published `embeddings-v3`, the model, the vector index).
 - Each step is a resumable job (they already are); a restart carries on. Progress goes to the page as an
   event, and Settings shows what is done and what is still coming.
+
+## Status, 2026-11-17: all fifteen done
+
+| # | Item | Commits |
+|---|---|---|
+| 1 | Season packs: only the chosen episode | 8621e13, 248baa9 |
+| 2 | Direct web downloads, resumable | 15781a5 |
+| 3 | A fresh install builds its search (0 → 199 of the author's 200 files matched); enrichment after; the meaning index offered in setup; `embeddings-v3` published | 24b545d, a4df39a |
+| 4 | Click to pause, double click for full screen, in the real window | 6c8d015 |
+| 5 | Full screen from a maximised window | 08b6b90 |
+| 6 | Each tab keeps its place; labelled Back; one way back | 5058717 |
+| 7 | The title page: wide Play, round buttons, every stream in a panel; "best" by health and preference | 0ad50c7, 56215ed |
+| 8 | Settings: side list, add-on cards, every change said | aa398c3 |
+| 9 | Films and TV: the library, then the catalogue | 0fc2922 |
+| 10 | Posters: TMDB, or the keyless service opted into (ADR-0048) | 08a59f5 |
+| 11 | A picture for each profile | f3a6e43 |
+| 12 | Onboarding: plainer add-ons, the picks shown back, motion | 4cc59d2 |
+| 13 | The library: every file checked on a copy; folders watched even after a failed scan | 7ae1608 |
+| 14 | Downloads: a finished file plays, shows in Explorer, opens its page | 46f868c |
+| 15 | Controller focus: back on the card opened; Settings keeps its place | 5a160aa |
+
+What later phases deepen is in `SPEC.md` Appendix F, I79–I86 (ADR-0049).
+
+**For the author to try** (what cannot be checked from here): the new installer, on a fresh install (the first run
+builds its search in about four minutes after the catalogue's ~23-minute download; onboarding shows it); clicking and
+double-clicking the film; choosing a profile picture from your Pictures folder (Windows' own dialog); Show in folder on
+a finished download; switching posters on; the whole app with a real Xbox controller.

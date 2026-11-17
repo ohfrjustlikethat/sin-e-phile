@@ -1777,10 +1777,31 @@ Size: **S** one commit · **M** a subtask · **L** several subtasks.
 | I77 | ⚑ A true-black option for OLED screens | 19 | S | |
 | I78 | ⚑ A tab hidden until its phase builds it (Live until Phase 25) | 19 | S | |
 
+**From the author's fix list** (ADR-0049, 2026-11-17: Phase 16 built the usable core; these deepen it)
+
+| ID | Improvement | Phase | Size | Done |
+|---|---|---|---|---|
+| I79 | Films and TV Shows browsed by decade, country and director; the genres too slow for the votes index today (documentaries, westerns, war) from a genre-and-votes index | 19 | M | |
+| I80 | With the profile's TMDB key: backdrops on title pages and cast photos (posters are built, ADR-0048) | 19 | M | |
+| I81 | Add-on logos on the add-on cards, fetched by the backend like posters (a monogram stands in) | 19 | S | |
+| I82 | TMDB's poster address cached per title on disk (one `find` call per title per session today) | 22 | S | |
+| I83 | HEIC and AVIF profile pictures, through Windows' own decoder | 22 | S | |
+| I84 | Two episodes of one season pack downloading at once (D87) | 22 | M | |
+| I85 | Logs and Downloads follow the data folder the app opened (D88) | 22 | S | |
+| I86 | The keyless poster switch and the TMDB key as one "Artwork" choice in the first run, after Phase 19's mockups | 19 | S | |
+
 ---
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 4.3.0 — 2026-11-17 (the author's fix list)
+
+Minor: it adds backlog items; no exit criterion changes.
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A38 | Appendix F | **Eight improvements from the author's fix list** (I79–I86): where Phase 16 built the usable core of something a later phase owns (Films and TV browsing, artwork, add-on cards, season packs, the data folder), what that phase adds. The fifteen fixes themselves are in Phase 16 (`docs/design/author-brief-2026-11-17.md`). | 0049 |
 
 ### spec_version 4.2.0 — 2026-11-17 (Stremio add-ons)
 

@@ -2374,3 +2374,27 @@ No SPEC.md amendment. Known debt D88 (logs and Downloads ignore `SINEPHILE_DATA_
 close the author's installed app (same image name); runs are stopped by PID now (memory updated). A commit
 subject of 73 characters was rejected by the hook and the next commit swept its files in; caught before
 pushing, split again with `git reset --soft`.
+
+**The author's fix list, items 8–15 (2026-11-17, Opus).** All fifteen items of the plan are done; the table and the
+author's manual checks are at the end of `docs/design/author-brief-2026-11-17.md`.
+8. Settings (aa398c3): a side list of nine sections; add-ons as cards with Configure (by id, `<base>/configure` in the
+   browser); every add, save and remove said inline and in a toast (`src/lib/toast.ts`). 9. Films and TV (0fc2922):
+   the library, then catalogue rails (most watched, new, genres), each rail measured on 3.1 M titles. 10. Posters
+   (08a59f5, ADR-0048, allowlist `metahub.space`): fetched by the backend, re-encoded, cached, handed over as `data:`
+   URLs; checked in the real app. 11. Profile pictures (f3a6e43). 12. Onboarding polish (4cc59d2). 13. Library
+   (7ae1608): every one of the author's 200 files checked on a copy (all correct; the "2026" films are 2026 films); the
+   cause of "new files not noticed" was the watcher starting only after a successful scan, and the first scan had
+   failed during the catalogue load; checked live in the real app (in at 2 s, out at 2 s). 14. Downloads (46f868c).
+   15. Focus (5a160aa): focus comes back to the card opened.
+
+**Decisions taken (none reserved):** the keyless poster service as the author named it, off by default and said
+plainly; add-on logos wait for artwork (monogram now); the slow genres left out of the rails; Settings' side list
+sticky; spec 4.3.0 (A38, ADR-0049) puts eight deepening items in Appendix F (I79–I86).
+
+**Found by the pad audit, fixed at the source:** the pad's B was a non-cancelable synthetic Escape, so no screen could
+mark it handled (B in the streams panel also left the film's page); the scroll memory stopped recording after any
+film had played (`<main>` is a new element afterwards); focus restore at first moved Settings to its top. Each is now
+held by a check.
+
+**A mistake to record.** The guard refused a commit: a doc comment wrote Explorer's `"select"` in quotes, which its
+SQL pattern reads as a statement under `src-tauri`. The comment was reworded; the guard was not touched.
