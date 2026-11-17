@@ -57,6 +57,16 @@ pub struct PlaybackPosition {
     pub subtitle_language: Option<String>,
 }
 
+fn position_of(row: sqlx::sqlite::SqliteRow) -> Result<PlaybackPosition, DbError> {
+    Ok(PlaybackPosition {
+        media_item_id: row.try_get("media_item_id")?,
+        position_seconds: row.try_get("position_seconds")?,
+        duration_seconds: row.try_get("duration_seconds")?,
+        audio_language: row.try_get("audio_language")?,
+        subtitle_language: row.try_get("subtitle_language")?,
+    })
+}
+
 /// What a mark as watched covers (Appendix F, I21).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WatchScope {
@@ -629,6 +639,50 @@ impl<'a> ProfileRepository<'a> {
         .bind(profile_id)
         .fetch_all(self.db.pool())
         .await?)
+    }
+
+    /// Every saved position, finished or not, most recent first (Phase 16: a finished
+    /// episode's show continues with the next episode, so finished ones are needed too).
+    pub async fn recent_positions(
+        &self,
+        profile_id: i64,
+        limit: i64,
+    ) -> Result<Vec<PlaybackPosition>, DbError> {
+        let rows = sqlx::query(
+            "SELECT media_item_id, position_seconds, duration_seconds,
+                    audio_language, subtitle_language
+             FROM playback_positions
+             WHERE profile_id = ?
+             ORDER BY updated_at DESC, rowid DESC
+             LIMIT ?",
+        )
+        .bind(profile_id)
+        .bind(limit)
+        .fetch_all(self.db.pool())
+        .await?;
+        rows.into_iter().map(position_of).collect()
+    }
+
+    /// The latest position saved in any episode of one series, finished or not.
+    pub async fn latest_in_series(
+        &self,
+        profile_id: i64,
+        series_id: i64,
+    ) -> Result<Option<PlaybackPosition>, DbError> {
+        let row = sqlx::query(
+            "SELECT p.media_item_id, p.position_seconds, p.duration_seconds,
+                    p.audio_language, p.subtitle_language
+             FROM playback_positions p
+             JOIN episodes e ON e.media_item_id = p.media_item_id
+             WHERE p.profile_id = ? AND e.series_id = ?
+             ORDER BY p.updated_at DESC, p.rowid DESC
+             LIMIT 1",
+        )
+        .bind(profile_id)
+        .bind(series_id)
+        .fetch_optional(self.db.pool())
+        .await?;
+        row.map(position_of).transpose()
     }
 
     /// Continue-watching, most recent first.

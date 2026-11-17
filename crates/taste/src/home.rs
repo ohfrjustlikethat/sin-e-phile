@@ -61,6 +61,8 @@ pub struct Rail {
     pub items: Vec<i64>,
     /// A line for an item beyond its own facts: "S2 E5" for a series with a new episode.
     pub notes: HashMap<i64, String>,
+    /// How far into it, 0 to 1: Continue watching's bar (Phase 16).
+    pub progress: HashMap<i64, f64>,
 }
 
 /// New episodes count if the catalogue gained them in this many days.
@@ -88,18 +90,23 @@ pub async fn rails(
         Ok(ids.into_iter().filter(|id| ok.contains(id)).collect())
     };
 
-    let started: Vec<i64> = profiles
-        .continue_watching(profile, PER_RAIL as i64)
-        .await?
-        .into_iter()
-        .map(|p| p.media_item_id)
+    // One card per film or show (Phase 16): a show's card is the show, saying which episode.
+    let continuing = crate::continuing::continuing(db, profile, PER_RAIL).await?;
+    let started: Vec<i64> = continuing.iter().map(|c| c.card).collect();
+    let continue_notes: HashMap<i64, String> = continuing
+        .iter()
+        .filter_map(|c| c.note.clone().map(|n| (c.card, n)))
+        .collect();
+    let continue_progress: HashMap<i64, f64> = continuing
+        .iter()
+        .filter_map(|c| c.progress.map(|p| (c.card, p)))
         .collect();
     let liked = profiles.liked(profile).await?;
     let saved = profiles.watchlist(profile).await?;
     let seen: HashSet<i64> = liked
         .iter()
         .map(|(id, _)| *id)
-        .chain(started.iter().copied())
+        .chain(continuing.iter().flat_map(|c| [c.card, c.plays]))
         .collect();
 
     // The taste model (Phase 15), with the profile's corrections: built once, for the new
@@ -247,10 +254,21 @@ pub async fn rails(
     ] {
         let items: Vec<i64> = suits(ids).await?.into_iter().take(PER_RAIL).collect();
         if !items.is_empty() {
-            let notes = if key == "new_episodes" {
+            let from = match key {
+                "new_episodes" => Some(&episode_notes),
+                "continue" => Some(&continue_notes),
+                _ => None,
+            };
+            let notes = from.map_or_else(HashMap::new, |from| {
                 items
                     .iter()
-                    .filter_map(|id| episode_notes.get(id).map(|n| (*id, n.clone())))
+                    .filter_map(|id| from.get(id).map(|n| (*id, n.clone())))
+                    .collect()
+            });
+            let progress = if key == "continue" {
+                items
+                    .iter()
+                    .filter_map(|id| continue_progress.get(id).map(|p| (*id, *p)))
                     .collect()
             } else {
                 HashMap::new()
@@ -260,6 +278,7 @@ pub async fn rails(
                 title,
                 items,
                 notes,
+                progress,
             });
         }
     }

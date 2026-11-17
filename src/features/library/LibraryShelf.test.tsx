@@ -2,14 +2,16 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import { useUi } from "@/lib/store";
+import type { HomeCard } from "@/lib/ipc";
 
 const ok = <T,>(data: T) => Promise.resolve({ status: "ok" as const, data });
-const card = (id: number, title: string, year: number) => ({ id, title, year, made_by: null, runtime_minutes: null, note: null });
+const card = (id: number, title: string, year: number) => ({ id, title, year, made_by: null, runtime_minutes: null, note: null, progress: null });
 
 const commands = {
   libraryTitles: vi.fn((shows: boolean) =>
     ok(shows ? [card(364360, "Samurai Champloo", 2004), card(94345, "Twin Peaks", 1990)] : [card(112691, "In the Mood for Love", 2000)]),
   ),
+  continueWatching: vi.fn((_shows: boolean) => ok([] as HomeCard[])),
   catalogueRails: vi.fn((shows: boolean) =>
     ok([
       { key: "most", title: shows ? "Most watched shows" : "Most watched films", items: [card(1, "Heat", 1995)] },
@@ -72,5 +74,26 @@ describe("LibraryShelf", () => {
     expect(commands.catalogueRails).toHaveBeenLastCalledWith(false);
     fireEvent.click(screen.getByText("Thief"));
     expect(useUi.getState().detail).toBe(2);
+  });
+
+  it("starts with Continue watching, of this page's kind only, a show's card opening the show (round 8)", async () => {
+    commands.continueWatching.mockImplementationOnce((shows: boolean) =>
+      ok(shows ? [{ ...card(94345, "Twin Peaks", 1990), note: "S1 E2 · Traces to Nowhere", progress: 0.03 }] : []),
+    );
+    renderIt(true);
+    await screen.findByText("Samurai Champloo");
+    expect(commands.continueWatching).toHaveBeenLastCalledWith(true);
+    const regions = (await screen.findAllByRole("region")).map((r) => r.getAttribute("aria-label"));
+    expect(regions[0]).toBe("Continue watching");
+    const going = screen.getByRole("region", { name: "Continue watching" });
+    expect(going).toHaveTextContent("S1 E2 · Traces to Nowhere");
+    fireEvent.click(screen.getAllByText("Twin Peaks")[0]!);
+    expect(useUi.getState().detail).toBe(94345);
+  });
+
+  it("has no Continue watching when there is nothing to continue", async () => {
+    renderIt(false);
+    await screen.findByText("In the Mood for Love");
+    expect(screen.queryByRole("region", { name: "Continue watching" })).toBeNull();
   });
 });

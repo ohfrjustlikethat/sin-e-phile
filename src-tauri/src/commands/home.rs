@@ -26,6 +26,8 @@ pub struct HomeCard {
     pub runtime_minutes: Option<i32>,
     /// A line beyond the card's own facts: "New: S2 E5" for a series with a new episode.
     pub note: Option<String>,
+    /// How far into it, 0 to 1: Continue watching's bar (Phase 16).
+    pub progress: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -67,6 +69,7 @@ pub async fn home(state: State<'_, AppState>) -> Result<Vec<RailView>, String> {
         let mut items = home_cards(&db, &r.items).await?;
         for card in &mut items {
             card.note = r.notes.get(&i64::from(card.id)).cloned();
+            card.progress = r.progress.get(&i64::from(card.id)).copied();
         }
         out.push(RailView {
             key: r.key.into(),
@@ -97,6 +100,7 @@ async fn home_cards(db: &sinephile_persistence::Db, ids: &[i64]) -> Result<Vec<H
             made_by: card.made_by,
             runtime_minutes: m.runtime_minutes.map(|r| r as i32),
             note: None,
+            progress: None,
         });
     }
     Ok(out)
@@ -154,6 +158,29 @@ pub async fn catalogue_rails(
         });
     }
     Ok(out)
+}
+
+/// Continue watching at the top of Films (or, with `shows`, TV Shows): only its own kind
+/// (Phase 16, the author's round 8). A show's card is the show, with the episode under it.
+#[tauri::command]
+#[specta::specta]
+pub async fn continue_watching(
+    state: State<'_, AppState>,
+    shows: bool,
+) -> Result<Vec<HomeCard>, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let me = state.profile().await?;
+    let kids = crate::commands::profiles::kids(&state).await;
+    let picked = sinephile_taste::continuing::of_kind(&db, me, shows, kids, 20)
+        .await
+        .map_err(|e| e.to_string())?;
+    let ids: Vec<i64> = picked.iter().map(|c| c.card).collect();
+    let mut cards = home_cards(&db, &ids).await?;
+    for (card, c) in cards.iter_mut().zip(&picked) {
+        card.note = c.note.clone();
+        card.progress = c.progress;
+    }
+    Ok(cards)
 }
 
 /// Whether a title is on this profile's watchlist.

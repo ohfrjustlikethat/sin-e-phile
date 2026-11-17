@@ -7,6 +7,7 @@ import { chapterTarget, clock, glide, keyIntent, nextSpeed, type Intent } from "
 import { usePadMode } from "@/design-system/focus/FocusLayer";
 import { onPlayerIntent } from "./intentBus";
 import { PauseOverlay } from "./PauseOverlay";
+import { episodeLine, nextLine, shortPlace, named } from "./place";
 import { PICTURE_DEFAULT, PlayerMenu, ShortcutsPanel, StatsPanel, type Picture } from "./PlayerPanels";
 import { EndCard, NextEpisodeCard } from "./WhatNext";
 import { moment } from "./endCard";
@@ -97,7 +98,9 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
     if (!state?.started) return;
     void commands.playerChapters().then((r) => setChapters(r.status === "ok" ? r.data : []));
   }, [state?.started]);
-  const chapterTitle = state?.chapter != null ? (chapters[state.chapter]?.title ?? null) : null;
+  // A chapter named only by its time ("00:00:00.000", as some files have) says nothing the clock does not.
+  const rawChapter = state?.chapter != null ? (chapters[state.chapter]?.title ?? null) : null;
+  const chapterTitle = rawChapter && !/^[\d:.]+$/.test(rawChapter.trim()) ? rawChapter : null;
 
   // The episodes either side (SPEC.md Phase 11): N/P and the stick clicks, and the card.
   const play = useUi((s) => s.play);
@@ -118,6 +121,13 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
     setFinished(false);
   }, [playing]);
   const next = neighbours.data?.next ?? null;
+  // An episode is named by its show first, then where it sits (Phase 16, the author's round 8).
+  const place = details.data?.show ?? null;
+  const heading = place?.title ?? playing?.title ?? "";
+  const where = place ? episodeLine(place) : null;
+  const barTitle = place
+    ? [place.title, shortPlace(place.season, place.episode) || null, named(place.episode_title)].filter(Boolean).join(" · ")
+    : (playing?.title ?? "");
   const now = moment({
     hasNext: !!next,
     position: state?.position ?? null,
@@ -648,7 +658,9 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
     >
       {paused && (
         <PauseOverlay
-          title={playing.title}
+          title={heading}
+          episode={where}
+          next={place && next ? nextLine(next) : null}
           still={still}
           position={position}
           duration={duration}
@@ -759,8 +771,9 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
             {playing.start ? `Resuming from ${clock(playing.start)}` : "Opening"}
           </p>
           <h1 className="max-w-[70%] font-serif text-[52px] leading-[1.02] tracking-[-0.015em]">
-            {playing.title}
+            {heading}
           </h1>
+          {where && <p className="text-[17px] text-ink-muted">{where}</p>}
         </div>
       )}
 
@@ -791,7 +804,7 @@ export function PlayerScreen({ mini = false }: { mini?: boolean } = {}) {
               </svg>
             </button>
             <span data-tauri-drag-region className="truncate font-display text-[17px] font-semibold tracking-[-0.02em]">
-              {playing.title}
+              {barTitle}
             </span>
           </div>
           )}

@@ -390,6 +390,11 @@ export const commands = {
 	 *  (Phase 16, brief item 9): most watched, new this year, and the main genres.
 	 */
 	catalogueRails: (shows: boolean) => typedError<RailView[], string>(__TAURI_INVOKE("catalogue_rails", { shows })),
+	/**
+	 *  Continue watching at the top of Films (or, with `shows`, TV Shows): only its own kind
+	 *  (Phase 16, the author's round 8). A show's card is the show, with the episode under it.
+	 */
+	continueWatching: (shows: boolean) => typedError<HomeCard[], string>(__TAURI_INVOKE("continue_watching", { shows })),
 	artworkSettings: () => typedError<ArtworkView, string>(__TAURI_INVOKE("artwork_settings")),
 	/**  Switch the keyless posters on or off for this profile (onboarding, Settings → Library). */
 	setShowPosters: (on: boolean) => typedError<null, string>(__TAURI_INVOKE("set_show_posters", { on })),
@@ -706,6 +711,8 @@ export type HomeCard = {
 	runtime_minutes: number | null,
 	/**  A line beyond the card's own facts: "New: S2 E5" for a series with a new episode. */
 	note: string | null,
+	/**  How far into it, 0 to 1: Continue watching's bar (Phase 16). */
+	progress: number | null,
 };
 
 export type ImportView = {
@@ -778,6 +785,8 @@ export type OptionalAsset = {
 };
 
 export type PauseDetails = {
+	/**  For an episode: its show, season and number. */
+	show: ShowPlace | null,
 	cast: PersonView[],
 	crew: PersonView[],
 	ratings: RatingView[],
@@ -985,6 +994,11 @@ export type SeriesView = {
 	next_airing: AiringView | null,
 	/**  How many of its episodes this profile has seen through (Appendix F, I21). */
 	watched: number,
+	/**
+	 *  The episode this profile is in the middle of, or the one after the last it
+	 *  finished: the page's Resume (Phase 16). `None` until one is started.
+	 */
+	up_next: UpNextView | null,
 };
 
 export type SheetsView = {
@@ -1002,6 +1016,20 @@ export type ShelvedView = {
 	season: number | null,
 	episode: number | null,
 	title: string | null,
+};
+
+/**
+ *  Which show an episode belongs to, and where in it: the pause screen names the show
+ *  first (Phase 16, the author: it did not say what show or which episode).
+ */
+export type ShowPlace = {
+	id: number,
+	/**  The show's name. */
+	title: string,
+	season: number | null,
+	episode: number | null,
+	/**  The episode's own name, when the catalogue has one (not "Episode #1.2"). */
+	episode_title: string | null,
 };
 
 /**  One row of the Sources list. */
@@ -1207,6 +1235,17 @@ export type UnmatchedView = {
 	title: string,
 	year: number | null,
 	why: string,
+};
+
+/**  The episode a show's page offers to resume (`sinephile_taste::continuing`). */
+export type UpNextView = {
+	id: number,
+	season: number | null,
+	episode: number | null,
+	/**  "S1 E2 · Traces to Nowhere", or "Next: S1 E3". */
+	line: string,
+	/**  How far into it, 0 to 1; `None` when it starts from the beginning. */
+	progress: number | null,
 };
 
 /**  What a mark as watched covers, from the page that asked (Appendix F, I21). */

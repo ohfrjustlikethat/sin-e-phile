@@ -8,7 +8,7 @@ import { clock } from "@/features/player/intents";
 import { languageName, qualityLabel, usePlaybackChoice } from "@/lib/playbackChoice";
 import { type Choice } from "./ChoiceRow";
 import { SourcePanel } from "./SourcePanel";
-import { SeriesSection } from "./SeriesSection";
+import { SeriesSection, UpNext } from "./SeriesSection";
 import { useSetWatched } from "./Watched";
 import { ICONS, RoundAction } from "./RoundAction";
 import { StreamsPanel } from "./StreamsPanel";
@@ -200,6 +200,7 @@ export function DetailScreen() {
 
       {isSeries ? (
         <>
+          <UpNext id={d.id} show={d.title} />
           <div className="mt-8 flex">
             <WatchlistAction id={d.id} />
           </div>

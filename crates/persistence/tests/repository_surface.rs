@@ -725,6 +725,22 @@ async fn profile_repository_surface() {
         1
     );
 
+    // recent_positions (Phase 16) — finished or not, most recent first
+    assert_eq!(
+        repo.recent_positions(second, 10)
+            .await
+            .expect("recent_positions")
+            .first()
+            .map(|p| p.media_item_id),
+        Some(film)
+    );
+    // latest_in_series — a film is in no series
+    assert!(repo
+        .latest_in_series(second, film)
+        .await
+        .expect("latest_in_series")
+        .is_none());
+
     // add_to_watchlist — insert and ON CONFLICT DO NOTHING
     repo.add_to_watchlist(second, film, Some("because"))
         .await

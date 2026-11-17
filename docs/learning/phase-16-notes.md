@@ -67,6 +67,10 @@ test passed. Four sections per ADR-0016 (A4).
 - **The library follows its folders, and finished downloads can be found** (2026-11-17): a folder is watched even
   after a failed scan (a new file is in within two seconds); each finished download has Play, Show in folder, and its
   title's page.
+- **Round 8** (2026-11-17, after the author tried the installer): Streams no longer crashes once Settings has been
+  opened; Manage profiles opens at Profile; the player's bars and pointer hide after 3 s in a window and in full
+  screen; Continue watching is one card per show, also atop Films and TV Shows; a show's page resumes its episode;
+  the pause screen names the show, the episode and what is next.
 - **Focus where it was** (2026-11-17): back from a title page, focus is on the card that opened it; Settings opens on
   its side list (now sticky) without losing its place.
 - **Full screen from a maximised window** (2026-11-17): it kept the maximised height, so the player's bar
@@ -156,6 +160,14 @@ test passed. Four sections per ADR-0016 (A4).
 - **Fetching in the backend so the page's security policy can stay strict** (remote images become `data:` URLs; only `image/*` under 4 MB; misses remembered) — `crates/artwork/src/posters.rs`, `src-tauri/src/commands/artwork.rs`.
 - **Loading only what comes into view** (`IntersectionObserver` with a margin) — `src/features/home/TitleCard.tsx` `useNear`.
 - **A crop as fractions of the picture, so the page's preview and the original agree** (and two pure functions convert, testable without a browser) — `crates/artwork/src/avatar.rs` `Crop`, `src/features/profiles/PictureEditor.tsx` `cropOf`, `viewOf`.
+- **Windows reports a still pointer as moving** when the window under it changes shape; filter by where it is, not
+  by the message — `crates/player/src/host.rs` `MoveFilter`.
+- **A Tauri command that is not `async` runs on the UI thread**: never take a lock there that a thread waiting on the
+  UI thread may hold (it froze the app) — `src-tauri/src/commands/player.rs` `player_cursor`.
+- **One cache key, one shape**: two screens storing different data under `["sources"]` crashed the second to read
+  it; share the hook instead (`useSeries`) — `src/features/detail/SeriesSection.tsx`.
+- **What to continue is derived, not stored**: the latest position per show, then the next episode —
+  `crates/taste/src/continuing.rs` `resolve`.
 - **Remembering focus by meaning, not by element** (`data-focus-key="title-<id>"`: the element is gone when the page comes back, the title is not) — `src/lib/scrollMemory.ts` `refocus`.
 - **A double click recognised from two clicks that arrive from different places** (the native window, then the page's still frame) — `src/features/player/PlayerScreen.tsx:531` `clickPicture`.
 

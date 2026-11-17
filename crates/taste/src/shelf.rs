@@ -56,6 +56,7 @@ pub async fn catalogue_rails(
                 title,
                 items,
                 notes: Default::default(),
+                progress: Default::default(),
             });
         }
     };

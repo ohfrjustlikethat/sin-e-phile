@@ -24,3 +24,15 @@
 Evidence: `src/features/detail/DetailScreen.test.tsx` "the title page's round buttons and streams";
 `crates/selection/tests/fixtures.rs`; the pad audit's title page steps (round Download, Watchlist, Mark
 watched, Streams, the Audio row inside the panel, B closing it with the film's page kept).
+
+## Continue watching, a show's Resume, and the pause screen (round 8, 2026-11-17)
+
+- **One card per show** (`crates/taste/src/continuing.rs`): the latest position saved in any of its episodes decides.
+  Unfinished, that episode, with a bar; finished (95%), the next one ("Next: S1 E3"); none after it, the show leaves
+  the rail. An older half-watched episode is behind the latest. The card is the show and opens the show's page.
+- **Films and TV Shows** start with the same rail, each of its own kind (`continue_watching(shows)`).
+- **The show's page** opens on that episode's season with a wide Resume (or Play for the next one), a bar, and the
+  episode marked in the list. Resume asks the sources for that episode and plays from where it was left.
+- **The pause screen** names the show first, then "Season 1 · Episode 2 — <name>", the time left, and "Next: S1 E3";
+  the side panel is the show's cast. The top bar says "Twin Peaks · S1 E2". An unnamed episode ("Episode #1.2") is
+  given by its numbers alone, by one rule (`episode_name`, mirrored in `src/features/player/place.ts`).

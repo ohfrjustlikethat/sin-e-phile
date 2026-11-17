@@ -247,6 +247,32 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
     expect(useUi.getState().detail).toBe(81);
   });
 
+  it("a show started opens ready to resume its episode, on that episode's season (Phase 16, round 8)", async () => {
+    commands.itemDetail.mockImplementationOnce(() => ok({ ...DETAIL, title: "Twin Peaks", kind: "series" }));
+    commands.seriesDetail.mockImplementationOnce(() =>
+      ok({
+        seasons: [{ number: 1, episodes: 2 }, { number: 2, episodes: 1 }], next_airing: null as never, watched: 1,
+        on_this_pc: 0, also_here: [],
+        up_next: { id: 72, season: 1, episode: 2, line: "S1 E2 · Traces to Nowhere", progress: 0.03 },
+      } as never),
+    );
+    renderIt();
+    const resume = await screen.findByRole("button", { name: "Resume S1 E2" });
+    expect(screen.getByText("S1 E2 · Traces to Nowhere")).toBeInTheDocument();
+    // The list opens on that season, the episode marked.
+    expect(commands.seasonEpisodes).toHaveBeenCalledWith(7, 1);
+    expect(await screen.findByText("Resume", { selector: "span" })).toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).toBe(resume));
+    fireEvent.click(resume);
+    expect(commands.preparePlay).toHaveBeenCalledWith(72, null, null, null);
+    resolvePlan({ status: "ok", data: { ...PLAN, open: "https://films.example/tp-1-2.mp4", start: 76 } });
+    await waitFor(() =>
+      expect(useUi.getState().playing).toEqual({
+        target: "https://films.example/tp-1-2.mp4", title: "Twin Peaks · S1 E2", mediaItemId: 72, start: 76,
+      }),
+    );
+  });
+
   it("a series says what is on this PC, and lists its own files the catalogue cannot place, in order", async () => {
     // Phase 16: the author's Twin Peaks, whose third season IMDb lists as another series.
     commands.itemDetail.mockImplementationOnce(() => ok({ ...DETAIL, title: "Twin Peaks", kind: "series" }));

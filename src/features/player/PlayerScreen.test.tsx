@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { useUi } from "@/lib/store";
 import { usePlaybackChoice } from "@/lib/playbackChoice";
@@ -295,6 +295,29 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
     expect(panel).toHaveTextContent("Directed by F. W. Murnau");
     expect(panel).toHaveTextContent("IMDb 7.9");
     expect(panel).toHaveTextContent("Vampyr");
+  });
+
+  it("an episode pauses on its show's name, season, episode and what is next (Phase 16, round 8)", async () => {
+    useUi.setState({ playing: { target: "https://films.example/tp.mp4", title: "Episode #1.2", mediaItemId: 72, start: null } });
+    commands.pauseDetails.mockImplementationOnce(() =>
+      ok({
+        show: { id: 70, title: "Twin Peaks", season: 1, episode: 2, episode_title: "Traces to Nowhere" },
+        cast: [{ person_id: 5, name: "Kyle MacLachlan", part: "Dale Cooper" }],
+        crew: [], ratings: [], more_like_this: [],
+      } as never),
+    );
+    commands.episodeNeighbours.mockImplementationOnce(() =>
+      ok({ previous: null, next: { id: 73, season: 1, episode: 3, title: "Episode #1.3", air_date: null, watched: false, on_this_pc: false } }),
+    );
+    render(<PlayerScreen />);
+    await waitFor(() => expect(commands.pauseDetails).toHaveBeenCalledWith(72));
+    fireEvent.keyDown(window, { key: " " });
+    const paused = await screen.findByRole("dialog", { name: "Paused" });
+    expect(await within(paused).findByRole("heading", { name: "Twin Peaks" })).toBeInTheDocument();
+    expect(within(paused).getByText("Season 1 · Episode 2 — Traces to Nowhere")).toBeInTheDocument();
+    expect(within(paused).getByText("Next: S1 E3")).toBeInTheDocument();
+    expect(within(paused).getByRole("complementary", { name: "About this show" })).toHaveTextContent("Kyle MacLachlan");
+    expect(screen.queryByText("Episode #1.2")).toBeNull();
   });
 
   it("a file the catalogue does not know pauses without an empty panel (Phase 11 E5 run)", async () => {

@@ -40,8 +40,23 @@ pub struct TitleView {
     pub part: Option<String>,
 }
 
+/// Which show an episode belongs to, and where in it: the pause screen names the show
+/// first (Phase 16, the author: it did not say what show or which episode).
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct ShowPlace {
+    pub id: i32,
+    /// The show's name.
+    pub title: String,
+    pub season: Option<i32>,
+    pub episode: Option<i32>,
+    /// The episode's own name, when the catalogue has one (not "Episode #1.2").
+    pub episode_title: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct PauseDetails {
+    /// For an episode: its show, season and number.
+    pub show: Option<ShowPlace>,
     pub cast: Vec<PersonView>,
     pub crew: Vec<PersonView>,
     pub ratings: Vec<RatingView>,
@@ -69,15 +84,30 @@ pub async fn pause_details(state: State<'_, AppState>, id: i32) -> Result<PauseD
     let db = state.db().ok_or("the library is still opening")?;
     let media = MediaRepository::new(&db);
     let mut item_id = i64::from(id);
-    // An episode's own credits are often a handful; its series has the cast.
     let mut credits = media.credits(item_id, 60).await.map_err(err)?;
-    if let Some((series, _, _)) = EpisodeRepository::new(&db)
+    let mut show = None;
+    if let Some((series, season, episode)) = EpisodeRepository::new(&db)
         .placement(item_id)
         .await
         .map_err(err)?
     {
-        if credits.len() < 4 {
-            credits = media.credits(series, 60).await.map_err(err)?;
+        // The show's cast, as the author asked (an episode's own credits are often a
+        // handful of guests), unless the show has none.
+        let of_show = media.credits(series, 60).await.map_err(err)?;
+        if !of_show.is_empty() {
+            credits = of_show;
+        }
+        let episode_title = media.by_id(item_id).await.map_err(err)?.and_then(|m| {
+            sinephile_taste::continuing::episode_name(&m.primary_title).map(str::to_string)
+        });
+        if let Some(s) = media.by_id(series).await.map_err(err)? {
+            show = Some(ShowPlace {
+                id: series as i32,
+                title: s.primary_title,
+                season: season.map(|n| n as i32),
+                episode: episode.map(|n| n as i32),
+                episode_title,
+            });
         }
         item_id = series;
     }
@@ -136,6 +166,7 @@ pub async fn pause_details(state: State<'_, AppState>, id: i32) -> Result<PauseD
         _ => vec![],
     };
     Ok(PauseDetails {
+        show,
         cast,
         crew,
         ratings,

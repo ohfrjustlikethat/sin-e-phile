@@ -32,6 +32,8 @@ export function TitleRail({ rail, lead, why }: { rail: RailView; lead: boolean; 
               director: c.note ?? c.made_by ?? "",
               // Its place in the rail: № 001 is the first widely loved, not "Uncatalogued".
               spine: i + 1,
+              // Continue watching: how far into the film, or the show's episode (Phase 16).
+              ...(c.progress !== null ? { progress: c.progress } : {}),
             }}
             onOpen={() => openDetail(c.id)}
           />

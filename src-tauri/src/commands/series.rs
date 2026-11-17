@@ -43,6 +43,21 @@ pub struct SeriesView {
     pub next_airing: Option<AiringView>,
     /// How many of its episodes this profile has seen through (Appendix F, I21).
     pub watched: i32,
+    /// The episode this profile is in the middle of, or the one after the last it
+    /// finished: the page's Resume (Phase 16). `None` until one is started.
+    pub up_next: Option<UpNextView>,
+}
+
+/// The episode a show's page offers to resume (`sinephile_taste::continuing`).
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct UpNextView {
+    pub id: i32,
+    pub season: Option<i32>,
+    pub episode: Option<i32>,
+    /// "S1 E2 · Traces to Nowhere", or "Next: S1 E3".
+    pub line: String,
+    /// How far into it, 0 to 1; `None` when it starts from the beginning.
+    pub progress: Option<f64>,
 }
 
 /// A file of the show's, placed by its own name rather than by the catalogue.
@@ -164,7 +179,22 @@ pub async fn series_detail(state: State<'_, AppState>, id: i32) -> Result<Series
         })
         .collect();
 
+    let up_next = match state.profile().await {
+        Ok(profile) => sinephile_taste::continuing::for_series(&db, profile, series)
+            .await
+            .map_err(err)?
+            .map(|c| UpNextView {
+                id: c.plays as i32,
+                season: c.season.map(|n| n as i32),
+                episode: c.episode.map(|n| n as i32),
+                line: c.note.unwrap_or_default(),
+                progress: c.progress,
+            }),
+        Err(_) => None,
+    };
+
     Ok(SeriesView {
+        up_next,
         on_this_pc: on_this_pc as i32,
         also_here,
         watched: watched as i32,
