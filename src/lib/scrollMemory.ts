@@ -8,10 +8,29 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
  */
 
 const positions = new Map<string, number>();
+/**
+ * Which titled thing had focus on each page (Phase 16, the author: "after closing something… focus is not where it
+ * was"): the `data-focus-key` of the closest element that carries one (a title card, a search result). Coming back
+ * to the page, focus goes back to it, so B from a title page lands on the card that opened it.
+ */
+const focused = new Map<string, string>();
 
 /** Forget every page whose key starts with `prefix`: a tab pressed again goes back to its start. */
 export function forgetScroll(prefix: string): void {
   for (const key of [...positions.keys()]) if (key.startsWith(prefix)) positions.delete(key);
+  for (const key of [...focused.keys()]) if (key.startsWith(prefix)) focused.delete(key);
+}
+
+/** Focus the element marked `focusKey` inside `root` (its own focusable, or the first one in it). */
+function refocus(root: HTMLElement, focusKey: string): boolean {
+  const marked = root.querySelector<HTMLElement>(`[data-focus-key="${CSS.escape(focusKey)}"]`);
+  if (!marked) return false;
+  const target = marked.matches("button, a, input, [tabindex]")
+    ? marked
+    : marked.querySelector<HTMLElement>("button, a, input, [tabindex]");
+  if (!target) return false;
+  target.focus({ preventScroll: true });
+  return document.activeElement === target;
 }
 
 /** What is remembered for a page (for tests). */
@@ -39,9 +58,38 @@ export function useScrollMemory(key: string, seq: number): (el: HTMLElement | nu
   useEffect(() => {
     if (!el) return;
     const onScroll = () => positions.set(current.current, el.scrollTop);
+    const onFocus = (e: FocusEvent) => {
+      const marked = (e.target as HTMLElement | null)?.closest<HTMLElement>("[data-focus-key]");
+      if (marked?.dataset["focusKey"]) focused.set(current.current, marked.dataset["focusKey"]);
+    };
     el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
+    el.addEventListener("focusin", onFocus);
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      el.removeEventListener("focusin", onFocus);
+    };
   }, [el]);
+
+  // Focus back where it was, when nothing else has taken it: tried as the page fills in (a rail's cards arrive
+  // after the page), for the same short while as the scroll position.
+  useEffect(() => {
+    if (!el) return;
+    const want = focused.get(key);
+    if (!want) return;
+    const free = () => {
+      const at = document.activeElement;
+      return !at || at === document.body || !at.isConnected || !el.contains(at) || at === el;
+    };
+    if (!free()) return;
+    let frame = 0;
+    const until = performance.now() + RETRY_MS;
+    const step = () => {
+      if (!free() || refocus(el, want) || performance.now() > until) return;
+      frame = requestAnimationFrame(step);
+    };
+    step();
+    return () => cancelAnimationFrame(frame);
+  }, [el, key, seq]);
 
   useLayoutEffect(() => {
     if (!el) return;

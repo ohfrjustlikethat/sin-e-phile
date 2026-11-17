@@ -70,7 +70,8 @@ export function TitleCard({
     staleTime: Infinity,
   });
   return (
-    <div ref={box}>
+    // `data-focus-key`: coming back to this page puts focus back on this card (src/lib/scrollMemory.ts).
+    <div ref={box} data-focus-key={`title-${id}`}>
       <PosterCard
         size={size ?? "md"}
         film={on && poster.data ? { ...film, artwork: poster.data } : film}

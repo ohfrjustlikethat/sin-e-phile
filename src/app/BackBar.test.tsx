@@ -74,4 +74,29 @@ describe("Each page keeps its scroll position (Phase 16)", () => {
     rerender(<Scroller page="films|" seq={2} />);
     expect(el.scrollTop).toBe(300);
   });
+
+  it("puts focus back on the card it was on when a page returns (Phase 16)", () => {
+    function Page({ page, seq }: { page: string; seq: number }): ReactElement {
+      const remember = useScrollMemory(page, seq);
+      return (
+        <div ref={remember} data-testid="main">
+          {page === "home|" ? (
+            ["1", "2", "3"].map((id) => (
+              <div key={id} data-focus-key={`title-${id}`}>
+                <button type="button">Card {id}</button>
+              </div>
+            ))
+          ) : (
+            <button type="button">Play</button>
+          )}
+        </div>
+      );
+    }
+    const { rerender } = render(<Page page="home|" seq={0} />);
+    screen.getByRole("button", { name: "Card 2" }).focus();
+    rerender(<Page page="home|9" seq={1} />);
+    expect(document.activeElement?.textContent).not.toBe("Card 2");
+    rerender(<Page page="home|" seq={2} />);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Card 2" }));
+  });
 });

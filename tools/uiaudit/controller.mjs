@@ -1113,6 +1113,9 @@ try {
   await press(B.B);
   await waitFor(onWatchlist, "the Watchlist again", 25);
   check(!(await titleShown()), "B goes back from the film's page to the Watchlist");
+  // Phase 16 (the author: after closing anything, focus was not where it was): back on the card it opened.
+  await waitFor(async () => ((await active())?.text ?? "").includes("Sunrise"), "focus back on the card", 25);
+  check(true, "and focus is back on the film's card, where it was");
 
   // ADR-0043 (Phase 11 E6): every text field, not just search. Menu opens Settings, the
   // D-pad walks down past the library's path field to the add-on catalogue's address, and

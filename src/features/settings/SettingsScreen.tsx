@@ -51,12 +51,13 @@ export function SettingsScreen() {
   useEffect(() => {
     const at = document.activeElement;
     if (!at || at === document.body || !at.isConnected) {
-      nav.current?.querySelector<HTMLElement>('[aria-current="page"]')?.focus();
+      // Without scrolling: Settings reopens where it was left (the scroll memory), and the list is sticky.
+      nav.current?.querySelector<HTMLElement>('[aria-current="page"]')?.focus({ preventScroll: true });
     }
   }, []);
   return (
     <div className="flex gap-12 px-16 pt-6 pb-24">
-      <nav ref={nav} aria-label="Settings sections" className="w-48 shrink-0">
+      <nav ref={nav} aria-label="Settings sections" className="sticky top-6 w-48 shrink-0 self-start">
         <h1 className="mb-6 font-serif text-[40px] leading-none tracking-[-0.015em] text-ink">Settings</h1>
         <ul className="flex flex-col">
           {SETTINGS_SECTIONS.map((s) => (

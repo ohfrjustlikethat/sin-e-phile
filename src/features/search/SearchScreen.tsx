@@ -360,7 +360,7 @@ export function SearchScreen() {
                   // weight and focus all follow what the eye and the keyboard see.
                   const index = position++;
                   return (
-                    <li key={hit.id}>
+                    <li key={hit.id} data-focus-key={`title-${hit.id}`}>
                       <Entry
                         hit={hit}
                         number={index + 1}

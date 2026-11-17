@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { EmptyState, PosterCard, Skeleton } from "@/design-system";
+import { EmptyState, Skeleton } from "@/design-system";
+import { TitleCard } from "@/features/home/TitleCard";
 import { commands } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
 
@@ -59,7 +60,8 @@ export function WatchlistScreen() {
         <ul className="grid gap-x-6 gap-y-10" style={{ gridTemplateColumns: "repeat(auto-fill, 194px)" }}>
           {saved.data.map((c, i) => (
             <li key={c.id}>
-              <PosterCard
+              <TitleCard
+                id={c.id}
                 size="md"
                 film={{ id: String(c.id), title: c.title, year: c.year ?? 0, director: c.made_by ?? "", spine: i + 1 }}
                 onOpen={() => openDetail(c.id)}
