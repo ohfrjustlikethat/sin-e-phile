@@ -159,6 +159,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::artwork::artwork_settings,
             commands::artwork::set_show_posters,
             commands::artwork::poster,
+            commands::artwork::backdrop,
             commands::artwork::pick_picture,
             commands::artwork::picture_preview,
             commands::artwork::set_profile_picture,

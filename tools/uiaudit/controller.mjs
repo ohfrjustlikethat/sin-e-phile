@@ -54,7 +54,10 @@ if (!CHROME) {
 const FAKE = `(() => {
   const SUNRISE = { id: 7, title: "Sunrise", year: 1927, kind: "film", why: "exact_title",
     made_by: "F. W. Murnau", runtime_minutes: 94, excerpt: null };
-  const searchResponse = (q) => ({ hits: /sun/i.test(q) ? [SUNRISE] : [], searchable_titles: 900000,
+  // Ranked above the film: the grid still starts with the film (round 9).
+  const DAYBREAK = { id: 8, title: "Daybreak Stories", year: 1990, kind: "series", why: "keyword",
+    made_by: null, runtime_minutes: null, excerpt: null };
+  const searchResponse = (q) => ({ hits: /sun/i.test(q) ? [DAYBREAK, SUNRISE] : [], searchable_titles: 900000,
     catalogue_partial: false, semantic: true, ready: true });
   const answers = {
     search: (a) => searchResponse(a.query),
@@ -806,7 +809,12 @@ try {
   await steerTo("Done");
   await press(B.A);
   await waitFor(async () => (await active())?.text.includes("Sunrise"), "focus on the result", 25);
-  check(true, "Done closes the keyboard and focus lands on the result");
+  check(true, "Done closes the keyboard and focus lands on the first result, the film, though a series ranked higher");
+  // Round 9: one grid, films first; the D-pad moves across it, and a series carries its mark.
+  await press(B.RIGHT);
+  check((await active())?.text === "Daybreak Stories, 1990, Series", `Right reaches the series beside it, marked (${(await active())?.text})`);
+  await press(B.LEFT);
+  check((await active())?.text.includes("Sunrise"), `Left comes back to the film (${(await active())?.text})`);
   await shoot("03-result");
 
   await press(B.A);

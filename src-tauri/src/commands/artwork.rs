@@ -1,6 +1,7 @@
-//! Posters (Phase 16, ADR-0048). **Thin**: which addresses to try and how a poster is
-//! fetched, kept and refused are `sinephile_artwork::posters`'s; this reads the profile's
-//! choices and hands the page a `data:` URL.
+//! Posters (Phase 16, ADR-0048) and a title's backdrop (round 9, ADR-0052). **Thin**: which
+//! addresses to try and how an image is fetched, kept and refused are
+//! `sinephile_artwork::posters`'s; this reads the profile's choices and hands the page a
+//! `data:` URL.
 
 use std::sync::OnceLock;
 
@@ -8,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use sinephile_artwork::posters::{data_url, is_imdb_id, sources};
-use sinephile_artwork::{ArtworkCache, Posters};
+use sinephile_artwork::{Art, ArtworkCache, Posters};
 use sinephile_metadata_api::tmdb::Tmdb;
 
 use sinephile_persistence::repositories::{CredentialRepository, MediaRepository, TmdbAccess};
@@ -71,6 +72,18 @@ pub async fn set_show_posters(state: State<'_, AppState>, on: bool) -> Result<()
 #[tauri::command]
 #[specta::specta]
 pub async fn poster(state: State<'_, AppState>, id: i32) -> Result<Option<String>, String> {
+    image(&state, id, Art::Poster).await
+}
+
+/// A title's backdrop, the wide still across the top of its page, as a `data:` URL; `None` as
+/// for a poster.
+#[tauri::command]
+#[specta::specta]
+pub async fn backdrop(state: State<'_, AppState>, id: i32) -> Result<Option<String>, String> {
+    image(&state, id, Art::Backdrop).await
+}
+
+async fn image(state: &State<'_, AppState>, id: i32, art: Art) -> Result<Option<String>, String> {
     let db = state.db().ok_or("the library is still opening")?;
     let me = state.profile().await?;
     let keyless = keyless_on(&db, me).await;
@@ -90,14 +103,18 @@ pub async fn poster(state: State<'_, AppState>, id: i32) -> Result<Option<String
         return Ok(None);
     };
     let tmdb = match key {
-        Some(key) => Tmdb::new(state.http.clone(), key)
-            .poster_url(&imdb)
-            .await
+        Some(key) => {
+            let tmdb = Tmdb::new(state.http.clone(), key);
+            match art {
+                Art::Poster => tmdb.poster_url(&imdb).await,
+                Art::Backdrop => tmdb.backdrop_url(&imdb).await,
+            }
             .ok()
-            .flatten(),
+            .flatten()
+        }
         None => None,
     };
-    let urls = sources(tmdb, keyless, &imdb);
+    let urls = sources(art, tmdb, keyless, &imdb);
     let Some(dir) = state.data_dir() else {
         return Ok(None);
     };

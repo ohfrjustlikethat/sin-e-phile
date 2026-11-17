@@ -59,10 +59,15 @@ struct Found {
 #[derive(Deserialize)]
 struct Posted {
     poster_path: Option<String>,
+    #[serde(default)]
+    backdrop_path: Option<String>,
 }
 
 /// TMDB's image server, at a width that suits a 176–236 px card at 125% (Phase 16).
 pub const POSTER_BASE: &str = "https://image.tmdb.org/t/p/w342";
+
+/// A still across the top of a title's page (round 9, ADR-0052): wide enough for the page at 150%.
+pub const BACKDROP_BASE: &str = "https://image.tmdb.org/t/p/w1280";
 
 pub struct Tmdb {
     transport: Arc<dyn Transport>,
@@ -128,6 +133,23 @@ impl Tmdb {
     /// The poster of a title, by its IMDb id, as an address on TMDB's image server (Phase 16,
     /// artwork with the profile's own key). `None` when TMDB has the title but no poster.
     pub async fn poster_url(&self, imdb_id: &str) -> Result<Option<String>, TmdbError> {
+        self.image_url(imdb_id, |p| p.poster_path, POSTER_BASE).await
+    }
+
+    /// A title's backdrop, a wide still, by its IMDb id (round 9, ADR-0052). `None` when TMDB
+    /// has the title but no still.
+    pub async fn backdrop_url(&self, imdb_id: &str) -> Result<Option<String>, TmdbError> {
+        self.image_url(imdb_id, |p| p.backdrop_path, BACKDROP_BASE).await
+    }
+
+    /// One of a title's images, found by IMDb id: only an IMDb id goes into the request, and
+    /// only a plain path on TMDB's image server comes out.
+    async fn image_url(
+        &self,
+        imdb_id: &str,
+        pick: fn(Posted) -> Option<String>,
+        base: &str,
+    ) -> Result<Option<String>, TmdbError> {
         if !imdb_id.starts_with("tt") || !imdb_id[2..].chars().all(|c| c.is_ascii_digit()) {
             return Ok(None);
         }
@@ -139,9 +161,9 @@ impl Tmdb {
         Ok(f.movie_results
             .into_iter()
             .chain(f.tv_results)
-            .find_map(|p| p.poster_path)
+            .find_map(pick)
             .filter(|p| p.starts_with('/') && !p.contains(".."))
-            .map(|p| format!("{POSTER_BASE}{p}")))
+            .map(|p| format!("{base}{p}")))
     }
 
     /// What is showing now, as IMDb ids, in TMDB's order (most popular first).
@@ -226,5 +248,26 @@ mod tests {
         // Not an IMDb id: nothing is asked at all.
         assert_eq!(client(&fake).poster_url("../config").await.unwrap(), None);
         assert_eq!(fake.requests.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_backdrop_is_found_by_imdb_id_at_the_wide_size() {
+        let fake = Arc::new(FakeTransport::new());
+        // The fake answers last-pushed first.
+        fake.push(Response::new(
+            200,
+            r#"{"movie_results":[{"poster_path":"/p.jpg","backdrop_path":"/../x"}],"tv_results":[]}"#,
+        ));
+        fake.push(Response::new(
+            200,
+            r#"{"movie_results":[{"poster_path":"/p.jpg","backdrop_path":"/wide.jpg"}],"tv_results":[]}"#,
+        ));
+        let got = client(&fake).backdrop_url("tt0105665").await.unwrap();
+        assert_eq!(
+            got.as_deref(),
+            Some("https://image.tmdb.org/t/p/w1280/wide.jpg")
+        );
+        // A path that leaves the image server's folder is not followed.
+        assert_eq!(client(&fake).backdrop_url("tt0105665").await.unwrap(), None);
     }
 }

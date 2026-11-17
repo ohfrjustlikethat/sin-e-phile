@@ -400,6 +400,11 @@ export const commands = {
 	setShowPosters: (on: boolean) => typedError<null, string>(__TAURI_INVOKE("set_show_posters", { on })),
 	/**  A title's poster as a `data:` URL, or `None`: no source chosen, no IMDb id, or no poster. */
 	poster: (id: number) => typedError<string | null, string>(__TAURI_INVOKE("poster", { id })),
+	/**
+	 *  A title's backdrop, the wide still across the top of its page, as a `data:` URL; `None` as
+	 *  for a poster.
+	 */
+	backdrop: (id: number) => typedError<string | null, string>(__TAURI_INVOKE("backdrop", { id })),
 	/**  Windows' file picker, for a profile picture. */
 	pickPicture: () => typedError<string | null, string>(__TAURI_INVOKE("pick_picture")),
 	/**  The chosen picture, ready for the crop to be adjusted. */

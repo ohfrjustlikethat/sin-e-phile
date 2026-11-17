@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, EmptyState, Skeleton } from "@/design-system";
+import { Button, EmptyState, Skeleton, TypographicCard, type PosterFilm } from "@/design-system";
 import { commands, type CandidateView, type PlayPlanView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
 import { openSettingsAt } from "@/lib/openSettings";
@@ -15,6 +15,7 @@ import { StreamsPanel } from "./StreamsPanel";
 import { DOWNLOADS, useDownloads } from "@/features/downloads/useDownloads";
 import { WATCHLIST } from "@/features/watchlist/WatchlistScreen";
 import { HOME } from "@/features/home/HomeScreen";
+import { useArtworkOn } from "@/features/home/TitleCard";
 
 /**
  * The minimal detail page — SPEC.md Phase 8: title, synopsis, cast, and a Play button
@@ -29,6 +30,9 @@ import { HOME } from "@/features/home/HomeScreen";
  * from the right to play or download exactly one. Play and the round Download take the best stream: the
  * healthiest at the preferred quality (Settings → Playback), then the nearest healthy one. The "stream or
  * download" advice is gone. The audio and quality choices (SPEC.md Phase 9) are at the top of Streams.
+ *
+ * Round 9 (the author): a wide still faded behind the top of the page, and the poster on the right, from the
+ * poster sources the person chose (ADR-0048, ADR-0052). Without a poster, the lettered card the rails use.
  */
 
 async function ok<T>(p: Promise<{ status: "ok"; data: T } | { status: "error"; error: string }>) {
@@ -193,8 +197,18 @@ export function DetailScreen() {
     play({ target: plan.plan.open, title: d.title, mediaItemId: d.id, start: over ? null : plan.plan.start });
   };
 
+  const film: Omit<PosterFilm, "artwork"> = {
+    id: String(d.id),
+    title: d.title,
+    year: d.year ?? 0,
+    director: makers.map((m) => m.name).join(", "),
+  };
+
   return (
-    <article className="max-w-[1100px] px-16 pt-6 pb-24">
+    <article className="relative">
+      <Backdrop id={d.id} />
+      <div className="relative flex items-start gap-14 px-16 pt-6 pb-24">
+      <div className="min-w-0 max-w-[1100px] flex-1">
       <h1 className="font-serif text-[64px] leading-[0.98] tracking-[-0.015em] text-ink">{d.title}</h1>
       {byline && <p className="label mt-5">{byline}</p>}
 
@@ -315,7 +329,59 @@ export function DetailScreen() {
           </ul>
         </section>
       )}
+      </div>
+      <TitlePoster id={d.id} film={film} />
+      </div>
     </article>
+  );
+}
+
+/** One of a title's images from the person's chosen sources, or null: none chosen, or none found. */
+function useTitleImage(kind: "poster" | "backdrop", id: number, on: boolean) {
+  return useQuery({
+    // The same key and shape as the cards' poster (TitleCard), so a poster seen in a rail is not fetched again.
+    queryKey: [kind, id],
+    queryFn: async () => {
+      const r = await (kind === "poster" ? commands.poster(id) : commands.backdrop(id));
+      return r.status === "ok" ? r.data : null;
+    },
+    enabled: on,
+    staleTime: Infinity,
+  });
+}
+
+/**
+ * The wide still behind the top of the page, faded into it (round 9, ADR-0052). Two scrims keep the text on it
+ * legible, as on a card's artwork: §9.0 bans shadow for depth, not a scrim for legibility. Nothing without one.
+ */
+function Backdrop({ id }: { id: number }) {
+  const on = useArtworkOn();
+  const still = useTitleImage("backdrop", id, on);
+  if (!on || !still.data) return null;
+  return (
+    <div aria-hidden data-backdrop className="pointer-events-none absolute inset-x-0 top-0 h-[640px] overflow-hidden">
+      <img src={still.data} alt="" className="h-full w-full object-cover object-top opacity-45" />
+      <span className="absolute inset-0 bg-gradient-to-b from-base/10 via-base/55 to-base" />
+      <span className="absolute inset-0 bg-gradient-to-r from-base/90 via-base/45 to-transparent" />
+    </div>
+  );
+}
+
+/** The poster on the right of the page (round 9); the lettered card when there is none. Hidden on narrow windows. */
+function TitlePoster({ id, film }: { id: number; film: Omit<PosterFilm, "artwork"> }) {
+  const on = useArtworkOn();
+  const poster = useTitleImage("poster", id, on);
+  return (
+    // Decorative: the heading names the title, and a focus stop that does nothing would be in the D-pad's way.
+    <aside aria-hidden data-title-poster className="hidden w-[300px] shrink-0 pt-2 lg:block">
+      <div className="aspect-[2/3] overflow-hidden rounded-sm border border-line-subtle bg-surface">
+        {on && poster.data ? (
+          <img src={poster.data} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <TypographicCard film={film} size="lead" />
+        )}
+      </div>
+    </aside>
   );
 }
 

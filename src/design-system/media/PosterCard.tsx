@@ -30,7 +30,14 @@ export interface PosterFilm {
   /** 0-1, drawn as a hairline across the bottom of the artwork. */
   progress?: number;
   availability?: "local" | "stream" | "download";
+  /** A line under the card in both states: a search result's kind, when it is not a film (round 9). */
+  tag?: string | undefined;
+  /** A quieter line beside it: why a search result matched, when the card does not show it. */
+  note?: string | undefined;
 }
+
+/** `fill` takes its cell's width: the search grid (round 9), where the columns set the size. */
+export type PosterSize = "sm" | "md" | "lead" | "fill";
 
 const AVAILABILITY: Record<
   NonNullable<PosterFilm["availability"]>,
@@ -50,26 +57,32 @@ export function PosterCard({
   film,
   size = "md",
   onOpen,
+  buttonId,
 }: {
   film: PosterFilm;
-  size?: "sm" | "md" | "lead";
+  size?: PosterSize;
   onOpen?: (id: string) => void;
+  /** An id for the card's button, for a page that names it as a D-pad target (`data-pad-down`). */
+  buttonId?: string | undefined;
 }) {
   const [hovered, setHovered] = useState(false);
-  const width = size === "lead" ? "w-[236px]" : size === "sm" ? "w-[152px]" : "w-[176px]";
+  const width = { lead: "w-[236px]", sm: "w-[152px]", md: "w-[176px]", fill: "w-full" }[size];
   const avail = film.availability ? AVAILABILITY[film.availability] : null;
 
   return (
     <article data-poster-card className={["shrink-0", width].join(" ")}>
       <button
         type="button"
+        id={buttonId}
         data-focus-tile
         onClick={() => onOpen?.(film.id)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         onFocus={() => setHovered(true)}
         onBlur={() => setHovered(false)}
-        aria-label={[film.title, film.director || null, film.year || null].filter(Boolean).join(", ")}
+        aria-label={[film.title, film.director || null, film.year || null, film.tag || null, film.note || null]
+          .filter(Boolean)
+          .join(", ")}
         className={[
           "relative block w-full overflow-hidden rounded-sm border text-left",
           "aspect-[3/4] bg-surface transition-colors",
@@ -139,6 +152,13 @@ export function PosterCard({
             </div>
           </>
         )}
+        {(film.tag || film.note) && (
+          <p className={`text-[10px] uppercase tracking-[0.08em] ${film.artwork ? "mt-1" : ""}`}>
+            {film.tag && <span className="text-oxblood-text">{film.tag}</span>}
+            {film.tag && film.note && <span className="text-ink-faint"> · </span>}
+            {film.note && <span className="text-ink-faint">{film.note}</span>}
+          </p>
+        )}
         {avail && (
           <div className={film.artwork ? "mt-2" : ""}>
             <Badge tone={avail.tone}>{avail.label}</Badge>
@@ -157,14 +177,14 @@ export function PosterCard({
  * the left is the only accent, and it is what makes the card read as *catalogued*
  * rather than as *missing something*.
  */
-function TypographicCard({
+export function TypographicCard({
   film, size,
 }: {
   film: PosterFilm;
-  size: "sm" | "md" | "lead";
+  size: PosterSize;
 }) {
   const titleSize =
-    size === "lead" ? "text-[34px]" : size === "sm" ? "text-[21px]" : "text-[26px]";
+    size === "lead" ? "text-[34px]" : size === "sm" || size === "fill" ? "text-[21px]" : "text-[26px]";
   return (
     <div className="flex h-full flex-col justify-between border-l-2 border-oxblood bg-surface p-4">
       <span className="spine">

@@ -54,6 +54,10 @@ let resolvePlan: (v: unknown) => void = () => {};
 let saved = false;
 const commands = {
   itemDetail: vi.fn(() => ok(DETAIL)),
+  // No poster source unless a test chooses one (ADR-0048).
+  artworkSettings: vi.fn(() => ok({ posters: false, tmdb: false })),
+  poster: vi.fn((_id: number) => ok<string | null>(null)),
+  backdrop: vi.fn((_id: number) => ok<string | null>(null)),
   preparePlay: vi.fn(() => new Promise((r) => (resolvePlan = r))),
   downloads: vi.fn(() => ok<unknown[]>([])),
   downloadTitle: vi.fn((_id: number, _tonight: boolean, _reason: string | null, _candidate: number | null) =>
@@ -101,9 +105,43 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
     usePlaybackChoice.setState({ audio: null, quality: null, preferred: null, details: false });
   });
 
+  it("with posters on, shows the title's still behind the top of the page and its poster on the right (round 9)", async () => {
+    commands.artworkSettings.mockImplementation(() => ok({ posters: true, tmdb: false }));
+    commands.poster.mockImplementation(() => ok("data:image/webp;base64,UE9TVEVS"));
+    commands.backdrop.mockImplementation(() => ok("data:image/webp;base64,U1RJTEw="));
+    try {
+      const { container } = renderIt();
+      await screen.findByRole("heading", { level: 1, name: "Sunrise" });
+      await waitFor(() =>
+        expect(container.querySelector("[data-backdrop] img")).toHaveAttribute("src", "data:image/webp;base64,U1RJTEw="),
+      );
+      await waitFor(() =>
+        expect(container.querySelector("[data-title-poster] img")).toHaveAttribute("src", "data:image/webp;base64,UE9TVEVS"),
+      );
+      expect(commands.backdrop).toHaveBeenCalledWith(7);
+    } finally {
+      commands.artworkSettings.mockImplementation(() => ok({ posters: false, tmdb: false }));
+      commands.poster.mockImplementation(() => ok(null));
+      commands.backdrop.mockImplementation(() => ok(null));
+    }
+  });
+
+  it("without a poster source, the lettered card stands on the right and nothing is fetched", async () => {
+    const { container } = renderIt();
+    await screen.findByRole("heading", { level: 1, name: "Sunrise" });
+    await waitFor(() => expect(commands.artworkSettings).toHaveBeenCalled());
+    const aside = container.querySelector("[data-title-poster]")!;
+    expect(aside).toHaveTextContent("Sunrise");
+    expect(aside).toHaveTextContent("F. W. Murnau · 1927");
+    expect(aside.querySelector("img")).toBeNull();
+    expect(container.querySelector("[data-backdrop]")).toBeNull();
+    expect(commands.poster).not.toHaveBeenCalled();
+    expect(commands.backdrop).not.toHaveBeenCalled();
+  });
+
   it("asks the sources the moment it opens, before Play is pressed", async () => {
     renderIt();
-    expect(await screen.findByText("Sunrise")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Sunrise" })).toBeInTheDocument();
     expect(commands.preparePlay).toHaveBeenCalledWith(7, null, null, null);
     expect(screen.getByText("Asking your sources…")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Play" })).toBeDisabled();
@@ -111,7 +149,7 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
 
   it("offers to resume, says where from, and starts the player", async () => {
     renderIt();
-    await screen.findByText("Sunrise");
+    await screen.findByRole("heading", { level: 1, name: "Sunrise" });
     resolvePlan({ status: "ok", data: { title: "Sunrise", open: "https://films.example/s.mp4", start: 1200, from: "Internet Archive", offered: 3, ...NO_OFFERS } });
     const button = await screen.findByRole("button", { name: "Resume from 20:00" });
     expect(screen.getByText("From Internet Archive")).toBeInTheDocument();
@@ -123,7 +161,7 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
 
   it("offers to start over beside Resume, and only when there is a place to resume from", async () => {
     renderIt();
-    await screen.findByText("Sunrise");
+    await screen.findByRole("heading", { level: 1, name: "Sunrise" });
     resolvePlan({ status: "ok", data: { title: "Sunrise", open: "https://films.example/s.mp4", start: 1200, from: "Internet Archive", offered: 3, ...NO_OFFERS } });
     fireEvent.click(await screen.findByRole("button", { name: "Start over" }));
     await waitFor(() =>
@@ -133,7 +171,7 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
 
   it("offers no Start over for a film that has not been started", async () => {
     renderIt();
-    await screen.findByText("Sunrise");
+    await screen.findByRole("heading", { level: 1, name: "Sunrise" });
     resolvePlan({ status: "ok", data: { ...PLAN, ...NO_OFFERS } });
     await screen.findByRole("button", { name: "Play" });
     expect(screen.queryByRole("button", { name: "Start over" })).not.toBeInTheDocument();
@@ -141,7 +179,7 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
 
   it("says why nothing can play", async () => {
     renderIt();
-    await screen.findByText("Sunrise");
+    await screen.findByRole("heading", { level: 1, name: "Sunrise" });
     resolvePlan({ status: "error", error: "none of your sources has this" });
     expect(await screen.findByText("none of your sources has this")).toBeInTheDocument();
     // Phase 16: said plainly, with the way to fix it one press away.
@@ -153,7 +191,7 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
 
   it("offers the languages and qualities the copies carry, original and dub told apart", async () => {
     renderIt();
-    await screen.findByText("Sunrise");
+    await screen.findByRole("heading", { level: 1, name: "Sunrise" });
     resolvePlan({
       status: "ok",
       data: { ...PLAN, languages: ["ja", "en"], original_language: "ja", qualities: ["full_hd", "hd"], unmet: null, candidates: STREAMS },
@@ -181,7 +219,7 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
   it("says plainly when no copy has the chosen language", async () => {
     usePlaybackChoice.setState({ audio: "hi", quality: null });
     renderIt();
-    await screen.findByText("Sunrise");
+    await screen.findByRole("heading", { level: 1, name: "Sunrise" });
     expect(commands.preparePlay).toHaveBeenCalledWith(7, "hi", null, null);
     resolvePlan({
       status: "ok",
@@ -196,14 +234,14 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
 
   it("says why this source, under Play", async () => {
     renderIt();
-    await screen.findByText("Sunrise");
+    await screen.findByRole("heading", { level: 1, name: "Sunrise" });
     resolvePlan({ status: "ok", data: { ...PLAN, ...NO_OFFERS, why: "1080p · plays everywhere · 120 seeders" } });
     expect(await screen.findByLabelText("Why this source")).toHaveTextContent("1080p · plays everywhere · 120 seeders");
   });
 
   it("Ctrl+Shift+S shows every source with the arithmetic of its score (E5)", async () => {
     renderIt();
-    await screen.findByText("Sunrise");
+    await screen.findByRole("heading", { level: 1, name: "Sunrise" });
     resolvePlan({ status: "ok", data: { ...PLAN, ...NO_OFFERS, candidates: RANKED } });
     await screen.findByText("From Internet Archive");
     expect(screen.queryByRole("region", { name: "Sources, ranked" })).not.toBeInTheDocument();
@@ -227,7 +265,7 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
   it("the Settings switch keeps the panel on", async () => {
     usePlaybackChoice.setState({ details: true });
     renderIt();
-    await screen.findByText("Sunrise");
+    await screen.findByRole("heading", { level: 1, name: "Sunrise" });
     resolvePlan({ status: "ok", data: { ...PLAN, ...NO_OFFERS, candidates: RANKED } });
     expect(await screen.findByRole("region", { name: "Sources, ranked" })).toBeInTheDocument();
   });
@@ -299,7 +337,7 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
 
   it("marks a film watched, and Resume no longer offers a place that is gone (Appendix F, I21)", async () => {
     renderIt();
-    await screen.findByText("Sunrise");
+    await screen.findByRole("heading", { level: 1, name: "Sunrise" });
     resolvePlan({ status: "ok", data: { title: "Sunrise", open: "https://films.example/s.mp4", start: 1200, from: "Internet Archive", offered: 3, ...NO_OFFERS } });
     await screen.findByRole("button", { name: "Resume from 20:00" });
     fireEvent.click(await screen.findByRole("button", { name: "Mark watched" }));
@@ -311,7 +349,7 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
   it("a film already watched offers the way back", async () => {
     commands.titleWatched.mockImplementationOnce(() => ok(true));
     renderIt();
-    await screen.findByText("Sunrise");
+    await screen.findByRole("heading", { level: 1, name: "Sunrise" });
     const watched = await screen.findByRole("button", { name: "Watched" });
     // Filled when on: pressed, so its state is said as well as shown.
     await waitFor(() => expect(watched).toHaveAttribute("aria-pressed", "true"));
@@ -335,7 +373,7 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
 
   it("saves a film to the watchlist and takes it off again (Appendix F, I39)", async () => {
     renderIt();
-    await screen.findByText("Sunrise");
+    await screen.findByRole("heading", { level: 1, name: "Sunrise" });
     fireEvent.click(await screen.findByRole("button", { name: "Watchlist" }));
     await waitFor(() => expect(commands.setWatchlisted).toHaveBeenCalledWith(7, true));
     const on = await screen.findByRole("button", { name: "On watchlist" });
@@ -356,13 +394,13 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
     it("asks for the preferred quality from Settings", async () => {
       usePlaybackChoice.setState({ preferred: "full_hd" });
       renderIt();
-      await screen.findByText("Sunrise");
+      await screen.findByRole("heading", { level: 1, name: "Sunrise" });
       expect(commands.preparePlay).toHaveBeenCalledWith(7, null, null, "full_hd");
     });
 
     it("the round Download takes the best stream, then says how far it has got", async () => {
       renderIt();
-      await screen.findByText("Sunrise");
+      await screen.findByRole("heading", { level: 1, name: "Sunrise" });
       resolvePlan({ status: "ok", data: { ...PLAN, ...NO_OFFERS, candidates: STREAMS } });
       const download = await screen.findByRole("button", { name: "Download" });
       await waitFor(() => expect(download).toBeEnabled());
@@ -379,7 +417,7 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
 
     it("lists every stream by add-on in Settings' order, each with what it is", async () => {
       renderIt();
-      await screen.findByText("Sunrise");
+      await screen.findByRole("heading", { level: 1, name: "Sunrise" });
       resolvePlan({ status: "ok", data: { ...PLAN, ...NO_OFFERS, candidates: STREAMS } });
       fireEvent.click(await screen.findByRole("button", { name: "Streams · 3" }));
       const panel = await screen.findByRole("dialog", { name: "Streams" });
@@ -404,7 +442,7 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
 
     it("plays or downloads exactly the stream chosen in the panel", async () => {
       renderIt();
-      await screen.findByText("Sunrise");
+      await screen.findByRole("heading", { level: 1, name: "Sunrise" });
       resolvePlan({ status: "ok", data: { ...PLAN, ...NO_OFFERS, candidates: STREAMS } });
       fireEvent.click(await screen.findByRole("button", { name: "Streams · 3" }));
       const panel = await screen.findByRole("dialog", { name: "Streams" });
@@ -424,7 +462,7 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
           <DetailScreen />
         </QueryClientProvider>,
       );
-      await screen.findByText("Sunrise");
+      await screen.findByRole("heading", { level: 1, name: "Sunrise" });
       resolvePlan({ status: "ok", data: { ...PLAN, ...NO_OFFERS, candidates: STREAMS } });
       fireEvent.click(await screen.findByRole("button", { name: "Streams · 3" }));
       const panel = await screen.findByRole("dialog", { name: "Streams" });
@@ -443,7 +481,7 @@ describe("DetailScreen (SPEC.md Phase 8)", () => {
       window.addEventListener("keydown", onKey);
       try {
         renderIt();
-        await screen.findByText("Sunrise");
+        await screen.findByRole("heading", { level: 1, name: "Sunrise" });
         resolvePlan({ status: "ok", data: { ...PLAN, ...NO_OFFERS, candidates: STREAMS } });
         fireEvent.click(await screen.findByRole("button", { name: "Streams · 3" }));
         await screen.findByRole("dialog", { name: "Streams" });

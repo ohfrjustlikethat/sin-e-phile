@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { PosterCard, type PosterFilm } from "@/design-system";
+import { PosterCard, type PosterFilm, type PosterSize } from "@/design-system";
 import { commands } from "@/lib/ipc";
 
 /**
@@ -51,11 +51,13 @@ export function TitleCard({
   film,
   size,
   onOpen,
+  buttonId,
 }: {
   id: number;
   film: Omit<PosterFilm, "artwork">;
-  size?: "sm" | "md" | "lead";
+  size?: PosterSize;
   onOpen: () => void;
+  buttonId?: string | undefined;
 }) {
   const on = useArtworkOn();
   const box = useRef<HTMLDivElement>(null);
@@ -76,6 +78,7 @@ export function TitleCard({
         size={size ?? "md"}
         film={on && poster.data ? { ...film, artwork: poster.data } : film}
         onOpen={onOpen}
+        buttonId={buttonId}
       />
     </div>
   );

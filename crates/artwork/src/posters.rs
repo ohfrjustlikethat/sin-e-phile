@@ -19,6 +19,16 @@ use crate::cache::ArtworkCache;
 /// Stremio's poster images, by IMDb id (ADR-0048).
 pub const KEYLESS_BASE: &str = "https://images.metahub.space/poster/medium";
 
+/// The same service's wide stills, by IMDb id (round 9, ADR-0052).
+pub const KEYLESS_BACKDROP_BASE: &str = "https://images.metahub.space/background/medium";
+
+/// Which of a title's images: the card's poster, or the still across the top of its page.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Art {
+    Poster,
+    Backdrop,
+}
+
 /// A poster is a few hundred kilobytes; anything far larger is not one.
 pub const MAX_IMAGE_BYTES: usize = 4 * 1024 * 1024;
 
@@ -29,17 +39,21 @@ pub fn is_imdb_id(id: &str) -> bool {
     id.len() > 2 && id.starts_with("tt") && id[2..].chars().all(|c| c.is_ascii_digit())
 }
 
-/// The keyless poster's address for an IMDb id.
-pub fn keyless_url(imdb_id: &str) -> Option<String> {
-    is_imdb_id(imdb_id).then(|| format!("{KEYLESS_BASE}/{imdb_id}/img"))
+/// The keyless address of a title's poster or backdrop, by IMDb id.
+pub fn keyless_url(art: Art, imdb_id: &str) -> Option<String> {
+    let base = match art {
+        Art::Poster => KEYLESS_BASE,
+        Art::Backdrop => KEYLESS_BACKDROP_BASE,
+    };
+    is_imdb_id(imdb_id).then(|| format!("{base}/{imdb_id}/img"))
 }
 
-/// The addresses to try for a title's poster, best first: TMDB's (when the profile has a
+/// The addresses to try for a title's image, best first: TMDB's (when the profile has a
 /// key, already looked up), then the keyless one (when the person switched it on).
-pub fn sources(tmdb: Option<String>, keyless: bool, imdb_id: &str) -> Vec<String> {
+pub fn sources(art: Art, tmdb: Option<String>, keyless: bool, imdb_id: &str) -> Vec<String> {
     let mut out: Vec<String> = tmdb.into_iter().collect();
     if keyless {
-        out.extend(keyless_url(imdb_id));
+        out.extend(keyless_url(art, imdb_id));
     }
     out
 }
@@ -152,15 +166,15 @@ mod tests {
     fn tmdb_first_then_the_keyless_one_and_neither_unless_chosen() {
         let tmdb = Some("https://image.tmdb.org/t/p/w342/a.jpg".to_string());
         assert_eq!(
-            sources(tmdb.clone(), true, "tt0013442"),
+            sources(Art::Poster, tmdb.clone(), true, "tt0013442"),
             [
                 "https://image.tmdb.org/t/p/w342/a.jpg",
                 "https://images.metahub.space/poster/medium/tt0013442/img"
             ]
         );
-        assert_eq!(sources(tmdb, false, "tt0013442").len(), 1);
+        assert_eq!(sources(Art::Poster, tmdb, false, "tt0013442").len(), 1);
         assert!(
-            sources(None, false, "tt0013442").is_empty(),
+            sources(Art::Backdrop, None, false, "tt0013442").is_empty(),
             "nothing asked unless chosen"
         );
         assert_eq!(data_url(b"RIFF"), "data:image/webp;base64,UklGRg==");
@@ -169,11 +183,15 @@ mod tests {
     #[test]
     fn only_an_imdb_id_goes_into_an_address() {
         assert_eq!(
-            keyless_url("tt0013442").as_deref(),
+            keyless_url(Art::Poster, "tt0013442").as_deref(),
             Some("https://images.metahub.space/poster/medium/tt0013442/img")
         );
-        assert_eq!(keyless_url("tt"), None);
-        assert_eq!(keyless_url("../../etc"), None);
-        assert_eq!(keyless_url("tt12/../x"), None);
+        assert_eq!(
+            keyless_url(Art::Backdrop, "tt0013442").as_deref(),
+            Some("https://images.metahub.space/background/medium/tt0013442/img")
+        );
+        assert_eq!(keyless_url(Art::Poster, "tt"), None);
+        assert_eq!(keyless_url(Art::Backdrop, "../../etc"), None);
+        assert_eq!(keyless_url(Art::Poster, "tt12/../x"), None);
     }
 }
