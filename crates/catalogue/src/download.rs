@@ -17,6 +17,12 @@
 //! as a continuation. That case is detected by the status code and starts over
 //! rather than producing a corrupt file, which is the failure that would otherwise
 //! surface much later as an unparseable line halfway through ingestion.
+//!
+//! **A `206` is a continuation only if it says it starts where we asked** (Phase 16,
+//! round 9, D90). The author's meaning file was the right size with 5 MB of its own data
+//! a megabyte late: a resume asked from byte N was answered from earlier, and the answer
+//! was appended at N. `Content-Range` says where an answer starts; one that starts
+//! elsewhere, or does not say, is dropped and the whole file is asked for again.
 
 use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -125,35 +131,31 @@ impl Downloader {
             0
         };
 
-        let mut request = self.client.get(url);
-        if have > 0 {
-            request = request.header(reqwest::header::RANGE, format!("bytes={have}-"));
-        }
-
-        let response = request
-            .send()
-            .await
-            .map_err(|e| JobError::step("download", format!("{url}: {e}")))?;
-
+        let mut response = self.get(url, have).await?;
         let status = response.status();
-        if !status.is_success() {
-            return Err(JobError::step(
-                "download",
-                format!("{url}: server said {status}"),
-            ));
-        }
 
         // A server that ignored the Range header sends 200 with the WHOLE body.
         // Appending that to what is already on disk produces a file that is
         // plausible in size and corrupt in the middle, which surfaces much later as
-        // an unparseable line. Start over instead.
-        let resuming = have > 0 && status == reqwest::StatusCode::PARTIAL_CONTENT;
+        // an unparseable line. Start over instead. So does a 206 that does not start
+        // where it was asked to (see the module's note): it is a piece of the file, and
+        // not the piece that comes next.
+        let resuming = have > 0
+            && status == reqwest::StatusCode::PARTIAL_CONTENT
+            && range_start(&response) == Some(have);
         if have > 0 && !resuming {
             tracing::warn!(
-                "{url}: the server ignored our Range request, so the partial download \
-                 is discarded and this starts from the beginning"
+                status = %status,
+                asked_from = have,
+                answered_from = ?range_start(&response),
+                "{url}: the server did not continue from where the partial download stopped, \
+                 so it is discarded and this starts from the beginning"
             );
             have = 0;
+            if status == reqwest::StatusCode::PARTIAL_CONTENT {
+                drop(response);
+                response = self.get(url, 0).await?;
+            }
         }
 
         let total = response
@@ -198,6 +200,43 @@ impl Downloader {
             fetched: true,
         })
     }
+
+    /// `url`, from byte `from` when it is not 0; an error unless the server says yes.
+    async fn get(&self, url: &str, from: u64) -> Result<reqwest::Response, JobError> {
+        let mut request = self.client.get(url);
+        if from > 0 {
+            request = request.header(reqwest::header::RANGE, format!("bytes={from}-"));
+        }
+        let response = request
+            .send()
+            .await
+            .map_err(|e| JobError::step("download", format!("{url}: {e}")))?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(JobError::step(
+                "download",
+                format!("{url}: server said {status}"),
+            ));
+        }
+        Ok(response)
+    }
+}
+
+/// Where a `206`'s body starts in the file, from its `Content-Range` (`bytes 100-199/1000`);
+/// `None` when it does not say.
+fn range_start(response: &reqwest::Response) -> Option<u64> {
+    content_range_start(
+        response
+            .headers()
+            .get(reqwest::header::CONTENT_RANGE)?
+            .to_str()
+            .ok()?,
+    )
+}
+
+fn content_range_start(value: &str) -> Option<u64> {
+    let (first, _) = value.trim().strip_prefix("bytes ")?.split_once('-')?;
+    first.trim().parse().ok()
 }
 
 /// Verify a gzip file decompresses cleanly end to end.
@@ -232,6 +271,17 @@ pub fn verify_gzip(path: &Path) -> Result<u64, JobError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_content_range_says_where_its_bytes_start() {
+        assert_eq!(
+            content_range_start("bytes 69422516-329537567/329537568"),
+            Some(69_422_516)
+        );
+        assert_eq!(content_range_start("bytes 0-9/*"), Some(0));
+        assert_eq!(content_range_start("bytes */1000"), None);
+        assert_eq!(content_range_start("items 1-2/3"), None);
+    }
 
     #[test]
     fn percent_is_none_without_a_total() {

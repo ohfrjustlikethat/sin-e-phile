@@ -139,6 +139,16 @@ describe("SearchScreen backfill", () => {
     expect(ordered.map((h) => h.id)).toEqual([2, 4, 3, 5, 1, 6]);
   });
 
+  it("keeps the engine's order between films and anime films, and between series and anime series", () => {
+    const ordered = filmsFirst([
+      hit(1, "an anime series", "anime_series", "semantic"),
+      hit(2, "an anime film", "anime_film", "semantic"),
+      hit(3, "a film", "film", "semantic"),
+      hit(4, "a series", "series", "semantic"),
+    ]);
+    expect(ordered.map((h) => h.id)).toEqual([2, 3, 1, 4]);
+  });
+
   it("offers search by meaning at the top of the empty page, with its size (round 8)", async () => {
     // The author's install: never downloaded, and the offer under the results went unseen.
     commands.optionalAssets.mockImplementation(() =>

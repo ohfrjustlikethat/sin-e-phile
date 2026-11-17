@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 4.5.0** · 21 session(s) completed · last updated 2026-11-17
+**Spec version 4.6.0** · 21 session(s) completed · last updated 2026-11-17
 
 ---
 
@@ -53,7 +53,7 @@
 
 ## What's next
 
-Phase 16, round 9 (docs/design/author-brief-2026-11-17.md, "Round 9"; do not re-ask). Items 1 and 2 are done (search grid, title backdrop and poster; ADR-0052, spec 4.5.0). Next, item 3, pinned by the author: search by meaning (D90). (a) Log the error in download_optional_assets (src-tauri/src/commands/assets.rs) and reproduce the build on a fresh read-only copy of the author's database (C:/Users/hashi/AppData/Local/sin-e-phile/data, via sqlite's backup API) with the release exe; (b) ship the model, tokenizer and meaning file inside the installer (src-tauri/tauri.conf.json bundle resources; crates/catalogue/src/assets.rs looks beside the exe first) and build the index on first launch; amend ADR-0050 with an ADR. Then give the author the installer and close Phase 16 (exit criteria and Appendix F items in docs/phases/phase-16-ready-to-watch.md, evidence into PROJECT_STATE.json, carry E9 sign-off and Load a file by name, /closephase).
+Phase 16, round 9 is built (docs/design/author-brief-2026-11-17.md, "Round 9" status): search grid, title backdrop and poster (ADR-0052), search by meaning inside the installer (ADR-0053, D90 resolved). Next: give the author the installer from `npm run release` (target/release/bundle/nsis/) and their checks, then close Phase 16: go through docs/phases/phase-16-ready-to-watch.md's exit criteria and Appendix F items, record evidence for each in PROJECT_STATE.json, carry what waits on the author (E9 sign-off, Load a file) by name, and run /closephase.
 
 ---
 
@@ -194,7 +194,7 @@ Legend: `[x]` complete · `[~]` in progress · `[!]` blocked · `[?]` awaiting r
 - **D87** (raised in Phase 16) Two episodes of ONE season pack downloaded at the same time share one torrent in librqbit (one info hash): the second download's Rqbit::add moves the torrent to its own folder with its own only_files, taking over the first. One at a time works (crates/downloads/tests/queue.rs one_episode_of_a_season_pack_is_all_that_is_downloaded). Fix: widen the running torrent's only_files instead (librqbit can update the selection of a managed torrent), and file each finished episode separately.
 - **D88** (raised in Phase 16) src-tauri/src/logging.rs data_dir() is always data/ beside the exe and ignores SINEPHILE_DATA_DIR, and src-tauri/src/commands/downloads.rs puts Downloads there too; a run on a scratch data folder still logs and downloads beside the exe (seen 2026-11-17 in the end-to-end catalogue run). Logging should follow the data folder the app actually opened. Small; carried to Phase 16's close or 22.
 - **D89** (raised in Phase 16) On a new install the setup bar reads 'Downloading the catalogue · 0%' for the whole first load of the titles (about 17 minutes on the author's machine): the freshness step reports no progress, only the bootstrap's later steps do (crates/catalogue/src/bootstrap.rs percent, src/features/onboarding/CatalogueBuild.tsx). Seen 2026-11-17 in the fresh-install run. It looks stuck; it should count rows loaded. Small; Phase 16's close, else Phase 19 (the first-run mockups).
-- **D90** (raised in Phase 16) On the author's install, search by meaning downloaded completely (model 34 MB, tokenizer, the 329.5 MB meaning file with all 858,170 vectors; 2026-11-17 19:17 local) but no index was ever written, and pressing 'Build the index' did not build it. download_optional_assets (src-tauri/src/commands/assets.rs) returns its error to the screen without logging it, so the log is silent on why. The author also wants search by meaning shipped inside the installer. Pinned by the author until the end of round 9; fix in Phase 16 before it closes: log the error, reproduce on a fresh copy of their database, bundle the assets.
+- **D90** (raised in Phase 16) RESOLVED 2026-11-18 (ADR-0053, spec 4.6.0). On the author's install search by meaning downloaded but never built: the meaning file was corrupt mid-file (5,128,192 bytes, the file's own data 1,005,504 bytes late, from byte 69,422,516) because a resumed download trusted a 206 to start where it asked; the checksum caught it, then the bad file was kept, the screen judged it by its header, every build failed on it, and the button's error was never logged. Fixed: Content-Range checked on resume (crates/catalogue/tests/download.rs), a failed download deleted and files checked in full before use (crates/catalogue/tests/meaning_files.rs), errors logged, and the installer carries the files (npm run release; tools/bundle/check_meaning.py). Verified on a copy of their install (docs/eval-results.md, 2026-11-18).
 
 ---
 

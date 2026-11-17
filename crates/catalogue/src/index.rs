@@ -235,7 +235,8 @@ pub async fn build_with(
     keys: Option<&Keys>,
     mut progress: impl FnMut(usize, usize),
 ) -> Result<Built, JobError> {
-    let artefact_path = sinephile_embedding::artefact_path(data_dir);
+    // The installed copy when there is one (ADR-0053), else the downloaded one.
+    let artefact_path = crate::assets::MeaningFiles::find(data_dir).artefact;
     let mut file = std::fs::File::open(&artefact_path)?;
     let artefact =
         Artefact::read(&mut file).map_err(|e| JobError::step("vector-index", e.to_string()))?;

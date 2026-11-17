@@ -3069,3 +3069,17 @@ a tab (walks far down the index): documentary films 507 ms, war series 856, west
 | Before the fix, same copy | refused: "position 858169 is now id 2615642" | Search → Download |
 | "a heist where the plan goes wrong" | 20 results, titles, people and meaning: Tower Heist, Heist: Who Stole the American Dream?, Jimmywork, The Crew, Cash Out, Hell's Angels '69, Reindeer Games | same run, real window |
 | A new install, release build, fresh data folder (ADR-0050) | titles loaded in 18 min (2,735,153 titles, 432,462 episodes); stage A done, then `new install: fetching search by meaning` with no button pressed; download and index 79 s (indexed=119833); `search: hybrid` | `target/release/sin-e-phile.exe`, `SINEPHILE_DATA_DIR` = empty folder with stage A's three datasets; its log, 10:05:45 → 10:29:14 UTC |
+
+### Search by meaning, the author's broken install (Phase 16, round 9, 2026-11-18)
+
+Commit: this change (the round 9 meaning commit). Copy of the author's install made read-only with sqlite's backup API
+(9 s), their meaning files copied as they were.
+
+| Metric | Value | Command / how |
+|---|---|---|
+| The author's meaning file | 329,537,568 bytes, sha256 `6f92d2ae…`; the published file is `7f11415a…`. 5,128,192 bytes wrong from byte 69,422,516: the file's own data, 1,005,504 bytes late | `sha256sum`; byte compare with the dev copy and the fresh-install download (both `7f11415a…`) |
+| Its failure, reproduced and now logged | "checksum mismatch: the artefact is corrupt or was modified" | debug app on the copy, `target/debug/data/logs` |
+| Debug build, no installed copy: launch | corrupt file found and removed, nothing downloaded; Search offers "Download 314 MB" | same run, real window |
+| Debug build: press Download | downloaded, checked, 119,833 titles indexed, hybrid in 54 s | same run |
+| Release build with the installed copy (`npm run release`), the copy in the author's state | at launch: 364,263,390 bytes of superseded downloads removed, index built from the installed copy in 23 s (119,833 titles, 63.8 MB), hybrid, no button | `target/release/sin-e-phile.exe`, `SINEPHILE_DATA_DIR` = copy, `target/release/data/logs` |
+| `tools/bundle/check_meaning.py` | refuses the author's copy (exit 1), passes the published files (exit 0) | `python tools/bundle/check_meaning.py <dir>` |

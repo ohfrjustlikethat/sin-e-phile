@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "tauri": "tauri",
+    "release": "tauri build --config src-tauri/tauri.release.conf.json",
     "audit:ui": "node tools/uiaudit/run.mjs",
     "audit:controller": "node tools/uiaudit/controller.mjs",
     "audit:contrast": "python tools/contrast/audit.py"

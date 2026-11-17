@@ -64,8 +64,14 @@ WebView2 151.0.4129.107 · FFmpeg 9.0 — confirmed by a real `cargo new` /
 ```bash
 npm install
 npm run tauri dev      # development build with hot reload
-npm run tauri build    # production build
+npm run tauri build    # production build, without search by meaning's files
+npm run release        # the installer people get: carries search by meaning (ADR-0053)
 ```
+
+`npm run release` packs the language model, its tokenizer and the meaning file from `data/` (`data/models/` and
+`data/embeddings-bge-small-en-v1.5-int8.bin`) into `meaning/` beside the app, and refuses unless each one's
+sha256 is the published file's (`tools/bundle/check_meaning.py`). Get them once by running the app with this
+folder as its data folder and pressing Search → Download.
 
 *(From Phase 1. There is no application to build yet — Phase 0 is infrastructure.)*
 

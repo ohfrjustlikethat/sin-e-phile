@@ -56,8 +56,12 @@ const WHY_NOTE: Partial<Record<Why, string>> = {
   filter: "matched your filters",
 };
 
-/** The order kinds appear in. Films first because that is what most searches are for. */
-const KIND_ORDER = ["film", "anime_film", "series", "anime_series", "episode"] as const;
+/**
+ * The order kinds appear in: films first because that is what most searches are for, then shows, then episodes.
+ * An anime film is a film and an anime series a show: split, "anime about loneliness" put every live-action film
+ * the engine ranked lower ahead of the anime films it ranked higher (seen in the release build).
+ */
+const KIND_GROUP: Record<string, number> = { film: 0, anime_film: 0, series: 1, anime_series: 1, episode: 2 };
 
 /** The mark on a result that is not a film. */
 const KIND_MARK: Record<string, string> = {
@@ -76,10 +80,7 @@ const TIER: Record<Why, number> = { exact_title: 0, both: 1, keyword: 1, filter:
  * Within a tier and a kind the rank is kept, and an unknown kind goes last in its tier.
  */
 export function filmsFirst(hits: SearchHit[]): SearchHit[] {
-  const place = (kind: string) => {
-    const i = KIND_ORDER.indexOf(kind as (typeof KIND_ORDER)[number]);
-    return i < 0 ? KIND_ORDER.length : i;
-  };
+  const place = (kind: string) => KIND_GROUP[kind] ?? 3;
   return [...hits].sort((a, b) => TIER[a.why] - TIER[b.why] || place(a.kind) - place(b.kind));
 }
 

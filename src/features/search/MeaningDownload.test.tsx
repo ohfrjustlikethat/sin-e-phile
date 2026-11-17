@@ -62,6 +62,15 @@ describe("Search by meaning", () => {
     expect(commands.downloadOptionalAssets).not.toHaveBeenCalled();
   });
 
+  it("in setup, with the files the installer carried, says it comes with the app and downloads nothing (ADR-0053)", async () => {
+    catalogue.ready = false;
+    plan.current = { ...PLAN, assets: [{ ...MODEL, state: "present" }, { ...INDEX, state: "present" }], outstanding_bytes: 0 };
+    renderIt(true);
+    expect(await screen.findByText(/Comes with the app\. Its index is built on this PC/)).toBeInTheDocument();
+    expect(screen.queryByText(/MB/)).toBeNull();
+    expect(commands.downloadOptionalAssets).not.toHaveBeenCalled();
+  });
+
   it("shows setup's download while it runs, never a second button, and goes once it works", async () => {
     plan.current = { ...PLAN, running: true };
     renderIt(true);

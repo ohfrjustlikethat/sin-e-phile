@@ -2439,3 +2439,30 @@ first, about 8 across, every result the same size; a title's page with a backdro
 **Decisions taken (none reserved):** films first within match tiers rather than over the whole page (above); the "why"
 note shown only for meaning, near spelling, filters, and title-and-meaning; the backdrop's top edge faded with a mask.
 **Spec amendments:** 4.5.0, A41 (Appendix F's I80: backdrops now, from both sources; cast photos stay Phase 19).
+
+## 2026-11-18 — Phase 16, round 9: search by meaning inside the installer (D90)
+
+The pinned item. Read the author's install (read-only): the model and tokenizer were right, the meaning file was the right
+size with a sound header and 5,128,192 bytes wrong from byte 69,422,516 — the file's own data 1,005,504 bytes late. A
+resumed download had been answered from an earlier byte than it asked for, and the downloader trusted every `206`. The
+checksum caught it; then the bad file was kept, the screen judged files by their header, "Build the index" failed on the
+checksum every time, and the button's error was never logged. Reproduced on a copy: "checksum mismatch: the artefact is
+corrupt or was modified".
+
+- **Downloads:** a resume continues only when `Content-Range` starts where it asked, else the whole file again; a download
+  that fails its checks is deleted; before building, every file is checked in full; failures are logged. Tests serve a
+  file from a thread, honestly and not (`crates/catalogue/tests/download.rs`, `meaning_files.rs`), each seen to fail.
+- **The installer carries the files** (ADR-0053, spec 4.6.0, A42; the author's request): `npm run release` packs them
+  into `meaning/` beside the exe, refused unless they hash as published (`tools/bundle/check_meaning.py`, seen to refuse
+  the author's copy). The installed copy is read first, a superseded download removed, and the index builds by itself
+  once the catalogue is searchable; that path never downloads.
+- **Checked on a copy in the author's exact state**, release build: superseded downloads removed (364 MB), index built
+  from the installed copy in 23 s, hybrid, no button; "anime about loneliness in a big city" answers. Debug build without
+  an installed copy: the corrupt file removed at launch, "Download 314 MB" offered, and pressed: hybrid in 54 s.
+- **Search order:** films and anime films are one group (as are series and anime series), in the engine's order: split,
+  an anime query put live-action films ahead of the anime films ranked above them (seen in the release build).
+
+**Decisions taken (none reserved):** the release installer is built by `npm run release` (the plain `tauri build` stays
+without the files, for development, and CI does not bundle); the launch-time build never downloads, so an existing
+install without the files is still only offered them; a corrupt download found at launch is removed so the offer states
+the real cost. **Spec amendments:** 4.6.0, A42.

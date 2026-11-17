@@ -159,6 +159,9 @@ fn start(app: AppHandle, force: bool) -> bool {
             match &report {
                 Ok(r) => {
                     tracing::info!(?r, "catalogue built");
+                    // The catalogue is searchable: an installed copy builds its meaning index
+                    // now, from the files the installer carried (ADR-0053). Downloads nothing.
+                    crate::commands::assets::build_meaning_when_on_disk(&app);
                     if r.akas {
                         // Files named by their romaji or English titles are worth another look.
                         crate::commands::library::scan_all(&app).await;

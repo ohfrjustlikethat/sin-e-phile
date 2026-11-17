@@ -82,7 +82,7 @@ The application must be fully functional with no paid services. Every external d
 
 Nothing leaves the machine except explicit user-initiated requests to APIs they configured. No analytics, no crash reporting to a server, no "anonymous usage statistics". Crash logs are written locally. State this in the README as a feature.
 
-**Static asset downloads are permitted and are not a violation** (ADR-0014). Fetching the ONNX model, the IMDb and MovieLens datasets, or a precomputed embedding artefact published as a versioned GitHub Release asset is not "a server component" in the sense §5 forbids: there is nothing operated, nothing paid for, and nothing whose downtime degrades a running installation. A published embedding artefact is applied to an install **by IMDb id** (ADR-0051), never by the producer's row positions, which no install shares. Every such download must be **consented to, with its size shown, before it happens** — never fetched in the background, never assumed. **One stated exception** (ADR-0050, the author's decision): setting up a **new** install is consent to what setup says it fetches — the datasets, and the search model and meaning index, which setup starts once the catalogue is searchable and shows with their size. An existing install is offered them, never fetched unasked.
+**Static asset downloads are permitted and are not a violation** (ADR-0014). Fetching the ONNX model, the IMDb and MovieLens datasets, or a precomputed embedding artefact published as a versioned GitHub Release asset is not "a server component" in the sense §5 forbids: there is nothing operated, nothing paid for, and nothing whose downtime degrades a running installation. A published embedding artefact is applied to an install **by IMDb id** (ADR-0051), never by the producer's row positions, which no install shares. Every such download must be **consented to, with its size shown, before it happens** — never fetched in the background, never assumed. **One stated exception** (ADR-0050, the author's decision): setting up a **new** install is consent to what setup says it fetches — the datasets, and the search model and meaning index, which setup starts once the catalogue is searchable and shows with their size. An existing install is offered them, never fetched unasked. **An installed copy fetches nothing for search by meaning** (ADR-0053, the author's request): the installer carries the model, its tokenizer and the published meaning file, checked against the published hashes when the installer is built, and the index is built on the machine once the catalogue is searchable.
 
 ### 2.8 This specification is amendable — deliberately, never casually
 
@@ -1794,6 +1794,14 @@ Size: **S** one commit · **M** a subtask · **L** several subtasks.
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 4.6.0 — 2026-11-17 (search by meaning in the installer)
+
+Minor: a download replaced by a file the installer carries, at the author's request; no exit criterion changes.
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A42 | §2.7 | **Search by meaning ships inside the installer** (the author, round 9, after their install downloaded it and never built it: the meaning file was corrupt mid-file from a resume answered from the wrong byte, and the bad file was kept and judged by its header). The installer carries the three files, checked against the published hashes; the index builds on the machine once the catalogue is searchable; downloads that remain check where a resume starts, delete what fails, and are checked in full before use. | 0053 |
 
 ### spec_version 4.5.0 — 2026-11-17 (a title's backdrop)
 

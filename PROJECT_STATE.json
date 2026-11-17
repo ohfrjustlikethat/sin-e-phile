@@ -1,5 +1,5 @@
 {
-  "spec_version": "4.5.0",
+  "spec_version": "4.6.0",
   "project": "sin-e-phile",
   "last_updated": "2026-11-17",
   "sessions_completed": 21,
@@ -2558,7 +2558,7 @@
       ]
     }
   ],
-  "next_action": "Phase 16, round 9 (docs/design/author-brief-2026-11-17.md, \"Round 9\"; do not re-ask). Items 1 and 2 are done (search grid, title backdrop and poster; ADR-0052, spec 4.5.0). Next, item 3, pinned by the author: search by meaning (D90). (a) Log the error in download_optional_assets (src-tauri/src/commands/assets.rs) and reproduce the build on a fresh read-only copy of the author's database (C:/Users/hashi/AppData/Local/sin-e-phile/data, via sqlite's backup API) with the release exe; (b) ship the model, tokenizer and meaning file inside the installer (src-tauri/tauri.conf.json bundle resources; crates/catalogue/src/assets.rs looks beside the exe first) and build the index on first launch; amend ADR-0050 with an ADR. Then give the author the installer and close Phase 16 (exit criteria and Appendix F items in docs/phases/phase-16-ready-to-watch.md, evidence into PROJECT_STATE.json, carry E9 sign-off and Load a file by name, /closephase).",
+  "next_action": "Phase 16, round 9 is built (docs/design/author-brief-2026-11-17.md, \"Round 9\" status): search grid, title backdrop and poster (ADR-0052), search by meaning inside the installer (ADR-0053, D90 resolved). Next: give the author the installer from `npm run release` (target/release/bundle/nsis/) and their checks, then close Phase 16: go through docs/phases/phase-16-ready-to-watch.md's exit criteria and Appendix F items, record evidence for each in PROJECT_STATE.json, carry what waits on the author (E9 sign-off, Load a file) by name, and run /closephase.",
   "blockers": [
     {
       "id": "B16",
@@ -2864,6 +2864,11 @@
     {
       "id": "0052",
       "title": "A title's backdrop, from the poster sources the person chose",
+      "date": "2026-11-17"
+    },
+    {
+      "id": "0053",
+      "title": "Search by meaning ships inside the installer",
       "date": "2026-11-17"
     }
   ],
@@ -3330,7 +3335,7 @@
     {
       "id": "D90",
       "phase_raised": 16,
-      "text": "On the author's install, search by meaning downloaded completely (model 34 MB, tokenizer, the 329.5 MB meaning file with all 858,170 vectors; 2026-11-17 19:17 local) but no index was ever written, and pressing 'Build the index' did not build it. download_optional_assets (src-tauri/src/commands/assets.rs) returns its error to the screen without logging it, so the log is silent on why. The author also wants search by meaning shipped inside the installer. Pinned by the author until the end of round 9; fix in Phase 16 before it closes: log the error, reproduce on a fresh copy of their database, bundle the assets."
+      "text": "RESOLVED 2026-11-18 (ADR-0053, spec 4.6.0). On the author's install search by meaning downloaded but never built: the meaning file was corrupt mid-file (5,128,192 bytes, the file's own data 1,005,504 bytes late, from byte 69,422,516) because a resumed download trusted a 206 to start where it asked; the checksum caught it, then the bad file was kept, the screen judged it by its header, every build failed on it, and the button's error was never logged. Fixed: Content-Range checked on resume (crates/catalogue/tests/download.rs), a failed download deleted and files checked in full before use (crates/catalogue/tests/meaning_files.rs), errors logged, and the installer carries the files (npm run release; tools/bundle/check_meaning.py). Verified on a copy of their install (docs/eval-results.md, 2026-11-18)."
     }
   ],
   "_comment": "Phase table generated from SPEC.md 15 by tools/state/build_state.py, so it cannot drift from the specification. Live fields (status, evidence, subtasks) are preserved across regeneration. CI runs --check."

@@ -277,4 +277,9 @@ the author's database (its write-ahead log was 3.7 GB at the time).
 |---|---|---|
 | Search shows films, other kinds only after scrolling | One poster grid, about 8 across, 48 results; films first among equally good matches (strictly first buried the Twin Peaks series under 40 films found only by meaning, seen in the real window); kind marked, a quiet note where the match is not visible | aebfb44 |
 | A title's page: empty space where the poster should be | A faded still behind the top and the poster on the right, from the poster sources chosen (ADR-0052, spec 4.5.0, A41); the lettered card without a poster | aebfb44 |
-| Search by meaning does not build | Pinned by the author until the end of the round (D90) | |
+| Search by meaning does not build | Their download was corrupt mid-file (a resume answered from the wrong byte), kept, and judged by its header; every build failed on it, unlogged. Resumes check `Content-Range`, bad downloads are deleted, files are checked in full, errors logged; **the installer carries the files** and the index builds by itself (ADR-0053, spec 4.6.0) | this round's meaning commit |
+| Films first buried anime films under live-action ones | Films and anime films are one group, series and anime series another, in the engine's order | same |
+
+**For the author to try:** install the new installer over the old one (about 350 MB larger). At the next start the
+index builds by itself in about half a minute, with nothing downloaded and no button; your corrupt download is removed.
+Then search "a heist where the plan goes wrong" or "anime about loneliness in a big city".

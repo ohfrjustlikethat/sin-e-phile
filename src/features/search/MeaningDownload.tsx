@@ -160,7 +160,12 @@ export function MeaningDownload({ onDone, setup = false }: { onDone?: () => void
       )}
 
       {setup && !running ? (
-        <SetupStart size={size} action={action} onStart={() => void start()} />
+        <SetupStart
+          size={size}
+          installed={plan.outstanding_bytes === 0}
+          action={action}
+          onStart={() => void start()}
+        />
       ) : running ? (
         <p className="mt-5 text-[13.5px] text-ink" role="status">
           {doing} Search works meanwhile.
@@ -171,7 +176,7 @@ export function MeaningDownload({ onDone, setup = false }: { onDone?: () => void
           <span className="text-[13.5px] text-ink-muted">
             {plan.outstanding_bytes > 0
               ? "Optional. Nothing is downloaded until you choose to."
-              : "Everything is downloaded; the index is built from it on this PC."}
+              : "Everything it needs is on this PC; the index is built from it here."}
           </span>
         </div>
       )}
@@ -197,12 +202,25 @@ export function MeaningDownload({ onDone, setup = false }: { onDone?: () => void
  * itself once it is, so this says so; once the catalogue is ready and nothing started it (an install set up before),
  * it is the button. The catalogue's status is read with the same key and shape as everywhere else.
  */
-function SetupStart({ size, action, onStart }: { size: string; action: string; onStart: () => void }) {
+function SetupStart({
+  size,
+  installed,
+  action,
+  onStart,
+}: {
+  size: string;
+  /** The installer carried the files (ADR-0053): nothing to download, only the index to build. */
+  installed: boolean;
+  action: string;
+  onStart: () => void;
+}) {
   const catalogue = useQuery({ queryKey: CATALOGUE, queryFn: () => ok(commands.catalogueStatus()) });
   if (catalogue.data && !catalogue.data.ready) {
     return (
       <p className="mt-5 text-[13.5px] text-ink">
-        Downloads by itself, {size}, as soon as your catalogue can be searched.
+        {installed
+          ? "Comes with the app. Its index is built on this PC as soon as your catalogue can be searched."
+          : `Downloads by itself, ${size}, as soon as your catalogue can be searched.`}
       </p>
     );
   }

@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **4.5.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **4.6.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -299,7 +299,9 @@ long-running series the feature exists for, and a confidently wrong number is wo
 than a NULL. AniList also paginates only to 5,000 entries, so its catalogue is swept
 per `seasonYear`.
 
-**Search by meaning arrives with a new install** (ADR-0050): setup starts the 347 MB model and meaning index once the
+**Search by meaning ships inside the installer** (ADR-0053): `npm run release` carries the model, tokenizer and meaning
+file in `meaning/` beside the exe (refused unless they hash as published), and the index builds once the catalogue is
+searchable. A copy without them falls back to ADR-0050: setup starts the 347 MB model and meaning index once the
 catalogue is searchable, and says so with the size; an existing install is offered it (Search, Settings), never fetched
 unasked. Every other optional download stays behind a button with its size (ADR-0014).
 
@@ -460,7 +462,8 @@ python tools/statecheck/check.py         # is the repo resumable by a cold sessi
 python tools/phasedoc/generate.py --log N  # keep the phase doc current
 
 npm run tauri dev          # run the app in development
-npm run tauri build        # production build
+npm run tauri build        # production build (no search-by-meaning files)
+npm run release            # the installer: carries search by meaning (ADR-0053)
 cargo test --workspace     # Rust tests (never from inside src-tauri)
 cargo fmt && cargo clippy -- -D warnings
 npm test                   # frontend tests

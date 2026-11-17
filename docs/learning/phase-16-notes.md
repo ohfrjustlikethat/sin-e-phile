@@ -79,6 +79,9 @@ test passed. Four sections per ADR-0016 (A4).
   floated 80 px up with black beneath; the window is now un-maximised first and maximised again after.
 - **Search as one poster grid** (round 9): Home's cards, about eight across, films first among equally good matches,
   each other kind marked; a title's page has a faded still behind its top and the poster on the right (ADR-0052).
+- **Search by meaning inside the installer** (round 9, ADR-0053): the author's download was corrupt mid-file (a resume
+  answered from the wrong byte), kept, and judged by its header, so the build failed forever without a log line. The
+  installer now carries the files; downloads check where a resume starts, delete what fails, and are read in full.
 
 ## 2. Why
 
@@ -187,6 +190,14 @@ test passed. Four sections per ADR-0016 (A4).
 - **One function choosing a field by a function pointer**: `fn(Posted) -> Option<String>` picks poster or backdrop
   from one TMDB answer — `crates/metadata-api/src/tmdb.rs` `image_url`.
 - **A CSS mask to fade an image's edge** without painting over it — `src/features/detail/DetailScreen.tsx` `Backdrop`.
+- **HTTP range requests and `Content-Range`**: a `206` says where its bytes start; trust that, not the request —
+  `crates/catalogue/src/download.rs` `range_start`.
+- **A header check versus a full check**: cheap enough for a screen, blind to a corrupt middle —
+  `crates/catalogue/src/assets.rs` `state_of`, `verified_state`.
+- **Tauri resources and a merged release config** (`--config`): files beside the exe, only for the installer —
+  `src-tauri/tauri.release.conf.json`, `crates/catalogue/src/assets.rs` `MeaningFiles`.
+- **A test HTTP server on a plain thread** (`std::net::TcpListener`), honest or not on purpose —
+  `crates/catalogue/tests/download.rs` `serve`.
 
 ## 4. Five questions
 
