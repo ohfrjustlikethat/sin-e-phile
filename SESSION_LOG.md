@@ -2506,3 +2506,23 @@ test passed before its fix, which a check that has never been seen to fail would
 
 **Carry forward.** Before giving the author an installer: a fresh install and a second launch on a scratch folder, in
 the real window, as a standing step. To Phase 19's author batch: Phase 7 E7, Phase 14 E4 and E6, D89, D91.
+
+## 2026-11-18 — Phase 17 opened: the item-item matrix (17.1, first half)
+
+Phase 16 merged (14bf49a) after branch CI passed; the close recorded on main (f050b24) and Phase 17 opened from SPEC.md
+section 15 with the subtasks authored before ADR-0045's renumbering, the received author checks moved to Phase 19.
+
+- **`crates/recommend`** (new, std only): likes indexed by person and by item, co-occurrence item by item on scoped
+  threads, one score family (asymmetric cosine with shrinkage), the top 50 neighbours per title; a hash split of
+  MovieLens users, 80/10/10, so nothing is judged on the people it learned from.
+- **Tuned, then judged** (`eval recommend`): alpha 0.65 chosen on the tuning users as the best recall whose coverage
+  clears 15%; on the test users Recall@20 0.2855 against popularity 0.1640 (+74.1%), coverage 16.4%.
+- **Stored and built over the catalogue**: migration 0029, `NeighbourRepository` (surface lines),
+  `catalogue::neighbours::build`, `ingest neighbours`: 989,600 rows in 10.4 s on the development copy, 199 MB peak.
+  Found on the way: a row kept the room of everything its item touched, about 1 GB; one buffer per thread, 137 MB.
+- Every new test seen to fail by a mutation.
+
+**Decisions taken (none reserved):** the score is chosen by a rule fixed before the test users were read (best recall
+whose coverage clears 15%); the matrix is built from every MovieLens user in the app, and only the evaluation splits
+them; the first run will fetch ml-25m as enrichment (the brief's item 3 named MovieLens in stage B) and delete it once
+built. **Spec amendments:** none.

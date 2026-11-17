@@ -15,7 +15,7 @@
       {
         "id": "17.1",
         "text": "Layer 2, item-item collaborative filtering (crates/recommend, new): built on this machine from the MovieLens ratings streamed from the archive (never stored or shipped, ADR-0019/ADR-0044), positive co-occurrence normalised against popularity (cosine with shrinkage, or lift damped by log popularity, chosen on a tuning split) so an obscure favourite can outrank a blockbuster; the top neighbours per title persisted (migration 0029, repository methods with surface lines); titles with no ratings fall back to content neighbours (cold start).",
-        "status": "not_started",
+        "status": "in_progress",
         "commit": null
       },
       {
@@ -1989,7 +1989,7 @@
         {
           "id": "17.1",
           "text": "Layer 2, item-item collaborative filtering (crates/recommend, new): built on this machine from the MovieLens ratings streamed from the archive (never stored or shipped, ADR-0019/ADR-0044), positive co-occurrence normalised against popularity (cosine with shrinkage, or lift damped by log popularity, chosen on a tuning split) so an obscure favourite can outrank a blockbuster; the top neighbours per title persisted (migration 0029, repository methods with surface lines); titles with no ratings fall back to content neighbours (cold start).",
-          "status": "not_started",
+          "status": "in_progress",
           "commit": null
         },
         {
@@ -2543,7 +2543,7 @@
       ]
     }
   ],
-  "next_action": "Phase 17, subtask 17.1: create crates/recommend (a new workspace member in Cargo.toml) with the item-item matrix built from the MovieLens archive on disk, streaming ratings.csv the way crates/catalogue/src/movielens.rs scan_ratings does and mapping movieId through the external_ids join that catalogue_by_imdb reads (ratings never stored, ADR-0019); co-occurrence of positive ratings (4.0 and up) scored by cosine with shrinkage against lift damped by log popularity, chosen on a tuning split in fixtures/recommender/; the top 50 neighbours per title persisted by crates/persistence/migrations/0029_item_neighbours with a repository whose every method has a line in crates/persistence/tests/repository_surface.rs. Read docs/phases/phase-17-recommendation-engine.md first.",
+  "next_action": "Phase 17, 17.1 (the rest; the matrix itself is built, stored and measured: c5a501d, 516d2c9): add it to the first run's enrichment in crates/catalogue/src/bootstrap.rs. A NEIGHBOURS step after ANIME in `run` that fetches ml-25m.zip (Downloader, then movielens::verify_md5 against ML25M_MD5), writes the join (links + catalogue_by_imdb + load, moved out of tools/ingest/src/main.rs `movielens` into crates/catalogue so both share it), builds with crates/catalogue/src/neighbours.rs `build`, and adds ml-25m.zip to SPARE so tidy deletes it after. A failed fetch (files.grouplens.org has served an expired certificate, movielens.rs) is logged and leaves the step owed rather than failing the run; label() names it for the setup bar; a bootstrap test with a local archive. Then 17.2: the ranker in crates/recommend/src/rank.rs (candidates from the taste modes' nearest, NeighbourRepository::of_many over liked titles, and popularity; MMR with caps; timed).",
   "blockers": [
     {
       "id": "B16",

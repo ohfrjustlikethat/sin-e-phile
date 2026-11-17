@@ -64,4 +64,3 @@ Collaborative versus content-based filtering; the item-item matrix and why it wo
   where the vector index already is.
 
 ## Work log
-
