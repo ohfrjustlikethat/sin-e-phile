@@ -3072,7 +3072,7 @@ a tab (walks far down the index): documentary films 507 ms, war series 856, west
 
 ### Search by meaning, the author's broken install (Phase 16, round 9, 2026-11-18)
 
-Commit: this change (the round 9 meaning commit). Copy of the author's install made read-only with sqlite's backup API
+Commit: c4c1fcc. Copy of the author's install made read-only with sqlite's backup API
 (9 s), their meaning files copied as they were.
 
 | Metric | Value | Command / how |
