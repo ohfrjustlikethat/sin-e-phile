@@ -4,129 +4,81 @@
   "last_updated": "2026-11-18",
   "sessions_completed": 21,
   "current_phase": {
-    "number": 16,
-    "slug": "ready-to-watch",
-    "title": "Ready to Watch",
+    "number": 17,
+    "slug": "recommendation-engine",
+    "title": "Recommendation Engine",
     "status": "in_progress",
-    "branch": "phase/16-ready-to-watch",
-    "started_at": "2026-11-08T05:28:30Z",
-    "note": "Inserted by spec 4.0.0 (ADR-0045) after the author used the release build. Receives the author batch: Phase 8 E5, Phase 14 E1 and Phase 15 E3 discharged here from the author's answers of 2026-11-08; Phase 7 E7 and Phase 14 E4/E6 to be met here (16.10). Judge by using the release build as a person would, not only by fixtures.",
+    "branch": "phase/17-recommendation-engine",
+    "started_at": "2026-11-17T18:13:36Z",
+    "note": "Builds on Phase 15's taste modes and axes. The author checks once batched for this phase (before ADR-0045 renumbered it) now sit with Phase 19's sign-off: Phase 7 E7, Phase 14 E4 and E6.",
     "subtasks": [
       {
-        "id": "16.1",
-        "text": "TV shows from folders (crates/library): the show from its folder (`Show (Year)`), the season from a `Season N` subfolder, the episode from the file; flat `S01E03` files under a show folder; anime absolute numbers mapped per season where the data allows (never cumulated, ADR-0031); one show across folders or drives merged; no episode ever filed as a film. A TV-layout corpus in fixtures/ including a Twin Peaks-like case, judged by eval identify (E4); then the author's real folder rescanned on the release build.",
-        "status": "complete",
-        "commit": "cabf03d"
+        "id": "17.1",
+        "text": "Layer 2, item-item collaborative filtering (crates/recommend, new): built on this machine from the MovieLens ratings streamed from the archive (never stored or shipped, ADR-0019/ADR-0044), positive co-occurrence normalised against popularity (cosine with shrinkage, or lift damped by log popularity, chosen on a tuning split) so an obscure favourite can outrank a blockbuster; the top neighbours per title persisted (migration 0029, repository methods with surface lines); titles with no ratings fall back to content neighbours (cold start).",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "16.2",
-        "text": "The catalogue refreshes itself (ADR-0030 made automatic): a background job once a day while idle fetches IMDb's updated basics, ratings and episode files and adds titles and episodes past what is stored; AniList airing every few hours; TMDB now-playing and airing for a profile with a key; Settings says when it last ran and offers 'refresh now' (E5).",
-        "status": "complete",
-        "commit": "345e392"
+        "id": "17.2",
+        "text": "Layer 1 and Layer 3, the hybrid ranker: about 1,000 candidates cheaply (each taste mode's nearest in embedding space, the CF neighbours of what was liked, the popularity pool), scored by a blend of content similarity, CF, the popularity prior, the axes (boosts) and avoids (penalties), availability and freshness; maximal marginal relevance with caps per director, franchise and year; ranking 1,000 candidates timed (E5, under 150 ms).",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "16.3",
-        "text": "Home in the specified order: Continue watching; New episodes of your shows; Your library (newest added first, shown the moment a scan finishes, by event); New releases filtered by taste; then the taste rails (E6).",
-        "status": "complete",
-        "commit": "394b11e"
+        "id": "17.3",
+        "text": "Explanations: every recommendation carries a reason built from the signal that put it there (the liked titles behind a CF score, the mode behind a content score, the axis behind a boost), tested so that every reason names something true of the profile (E4); Home's taste rails use the ranker and show the reasons, pad-complete.",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "16.4",
-        "text": "The controller in the player (TV-standard: A, left/right seek with hold to scrub, up/down volume, LB/RB episode or chapter, Y subtitles quick menu, X audio quick menu, Menu panel, B back) and the right stick scrolling everything: page, panel, rail, the paused details, speed by deflection, focus following (E3).",
-        "status": "complete",
-        "commit": "0367901"
+        "id": "17.4",
+        "text": "fixtures/recommender/ and eval recommend: Recall@20 against popularity on a held-out split (E1, more than 40% relative), catalogue coverage over the users (E2, above 15%), intra-list diversity against a documented target and no rail dominated by one director, franchise or year (E3), ranking time (E5); seen to fail for each.",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "16.5",
-        "text": "The hybrid player: clean while watching; the full panel (subtitles, style, sync, audio, speed, picture); controls answering in under 100 ms; opening, closing, bar and panels without jumps or flicker, measured in the UI audit (E1).",
-        "status": "complete",
-        "commit": "989c481"
-      },
-      {
-        "id": "16.6",
-        "text": "Subtitles in the player: a live style editor kept per profile; find and download from OpenSubtitles in playback; sync in 0.1 s steps with 'align again'; load a file from disk; all by pad (E2).",
-        "status": "complete",
-        "commit": "2416ab6"
-      },
-      {
-        "id": "16.7",
-        "text": "A first run that leaves the viewer ready to watch: library folders (scan starts at once), add-ons by address with a live check (the app suggests none, §2.1), TMDB and OpenSubtitles keys with links and live tests, the download backend with the VPN check; honest no-source states wherever play or download would be (E7).",
-        "status": "complete",
-        "commit": "c1cd70c"
-      },
-      {
-        "id": "16.8",
-        "text": "SETUP.md: every prerequisite with its official link and how to add it to the app, and how to add any add-on by its address; names no content source; passes the guard (E8).",
-        "status": "complete",
-        "commit": "42533a9"
-      },
-      {
-        "id": "16.9",
-        "text": "Polish: Settings section headings clear and larger in the display face; the taste screen (films as cards, clearer hierarchy, live Home preview, fewer words); first run and Home audited for layout, clipping, focus jumps and content flashes at three window sizes, with automated checks added to the UI audit.",
-        "status": "complete",
-        "commit": "511a621"
-      },
-      {
-        "id": "16.10",
-        "text": "The author batch: sign-off on a screenshot set (player, first run, Home, Settings, taste screen; Phase 14 E4/E6 with it), a download and a stream with a source of their choosing (Phase 7 E7's VPN cut with it); docs/specs, learning note, README and HOW_IT_WORKS, regression, close (E9).",
-        "status": "complete",
-        "commit": "f2dd945"
+        "id": "17.5",
+        "text": "The case study (docs/case-studies/recommender.md) with real numbers (E6); docs/specs/recommender.md, learning note, README and HOW_IT_WORKS, regression, close.",
+        "status": "not_started",
+        "commit": null
       }
     ],
     "exit_criteria": [
       {
         "id": "E1",
-        "text": "The player is hybrid as specified, every panel option is reachable by pad, controls respond in under 100 ms of input, and opening and closing show no flicker, all measured in the UI audit.",
-        "met": true,
-        "evidence": "7776473, 2c1cd5b (2026-11-16), met again after the reopen. The panel now has the picture's shape (as filmed, 16:9, 4:3, 2.35:1, fill the screen) and zoom (50-300%) beside brightness, contrast and saturation: crates/player/src/player.rs framing_tests and crates/player/tests/playback.rs the_shape_and_zoom_reach_the_playing_film (seen to fail before set_framing existed). node tools/uiaudit/controller.mjs (2026-11-16, 2c1cd5b): 'the D-pad reaches every control in the player panel (40/40; missed: none)', the walk seen to fail with the Speed section inert (20/34). 16.5's real-window measurement (docs/eval-results.md 'The player, measured in its real window'): intent to video-region change ~14 ms (under 100 ms); the video window hidden until the first frame (430 ms), so no black flash on open; hidden 7 ms after Back on close; the menu cut out of the video ('2 -> 3 holes', seen to fail without data-cutout); the bar glides between reports (src/features/player/intents.ts glide, unit-tested). Spec: docs/specs/ready-to-watch.md section 1."
+        "text": "Recall@20 beats a popularity baseline by > 40% relative on a held-out split — i.e. `(recall_model / recall_baseline) - 1 > 0.40`, not 40 percentage points.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E2",
-        "text": "Subtitles: the style editor applies live and persists per profile; find and download, sync in 0.1 s steps, and load from disk each work in the player, by pad.",
-        "met": true,
-        "evidence": "1863bcb, 803a1c4 (2026-11-18, round 10), met. Load a file in the real window: the debug build playing a generated clip, the panel's 'Load a file…' clicked, Windows' picker ('Load subtitles', offering 'Subtitles (*.srt;*.ass;*.ssa;*.vtt;*.sub)') with a path typed and Enter: the cue on the picture, the track listed 'clip-test' as now showing, the panel saying 'Showing the file (not aligned (no speech found in the audio); loaded as it is)' (docs/eval-results.md 'Load a file, in the real window'). The D-pad reaches and A presses 'Load a file…' (node tools/uiaudit/controller.mjs: 'the D-pad reaches every control in the player panel (40/40)'); inside Windows' own picker a file is chosen by keyboard or mouse, and a pad-only way to choose one is carried as D91 to Phase 19. Unit: src/features/player/SubtitleTools.test.tsx 'loads a file from disk…' (seen to fail with the button disconnected); crates/subtitles files::tests::the_picker_offers_every_subtitle_kind_and_a_loaded_file_keeps_its_name (seen to fail). Held from before (2026-11-16): node tools/uiaudit/controller.mjs, in the player by pad: Menu, the D-pad to 'Find subtitles', the first found, A downloads and shows it and says so; 'A on Subtitles later moves them 0.1 s, and says so (Subtitles +0.1 s)'; 'A on Larger subtitles sets the style for this profile (size 46 -> 50)' (seen to fail before rescueFocus kept focus in the open panel: 'no button Subtitles later (nothing has focus)'). Live: 16.6's real window read mpv back after the style changed (sub-color=#FFFFD400 sub-border-size=5.000000). Per profile: set_subtitle_settings stores it with CredentialRepository::set(profile, ...), crates/persistence/tests/credentials.rs keys_are_per_profile_and_do_not_leak_between_them; src/features/player/SubtitleTools.test.tsx 'changes the style live and keeps it for the profile'. Find and download: crates/subtitles/tests/chain.rs the_viewer_chooses_among_the_offers_and_only_a_download_spends_the_budget."
+        "text": "Catalogue coverage > 15% — the recommender does not only ever surface the same 2,000 films.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E3",
-        "text": "The controller works in the player as specified, and the right stick scrolls pages, rails, panels and the paused details, each covered by the pad-flow audit.",
-        "met": true,
-        "evidence": "2c1cd5b (2026-11-16): node tools/uiaudit/controller.mjs, 'the whole flow works with only a pad'. In the player: A pauses; Up raises the volume (105) and says so; Y opens the subtitles menu with focus on its first choice, cut out of the video (2 -> 3 holes), Down inside it does not change the volume, A picks and closes; X opens the sound menu, Down and A choose the second track (German); RB goes to the next chapter (10:00) and says which, LB restarts the one playing (0:00); Right seeks 10 s once per press; Left held 0.9 s scrubs back 5 steps; Menu opens the panel, every control reached (40/40); RT seeks 30 s; B leaves. The right stick scrolls: a 24-card rail sideways (0 -> 970) with focus following onto a card in view; the player panel (349 -> 0); the paused film's details (636); the Settings page (0 -> 1095) with focus following. Seen to fail: rail 0 -> 0 before snapping was suspended; panel 349 -> 349 before a dialog held the D-pad, 349 -> 318 before the follow was held in the dialog. Unit: src/lib/gamepad.test.ts 'focus and the right stick, on a page (Phase 16)', four tests, each seen to fail with its fix removed; 'maps the player buttons as ADR-0045's TV-standard table says'. Spec: docs/specs/ready-to-watch.md sections 2-3."
+        "text": "Intra-list diversity meets the documented target; no rail is dominated by one director, franchise, or year.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E4",
-        "text": "A TV-layout corpus (season folders, flat, anime absolute, split across drives, including a real-world case like the author's) is identified with at least 98% of episodes right and no episode filed as a film.",
-        "met": true,
-        "evidence": "cabf03d: cargo run --release -p eval -- tvlayouts (2026-11-08) over fixtures/tv-layouts/layouts.psv (184 files: the author's Twin Peaks layout with groups replaced, season folders, flat, anime fansub numbering, one show split across three folders): episodes 59/59 = 100%, 0 filed as films, the nested film 1/1, extras 105/105 left out and 0 searched for. Seen to fail: --before (no extras rule) searches all 105 extras as titles; crates/library/tests/scan.rs a_shows_extras_are_left_out_and_its_episodes_and_film_kept and tests/identify.rs a_fansub_number_is_the_episode_only_when_the_show_has_one_season each fail with their rule removed. On the author's real folder (eval tvlayouts --folder, read-only): 102 extras left out, 48 episodes under Twin Peaks (1990), the film found, 0 to review. eval identify unchanged (523/528, 2/510; 108/108, 0/103). docs/eval-results.md."
+        "text": "Every recommendation has a truthful explanation.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E5",
-        "text": "The catalogue refreshes daily in the background: titles and episodes released since the last refresh appear without the user doing anything, and a run on the real data adds the recent releases it lacked.",
-        "met": true,
-        "evidence": "345e392: the app checks hourly from launch (src-tauri/src/commands/catalogue.rs keep_current -> sinephile_catalogue::freshness::refresh), an interrupted refresh finished first and resumed from its starting watermark, episodes refreshed with titles (followed series whatever their votes), AniList airing every 6 h. Real data (2026-11-08, target/release/ingest.exe keep, the same function): the refresh stuck since 2026-11-07 finished, 885 titles added (300 films of 2026) and 7,951 episodes, 86 s. Tests: crates/catalogue/tests/refresh.rs an_interrupted_refresh_is_finished_before_the_publisher_is_asked and a_resumed_refresh_reads_past_the_watermark_it_started_from, each seen to fail with its fix removed (the first returns AlreadyCurrent). docs/eval-results.md."
+        "text": "Ranking 1,000 candidates completes in < 150 ms on Tier 0.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E6",
-        "text": "Home's rails are in the specified order, and a finished library scan appears on Home within 2 s.",
-        "met": true,
-        "evidence": "2026-11-16, measured in the real app. Order: crates/taste/tests/home.rs home_is_in_the_authors_order_with_new_episodes_the_library_and_new_releases (Continue watching, New episodes, Your library, New releases, the taste rails, Watchlist, Widely loved). Scan to Home: the debug build on a copy of the 4 GB catalogue database (SINEPHILE_DATA_DIR in scratch, never the original), its library folder pointed at generated films named and timed as real catalogue titles, emptied before each launch so the launch rescan adds them; the probe (src/features/player/useDropToPlay.ts, SINEPHILE_PROBE) logs the scan's 'done' event and polls each frame for the first card of the 'Your library' rail. 5 films: shown 28 ms after the scan finished (page received 'done' 0.4 ms after the backend logged it; rail absent 0.5 s before). 200 films (the 200 most-voted, scanned in 1,519 ms, 198 accepted, 2 asked): shown 38 ms after. Budget 2 s. Seen to fail: Home's refetch on 'done' disabled, 'home library not shown within 10 s of the scan finishing'. Tier 2 dev machine, debug build; the margin is ~50x. docs/eval-results.md 'E6: a finished scan on Home'."
-      },
-      {
-        "id": "E7",
-        "text": "A first run done only by pad leaves library folders, an add-on the user chose, keys and a download backend configured and tested; with no source, the app says so wherever play or download would be.",
-        "met": true,
-        "evidence": "af1be92 (2026-11-16): node tools/uiaudit/controller.mjs, the first run done only by pad, each step saying it took: 'first run, by pad: a library folder typed and added (d:\films)'; 'an add-on chosen by its address, looked at, then added (https://a.example/m.json)'; 'an OpenSubtitles key typed, checked and saved'; 'a TMDB key typed, checked and saved'; 'A on a list (the network adapter) opens it by pad, focus on the current choice'; 'A chooses the VPN's adapter; the list closes, focus back on it'; 'downloads bound to the VPN's adapter, and saved'; then 'after a first run that set everything up by pad, Home has nothing left to set up'. 104 checks, all with only a pad. Found on the way and fixed, each seen to fail: no select could be changed by pad (src/app/PadPicker.tsx; without it the flow times out waiting for the adapter list), no slider either (gamepad.ts adjustValue), a self-disabling button dropped focus to the page ('no button Continue' before rescueFocus), and a long step's fields sat under the sticky footer ('could not reach Start watching' before scroll-pb-32). The real backend's checks: crates/subtitles/tests/chain.rs a_key_is_checked_when_it_is_entered; crates/metadata-api tmdb.rs a_key_is_checked_and_a_refused_one_says_so; crates/sources/tests/addons.rs paste_describe_install_find_resolve; crates/torrent/tests/binding.rs bound_to_one_adapter_traffic_never_leaves_by_another. No source: src/features/detail/DetailScreen.test.tsx 'says why nothing can play' (the title page, which episode rows and search results open, is where play and download are). Unit: src/app/PadPicker.test.tsx, src/lib/gamepad.test.ts (sliders, focus rescue, a screen that goes), each seen to fail. A real controller in hand stays in the author batch as confirmation."
-      },
-      {
-        "id": "E8",
-        "text": "`SETUP.md` lists every prerequisite with its official link and how to add it, and passes the posture guard.",
-        "met": true,
-        "evidence": "42533a9: SETUP.md at the repository root, linked from README.md 'Set it up': WebView2, FFmpeg, libmpv, the catalogue (self-updating), library folders, add-ons by address (Settings, Sources, Add a source: preview before install), OpenSubtitles and TMDB keys (official sign-up pages, checked on save), qBittorrent (transport only, ADR-0029), VPN adapter binding, controller; each with its official source and how to add it. Names no content source. python tools/guard/guard.py --tree: clean; --selftest: all 54 checks passed (the guard fires when it should)."
-      },
-      {
-        "id": "E9",
-        "text": "The author signs off a screenshot set of the player, first run, Home, Settings and the taste screen, and confirms a download and a stream work with a source of their choosing.",
-        "met": true,
-        "evidence": "manual: the author installed and used the release build through ten rounds of fixes, 2026-11-17 to 2026-11-18 (docs/design/author-brief-2026-11-17.md), judging the screens themselves rather than a separate screenshot set: the player, the first run (reshaped from their rounds 1 and 3), Home, Settings, the taste screen. A stream through an add-on of their choosing played (first frame 6.3 s, from their install's log, 2026-11-17); 'Downloading works' (round 8, 2026-11-17). Signed off after round 9: 'everything is good, except search by meaning'; after round 10 (2026-11-18): 'installed it, search by meaning works now, one small thing before we close this phase and finally move to phase 17 … everything else is good' (the one thing, a way back from Who's watching?, is f2dd945)."
+        "text": "Case study written with real numbers.",
+        "met": false,
+        "evidence": null
       }
     ]
   },
@@ -1865,8 +1817,8 @@
       "title": "Ready to Watch",
       "depends_on": "15",
       "sessions": "3–4",
-      "status": "in_progress",
-      "completion_commit": null,
+      "status": "complete",
+      "completion_commit": "14bf49a",
       "exit_criteria": [
         {
           "id": "E1",
@@ -1993,7 +1945,7 @@
       "title": "Recommendation Engine",
       "depends_on": "15, 16",
       "sessions": "2–3",
-      "status": "not_started",
+      "status": "in_progress",
       "completion_commit": null,
       "exit_criteria": [
         {
@@ -2032,7 +1984,40 @@
           "met": false,
           "evidence": null
         }
-      ]
+      ],
+      "subtasks": [
+        {
+          "id": "17.1",
+          "text": "Layer 2, item-item collaborative filtering (crates/recommend, new): built on this machine from the MovieLens ratings streamed from the archive (never stored or shipped, ADR-0019/ADR-0044), positive co-occurrence normalised against popularity (cosine with shrinkage, or lift damped by log popularity, chosen on a tuning split) so an obscure favourite can outrank a blockbuster; the top neighbours per title persisted (migration 0029, repository methods with surface lines); titles with no ratings fall back to content neighbours (cold start).",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "17.2",
+          "text": "Layer 1 and Layer 3, the hybrid ranker: about 1,000 candidates cheaply (each taste mode's nearest in embedding space, the CF neighbours of what was liked, the popularity pool), scored by a blend of content similarity, CF, the popularity prior, the axes (boosts) and avoids (penalties), availability and freshness; maximal marginal relevance with caps per director, franchise and year; ranking 1,000 candidates timed (E5, under 150 ms).",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "17.3",
+          "text": "Explanations: every recommendation carries a reason built from the signal that put it there (the liked titles behind a CF score, the mode behind a content score, the axis behind a boost), tested so that every reason names something true of the profile (E4); Home's taste rails use the ranker and show the reasons, pad-complete.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "17.4",
+          "text": "fixtures/recommender/ and eval recommend: Recall@20 against popularity on a held-out split (E1, more than 40% relative), catalogue coverage over the users (E2, above 15%), intra-list diversity against a documented target and no rail dominated by one director, franchise or year (E3), ranking time (E5); seen to fail for each.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "17.5",
+          "text": "The case study (docs/case-studies/recommender.md) with real numbers (E6); docs/specs/recommender.md, learning note, README and HOW_IT_WORKS, regression, close.",
+          "status": "not_started",
+          "commit": null
+        }
+      ],
+      "note": "Builds on Phase 15's taste modes and axes. The author checks once batched for this phase (before ADR-0045 renumbered it) now sit with Phase 19's sign-off: Phase 7 E7, Phase 14 E4 and E6."
     },
     {
       "number": 18,
@@ -2558,7 +2543,7 @@
       ]
     }
   ],
-  "next_action": "Phase 16 is ready to close (every criterion evidenced; Phase 7 E7 and Phase 14 E4/E6 carried to 19). Push phase/16-ready-to-watch, wait for CI green, merge into main with --no-ff, wait for CI green on main, tag phase-16 on the merge; then on main write phases[16] complete with completion_commit = the merge, run python tools/phasedoc/generate.py --close 16 and --open 17, set current_phase to 17 from SPEC.md section 15 (Recommendation Engine), and give the author the round 10 installer from npm run release (target/release/bundle/nsis/).",
+  "next_action": "Phase 17, subtask 17.1: create crates/recommend (a new workspace member in Cargo.toml) with the item-item matrix built from the MovieLens archive on disk, streaming ratings.csv the way crates/catalogue/src/movielens.rs scan_ratings does and mapping movieId through the external_ids join that catalogue_by_imdb reads (ratings never stored, ADR-0019); co-occurrence of positive ratings (4.0 and up) scored by cosine with shrinkage against lift damped by log popularity, chosen on a tuning split in fixtures/recommender/; the top 50 neighbours per title persisted by crates/persistence/migrations/0029_item_neighbours with a repository whose every method has a line in crates/persistence/tests/repository_surface.rs. Read docs/phases/phase-17-recommendation-engine.md first.",
   "blockers": [
     {
       "id": "B16",
