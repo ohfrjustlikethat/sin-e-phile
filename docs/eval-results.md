@@ -3065,6 +3065,6 @@ a tab (walks far down the index): documentary films 507 ms, war series 856, west
 | Metric | Value | Command / how |
 |---|---|---|
 | Key file for `embeddings-v3` | 119,874 of 858,170 positions named by IMDb id; 959,052 bytes | `cargo run -p sinephile-ingest --bin ingest -- artefact-keys` (dev catalogue; id digest `e66f698d…` matches the artefact) |
-| Index build on a copy of the author's install | 30 s, 60.9 MB | debug app, `SINEPHILE_DATA_DIR` = copy, Search → Build the index, timed to the `.usearch` file |
+| Index build on a copy of the author's install | 30 s, 60.9 MB; 119,833 of the 119,874 keyed titles found in that catalogue (41 absent), 761,194 core titles beyond the artefact | debug app, `SINEPHILE_DATA_DIR` = copy, Search → Build the index, timed to the `.usearch` file |
 | Before the fix, same copy | refused: "position 858169 is now id 2615642" | Search → Download |
 | "a heist where the plan goes wrong" | 20 results, titles, people and meaning: Tower Heist, Heist: Who Stole the American Dream?, Jimmywork, The Crew, Cash Out, Hell's Angels '69, Reindeer Games | same run, real window |
