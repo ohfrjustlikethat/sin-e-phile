@@ -13,6 +13,7 @@ pub mod home;
 pub mod model;
 pub mod modes;
 pub mod rounds;
+pub mod shelf;
 pub mod signals;
 
 use std::collections::HashSet;

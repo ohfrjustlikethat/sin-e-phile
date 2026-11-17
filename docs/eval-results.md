@@ -3051,3 +3051,11 @@ The rest of that run, on 6c8d015's code: alternate titles and the catch-up finis
 after search opened; the catch-up re-indexed 880,187 titles. Afterwards `MATCH 'kyojin'` gives 62, the same
 as building alternate titles first, and no title is left without a normalised form. Job order in the copy:
 refresh, refresh-episodes, titles-normalise, search-index, imdb-akas, catalogue-catch-up, all complete.
+
+### Films and TV Shows catalogue rails (Phase 16, brief item 9) — 2026-11-17
+
+The rail query (`MediaRepository::most_voted_of`: the votes index walked, the genre checked per row), on the
+3,167,536-title copy of the author's install, `LIMIT 30`, Python `sqlite3`, read-only. Films: Drama 12 ms, Comedy
+4, Action 0, Thriller 2, Crime 1, Sci-Fi 1, Animation 2, Horror 87; most watched 0; new this year (`new_of`, year
+index) 113. Shows: Drama 4, Comedy 4, Crime 3, Animation 8, Sci-Fi 18, Mystery 7; new 8. Left out as too slow for
+a tab (walks far down the index): documentary films 507 ms, war series 856, western series 769.

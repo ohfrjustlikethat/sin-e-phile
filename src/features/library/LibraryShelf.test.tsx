@@ -10,9 +10,21 @@ const commands = {
   libraryTitles: vi.fn((shows: boolean) =>
     ok(shows ? [card(364360, "Samurai Champloo", 2004), card(94345, "Twin Peaks", 1990)] : [card(112691, "In the Mood for Love", 2000)]),
   ),
+  catalogueRails: vi.fn((shows: boolean) =>
+    ok([
+      { key: "most", title: shows ? "Most watched shows" : "Most watched films", items: [card(1, "Heat", 1995)] },
+      { key: "Crime", title: "Crime", items: [card(2, "Thief", 1981)] },
+    ]),
+  ),
 };
 vi.mock("@/lib/ipc", () => ({ commands }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(() => Promise.resolve(() => undefined)) }));
+// The catalogue rails measure themselves; jsdom has no ResizeObserver.
+globalThis.ResizeObserver = class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof ResizeObserver;
 const { LibraryShelf } = await import("./LibraryShelf");
 
 function renderIt(shows: boolean) {
@@ -45,8 +57,20 @@ describe("LibraryShelf", () => {
   it("with nothing on this PC, says how to add a folder rather than showing an empty page", async () => {
     commands.libraryTitles.mockImplementationOnce(() => ok([]));
     renderIt(true);
-    expect(await screen.findByRole("heading", { name: "No shows on this PC yet" })).toBeInTheDocument();
+    expect(await screen.findByText(/^No shows on this PC yet\./)).toBeInTheDocument();
+    // Not a dead end: the catalogue is still below.
+    expect(await screen.findByRole("region", { name: "Most watched shows" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Add a folder" }));
     expect(useUi.getState().settingsOpen).toBe(true);
+  });
+
+  it("puts the catalogue under the library, so the tab is never empty (Phase 16)", async () => {
+    renderIt(false);
+    await screen.findByText("In the Mood for Love");
+    const regions = (await screen.findAllByRole("region")).map((r) => r.getAttribute("aria-label"));
+    expect(regions.slice(0, 3)).toEqual(["Films", "Most watched films", "Crime"]);
+    expect(commands.catalogueRails).toHaveBeenLastCalledWith(false);
+    fireEvent.click(screen.getByText("Thief"));
+    expect(useUi.getState().detail).toBe(2);
   });
 });

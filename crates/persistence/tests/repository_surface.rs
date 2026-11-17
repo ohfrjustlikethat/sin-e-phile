@@ -208,6 +208,30 @@ async fn media_repository_surface() {
         .unwrap()
         .is_empty());
 
+    // most_voted_of — one kind, by votes, optionally one genre (Phase 16's catalogue rails)
+    assert_eq!(
+        repo.most_voted_of(false, None, 2)
+            .await
+            .expect("most_voted_of"),
+        vec![famous, known]
+    );
+    assert!(
+        repo.most_voted_of(true, None, 5).await.unwrap().is_empty(),
+        "no shows with votes here"
+    );
+    genre("Crime", known).await;
+    assert_eq!(
+        repo.most_voted_of(false, Some("Crime"), 5).await.unwrap(),
+        vec![known],
+        "only the genre asked for"
+    );
+    // new_of — one kind, from a year, with enough votes
+    assert_eq!(
+        repo.new_of(false, 1990, 500, 5).await.expect("new_of"),
+        vec![famous]
+    );
+    assert!(repo.new_of(true, 1990, 500, 5).await.unwrap().is_empty());
+
     // most_voted_films_between — only the years asked for
     assert_eq!(
         repo.most_voted_films_between(1980, 1989, 5)

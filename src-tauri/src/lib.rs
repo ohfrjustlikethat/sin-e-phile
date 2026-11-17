@@ -151,6 +151,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::home::home,
             commands::home::watchlist,
             commands::home::library_titles,
+            commands::home::catalogue_rails,
             commands::home::title_watchlisted,
             commands::home::set_watchlisted,
             commands::playback::end_viewing,

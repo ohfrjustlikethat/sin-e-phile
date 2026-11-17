@@ -93,6 +93,9 @@ const FAKE = `(() => {
     library_folders: () => window.__folders,
     // The Films and TV Shows pages (Phase 16), passed through on the way to Watchlist.
     library_titles: () => [],
+    // Phase 16: the catalogue under Films and TV Shows, so neither tab is empty.
+    catalogue_rails: (a) => [{ key: "most", title: a.shows ? "Most watched shows" : "Most watched films",
+      items: [{ id: 7, title: "Sunrise", year: 1927, made_by: "F. W. Murnau", runtime_minutes: 94, note: null }] }],
     add_library_folder: (a) => {
       window.__folders.push({ id: window.__folders.length + 1, path: a.path, files: 0, scanned_at: null, scanning: true });
       return window.__folders.length;

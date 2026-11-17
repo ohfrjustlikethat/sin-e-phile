@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { PosterCard, Rail, Skeleton } from "@/design-system";
-import { commands, type HomeCard, type RailView } from "@/lib/ipc";
-import { useUi } from "@/lib/store";
+import { Skeleton } from "@/design-system";
+import { commands } from "@/lib/ipc";
 import { onEvent } from "@/lib/events";
 import { SetupCard } from "./SetupCard";
+import { TitleRail } from "./TitleRail";
 
 /**
  * Home, first version (SPEC.md Phase 14; Phase 18 overhauls it). Continue watching, where
@@ -62,41 +62,9 @@ export function HomeScreen() {
     <div className="flex flex-col gap-12 pt-10 pb-24">
       <SetupCard />
       {home.data.map((r, i) => (
-        <HomeRail key={r.key} rail={r} lead={i === 0} />
+        <TitleRail key={r.key} rail={r} lead={i === 0} why={WHY[r.key] ?? ""} />
       ))}
     </div>
   );
 }
 
-function HomeRail({ rail, lead }: { rail: RailView; lead: boolean }) {
-  const openDetail = useUi((s) => s.openDetail);
-  return (
-    // No padding of its own: the rail's grid holds the page margin and the index column
-    // (ADR-0024). Padding here as well pushed the column in and cut the rail short (Phase 16).
-    <section aria-label={rail.title}>
-      <Rail<HomeCard>
-        label={rail.title}
-        why={WHY[rail.key] ?? ""}
-        items={rail.items}
-        keyOf={(c) => String(c.id)}
-        itemWidth={194}
-        leadWidth={lead ? 254 : 194}
-        render={(c, i) => (
-          <PosterCard
-            size={lead && i === 0 ? "lead" : "md"}
-            film={{
-              id: String(c.id),
-              title: c.title,
-              year: c.year ?? 0,
-              // A new episode's number says why the show is here; otherwise who made it.
-              director: c.note ?? c.made_by ?? "",
-              // Its place in the rail: № 001 is the first widely loved, not "Uncatalogued".
-              spine: i + 1,
-            }}
-            onOpen={() => openDetail(c.id)}
-          />
-        )}
-      />
-    </section>
-  );
-}

@@ -131,6 +131,31 @@ pub async fn library_titles(
     home_cards(&db, &ids).await
 }
 
+/// The catalogue under Films (or, with `shows`, TV Shows), below what is on this PC
+/// (Phase 16, brief item 9): most watched, new this year, and the main genres.
+#[tauri::command]
+#[specta::specta]
+pub async fn catalogue_rails(
+    state: State<'_, AppState>,
+    shows: bool,
+) -> Result<Vec<RailView>, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let kids = crate::commands::profiles::kids(&state).await;
+    let year = sinephile_taste::shelf::this_year();
+    let rails = sinephile_taste::shelf::catalogue_rails(&db, shows, kids, year)
+        .await
+        .map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for r in rails {
+        out.push(RailView {
+            key: r.key.into(),
+            title: r.title.into(),
+            items: home_cards(&db, &r.items).await?,
+        });
+    }
+    Ok(out)
+}
+
 /// Whether a title is on this profile's watchlist.
 #[tauri::command]
 #[specta::specta]

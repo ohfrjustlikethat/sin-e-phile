@@ -365,6 +365,11 @@ export const commands = {
 	 *  and TV Shows pages, before Phase 19 adds the catalogue around them).
 	 */
 	libraryTitles: (shows: boolean) => typedError<HomeCard[], string>(__TAURI_INVOKE("library_titles", { shows })),
+	/**
+	 *  The catalogue under Films (or, with `shows`, TV Shows), below what is on this PC
+	 *  (Phase 16, brief item 9): most watched, new this year, and the main genres.
+	 */
+	catalogueRails: (shows: boolean) => typedError<RailView[], string>(__TAURI_INVOKE("catalogue_rails", { shows })),
 	/**  Whether a title is on this profile's watchlist. */
 	titleWatchlisted: (id: number) => typedError<boolean, string>(__TAURI_INVOKE("title_watchlisted", { id })),
 	/**  Save a title to the watchlist, or take it off. */

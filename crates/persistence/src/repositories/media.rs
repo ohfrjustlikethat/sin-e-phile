@@ -425,6 +425,64 @@ impl<'a> MediaRepository<'a> {
         .await?)
     }
 
+    /// The most-voted films (or, with `series`, shows), not adult, optionally in one genre:
+    /// the catalogue rails under Films and TV Shows (Phase 16), so neither tab is ever empty.
+    /// Walks the votes index and checks the genre per row (the `+` keeps kind out of the
+    /// index choice): 0–90 ms for the genres the rails use, on 3.1 million titles.
+    pub async fn most_voted_of(
+        &self,
+        series: bool,
+        genre: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<i64>, DbError> {
+        let kinds = if series {
+            "'series', 'anime_series'"
+        } else {
+            "'film', 'anime_film'"
+        };
+        let sql = format!(
+            "SELECT m.id FROM media_items m
+             WHERE +m.kind IN ({kinds}) AND m.is_adult = 0 AND m.rating_votes IS NOT NULL
+               AND (?1 IS NULL OR EXISTS (
+                   SELECT 1 FROM media_genres mg JOIN genres g ON g.id = mg.genre_id
+                    WHERE mg.media_item_id = m.id AND g.name = ?1))
+             ORDER BY m.rating_votes DESC, m.id LIMIT ?2"
+        );
+        Ok(sqlx::query_scalar(&sql)
+            .bind(genre)
+            .bind(limit)
+            .fetch_all(self.db.pool())
+            .await?)
+    }
+
+    /// Films (or shows) of `from_year` or later with at least `min_votes`, most voted first:
+    /// "New this year" under Films and TV Shows. By the year index, as `new_releases`.
+    pub async fn new_of(
+        &self,
+        series: bool,
+        from_year: i64,
+        min_votes: i64,
+        limit: i64,
+    ) -> Result<Vec<i64>, DbError> {
+        let kinds = if series {
+            "'series', 'anime_series'"
+        } else {
+            "'film', 'anime_film'"
+        };
+        let sql = format!(
+            "SELECT id FROM media_items INDEXED BY idx_media_items_year_votes
+             WHERE release_year >= ?1 AND rating_votes >= ?2 AND is_adult = 0
+               AND +kind IN ({kinds})
+             ORDER BY rating_votes DESC, id LIMIT ?3"
+        );
+        Ok(sqlx::query_scalar(&sql)
+            .bind(from_year)
+            .bind(min_votes)
+            .bind(limit)
+            .fetch_all(self.db.pool())
+            .await?)
+    }
+
     pub async fn count(&self) -> Result<i64, DbError> {
         Ok(sqlx::query_scalar("SELECT COUNT(*) FROM media_items")
             .fetch_one(self.db.pool())

@@ -13,7 +13,7 @@ use sinephile_persistence::repositories::{
 use sinephile_persistence::{Db, DbError};
 use sinephile_search_engine::Semantic;
 
-fn now_iso() -> String {
+pub(crate) fn now_iso() -> String {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs() as i64);
