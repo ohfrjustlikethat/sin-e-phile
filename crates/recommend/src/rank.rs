@@ -304,6 +304,32 @@ pub fn quotas(shares: &[f32], k: usize) -> Vec<usize> {
     quota
 }
 
+/// The picks in an order that spreads each taste mode through the rail in proportion: the
+/// j-th of a mode's n picks sits near position (j + 1/2) / n of it, ties kept in pick order.
+/// The quotas choose *which* titles; picking them best-first leaves a smaller taste's at the
+/// end, past what a screen shows (17.6, the real window: five anime at 16 to 20).
+fn interleaved(candidates: &[Candidate], picked: &[usize]) -> Vec<usize> {
+    let mode = |i: usize| candidates[i].near.map(|(m, _)| m);
+    let mut total: HashMap<Option<usize>, usize> = HashMap::new();
+    for &i in picked {
+        *total.entry(mode(i)).or_default() += 1;
+    }
+    let mut seen: HashMap<Option<usize>, usize> = HashMap::new();
+    let mut keyed: Vec<(f32, usize, usize)> = picked
+        .iter()
+        .enumerate()
+        .map(|(at, &i)| {
+            let m = mode(i);
+            let j = seen.entry(m).or_default();
+            let key = (*j as f32 + 0.5) / total[&m] as f32;
+            *j += 1;
+            (key, at, i)
+        })
+        .collect();
+    keyed.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+    keyed.into_iter().map(|(_, _, i)| i).collect()
+}
+
 /// A rail of `k` from `candidates`: scored, then picked one at a time by maximal marginal
 /// relevance within the caps, each taste mode within its quota ([`quotas`] of `shares`,
 /// the modes' shares of the profile in the order `Candidate::near` names them; empty for
@@ -409,6 +435,9 @@ pub fn rank(
             *n += 1;
         }
         picked.push(i);
+    }
+    if !quota.is_empty() {
+        picked = interleaved(candidates, &picked);
     }
     picked
         .into_iter()
@@ -538,6 +567,14 @@ mod tests {
         let rail = rank(&c, &WEIGHTS, &CAPS, 0.0, &shares, 8);
         assert_eq!(rail.len(), 8);
         assert_eq!(anime(&rail), 2, "{rail:?}");
+        // Spread through the rail, not left at its end: at the third and seventh places.
+        let at: Vec<usize> = rail
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.id >= 100)
+            .map(|(n, _)| n)
+            .collect();
+        assert_eq!(at, vec![2, 6], "{rail:?}");
         // Only one mode has candidates left: its quota gives way rather than leave the
         // rail short.
         let films_only: Vec<Candidate> = c.iter().filter(|x| x.id < 100).cloned().collect();

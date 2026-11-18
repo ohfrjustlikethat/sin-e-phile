@@ -485,3 +485,62 @@ async fn what_is_showing_now_is_matched_to_the_catalogue_and_kept_for_the_profil
         Some("2026-11-08")
     );
 }
+
+#[tokio::test]
+async fn a_ratings_chunk_touches_only_its_own_rows() {
+    // 17.6: an `UPDATE ... FROM` form of the ratings refresh read naturally and took 17 s a
+    // chunk on the real catalogue, because the planner scanned every IMDb id for each chunk
+    // of 200; the full refresh is about 8,000 chunks. Its cost grows with the catalogue, so
+    // this builds one large enough to show it (300,000 titles: the slow form takes seconds
+    // here, the right one milliseconds) and re-applies one chunk's ratings.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let db = Db::open_in(dir.path()).await.expect("open");
+    sqlx::query(
+        "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 300000)
+         INSERT INTO media_items (id, kind, primary_title, rating_votes)
+         SELECT i, 'film', 'Film ' || i, 100 FROM n",
+    )
+    .execute(db.pool())
+    .await
+    .expect("titles");
+    sqlx::query(
+        "INSERT INTO external_ids (media_item_id, source, external_id)
+         SELECT id, 'imdb', printf('tt%07d', id) FROM media_items",
+    )
+    .execute(db.pool())
+    .await
+    .expect("ids");
+    // As the real catalogue is: the planner has statistics for media_items and none for
+    // external_ids, which is what let it guess "every IMDb id" is a small set. Reopened, so
+    // every pooled connection plans with them.
+    sqlx::query("ANALYZE media_items")
+        .execute(db.pool())
+        .await
+        .expect("analyze");
+    db.pool().close().await;
+    drop(db);
+    let db = Db::open_in(dir.path()).await.expect("reopen");
+
+    let chunk: Vec<u32> = (150_000..150_200).collect();
+    let votes: HashMap<u32, i64> = chunk.iter().map(|i| (*i, 250)).collect();
+    let averages: HashMap<u32, i64> = chunk.iter().map(|i| (*i, 70)).collect();
+    let mut job = Job::begin(&db, "refresh").await.expect("job");
+    let started = std::time::Instant::now();
+    let updated = refresh::ratings(&mut job, Arc::new(votes), Arc::new(averages))
+        .await
+        .expect("ratings");
+    let took = started.elapsed();
+    job.finish().await.expect("finish");
+    assert_eq!(updated, 200);
+    assert!(
+        took < std::time::Duration::from_millis(400),
+        "one chunk of 200 took {took:?}: the update is reading the whole catalogue"
+    );
+    let moved: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM media_items WHERE previous_votes = 100 AND rating_votes = 250",
+    )
+    .fetch_one(db.pool())
+    .await
+    .expect("moved");
+    assert_eq!(moved, 200, "each kept the count before it");
+}
