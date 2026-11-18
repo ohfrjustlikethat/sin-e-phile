@@ -45,8 +45,8 @@
       {
         "id": "17.5",
         "text": "The case study (docs/case-studies/recommender.md) with real numbers (E6); docs/specs/recommender.md, learning note, README and HOW_IT_WORKS, regression, close.",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "ae86aa0"
       }
     ],
     "exit_criteria": [
@@ -86,7 +86,7 @@
         "id": "E6",
         "text": "Case study written with real numbers.",
         "met": true,
-        "evidence": "docs/case-studies/recommender.md (1,786 words, with docs/case-studies/shots/taste-rail.png from the release build): the problem, what was considered, what was built (a diagram), the maths, how it was judged, every number from docs/eval-results.md, what went wrong (five fixes), staying current, what would be done differently."
+        "evidence": "ae86aa0: docs/case-studies/recommender.md (1,892 words, with docs/case-studies/shots/taste-rail.png from the release build): the problem, what was considered, what was built (a diagram), the maths, how it was judged, every number from docs/eval-results.md, what went wrong (five fixes), staying current, what would be done differently."
       },
       {
         "id": "E7",
@@ -1998,7 +1998,7 @@
           "id": "E6",
           "text": "Case study written with real numbers.",
           "met": true,
-          "evidence": "docs/case-studies/recommender.md (1,786 words, with docs/case-studies/shots/taste-rail.png from the release build): the problem, what was considered, what was built (a diagram), the maths, how it was judged, every number from docs/eval-results.md, what went wrong (five fixes), staying current, what would be done differently."
+          "evidence": "ae86aa0: docs/case-studies/recommender.md (1,892 words, with docs/case-studies/shots/taste-rail.png from the release build): the problem, what was considered, what was built (a diagram), the maths, how it was judged, every number from docs/eval-results.md, what went wrong (five fixes), staying current, what would be done differently."
         },
         {
           "id": "E7",
@@ -2041,8 +2041,8 @@
         {
           "id": "17.5",
           "text": "The case study (docs/case-studies/recommender.md) with real numbers (E6); docs/specs/recommender.md, learning note, README and HOW_IT_WORKS, regression, close.",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "ae86aa0"
         }
       ],
       "note": "Builds on Phase 15's taste modes and axes. The author checks once batched for this phase (before ADR-0045 renumbered it) now sit with Phase 19's sign-off: Phase 7 E7, Phase 14 E4 and E6."
