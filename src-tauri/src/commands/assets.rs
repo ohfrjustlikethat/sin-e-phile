@@ -127,7 +127,8 @@ pub fn engine_for(dir: &std::path::Path) -> sinephile_search_engine::Engine {
     // The installed copy's model when there is one (ADR-0053), else the downloaded one.
     let files = assets::MeaningFiles::find(dir);
     match sinephile_embedder::Embedder::pinned(&files.model, &files.tokenizer) {
-        Ok(embedder) => match sinephile_vector_index::VectorIndex::view(
+        // `open`: the published graph and the titles given meaning since (ADR-0054).
+        Ok(embedder) => match sinephile_vector_index::VectorIndex::open(
             &sinephile_vector_index::index_path(dir),
         ) {
             Ok(index) => {
