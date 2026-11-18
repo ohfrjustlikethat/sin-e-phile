@@ -12,6 +12,7 @@ pub mod anime;
 pub mod assets;
 pub mod bootstrap;
 pub mod credits;
+pub mod current;
 pub mod download;
 pub mod embed;
 pub mod episodes;

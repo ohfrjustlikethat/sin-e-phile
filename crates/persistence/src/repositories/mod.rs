@@ -31,7 +31,7 @@ pub use library::{
     NewLocalFile, Probe, Upserted,
 };
 pub use meaning::{Awaiting, MeaningCounts, MeaningRepository, Retry};
-pub use media::{Appearance, Credit, Facts, MediaRepository};
+pub use media::{Appearance, Credit, Facts, MediaRepository, RISING_KEY};
 pub use neighbours::{NeighbourRepository, NeighbourSource};
 pub use profiles::{NewProfile, Profile, ProfileRepository, Viewing, WatchScope};
 pub use search::{Hit, HitDetail, MatchReason, SearchRepository};

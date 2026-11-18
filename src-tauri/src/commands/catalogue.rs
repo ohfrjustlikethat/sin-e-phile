@@ -91,6 +91,33 @@ pub async fn catalogue_status(state: State<'_, AppState>) -> Result<CatalogueSta
     Ok(out)
 }
 
+/// One source the app keeps current, as Settings lists it (ADR-0054 step 7).
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct SourceStatus {
+    pub name: String,
+    /// ISO 8601 UTC; `None` before its first update.
+    pub updated_at: Option<String>,
+    pub detail: String,
+}
+
+/// Each source the app keeps current: when it last updated and what it did
+/// (`sinephile_catalogue::current`).
+#[tauri::command]
+#[specta::specta]
+pub async fn staying_current(state: State<'_, AppState>) -> Result<Vec<SourceStatus>, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    Ok(sinephile_catalogue::current::sources(&db)
+        .await
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .map(|s| SourceStatus {
+            name: s.name.to_string(),
+            updated_at: s.updated_at,
+            detail: s.detail,
+        })
+        .collect())
+}
+
 /// "Refresh now": a refresh whatever the publisher says, in the background.
 #[tauri::command]
 #[specta::specta]

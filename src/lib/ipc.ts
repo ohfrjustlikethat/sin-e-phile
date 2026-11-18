@@ -362,6 +362,11 @@ export const commands = {
 	catalogueStatus: () => typedError<CatalogueStatus, string>(__TAURI_INVOKE("catalogue_status")),
 	/**  "Refresh now": a refresh whatever the publisher says, in the background. */
 	refreshCatalogue: () => typedError<boolean, string>(__TAURI_INVOKE("refresh_catalogue")),
+	/**
+	 *  Each source the app keeps current: when it last updated and what it did
+	 *  (`sinephile_catalogue::current`).
+	 */
+	stayingCurrent: () => typedError<SourceStatus[], string>(__TAURI_INVOKE("staying_current")),
 	tmdbStatus: () => typedError<TmdbStatus, string>(__TAURI_INVOKE("tmdb_status")),
 	/**
 	 *  Save this profile's own TMDB key, checked first: a refused key is not saved. Then what
@@ -1058,6 +1063,14 @@ export type SourceInfo = {
 	protocol: string | null,
 	/**  It has its own settings page, which `addon_configure` opens. */
 	configurable: boolean,
+};
+
+/**  One source the app keeps current, as Settings lists it (ADR-0054 step 7). */
+export type SourceStatus = {
+	name: string,
+	/**  ISO 8601 UTC; `None` before its first update. */
+	updated_at: string | null,
+	detail: string,
 };
 
 /**  Everything the Sources section needs at once. */

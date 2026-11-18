@@ -108,6 +108,14 @@ async fn current(
         ..built?
     };
     freshness::remember_url(db, "movielens", url, &validator).await?;
+    // When, for Settings (`current`): the write time is the build's.
+    sinephile_persistence::repositories::ProfileRepository::new(db)
+        .set_setting(
+            crate::current::MOVIELENS_KEY,
+            &format!(r#"{{"titles":{},"rows":{}}}"#, built.titles, built.rows),
+        )
+        .await
+        .map_err(|e| JobError::step("neighbours", e.to_string()))?;
     Ok(Outcome::Built(built))
 }
 
