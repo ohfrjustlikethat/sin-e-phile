@@ -39,7 +39,7 @@
       {
         "id": "17.6",
         "text": "Staying current (ADR-0054), on every launch after the catalogue check: the titles it added get a synopsis (TMDB with the profile's key, AniList for anime, else Wikipedia through Wikidata) and a meaning vector inserted into the index (every tier, capped at 2,000 a launch); AniList's and TMDB's recommendations stored beside MovieLens' neighbours by source and asked again when a week old; the matrix built from MovieLens' newest release and rebuilt when its Last-Modified changes; neighbours by meaning and shared people for a title nobody has rated; IMDb's previous votes kept for a rising signal; rails re-ranked; Settings shows each source's last update (E7, tested end to end with a fixture refresh).",
-        "status": "not_started",
+        "status": "in_progress",
         "commit": null
       },
       {
@@ -2031,7 +2031,7 @@
         {
           "id": "17.6",
           "text": "Staying current (ADR-0054), on every launch after the catalogue check: the titles it added get a synopsis (TMDB with the profile's key, AniList for anime, else Wikipedia through Wikidata) and a meaning vector inserted into the index (every tier, capped at 2,000 a launch); AniList's and TMDB's recommendations stored beside MovieLens' neighbours by source and asked again when a week old; the matrix built from MovieLens' newest release and rebuilt when its Last-Modified changes; neighbours by meaning and shared people for a title nobody has rated; IMDb's previous votes kept for a rising signal; rails re-ranked; Settings shows each source's last update (E7, tested end to end with a fixture refresh).",
-          "status": "not_started",
+          "status": "in_progress",
           "commit": null
         },
         {
@@ -2567,7 +2567,7 @@
       ]
     }
   ],
-  "next_action": "Phase 17: (1) 17.6 (ADR-0054), in this order: (a) meaning vectors for titles a refresh adds: a companion index beside the published one in crates/vector-index/src/lib.rs (VectorIndex gains an in-memory `added` usearch index saved to vector-index-<model>.added.usearch; search merges both, vector() reads both, insert() adds), a persistence query for indexable titles without a vector, synopses from AniList (anime) / TMDB (profile key) / Wikipedia via Wikidata, embedded and inserted after the catalogue check in crates/catalogue/src/bootstrap.rs, capped at 2,000 a launch; (b) live AniList and TMDB neighbours by source (migration 0030 adds item_neighbours.source; NeighbourRepository::replace_all replaces only MovieLens rows), refreshed weekly; (c) people neighbours for an unrated title; (d) IMDb's previous votes for a rising signal; (e) each source's last update in Settings; (f) E7's end-to-end test; (2) 17.5, the case study docs/case-studies/recommender.md with the numbers in docs/eval-results.md and a screenshot of the rail from the release build on a scratch copy.",
+  "next_action": "Phase 17, 17.6 (ADR-0054) remaining, in this order: (1) calibrate the taste rail by mode in crates/recommend/src/rank.rs (each taste mode's share of the rail close to its share of the profile, Steck 2018; the candidate's mode is Candidate.near's), then `cargo run --release -p eval -- recommend --whole` must still meet E1 (> +40%), E2 (> 15%) and E3, and `SINEPHILE_DATA_DIR=<the scratch copy> eval recommend --rail 1` must show anime for a profile whose loves include two (docs/eval-results.md 'live neighbours on the copy'); (2) neighbours by shared people for a title nobody has rated (a 'people' reason, not 'loved by'); (3) IMDb's previous vote counts kept at each refresh for a rising signal (a migration adding media_items.previous_votes, set in crates/catalogue/src/refresh.rs); (4) Settings shows each source's last update (catalogue LAST_REFRESH, meaning::LAST_KEY and live::LAST_KEY via ProfileRepository::setting_written, MovieLens' validator), an IPC command in src-tauri/src/commands/catalogue.rs and a section in src/features/settings; (5) E7's end-to-end test (a refresh adds a title, meaning::keep_current embeds it, the taste rail reaches it with a true reason); then 17.5, the case study docs/case-studies/recommender.md.",
   "blockers": [
     {
       "id": "B16",

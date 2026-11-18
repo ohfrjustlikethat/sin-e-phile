@@ -2606,3 +2606,27 @@ amendments:** none.
 more than a quarter of a rail; up to 500 loved titles asked; popularity enters as candidates but not as a push; the
 tuning rule for coverage stated before its run; E5 stays open until a Tier 0 machine measures it. **Spec amendments:**
 none.
+
+## 2026-11-18 — 17.3 seen in the real window; 17.6 begun (meaning for every title without it, live neighbours)
+
+- **17.3**: the release build on a scratch copy of the development data showed Home's taste rail with a reason on each
+  card, and `eval recommend --rail 1` the whole rail: twenty of twenty said "Close to", Pickpocket "close to The
+  Godfather". The reason is now the part furthest above the median candidate; the same twenty say "Loved by people who
+  loved ...". Seen to fail first (1cad203).
+- **Meaning for titles without it** (ADR-0054 step 2): a companion usearch graph beside the published one
+  (`VectorIndex::open` reads both, `Companion` writes), migration 0030 (`new_meaning`), the job in
+  `crates/catalogue/src/meaning.rs` (TMDB with a key, AniList for anime, Wikipedia through Wikidata by id, the
+  article's opening when the lead is short), wired after each launch's check.
+- **Found by running it, amended in the open (A44, 4.7.1)**: "the titles a refresh added" were 19,052 little-known
+  titles of this year; 1,331 core titles with 10,000+ votes (Doctor Who, One Punch Man, Solo Leveling) had no vector
+  at all. The batch is now every core title the published file does not hold, most-voted first, 2,000 a launch.
+  Three runs on the copy: 16, 170, 188 embedded.
+- **Live neighbours** (ADR-0054 step 3): migration 0031 (`item_neighbours.source`, `neighbours_asked`), AniList's and
+  TMDB's recommendations for each profile's liked titles, weekly, scored at MovieLens' mean for the same rank; hourly
+  with the catalogue check. On the copy they showed the rail giving the larger taste every slot: calibration next.
+
+**Decisions taken (none reserved):** a reason is the part furthest above the median candidate; the meaning batch covers
+every title without a vector, retrying after 7 days (released in the last year) or 90; up to 100 article openings a
+launch; TMDB with the first profile's own key that has one (the result is a fact about a title, shared like the
+catalogue); live rows scored by rank against MovieLens' mean; AniList 200 and TMDB 25 titles a launch. **Spec
+amendments:** A44, spec_version 4.7.1 (ADR-0054 amended, CLAUDE.md resynced).
