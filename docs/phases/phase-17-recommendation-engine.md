@@ -1,6 +1,6 @@
 # Phase 17 — Recommendation Engine
 
-**Status:** in_progress · **Depends on:** 15, 16 · **Sessions:** 2–3
+**Status:** complete · **Depends on:** 15, 16 · **Sessions:** 2–3
 
 > The single file a session reads to know what it is doing. Generated from
 > `SPEC.md` §15 by `tools/phasedoc/generate.py`. Working file, not a document.
@@ -83,3 +83,47 @@ Home in the real window.
 - **17.3** Explanations: every recommendation carries a reason built from the signal that put it there (the · `1cad203`
 - **17.6** Staying current (ADR-0054), on every launch after the catalogue check: the titles it added get a · `287e33d`
 - **17.5** The case study (docs/case-studies/recommender.md) with real numbers (E6); docs/specs/recommender · `ae86aa0`
+
+<!-- closed: written at phase end -->
+
+---
+
+## Outcome
+
+**Complete.** Merged as `90231e6`.
+
+### Evidence per criterion
+
+**E1** — Recall@20 beats a popularity baseline by > 40% relative on a held-out split — i.e. `(recall_model / recall_baseline) - 1 > 0.40`, not 40 percentage points.
+
+> 2026-11-18, on eca974f (calibrated, makers at 0.1; 5c70542 interleaves the order only), 15,640 test users: SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- recommend --whole: Recall@20 0.2639 against popularity 0.1641, +60.9% relative (> 40%). The weights and the makers' weight chosen on tuning users only, by rules recorded before their runs (docs/eval-results.md, 17.4 and 17.6). Calibration (17.6) traded 11.8 points of lift from the first build (c183f27, +72.7%) for coverage and a rail that mixes as the profile does. Seen to fail: the matrix harness at alpha 0.9 (-58.6%).
+
+**E2** — Catalogue coverage > 15% — the recommender does not only ever surface the same 2,000 films.
+
+> 2026-11-18, on eca974f (calibrated, makers at 0.1; 5c70542 interleaves the order only), 15,640 test users: coverage 45.7% of the 18,377 titles the build users liked five times or more (> 15%; 16.6% before calibration). Seen to fail: --whole --limit 300 reports 3.8%, NOT met.
+
+**E3** — Intra-list diversity meets the documented target; no rail is dominated by one director, franchise, or year.
+
+> 2026-11-18, on eca974f (calibrated, makers at 0.1; 5c70542 interleaves the order only), 15,640 test users: no rail over the app's caps (two per director, two per franchise, five per year), intra-list diversity 0.418 against 0.404 for the same candidates in score order; miscalibration 0.008 against 0.664. Seen to fail: --whole --limit 300 --caps 20,20,20, 196 of 300 rails over the app's caps. Units: crates/recommend/src/rank.rs no_more_than_two_by_one_director_two_per_franchise_five_per_year, each_taste_mode_fills_no_more_than_its_share_of_the_rail (seen to fail without quotas and without the interleaving).
+
+**E4** — Every recommendation has a truthful explanation.
+
+> A reason is the part that lifts a pick furthest above the median candidate (1cad203), and names only what is true: crates/recommend/src/rank.rs every_reason_names_something_true_of_the_candidate (a property over 300 candidates with loved-with, mode and maker links; seen to fail with every Mode reason forced to mode 0), a_reason_is_what_lifts_a_title_above_the_typical_candidate (seen to fail on the biggest-part rule), a_title_nobody_has_rated_reaches_the_profile_through_its_maker; crates/taste/src/hybrid.rs a_note_names_only_titles_the_profile_loved (with 'By Andrei Tarkovsky, who made Stalker and Solaris'); crates/taste/tests/hybrid.rs end to end. Manual: the release build on a copy of the development data (2026-11-18, 22:25) showed the rail with each card's reason, among them Mob Psycho 100 'Loved by people who loved One Punch Man' and Tower of God 'Loved by people who loved Solo Leveling' (docs/case-studies/shots/taste-rail.png).
+
+**E5** — Ranking 1,000 candidates completes in < 150 ms on Tier 0.
+
+**Not met; carried to Phase 19.** The 150 ms budget is enforced on Tier 0 hardware (SPEC.md 2.3) and this is the Tier 2 development machine; the run is asked for in the Phase 19 author batch with Phase 7 E7, Phase 14 E4/E6, D89 and D91.
+
+> MEASURED, Tier 2 only: 2026-11-18, on eca974f (calibrated, makers at 0.1; 5c70542 interleaves the order only), 15,640 test users: ranking one user's candidates (median 1,051, at most 1,144) p50 2.30 ms, p95 7.36 ms, max 13.75 ms with builds running beside it (budget 150 ms on Tier 0). The Tier 0 run needs the author's hardware: carried to the Phase 19 author batch.
+
+**E6** — Case study written with real numbers.
+
+> ae86aa0: docs/case-studies/recommender.md (1,892 words, with docs/case-studies/shots/taste-rail.png from the release build): the problem, what was considered, what was built (a diagram), the maths, how it was judged, every number from docs/eval-results.md, what went wrong (five fixes), staying current, what would be done differently.
+
+**E7** — A title the catalogue gains at a launch can be recommended on that same launch with a truthful reason, and each source (catalogue, meaning, MovieLens, AniList, TMDB) says when it last updated.
+
+> crates/catalogue/tests/staying_current.rs a_title_gained_at_a_launch_is_recommended_on_that_launch_with_a_true_reason (3bee71a): a fixture refresh adds a film through the refresh's own load, meaning::keep_current describes and embeds it into the companion beside a published graph, Home's taste rail over both graphs reaches it with a true reason; seen to fail with the companion insert removed. Each source's last update: crates/catalogue/tests/current.rs each_source_says_when_it_last_updated_and_what_it_did, the Settings section's test (seen to fail with the list hidden). Manual: the release build on the copy (2026-11-18) ran the launch's chain (catalogue refreshed, 201 titles given meaning, search reopened) and Settings > Library listed IMDb's catalogue, meaning (201 at the last update, 766 in all), MovieLens (25,032 titles), AniList (2 anime), TMDB (no key set) and Rising now, each with when it last updated.
+
+### Next phase starts by
+
+Phase 18, 18.1: create crates/recommend/src/strategy.rs with the six arms as candidate generators over crates/taste/src/hybrid.rs's pools and the meaning index (safe-familiar = Phase 17's rail; adjacent-stretch = one axis from a mode; cross-mode bridge = the midpoint direction of two modes; blind-spot = a well-voted country or decade the profile has no titles from; canon-gap = top-rated titles near a mode the profile has not met; deep-cut = high rating, low votes, near a mode), each pick carrying a label that names only what is true; a property test that every label is true (E3). Plan first in docs/phases/phase-18-discovery-engine.md.

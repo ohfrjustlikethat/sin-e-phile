@@ -4,95 +4,81 @@
   "last_updated": "2026-11-18",
   "sessions_completed": 21,
   "current_phase": {
-    "number": 17,
-    "slug": "recommendation-engine",
-    "title": "Recommendation Engine",
+    "number": 18,
+    "slug": "discovery-engine",
+    "title": "Discovery Engine",
     "status": "in_progress",
-    "branch": "phase/17-recommendation-engine",
-    "started_at": "2026-11-17T18:13:36Z",
-    "note": "Builds on Phase 15's taste modes and axes. The author checks once batched for this phase (before ADR-0045 renumbered it) now sit with Phase 19's sign-off: Phase 7 E7, Phase 14 E4 and E6.",
+    "branch": "phase/18-discovery-engine",
+    "started_at": "2026-11-18T15:36:05Z",
+    "note": "Builds on Phase 17's recommender: its candidate pools, calibration and reasons are what the arms draw from. Receives Phase 5 E3 and E4 (search by meaning, carried on at Phase 17's close).",
     "subtasks": [
       {
-        "id": "17.1",
-        "text": "Layer 2, item-item collaborative filtering (crates/recommend, new): built on this machine from the MovieLens ratings streamed from the archive (never stored or shipped, ADR-0019/ADR-0044), positive co-occurrence normalised against popularity (cosine with shrinkage, or lift damped by log popularity, chosen on a tuning split) so an obscure favourite can outrank a blockbuster; the top neighbours per title persisted (migration 0029, repository methods with surface lines); titles with no ratings fall back to content neighbours (cold start).",
-        "status": "complete",
-        "commit": "9721428"
+        "id": "18.1",
+        "text": "The strategy arms (crates/recommend/src/strategy.rs, new): safe-familiar, adjacent-stretch (one axis away from a taste mode), cross-mode bridge (between two of the profile's modes), blind-spot (a well-regarded region the profile never touched: a country, a decade, a movement), canon-gap (acclaimed work the taste predicts and the profile has not seen), deep-cut (highly rated obscurity near a mode); each yields candidates from Phase 17's pools and the meaning index with an honest label ('Because you loved Stalker', 'Your blind spot: Iranian New Wave'), tested so every label is true (E3).",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "17.2",
-        "text": "Layer 1 and Layer 3, the hybrid ranker: about 1,000 candidates cheaply (each taste mode's nearest in embedding space, the CF neighbours of what was liked, the popularity pool), scored by a blend of content similarity, CF, the popularity prior, the axes (boosts) and avoids (penalties), availability and freshness; maximal marginal relevance with caps per director, franchise and year; ranking 1,000 candidates timed (E5, under 150 ms).",
-        "status": "complete",
-        "commit": "c183f27"
+        "id": "18.2",
+        "text": "The contextual bandit (Thompson sampling) over the arms, rewarded by outcomes (played, completed, abandoned early, watchlisted, dismissed), with an exploration floor and no arm dominating; a simulation harness (`eval discovery`) with simulated users whose reward patterns change (E1), a maximally conservative user who still gets discovery (E2), and the novelty metric, mean inverse popularity, against its target with relevance held (E4).",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "17.3",
-        "text": "Explanations: every recommendation carries a reason built from the signal that put it there (the liked titles behind a CF score, the mode behind a content score, the axis behind a boost), tested so that every reason names something true of the profile (E4); Home's taste rails use the ranker and show the reasons, pad-complete.",
-        "status": "complete",
-        "commit": "1cad203"
+        "id": "18.3",
+        "text": "The exploration budget and dismissals: a Comfort to Adventure setting per profile adapted by the bandit; 'not for me', 'not right now', 'already seen' on every recommended card (pad-reachable) feeding back; never the same item in two rails.",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "17.4",
-        "text": "fixtures/recommender/ and eval recommend: Recall@20 against popularity on a held-out split (E1, more than 40% relative), catalogue coverage over the users (E2, above 15%), intra-list diversity against a documented target and no rail dominated by one director, franchise or year (E3), ranking time (E5); seen to fail for each.",
-        "status": "complete",
-        "commit": "c183f27"
+        "id": "18.4",
+        "text": "Surprise me (one button and a pad shortcut: a film the viewer will probably like, from their taste and their sources, opened ready to play) and mood shelves from the semantic index offered to Home's rails, with I42 ('I have 90 minutes'). Search-by-meaning quality, carried from Phase 5 (E3 nDCG@10 0.0472, E4 the two named queries), is worked here, where mood shelves depend on it.",
+        "status": "not_started",
+        "commit": null
       },
       {
-        "id": "17.6",
-        "text": "Staying current (ADR-0054), on every launch after the catalogue check: the titles it added get a synopsis (TMDB with the profile's key, AniList for anime, else Wikipedia through Wikidata) and a meaning vector inserted into the index (every tier, capped at 2,000 a launch); AniList's and TMDB's recommendations stored beside MovieLens' neighbours by source and asked again when a week old; the matrix built from MovieLens' newest release and rebuilt when its Last-Modified changes; neighbours by meaning and shared people for a title nobody has rated; IMDb's previous votes kept for a rising signal; rails re-ranked; Settings shows each source's last update (E7, tested end to end with a fixture refresh).",
-        "status": "complete",
-        "commit": "287e33d"
-      },
-      {
-        "id": "17.5",
-        "text": "The case study (docs/case-studies/recommender.md) with real numbers (E6); docs/specs/recommender.md, learning note, README and HOW_IT_WORKS, regression, close.",
-        "status": "complete",
-        "commit": "ae86aa0"
+        "id": "18.5",
+        "text": "The flagship case study (E6), the author's acceptance test on their own taste (E5, asked in the author batch), docs/specs, learning note, README and HOW_IT_WORKS, regression against every recorded number, close.",
+        "status": "not_started",
+        "commit": null
       }
     ],
     "exit_criteria": [
       {
         "id": "E1",
-        "text": "Recall@20 beats a popularity baseline by > 40% relative on a held-out split — i.e. `(recall_model / recall_baseline) - 1 > 0.40`, not 40 percentage points.",
-        "met": true,
-        "evidence": "2026-11-18, on eca974f (calibrated, makers at 0.1; 5c70542 interleaves the order only), 15,640 test users: SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- recommend --whole: Recall@20 0.2639 against popularity 0.1641, +60.9% relative (> 40%). The weights and the makers' weight chosen on tuning users only, by rules recorded before their runs (docs/eval-results.md, 17.4 and 17.6). Calibration (17.6) traded 11.8 points of lift from the first build (c183f27, +72.7%) for coverage and a rail that mixes as the profile does. Seen to fail: the matrix harness at alpha 0.9 (-58.6%)."
+        "text": "The bandit demonstrably shifts its strategy distribution in simulation when reward patterns change.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E2",
-        "text": "Catalogue coverage > 15% — the recommender does not only ever surface the same 2,000 films.",
-        "met": true,
-        "evidence": "2026-11-18, on eca974f (calibrated, makers at 0.1; 5c70542 interleaves the order only), 15,640 test users: coverage 45.7% of the 18,377 titles the build users liked five times or more (> 15%; 16.6% before calibration). Seen to fail: --whole --limit 300 reports 3.8%, NOT met."
+        "text": "The exploration floor holds: even a maximally-conservative simulated user still receives genuine discovery.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E3",
-        "text": "Intra-list diversity meets the documented target; no rail is dominated by one director, franchise, or year.",
-        "met": true,
-        "evidence": "2026-11-18, on eca974f (calibrated, makers at 0.1; 5c70542 interleaves the order only), 15,640 test users: no rail over the app's caps (two per director, two per franchise, five per year), intra-list diversity 0.418 against 0.404 for the same candidates in score order; miscalibration 0.008 against 0.664. Seen to fail: --whole --limit 300 --caps 20,20,20, 196 of 300 rails over the app's caps. Units: crates/recommend/src/rank.rs no_more_than_two_by_one_director_two_per_franchise_five_per_year, each_taste_mode_fills_no_more_than_its_share_of_the_rail (seen to fail without quotas and without the interleaving)."
+        "text": "Rail labels accurately describe why each item is there.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E4",
-        "text": "Every recommendation has a truthful explanation.",
-        "met": true,
-        "evidence": "A reason is the part that lifts a pick furthest above the median candidate (1cad203), and names only what is true: crates/recommend/src/rank.rs every_reason_names_something_true_of_the_candidate (a property over 300 candidates with loved-with, mode and maker links; seen to fail with every Mode reason forced to mode 0), a_reason_is_what_lifts_a_title_above_the_typical_candidate (seen to fail on the biggest-part rule), a_title_nobody_has_rated_reaches_the_profile_through_its_maker; crates/taste/src/hybrid.rs a_note_names_only_titles_the_profile_loved (with 'By Andrei Tarkovsky, who made Stalker and Solaris'); crates/taste/tests/hybrid.rs end to end. Manual: the release build on a copy of the development data (2026-11-18, 22:25) showed the rail with each card's reason, among them Mob Psycho 100 'Loved by people who loved One Punch Man' and Tower of God 'Loved by people who loved Solo Leveling' (docs/case-studies/shots/taste-rail.png)."
+        "text": "Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.",
+        "met": false,
+        "evidence": null
       },
       {
         "id": "E5",
-        "text": "Ranking 1,000 candidates completes in < 150 ms on Tier 0.",
+        "text": "The author tests it on their own taste and finds at least three films they hadn't heard of and want to watch. This is the real acceptance test.",
         "met": false,
-        "evidence": "MEASURED, Tier 2 only: 2026-11-18, on eca974f (calibrated, makers at 0.1; 5c70542 interleaves the order only), 15,640 test users: ranking one user's candidates (median 1,051, at most 1,144) p50 2.30 ms, p95 7.36 ms, max 13.75 ms with builds running beside it (budget 150 ms on Tier 0). The Tier 0 run needs the author's hardware: carried to the Phase 19 author batch.",
-        "carried_to_phase": 19,
-        "carried_reason": "The 150 ms budget is enforced on Tier 0 hardware (SPEC.md 2.3) and this is the Tier 2 development machine; the run is asked for in the Phase 19 author batch with Phase 7 E7, Phase 14 E4/E6, D89 and D91."
+        "evidence": null
       },
       {
         "id": "E6",
-        "text": "Case study written with real numbers.",
-        "met": true,
-        "evidence": "ae86aa0: docs/case-studies/recommender.md (1,892 words, with docs/case-studies/shots/taste-rail.png from the release build): the problem, what was considered, what was built (a diagram), the maths, how it was judged, every number from docs/eval-results.md, what went wrong (five fixes), staying current, what would be done differently."
-      },
-      {
-        "id": "E7",
-        "text": "A title the catalogue gains at a launch can be recommended on that same launch with a truthful reason, and each source (catalogue, meaning, MovieLens, AniList, TMDB) says when it last updated.",
-        "met": true,
-        "evidence": "crates/catalogue/tests/staying_current.rs a_title_gained_at_a_launch_is_recommended_on_that_launch_with_a_true_reason (3bee71a): a fixture refresh adds a film through the refresh's own load, meaning::keep_current describes and embeds it into the companion beside a published graph, Home's taste rail over both graphs reaches it with a true reason; seen to fail with the companion insert removed. Each source's last update: crates/catalogue/tests/current.rs each_source_says_when_it_last_updated_and_what_it_did, the Settings section's test (seen to fail with the list hidden). Manual: the release build on the copy (2026-11-18) ran the launch's chain (catalogue refreshed, 201 titles given meaning, search reopened) and Settings > Library listed IMDb's catalogue, meaning (201 at the last update, 766 in all), MovieLens (25,032 titles), AniList (2 anime), TMDB (no key set) and Rising now, each with when it last updated."
+        "text": "Case study written — this is the flagship one.",
+        "met": false,
+        "evidence": null
       }
     ]
   },
@@ -1959,8 +1945,8 @@
       "title": "Recommendation Engine",
       "depends_on": "15, 16",
       "sessions": "2–3",
-      "status": "in_progress",
-      "completion_commit": null,
+      "status": "complete",
+      "completion_commit": "90231e6",
       "exit_criteria": [
         {
           "id": "E1",
@@ -2053,7 +2039,7 @@
       "title": "Discovery Engine",
       "depends_on": "17",
       "sessions": "2",
-      "status": "not_started",
+      "status": "in_progress",
       "completion_commit": null,
       "exit_criteria": [
         {
@@ -2091,6 +2077,38 @@
           "text": "Case study written — this is the flagship one.",
           "met": false,
           "evidence": null
+        }
+      ],
+      "subtasks": [
+        {
+          "id": "18.1",
+          "text": "The strategy arms (crates/recommend/src/strategy.rs, new): safe-familiar, adjacent-stretch (one axis away from a taste mode), cross-mode bridge (between two of the profile's modes), blind-spot (a well-regarded region the profile never touched: a country, a decade, a movement), canon-gap (acclaimed work the taste predicts and the profile has not seen), deep-cut (highly rated obscurity near a mode); each yields candidates from Phase 17's pools and the meaning index with an honest label ('Because you loved Stalker', 'Your blind spot: Iranian New Wave'), tested so every label is true (E3).",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "18.2",
+          "text": "The contextual bandit (Thompson sampling) over the arms, rewarded by outcomes (played, completed, abandoned early, watchlisted, dismissed), with an exploration floor and no arm dominating; a simulation harness (`eval discovery`) with simulated users whose reward patterns change (E1), a maximally conservative user who still gets discovery (E2), and the novelty metric, mean inverse popularity, against its target with relevance held (E4).",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "18.3",
+          "text": "The exploration budget and dismissals: a Comfort to Adventure setting per profile adapted by the bandit; 'not for me', 'not right now', 'already seen' on every recommended card (pad-reachable) feeding back; never the same item in two rails.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "18.4",
+          "text": "Surprise me (one button and a pad shortcut: a film the viewer will probably like, from their taste and their sources, opened ready to play) and mood shelves from the semantic index offered to Home's rails, with I42 ('I have 90 minutes'). Search-by-meaning quality, carried from Phase 5 (E3 nDCG@10 0.0472, E4 the two named queries), is worked here, where mood shelves depend on it.",
+          "status": "not_started",
+          "commit": null
+        },
+        {
+          "id": "18.5",
+          "text": "The flagship case study (E6), the author's acceptance test on their own taste (E5, asked in the author batch), docs/specs, learning note, README and HOW_IT_WORKS, regression against every recorded number, close.",
+          "status": "not_started",
+          "commit": null
         }
       ]
     },
@@ -2571,7 +2589,7 @@
       ]
     }
   ],
-  "next_action": "Phase 17 close (17.5): (1) when `eval all` on the scratch copy finishes, compare every harness with its recorded number in docs/eval-results.md (rerun `target/release/eval.exe search` alone on a quiet machine: under load it read p95 34.5 ms against 15.2 ms recorded) and record the regression table; (2) carry Phase 5 E3 and E4 (meaning nDCG@10 still 0.0472; carried to 17) on to Phase 18, whose mood shelves are built from the semantic index, with the measured value; (3) docs: the learning note, HOW_IT_WORKS and README are done, the case study is docs/case-studies/recommender.md; (4) run every pre-push check, push, CI green, merge phase/17-recommendation-engine into main (--no-ff), tag phase-17, close with tools/phasedoc/generate.py --close 17 and --open 18.",
+  "next_action": "Phase 18, 18.1: create crates/recommend/src/strategy.rs with the six arms as candidate generators over crates/taste/src/hybrid.rs's pools and the meaning index (safe-familiar = Phase 17's rail; adjacent-stretch = one axis from a mode; cross-mode bridge = the midpoint direction of two modes; blind-spot = a well-voted country or decade the profile has no titles from; canon-gap = top-rated titles near a mode the profile has not met; deep-cut = high rating, low votes, near a mode), each pick carrying a label that names only what is true; a property test that every label is true (E3). Plan first in docs/phases/phase-18-discovery-engine.md.",
   "blockers": [
     {
       "id": "B16",
