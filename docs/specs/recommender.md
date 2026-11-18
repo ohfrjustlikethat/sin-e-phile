@@ -13,7 +13,7 @@ What Home's "Where your taste points" is made of, how it is judged, and how it s
   `c / (mass_i^(1-alpha) * mass_j^alpha)` with alpha 0.65, chosen on tuning users as the best recall whose coverage
   clears 15% (cosine, 0.5, found slightly more and reached 10% of the catalogue).
 - **Layer 3, the ranker** (`crates/recommend/src/rank.rs`): about a thousand candidates gathered by
-  `crates/taste/src/hybrid.rs` from three capped pools (each mode's nearest, the matrix neighbours of the 60 best-loved
+  `crates/taste/src/hybrid.rs` from three capped pools (each mode's nearest, the matrix neighbours of the 500 best-loved
   titles, the 100 most-voted), one score, a rail picked for variety within caps, a reason for every pick.
 
 ## 2. The score
@@ -26,8 +26,9 @@ tuning users (`eval recommend --whole --tune`), never on the users the reported 
 
 ## 3. Variety, and its target (E3)
 
-- **Caps**, kept by construction: at most two titles by one director, one per franchise, three from one year, in a
-  rail. A franchise is read from the title (`rank::franchise_key`: "Toy Story 3" and "Toy Story" are one), a proxy,
+- **Caps**, kept by construction: at most two titles by one director, two per franchise, five from one year, in a
+  rail of twenty, so none of them takes more than a quarter of it ("dominated", E3). One per franchise and three per
+  year cost a sixth of the recall on the tuning users and were loosened. A franchise is read from the title (`rank::franchise_key`: "Toy Story 3" and "Toy Story" are one), a proxy,
   because no free keyless source names franchises; a false match costs a title its place, never a wrong reason.
 - **Maximal marginal relevance**: each pick is the best remaining score less how closely it repeats the most similar
   pick so far (cosine in the meaning index), weighted by `rank::DIVERSITY`.

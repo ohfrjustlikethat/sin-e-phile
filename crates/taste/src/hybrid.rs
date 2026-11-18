@@ -25,8 +25,10 @@ use crate::modes::Mode;
 /// Nearest titles asked for per mode, and the most the meaning pool keeps.
 const PER_MODE: usize = 200;
 const MEANING: usize = 500;
-/// Liked titles whose neighbours are asked for, strongest first, and the most kept.
-const LIKED_ASKED: usize = 60;
+/// Liked titles whose neighbours are asked for, strongest first, and the most kept. Asking
+/// for only 60 left most of a long history out, and cost about a fifth of the recall on
+/// MovieLens' tuning users (docs/eval-results.md); 500 is one query of about 25,000 rows.
+const LIKED_ASKED: usize = 500;
 const LOVED: usize = 400;
 /// The most-voted titles in the pool.
 const POPULAR: i64 = 100;

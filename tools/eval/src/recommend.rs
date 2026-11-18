@@ -397,6 +397,8 @@ pub async fn whole(
     let mut popularity = 0.0;
     let mut rank_ms: Vec<f64> = Vec::new();
     let mut sizes: Vec<usize> = Vec::new();
+    // Seconds spent per stage over all users: modes, the axes, gathering candidates.
+    let mut spent = [0.0f64; 3];
     let started = Instant::now();
     for (_, shown, held) in &users {
         let met: HashSet<i64> = shown.iter().copied().collect();
@@ -408,7 +410,9 @@ pub async fn whole(
                 Some((*id, v.iter().map(|x| f32::from(*x)).collect(), 1.0))
             })
             .collect();
+        let t = Instant::now();
         let modes = sinephile_taste::modes::modes(&with_vectors);
+        spent[0] += t.elapsed().as_secs_f64();
         let mut loved: HashMap<i64, Vec<(i64, f32)>> = HashMap::new();
         let strongest = match asked {
             Some(n) => hybrid::strongest_n(&liked, n),
@@ -425,11 +429,15 @@ pub async fn whole(
                 }
             }
         }
+        let t = Instant::now();
         let axes =
             sinephile_taste::axes::axes(&db, &liked, &sinephile_taste::Statements::default())
                 .await?;
+        spent[1] += t.elapsed().as_secs_f64();
+        let t = Instant::now();
         let candidates =
             hybrid::candidates(&db, semantic, &modes, &met, &loved, &axes, &HashSet::new()).await?;
+        spent[2] += t.elapsed().as_secs_f64();
         sizes.push(candidates.len());
         let by_id: HashMap<i64, &rank::Candidate> = candidates.iter().map(|c| (c.id, c)).collect();
         let held32: Vec<u32> = held.iter().filter_map(|i| u32::try_from(*i).ok()).collect();
@@ -472,6 +480,10 @@ pub async fn whole(
         started.elapsed().as_secs_f64(),
         sizes[sizes.len() / 2],
         sizes[sizes.len() - 1]
+    );
+    println!(
+        "  time in: modes {:.0} s, axes {:.0} s, gathering candidates {:.0} s",
+        spent[0], spent[1], spent[2]
     );
     println!(
         "  ranking one user's candidates: p50 {:.2} ms, p95 {:.2} ms, max {:.2} ms (release build, this machine)\n",

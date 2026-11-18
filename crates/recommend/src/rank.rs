@@ -16,8 +16,10 @@
 //! 2. **Maximal marginal relevance**: the rail is picked one title at a time, each the best
 //!    remaining score minus how much it repeats what is already picked (its closeness in
 //!    meaning to the most similar pick), so a rail is not eight versions of one film.
-//! 3. **Caps** ([`Caps`]): no more than two by one director, one per franchise, three from one
-//!    year. A title over a cap is passed over, not penalised: the rule is the rule.
+//! 3. **Caps** ([`Caps`]): no more than two by one director, two per franchise, five from one
+//!    year, so none takes more than a quarter of a rail of twenty. A title over a cap is passed
+//!    over, not penalised: the rule is the rule. (Tighter caps, one per franchise and three per
+//!    year, cost a sixth of the recall on MovieLens' tuning users: docs/eval-results.md.)
 //! 4. **A reason** ([`Reason`]) from the part that contributed most to its score, naming only
 //!    things true of the profile: the titles it loved that point here, or the mode it is
 //!    near. E4: every recommendation has a truthful explanation.
@@ -76,8 +78,8 @@ pub struct Caps {
 
 pub const CAPS: Caps = Caps {
     per_director: 2,
-    per_franchise: 1,
-    per_year: 3,
+    per_franchise: 2,
+    per_year: 5,
 };
 
 /// How much repeating an earlier pick costs, 0 (none) to 1 (only novelty counts).
@@ -320,7 +322,7 @@ mod tests {
     }
 
     #[test]
-    fn no_more_than_two_by_one_director_one_per_franchise_three_per_year() {
+    fn no_more_than_two_by_one_director_two_per_franchise_five_per_year() {
         let mut c: Vec<Candidate> = (1..=6)
             .map(|i| Candidate {
                 directors: vec![77],
@@ -347,12 +349,12 @@ mod tests {
         );
         assert_eq!(
             ids.iter().filter(|i| (10..=13).contains(*i)).count(),
-            1,
+            2,
             "{ids:?}"
         );
         assert_eq!(
             ids.iter().filter(|i| (20..=25).contains(*i)).count(),
-            3,
+            5,
             "{ids:?}"
         );
         // The two kept by the director are his best two.

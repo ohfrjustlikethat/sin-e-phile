@@ -3162,3 +3162,38 @@ How current it is: titles with neighbours by year, 2019: 662, 2020: 461, 2021: 4
 later. *Past Lives* (2023) has neighbours (You Hurt My Feelings, Of an Age, …); *Oppenheimer* and *The Boy and the
 Heron* (2023) do not. GroupLens' rolling release stops in 2023, which is why ADR-0054 adds AniList's and TMDB's live
 recommendations and cold-start neighbours (17.6) rather than relying on MovieLens.
+
+### The whole recommender (17.4, 2026-11-18)
+
+`cargo run --release -p eval -- recommend --whole [--tune] [--limit N]`: the app's own gathering
+(`sinephile_taste::hybrid::candidates`) and ranker (`sinephile_recommend::rank`) on MovieLens users the matrix never
+learned from. The matrix is rebuilt in the harness from ml-25m's build users onto catalogue titles (129,892 people,
+18,377 titles); each judged user's shown likes become a profile (modes from their vectors in the meaning index, axes
+from the catalogue); the held-out likes are the answer; popularity gets the same 20 slots with the build users'
+most-liked titles not shown.
+
+**First trial** (300 test users, the starting setting near 1, loved 1, popular 0.15, diversity 0.3): Recall@20 0.2482
+against popularity 0.1730 (+43.5%); about 926 candidates a user. Ranking one user's candidates took p50 26.08 ms; the
+variety step compared every candidate with every pick in each round. Keeping each candidate's closeness to the nearest
+pick as picks are made: **p50 3.73 ms, p95 3.93 ms**, identical results (release build, Tier 2 dev machine).
+
+**Tuning sweep** (2,000 tuning users, 108 settings of near, loved, popular and diversity; 723 s): popularity 0.1627;
+every setting between **0.2497 and 0.2560 (+53.4% to +57.3%)**, best near 1, loved 0.5, popular 0.3, diversity 0.15.
+Coverage 7.3-8.9% (2,000 users fill only 40,000 slots, so this is not E2's measure). No rail over a cap. The weights
+barely matter; and the whole recommender finds fewer held-out favourites than the matrix alone did on the same kind of
+users (0.2864, +72.1%), so something structural costs recall. Suspects being measured: only 60 loved titles' neighbours
+are asked for (in the harness every like weighs the same, so which 60 is arbitrary), and three per year is a strict cap.
+
+**Where the recall went** (the same 1,000 tuning users each time, popularity 0.1665; the starting setting, then the
+best of the 108):
+
+| Variant | Starting setting | Best setting |
+|---|---|---|
+| A: as built (60 loved titles asked, caps 2/1/3) | 0.2484 (+49.2%) | 0.2537 (+52.4%) |
+| B: every loved title asked (`--asked 2000`) | 0.2650 (+59.2%) | 0.2706 (+62.6%) |
+| C: caps 2 per director, 2 per franchise, 5 per year (`--caps 2,2,5`) | 0.2691 (+61.6%) | 0.2735 (+64.3%) |
+| **D: both** | **0.2859 (+71.7%)** | **0.2906 (+74.6%)** |
+
+Both are structural, and together they bring the whole recommender back to the matrix alone's level (+72.1% on tuning
+users) and past it. Taken: up to 500 loved titles asked (one query of about 25,000 rows), and caps of 2/2/5 in a rail
+of twenty, so no director, franchise or year takes more than a quarter of it.
