@@ -121,4 +121,10 @@ async fn each_source_says_when_it_last_updated_and_what_it_did() {
         named(&after, "Rising now").detail,
         "Starts at the next catalogue update"
     );
+    // A refresh that moved nothing has still updated it.
+    media.keep_rising(2, 1_000, 200).await.unwrap();
+    let kept = current::sources(&db).await.expect("sources");
+    let rising = named(&kept, "Rising now");
+    assert!(rising.updated_at.is_some());
+    assert_eq!(rising.detail, "No counts moved at the last update");
 }

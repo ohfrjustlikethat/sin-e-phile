@@ -57,7 +57,8 @@ describe("The catalogue keeps itself current (Phase 16)", () => {
     expect(
       screen.getByText("Updated today. 188 titles given meaning at the last update, 374 in all."),
     ).toBeInTheDocument();
-    expect(screen.getByText("Not yet. Used with a profile's own TMDB key; none is set.")).toBeInTheDocument();
+    // Without a time, the detail says what it is waiting for on its own.
+    expect(screen.getByText("Used with a profile's own TMDB key; none is set.")).toBeInTheDocument();
   });
 
   it("puts a time in words", () => {

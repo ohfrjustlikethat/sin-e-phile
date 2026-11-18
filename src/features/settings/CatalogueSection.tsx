@@ -99,7 +99,7 @@ export function CatalogueSection() {
             <div key={s.name} className="grid gap-1 border-b border-line-subtle py-3 sm:grid-cols-[14rem_1fr] sm:gap-4">
               <dt className="text-[14px] text-ink">{s.name}</dt>
               <dd className="text-[13px] text-ink-muted">
-                {s.updated_at ? `Updated ${when(s.updated_at)}. ` : "Not yet. "}
+                {s.updated_at ? `Updated ${when(s.updated_at)}. ` : ""}
                 {s.detail}.
               </dd>
             </div>

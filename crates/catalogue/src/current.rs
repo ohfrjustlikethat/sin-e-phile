@@ -150,17 +150,18 @@ pub async fn sources(db: &Db) -> Result<Vec<Source>, DbError> {
 
     // Rising now (step 6).
     let rising = MediaRepository::new(db).kept_rising().await?;
+    let rising_at = profiles
+        .setting_written(RISING_KEY)
+        .await?
+        .map(|(_, at)| iso(&at));
     out.push(Source {
         name: "Rising now",
-        updated_at: profiles
-            .setting_written(RISING_KEY)
-            .await?
-            .map(|(_, at)| iso(&at)),
-        detail: if rising.is_empty() {
-            "Starts at the next catalogue update".into()
-        } else {
-            format!("{} titles gaining the most ratings", n(rising.len() as i64))
+        detail: match (rising.is_empty(), rising_at.is_some()) {
+            (false, _) => format!("{} titles gaining the most ratings", n(rising.len() as i64)),
+            (true, true) => "No counts moved at the last update".into(),
+            (true, false) => "Starts at the next catalogue update".into(),
         },
+        updated_at: rising_at,
     });
     Ok(out)
 }
