@@ -3151,3 +3151,14 @@ database +22.6 MB, peak working set 199 MB. Neighbours, read back: *Tokyo Story*
 Sansho the Bailiff, Floating Weeds, Sunrise, Ordet, A Man Escaped; *Stalker* — Solaris, The Mirror, Andrei Rublev,
 Nostalgia, The Sacrifice, Ivan's Childhood, Persona, Come and See; *Spirited Away* — seven Ghibli films and Grave of the
 Fireflies.
+
+**The app's own path, MovieLens' rolling release** (`target/release/ingest neighbours`, which calls the launch step
+`neighbours::keep_current`; 2026-11-18, development copy, real network): `ml-latest.zip` fetched over verified HTTPS
+(334.6 MB), joined, built and stored: 33,832,162 ratings, 16,844,614 likes by 324,303 people over **25,032 titles**
+(19,792 from ml-25m); 1,251,574 rows; the build 15.6 s, **130.5 s in all** (the download most of it); database
++20.9 MB; peak working set 242 MB; the archive deleted. **Run again: `Current`**, one HEAD, nothing fetched.
+
+How current it is: titles with neighbours by year, 2019: 662, 2020: 461, 2021: 400, 2022: 332, **2023: 77**, none
+later. *Past Lives* (2023) has neighbours (You Hurt My Feelings, Of an Age, …); *Oppenheimer* and *The Boy and the
+Heron* (2023) do not. GroupLens' rolling release stops in 2023, which is why ADR-0054 adds AniList's and TMDB's live
+recommendations and cold-start neighbours (17.6) rather than relying on MovieLens.

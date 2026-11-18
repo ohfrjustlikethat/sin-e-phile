@@ -88,10 +88,12 @@ async fn current(
         },
     };
     on_build();
+    let started = Instant::now();
     let path = datasets.join(Release::Latest.filename());
-    crate::download::Downloader::new()
+    let fetched = crate::download::Downloader::new()
         .fetch(url, &path, |_| {})
-        .await?;
+        .await?
+        .bytes;
     let built = async {
         crate::movielens::join(db, &path).await?;
         build(db, &path).await
@@ -100,7 +102,11 @@ async fn current(
     // Whatever happened, the archive goes: a corrupt one would fail the same way again,
     // and a good one is not read again until GroupLens publishes the next.
     let _ = std::fs::remove_file(&path);
-    let built = built?;
+    let built = Built {
+        fetched,
+        total_seconds: started.elapsed().as_secs_f64(),
+        ..built?
+    };
     freshness::remember_url(db, "movielens", url, &validator).await?;
     Ok(Outcome::Built(built))
 }
@@ -116,7 +122,12 @@ pub struct Built {
     pub people: usize,
     pub titles: usize,
     pub rows: u64,
+    /// The build alone: reading the ratings to storing the rows.
     pub seconds: f64,
+    /// Bytes downloaded for it; 0 when built from an archive already on disk.
+    pub fetched: u64,
+    /// The download and the join as well: what a launch spends.
+    pub total_seconds: f64,
 }
 
 /// Build the matrix from the MovieLens `archive` and store it. Leaves one core free: it is
@@ -163,5 +174,7 @@ pub async fn build(db: &Db, archive: &Path) -> Result<Built, JobError> {
         titles: matrix.items(),
         rows: written,
         seconds: started.elapsed().as_secs_f64(),
+        fetched: 0,
+        total_seconds: started.elapsed().as_secs_f64(),
     })
 }

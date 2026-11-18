@@ -39,9 +39,10 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            Ratings are NOT stored — they are an input to the
                            on-device matrix (ADR-0019), and Phase 4's job is to
                            measure what that will cost.
-  ingest neighbours        build the item-item matrix (Phase 17) from ml-25m.zip in
-                           datasets/ over the films `ingest movielens` joined, and
-                           store each title's best 50 neighbours. What the app does.
+  ingest neighbours [--ml25m] what the app does at every launch (ADR-0054): fetch
+                           MovieLens' rolling release when it changed, join it, and
+                           store each title's best 50 neighbours. --ml25m builds from
+                           the fixed ml-25m.zip in datasets/ (the evaluation's set).
   ingest repair-variants   recompute titles.variant for rows the region-over-
                            language bug labelled english. Narrow and re-runnable.
   ingest keep              what the app does hourly: finish an interrupted refresh,
@@ -168,7 +169,14 @@ async fn main() -> Result<(), JobError> {
                 .unwrap_or(sinephile_catalogue::movielens::Release::Ml25m);
             movielens(&db, &dir.join("datasets"), set).await
         }
-        "neighbours" => neighbours(&db, &dir.join("datasets")).await,
+        "neighbours" => {
+            neighbours(
+                &db,
+                &dir.join("datasets"),
+                args.iter().any(|a| a == "--ml25m"),
+            )
+            .await
+        }
         "repair-variants" => repair_variants(&db).await,
         "refresh" => refresh(&db, &dir.join("datasets")).await,
         "keep" => keep(&db, &dir.join("datasets")).await,
@@ -667,21 +675,38 @@ async fn episodes(
 }
 
 /// MovieLens: join by IMDb id, and measure what the on-device matrix will cost.
-/// The item-item matrix, as the app builds it (Phase 17, 17.1).
-async fn neighbours(db: &Db, datasets: &Path) -> Result<(), JobError> {
+/// The item-item matrix (Phase 17). By default exactly what the app does at every launch
+/// (ADR-0054): MovieLens' rolling release, fetched, joined and built only when it changed.
+/// `--ml25m` builds from the fixed ml-25m archive in datasets/ instead (the release the
+/// evaluation is measured on).
+async fn neighbours(db: &Db, datasets: &Path, ml25m: bool) -> Result<(), JobError> {
     use sinephile_catalogue::movielens::Release;
+    use sinephile_catalogue::neighbours::{self, Outcome};
     let before = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
-    let path = datasets.join(Release::Ml25m.filename());
-    let built = sinephile_catalogue::neighbours::build(db, &path).await?;
+    let built = if ml25m {
+        neighbours::build(db, &datasets.join(Release::Ml25m.filename())).await?
+    } else {
+        let transport = sinephile_metadata_api::HttpTransport::new();
+        let on_build = || println!("MovieLens has a release this copy has not built: fetching it");
+        match neighbours::keep_current(db, datasets, &transport, &on_build).await {
+            Outcome::Built(built) => built,
+            other => {
+                println!("neighbours: {other:?}");
+                return Ok(());
+            }
+        }
+    };
     let after = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
     println!(
-        "neighbours: {} ratings, {} likes by {} people over {} titles; {} rows stored in {:.1} s; database {:+.1} MB",
+        "neighbours: {} ratings, {} likes by {} people over {} titles; {} rows; build {:.1} s, {:.1} MB fetched, {:.1} s in all; database {:+.1} MB",
         built.ratings,
         built.likes,
         built.people,
         built.titles,
         built.rows,
         built.seconds,
+        built.fetched as f64 / 1_048_576.0,
+        built.total_seconds,
         (after as f64 - before as f64) / 1_048_576.0
     );
     Ok(())
