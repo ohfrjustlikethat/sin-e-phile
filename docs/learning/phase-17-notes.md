@@ -15,9 +15,10 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
   no matrix yet, it is fetched, joined onto the catalogue, built and stored, and the archive deleted.
 - **The hybrid ranker** (17.2, `crates/recommend/src/rank.rs`): about a thousand candidates from three pools (each
   taste mode's nearest in meaning, the matrix neighbours of what the profile loved, the most-voted), one blended score,
-  a rail picked for variety within caps (two per director, one per franchise, three per year), and a reason for every
-  pick. Home's "Where your taste points" uses it, and each card says why: "Loved by people who loved Stalker and
-  Solaris", or "Close to Stalker and Solaris, which you loved".
+  a rail picked for variety within caps (two per director, two per franchise, five per year), and a reason for every
+  pick: the part of its score that lifts it furthest above a typical candidate. Home's "Where your taste points" uses
+  it, and each card says why: "Loved by people who loved Stalker and Solaris", or "Close to Stalker and Solaris, which
+  you loved". `eval recommend --rail 1` prints a profile's whole rail with its reasons.
 - **The evaluation** (`eval recommend`): an 80/10/10 split of users by hash, a fifth of each judged user's likes held
   out, Recall@20 against popularity, and coverage.
 
@@ -52,12 +53,13 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
 - **Recall@K and coverage**, and why a popularity baseline is the honest one — `tools/eval/src/recommend.rs`.
 - **CPU work off the async runtime** (`spawn_blocking`) — `crates/catalogue/src/neighbours.rs:39`.
 - **Scaling each part of a score over the candidates** before weighting, so a weight says how much a part counts —
-  `crates/recommend/src/rank.rs:112`.
-- **A reason from the largest contribution**, so it is true by construction — `crates/recommend/src/rank.rs:138`.
+  `crates/recommend/src/rank.rs:132`.
+- **A reason from the part furthest above the median candidate**, not the biggest part: a part every candidate has
+  (closeness) tells none of them apart — `crates/recommend/src/rank.rs:164`.
 - **Maximal marginal relevance**: score minus similarity to what is already picked —
-  `crates/recommend/src/rank.rs:221`.
-- **Hard caps as a filter, not a penalty** — `crates/recommend/src/rank.rs:205`.
-- **A proxy, said to be one**: a franchise read from the title — `crates/recommend/src/rank.rs:256`.
+  `crates/recommend/src/rank.rs:266`.
+- **Hard caps as a filter, not a penalty** — `crates/recommend/src/rank.rs:257`.
+- **A proxy, said to be one**: a franchise read from the title — `crates/recommend/src/rank.rs:309`.
 - **A trait as a seam**: the meaning index behind `Meaning`, so a test can stand in a few vectors —
   `crates/taste/src/hybrid.rs:70`.
 - **`Send` versus `Sync`**: a future holding `&T` across `.await` needs `T: Sync`; holding `&mut T` needs only

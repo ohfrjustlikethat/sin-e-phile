@@ -124,7 +124,15 @@ async fn main() {
                     .map(|v| v.split(',').filter_map(|x| x.parse().ok()).collect())
                     .unwrap_or_else(|| default.to_vec())
             };
-            if args.iter().any(|a| a == "--whole") {
+            // `--rail 1`: profile 1's taste rail with every card's reason.
+            let rail = args
+                .iter()
+                .position(|a| a == "--rail")
+                .and_then(|i| args.get(i + 1))
+                .and_then(|n| n.parse().ok());
+            if let Some(profile) = rail {
+                recommend::rail(Path::new(&data_dir), profile).await
+            } else if args.iter().any(|a| a == "--whole") {
                 let limit = args
                     .iter()
                     .position(|a| a == "--limit")

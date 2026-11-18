@@ -110,11 +110,23 @@ pub struct Pick {
     pub reason: Reason,
 }
 
-/// Each part of every candidate's score, scaled to 0..1 over the candidates.
+/// Each part of every candidate's score, scaled to 0..1 over the candidates, and each part's
+/// median: what a typical candidate gets from it.
 struct Parts {
     near: Vec<f32>,
     loved: Vec<f32>,
     popular: Vec<f32>,
+    typical: [f32; 3],
+}
+
+/// The middle value (the lower of the two middles for an even count); 0 for none.
+fn median(values: &[f32]) -> f32 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    let mut v = values.to_vec();
+    let mid = (v.len() - 1) / 2;
+    *v.select_nth_unstable_by(mid, f32::total_cmp).1
 }
 
 fn parts(candidates: &[Candidate]) -> Parts {
@@ -125,39 +137,60 @@ fn parts(candidates: &[Candidate]) -> Parts {
     let max_loved = loved_sum.iter().copied().fold(0.0, f32::max);
     let max_votes = candidates.iter().map(|c| c.votes).max().unwrap_or(0).max(1);
     let top = ((max_votes + 1) as f32).ln();
+    // Cosine -1..1 to 0..1; no vector counts as no closeness at all.
+    let near: Vec<f32> = candidates
+        .iter()
+        .map(|c| c.near.map_or(0.0, |(_, s)| (s + 1.0) / 2.0))
+        .collect();
+    let loved: Vec<f32> = loved_sum
+        .iter()
+        .map(|s| if max_loved > 0.0 { s / max_loved } else { 0.0 })
+        .collect();
+    let popular: Vec<f32> = candidates
+        .iter()
+        .map(|c| ((c.votes.max(0) + 1) as f32).ln() / top)
+        .collect();
+    let typical = [median(&near), median(&loved), median(&popular)];
     Parts {
-        // Cosine -1..1 to 0..1; no vector counts as no closeness at all.
-        near: candidates
-            .iter()
-            .map(|c| c.near.map_or(0.0, |(_, s)| (s + 1.0) / 2.0))
-            .collect(),
-        loved: loved_sum
-            .iter()
-            .map(|s| if max_loved > 0.0 { s / max_loved } else { 0.0 })
-            .collect(),
-        popular: candidates
-            .iter()
-            .map(|c| ((c.votes.max(0) + 1) as f32).ln() / top)
-            .collect(),
+        near,
+        loved,
+        popular,
+        typical,
     }
 }
 
-/// The score of candidate `i`, and the reason: the part that added most to it.
+/// The score of candidate `i`, and the reason: the part that lifts it furthest above a
+/// typical candidate.
 fn scored(c: &Candidate, p: &Parts, i: usize, w: &Weights) -> (f32, Reason) {
     let near = w.near * p.near[i];
     let loved = w.loved * p.loved[i];
     let popular = w.popular * p.popular[i];
     let score =
         near + loved + popular + w.axes * c.axes + if c.playable { w.playable } else { 0.0 };
-    // The reason is what sets the title apart, so closeness counts only above "unrelated":
-    // the score maps cosine 0 to half the part, which every title with a vector gets, and
-    // counted whole it outvoted three loved titles pointing here (the tuned weights showed it).
-    let distinct_near = w.near * c.near.map_or(0.0, |(_, s)| s.max(0.0));
-    let reason = if loved > 0.0 && loved >= distinct_near && loved >= popular {
+    // WHY ABOVE A TYPICAL CANDIDATE, NOT THE BIGGEST PART. Every candidate the meaning pool
+    // brings is close to some mode, so closeness is large for all of them, and as the
+    // biggest part it named a mode for every pick: the real window (17.3) showed twenty of
+    // twenty "Close to", Bresson's Pickpocket among them as "close to The Godfather", when
+    // what put it there was the people who loved Stalker and Late Spring. A score is one
+    // title against the others, so the part that ranked it is the one where it beats the
+    // typical candidate by most: each part minus its median, weighted as in the score.
+    let lift = |part: f32, typical: f32, weight: f32| weight * (part - typical);
+    let [near_typical, loved_typical, popular_typical] = p.typical;
+    let near_lift = c.near.map(|_| lift(p.near[i], near_typical, w.near));
+    let loved_lift = (loved > 0.0).then(|| lift(p.loved[i], loved_typical, w.loved));
+    // "Widely loved" only of what is more widely seen than most candidates.
+    let popular_lift =
+        (p.popular[i] > popular_typical).then(|| lift(p.popular[i], popular_typical, w.popular));
+    let beats = |a: Option<f32>, b: Option<f32>| match (a, b) {
+        (Some(a), Some(b)) => a >= b,
+        (Some(_), None) => true,
+        (None, _) => false,
+    };
+    let reason = if beats(loved_lift, near_lift) && beats(loved_lift, popular_lift) {
         let mut by: Vec<(i64, f32)> = c.loved_with.clone();
         by.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
         Reason::LovedWith(by.into_iter().take(3).map(|(id, _)| id).collect())
-    } else if let Some((mode, _)) = c.near.filter(|_| distinct_near >= popular) {
+    } else if let Some((mode, _)) = c.near.filter(|_| beats(near_lift, popular_lift)) {
         Reason::Mode(mode)
     } else {
         Reason::Popular
@@ -329,6 +362,36 @@ mod tests {
         // The three strongest, strongest first.
         assert_eq!(rail[0].reason, Reason::LovedWith(vec![902, 901, 903]));
         assert_eq!(rail[1].reason, Reason::Mode(1));
+    }
+
+    #[test]
+    fn a_reason_is_what_lifts_a_title_above_the_typical_candidate() {
+        // 17.3's real window: ten titles from the meaning pool, all close to a mode, and a
+        // title loved alongside what the profile loved that is only loosely close to one
+        // (Pickpocket, said to be "close to The Godfather"). Closeness is what every
+        // candidate has; what this one has that the others do not is the people.
+        let mut c: Vec<Candidate> = (10..20)
+            .map(|i| Candidate {
+                near: Some((0, 0.6)),
+                ..film(i)
+            })
+            .collect();
+        c.push(Candidate {
+            near: Some((1, 0.35)),
+            loved_with: vec![(901, 0.6)],
+            ..film(1)
+        });
+        c.push(Candidate {
+            loved_with: vec![(902, 1.0)],
+            ..film(2)
+        });
+        let rail = rank(&c, &WEIGHTS, &CAPS, 0.0, c.len());
+        let reason = |id: i64| rail.iter().find(|p| p.id == id).unwrap().reason.clone();
+        assert_eq!(reason(1), Reason::LovedWith(vec![901]));
+        assert_eq!(reason(2), Reason::LovedWith(vec![902]));
+        for id in 10..20 {
+            assert_eq!(reason(id), Reason::Mode(0), "{id}");
+        }
     }
 
     #[test]

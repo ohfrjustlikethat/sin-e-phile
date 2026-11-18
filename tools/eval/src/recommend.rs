@@ -606,3 +606,55 @@ pub async fn whole(
     );
     Ok(e1 && e2 && e3)
 }
+
+/// One profile's "Where your taste points" as Home builds it, each card's reason beside it,
+/// and how the reasons divide: what 17.3's look at the real window reads in full (the window
+/// shows eight), and what the case study quotes. Run it on a copy (`SINEPHILE_DATA_DIR`):
+/// Home keeps the profile's taste model in its cache.
+pub async fn rail(data_dir: &Path, profile: i64) -> Result<bool, EvalError> {
+    let (mut engine, hybrid) = crate::search::engine(data_dir)?;
+    if !hybrid {
+        println!("rail: no meaning index here, and the taste rail needs one");
+        return Ok(false);
+    }
+    let db = sinephile_persistence::Db::open_in(data_dir).await?;
+    let cache = sinephile_taste::model::ModelCache::default();
+    let started = Instant::now();
+    let rails =
+        sinephile_taste::home::rails(&db, engine.semantic_mut(), profile, false, None, &cache)
+            .await?;
+    let took = started.elapsed().as_secs_f64() * 1000.0;
+    let Some(taste) = rails.iter().find(|r| r.key == "taste") else {
+        println!("rail: profile {profile} has no taste rail");
+        return Ok(false);
+    };
+    let facts: HashMap<i64, (String, Option<i64>)> =
+        sinephile_persistence::repositories::MediaRepository::new(&db)
+            .facts(&taste.items)
+            .await?
+            .into_iter()
+            .map(|f| (f.id, (f.title, f.year)))
+            .collect();
+    println!(
+        "rail: profile {profile}, \"{}\", Home built in {took:.0} ms\n",
+        taste.title
+    );
+    let (mut loved, mut close, mut widely) = (0, 0, 0);
+    for (n, id) in taste.items.iter().enumerate() {
+        let note = taste.notes.get(id).map_or("", String::as_str);
+        if note.starts_with("Loved by") {
+            loved += 1;
+        } else if note.starts_with("Close to") {
+            close += 1;
+        } else {
+            widely += 1;
+        }
+        let (title, year) = facts.get(id).cloned().unwrap_or_default();
+        let year = year.map_or(String::new(), |y| format!(" ({y})"));
+        println!("  {:>2}. {title}{year}: {note}", n + 1);
+    }
+    println!(
+        "\nreasons: {loved} loved by people who loved, {close} close in meaning, {widely} widely loved"
+    );
+    Ok(!taste.items.is_empty())
+}

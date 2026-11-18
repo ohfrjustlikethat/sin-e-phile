@@ -38,8 +38,12 @@ tuning users (`eval recommend --whole --tune`), never on the users the reported 
 
 ## 4. Reasons (E4)
 
-A pick's reason is the part that added most to its score, so it is true by construction, and it names only what is
-true of the profile: "Loved by people who loved Stalker and Solaris" (the loved titles whose neighbours include it,
+A pick's reason is the part that lifts it furthest above a typical candidate: each part of its score minus that
+part's median over the candidates, weighted as in the score. That is the part that ranked it, since a score only
+matters against the others. (The biggest part outright was the first rule: closeness is high for every candidate the
+meaning pool brings, so it named a mode for twenty picks of twenty in the real window, Pickpocket "close to The
+Godfather" among them; `rank::tests::a_reason_is_what_lifts_a_title_above_the_typical_candidate`.) "Widely loved" is
+said only of a title more widely seen than most candidates. A reason names only what is true of the profile: "Loved by people who loved Stalker and Solaris" (the loved titles whose neighbours include it,
 strongest first, at most three), "Close to Stalker and Solaris, which you loved" (the two strongest loved titles of the
 mode it is nearest), or "Widely loved". `rank::tests::every_reason_names_something_true_of_the_candidate` checks it as a
 property over 300 mixed candidates; `crates/taste/tests/hybrid.rs` end to end.

@@ -3249,3 +3249,23 @@ batched author checks.
 `--whole --limit 300 --caps 20,20,20` (300 users fill too few slots for coverage, 3.8%: "NOT met"; ranked with loose
 caps, 196 of 300 rails break the app's caps: "NOT met"). The caps check judges against the app's caps whatever the
 ranking used, which is what made it able to fail.
+
+### 17.3: the taste rail in the real window, and its reasons (2026-11-18)
+
+A copy of the development data (`SINEPHILE_DATA_DIR`), profile 1 given five loved films (Stalker, Solaris, Tokyo
+Story, In the Mood for Love, Late Spring) beside its three liked ones; the release build's Home, then the whole rail
+with `cargo run --release -p eval -- recommend --rail 1` (Home's own `rails`, built in 53-55 ms):
+
+| Reason rule | Loved by people who loved | Close in meaning | Widely loved |
+|---|---|---|---|
+| the biggest part (96310a6) | 0 | **20** | 0 |
+| the part furthest above the typical candidate (this commit) | **20** | 0 | 0 |
+
+The picks are the same twenty, in the same order (the rule changes no score): Andrei Rublev, Early Summer, The Mirror,
+Wild Strawberries, A Man Escaped, The Passion of Joan of Arc, Ugetsu, L'Avventura, The Godfather Part II, Sunrise,
+Pickpocket, Harakiri, Floating Weeds, Persona, Sansho the Bailiff, Close-Up, Viridiana, Man with a Movie Camera, The
+Discreet Charm of the Bourgeoisie, La Dolce Vita. Under the first rule Pickpocket and The Discreet Charm of the
+Bourgeoisie were "close to The Godfather and Oppenheimer"; under the second, "loved by people who loved Tokyo Story,
+Stalker and Solaris". Every candidate from the meaning pool is close to some mode, so closeness never told one apart;
+the people who loved the same titles did. "Close to" is now what a title gets when closeness is what sets it apart,
+which is the case of a title nobody has rated (17.6).
