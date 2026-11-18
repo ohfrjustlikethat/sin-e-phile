@@ -136,6 +136,29 @@ impl<'a> MeaningRepository<'a> {
         Ok(())
     }
 
+    /// Those of `ids` whose synopsis the job wrote: their text is not what the published
+    /// file was made from, knowingly, so a check of the file against the catalogue passes
+    /// them by.
+    pub async fn described_ids(
+        &self,
+        ids: &[i64],
+    ) -> Result<std::collections::HashSet<i64>, DbError> {
+        let mut out = std::collections::HashSet::new();
+        for chunk in ids.chunks(500) {
+            let marks = vec!["?"; chunk.len()].join(",");
+            let sql = format!(
+                "SELECT media_item_id FROM new_meaning
+                  WHERE source IS NOT NULL AND media_item_id IN ({marks})"
+            );
+            let mut query = sqlx::query_scalar::<_, i64>(&sql);
+            for id in chunk {
+                query = query.bind(id);
+            }
+            out.extend(query.fetch_all(self.db.pool()).await?);
+        }
+        Ok(out)
+    }
+
     /// Record that these titles' vectors are in the companion graph.
     pub async fn embedded(&self, ids: &[i64]) -> Result<(), DbError> {
         let mut tx = self.db.pool().begin().await?;

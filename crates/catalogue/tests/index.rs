@@ -494,3 +494,35 @@ fn the_published_keys_name_the_published_artefact() {
         "ascending by position"
     );
 }
+
+#[tokio::test]
+async fn a_title_the_meaning_job_described_does_not_fail_verification() {
+    // ADR-0054 (A44): the launch's meaning job writes synopses for titles the published
+    // file holds without one. Their documents change on purpose; verifying the file must
+    // pass them by, not report a shifted catalogue. Position 0 is always sampled.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let db = Db::open_in(dir.path()).await.expect("open");
+    catalogue(&db, 20, 0).await;
+    let ids = CatalogueRepository::new(&db).core_ids().await.expect("ids");
+    sqlx::query("UPDATE media_items SET synopsis = NULL WHERE id = ?")
+        .bind(ids[0])
+        .execute(db.pool())
+        .await
+        .expect("no synopsis");
+    let path = sinephile_embedding::artefact_path(dir.path());
+    produce(&db, &mut Fake { dimension: 8 }, &path).await;
+
+    sinephile_persistence::repositories::MeaningRepository::new(&db)
+        .described(ids[0], &"Described at last. ".repeat(20), "wikipedia")
+        .await
+        .expect("described");
+    index::verify_prefix(&db, &mut Fake { dimension: 8 }, &artefact_at(&path), &ids)
+        .await
+        .expect("a title described on purpose is not a shift");
+    // And the published graph does not count it as its own.
+    let with_text = CatalogueRepository::new(&db)
+        .core_ids_for_vectors()
+        .await
+        .expect("ids");
+    assert_eq!(with_text[0], None);
+}

@@ -2833,3 +2833,52 @@ async fn rising_surface() {
     assert_eq!(media.keep_rising(2, 1_000_000, 2).await.unwrap(), 0);
     assert!(media.kept_rising().await.unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn core_ids_for_vectors_surface() {
+    // The published graph's titles: core, described at least MIN_SYNOPSIS long, and not
+    // described since by the launch's meaning job (ADR-0054: those are the companion's).
+    use sinephile_persistence::repositories::{CatalogueRepository, MeaningRepository};
+    let db = Db::in_memory().await.expect("open");
+    let media = MediaRepository::new(&db);
+    let long = "a synopsis long enough to be worth a vector. ".repeat(8);
+    let mut ids = Vec::new();
+    for k in 0..4 {
+        let id = media
+            .insert(&NewMediaItem::film(format!("Film {k}"), 2000))
+            .await
+            .unwrap();
+        sqlx::query("UPDATE media_items SET in_core = ? WHERE id = ?")
+            .bind(k != 3)
+            .bind(id)
+            .execute(db.pool())
+            .await
+            .unwrap();
+        ids.push(id);
+    }
+    sqlx::query("UPDATE media_items SET synopsis = ? WHERE id IN (?, ?)")
+        .bind(&long)
+        .bind(ids[0])
+        .bind(ids[1])
+        .execute(db.pool())
+        .await
+        .unwrap();
+    let repo = CatalogueRepository::new(&db);
+    // in id order, the core tier only; a title without enough text is a gap
+    assert_eq!(
+        repo.core_ids_for_vectors().await.unwrap(),
+        vec![Some(ids[0]), Some(ids[1]), None]
+    );
+    // described by the meaning job: still a gap in the published graph
+    let meaning = MeaningRepository::new(&db);
+    meaning.described(ids[2], &long, "wikipedia").await.unwrap();
+    meaning.described(ids[1], &long, "anilist").await.unwrap();
+    assert_eq!(
+        repo.core_ids_for_vectors().await.unwrap(),
+        vec![Some(ids[0]), None, None]
+    );
+    // described_ids: those of the given the job wrote
+    let ours = meaning.described_ids(&ids).await.unwrap();
+    assert_eq!(ours.len(), 2);
+    assert!(ours.contains(&ids[1]) && ours.contains(&ids[2]));
+}

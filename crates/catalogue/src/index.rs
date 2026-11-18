@@ -137,8 +137,20 @@ pub async fn verify_prefix(
         ));
     }
 
-    for position in sample_positions(count, VERIFY_SAMPLES) {
+    // A title the launch's meaning job described has new text on purpose (ADR-0054): its
+    // published vector stands for the text it had, the companion holds the new one, and
+    // re-deriving its document here would report a change that is not a shift.
+    let positions = sample_positions(count, VERIFY_SAMPLES);
+    let sampled: Vec<i64> = positions.iter().map(|p| ids[*p]).collect();
+    let described = sinephile_persistence::repositories::MeaningRepository::new(db)
+        .described_ids(&sampled)
+        .await
+        .map_err(|e| JobError::step("vector-index", e.to_string()))?;
+    for position in positions {
         let id = ids[position];
+        if described.contains(&id) {
+            continue;
+        }
         let Some(document) = crate::embed::document_for(db, id).await? else {
             // The id came from the core-tier query a moment ago, so its absence now means
             // the two disagree about what the core tier IS — which is the failure this
