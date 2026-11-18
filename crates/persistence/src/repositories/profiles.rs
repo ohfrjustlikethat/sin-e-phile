@@ -822,6 +822,17 @@ impl<'a> ProfileRepository<'a> {
                 .await?,
         )
     }
+
+    /// A setting and when it was last written (UTC, `YYYY-MM-DD HH:MM:SS`): what Settings
+    /// shows as a source's last update (ADR-0054).
+    pub async fn setting_written(&self, key: &str) -> Result<Option<(String, String)>, DbError> {
+        Ok(
+            sqlx::query_as("SELECT value, updated_at FROM settings WHERE key = ?")
+                .bind(key)
+                .fetch_optional(self.db.pool())
+                .await?,
+        )
+    }
 }
 
 fn map_profile(row: sqlx::sqlite::SqliteRow) -> Result<Profile, DbError> {

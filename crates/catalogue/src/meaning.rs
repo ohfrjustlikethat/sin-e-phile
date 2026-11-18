@@ -1,13 +1,16 @@
-//! Meaning for what is new (ADR-0054 step 2): each launch, the titles the catalogue gained
-//! after the published meaning file get a synopsis and a vector in the companion graph
-//! beside the published one, so search by meaning and the recommender reach them the
-//! launch they arrive.
+//! Meaning for what has none (ADR-0054 step 2, amended by A44): each launch, core titles the
+//! published meaning file does not hold get a synopsis and a vector in the companion graph
+//! beside the published one, so search by meaning and the recommender reach them. Those are
+//! the titles the catalogue gained since the file, and the ones it left out because they
+//! had no synopsis when it was made: Doctor Who, One Punch Man and Solo Leveling among
+//! them, 1,331 titles with 10,000 votes or more in the development catalogue.
 //!
 //! # In order
 //!
-//! 1. **Who waits**: core titles past the published file's last id with no vector yet, most
-//!    voted first, at most [`PER_LAUNCH`] ([`MeaningRepository::awaiting`]). A title asked
-//!    about in the last [`RETRY_DAYS`] that nobody could describe waits for the next turn.
+//! 1. **Who waits**: core titles with no vector in either graph, most voted first, at most
+//!    [`PER_LAUNCH`] ([`MeaningRepository::awaiting`]). A title nobody could describe is
+//!    asked again after [`RETRY_RECENT_DAYS`] when it came out in the last year (its
+//!    article is often written in the weeks after), else after [`RETRY_OTHER_DAYS`].
 //! 2. **A synopsis**, from the first source that has one long enough to index
 //!    ([`MIN_SYNOPSIS`], the published file's own rule): TMDB's overview with the
 //!    profile's key, AniList's description for anime (no key), else the Wikipedia lead
@@ -22,11 +25,17 @@
 //! thousands of documents; a launch's new titles are tens to a few thousand.
 
 use std::collections::HashMap;
+use std::path::Path;
+use std::sync::Arc;
 
 use sinephile_metadata_api::anilist::AniList;
 use sinephile_metadata_api::tmdb::Tmdb;
 use sinephile_metadata_api::wikipedia::{Wikipedia, EXTRACTS_PER_REQUEST, MAPPINGS_PER_REQUEST};
-use sinephile_persistence::repositories::{Awaiting, MeaningRepository, MIN_SYNOPSIS};
+use sinephile_metadata_api::Transport;
+use sinephile_persistence::repositories::{
+    Awaiting, CredentialRepository, MeaningRepository, ProfileRepository, Retry, TmdbAccess,
+    MIN_SYNOPSIS,
+};
 use sinephile_persistence::Db;
 use sinephile_vector_index::Companion;
 
@@ -36,13 +45,33 @@ use crate::job::JobError;
 /// Titles one launch describes and embeds, the rest the next (ADR-0054).
 pub const PER_LAUNCH: usize = 2_000;
 
-/// How long a title nobody could describe waits before it is asked about again: a new
-/// film's article is often written in the weeks after it comes out.
-pub const RETRY_DAYS: i64 = 7;
+/// Articles whose lead was too short, asked for their opening each launch: one a request at
+/// Wikipedia's two a second, so about 50 s of a launch's background, most-voted first.
+pub const OPENINGS_PER_LAUNCH: usize = 100;
+
+/// How long a title from the last year that nobody could describe waits before it is asked
+/// again: a new film's article is often written in the weeks after it comes out.
+pub const RETRY_RECENT_DAYS: i64 = 7;
+
+/// How long an older one waits: what was not written in years is rarely written this week,
+/// and asking it at every launch would crowd out the titles that can be described.
+pub const RETRY_OTHER_DAYS: i64 = 90;
+
+/// This year, from the clock.
+fn this_year() -> i64 {
+    let days = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs() / 86_400);
+    (days as f64 / 365.2425 + 1970.0).floor() as i64
+}
 
 /// Vectors between saves of the companion graph, so a launch closed halfway keeps most of
 /// what it made.
 pub const SAVE_EVERY: usize = 200;
+
+/// Where a launch records what this did (JSON, a [`Report`]); the setting's write time is
+/// the "last updated" Settings shows.
+pub const LAST_KEY: &str = "meaning.last";
 
 /// Where a synopsis can come from, each optional: TMDB needs the profile's key, and a
 /// machine offline has none of them (what is described already is still embedded).
@@ -109,8 +138,8 @@ fn heavy<T>(work: impl FnOnce() -> T) -> T {
     }
 }
 
-/// Bring the meaning of what is new up to date. `after` is the published file's last
-/// catalogue id; `companion` the graph beside it, opened for writing.
+/// Give meaning to what has none. `after` is the published file's last catalogue id;
+/// `companion` the graph beside it, opened for writing.
 pub async fn keep_current(
     db: &Db,
     embedder: &mut (dyn DocumentEmbedder + Send),
@@ -125,8 +154,13 @@ pub async fn keep_current(
     if companion.is_empty() {
         repo.forget_embedded().await.map_err(step)?;
     }
+    let retry = Retry {
+        recent_year: this_year() - 1,
+        recent_days: RETRY_RECENT_DAYS,
+        other_days: RETRY_OTHER_DAYS,
+    };
     let waiting = repo
-        .awaiting(after, RETRY_DAYS, limit as i64)
+        .awaiting(after, retry, limit as i64)
         .await
         .map_err(step)?;
     let mut report = Report {
@@ -183,7 +217,12 @@ pub async fn keep_current(
             .filter(|w| !texts.long.contains_key(&w.id))
             .filter_map(|w| Some((w.imdb_id.as_deref()?, w.id)))
             .collect();
-        let imdb_ids: Vec<String> = by_imdb.keys().map(|s| s.to_string()).collect();
+        // In vote order, so a launch's openings go to what people look for.
+        let imdb_ids: Vec<String> = undescribed
+            .iter()
+            .filter_map(|w| w.imdb_id.clone())
+            .filter(|i| by_imdb.contains_key(i.as_str()))
+            .collect();
         let mut articles: Vec<(String, i64)> = Vec::new();
         let mut reached = true;
         for group in imdb_ids.chunks(MAPPINGS_PER_REQUEST) {
@@ -218,6 +257,34 @@ pub async fn keep_current(
                         }
                     }
                 }
+                Err(error) => {
+                    tracing::info!(%error, "meaning: Wikipedia stopped answering");
+                    reached = false;
+                    break;
+                }
+            }
+        }
+        // A lead is often one sentence of production facts, too short to index (the
+        // published file's rule); the article's opening runs on into its plot. Measured on
+        // the development catalogue: 1,518 of the first 2,000 leads were too short.
+        let rank: HashMap<i64, usize> = undescribed
+            .iter()
+            .enumerate()
+            .map(|(i, w)| (w.id, i))
+            .collect();
+        let mut short_leads: Vec<&(String, i64)> = articles
+            .iter()
+            .filter(|(_, id)| !texts.long.contains_key(id))
+            .collect();
+        short_leads.sort_by_key(|(_, id)| rank.get(id).copied().unwrap_or(usize::MAX));
+        for (article, id) in short_leads
+            .into_iter()
+            .take(OPENINGS_PER_LAUNCH)
+            .take_while(|_| reached)
+        {
+            match wiki.opening(article).await {
+                Ok(Some(e)) => texts.keep(*id, e.text, "wikipedia"),
+                Ok(None) => {}
                 Err(error) => {
                     tracing::info!(%error, "meaning: Wikipedia stopped answering");
                     break;
@@ -274,4 +341,85 @@ pub async fn keep_current(
         repo.embedded(&since_save).await.map_err(step)?;
     }
     Ok(report)
+}
+
+/// What the app runs after each launch's catalogue check: the job over [`PER_LAUNCH`]
+/// titles with what this data directory has, its report recorded under [`LAST_KEY`].
+/// `None` when there is no meaning here to extend (no model, no published file or no
+/// graph yet: ADR-0050's offer comes first).
+///
+/// TMDB is asked with the first profile's own key that has one (ADR-0013): the synopsis
+/// it gives is a fact about the title, shared by every profile like the rest of the
+/// catalogue.
+pub async fn at_launch(
+    db: &Db,
+    data_dir: &Path,
+    transport: Arc<dyn Transport>,
+) -> Result<Option<Report>, JobError> {
+    let files = crate::assets::MeaningFiles::find(data_dir);
+    let index = sinephile_vector_index::index_path(data_dir);
+    if ![&index, &files.artefact, &files.model, &files.tokenizer]
+        .iter()
+        .all(|p| p.is_file())
+    {
+        return Ok(None);
+    }
+    let header = {
+        let mut file = std::fs::File::open(&files.artefact).map_err(step)?;
+        sinephile_embedding::Header::peek(&mut file).map_err(step)?
+    };
+    let mut embedder =
+        sinephile_embedder::Embedder::pinned(&files.model, &files.tokenizer).map_err(step)?;
+    // A vector from another model is a point in another space: it would sit in the graph
+    // and be near nothing it means.
+    if DocumentEmbedder::identity(&embedder) != header.model {
+        return Err(step(format!(
+            "the model is {} and the published file is {}",
+            DocumentEmbedder::identity(&embedder),
+            header.model
+        )));
+    }
+    let mut companion =
+        sinephile_vector_index::Companion::open(&index, header.dimension as usize).map_err(step)?;
+
+    let mut key = None;
+    for p in ProfileRepository::new(db).all().await.map_err(step)? {
+        if let Ok(TmdbAccess::Configured(k)) = CredentialRepository::new(db).tmdb_access(p.id).await
+        {
+            key = Some(k);
+            break;
+        }
+    }
+    let tmdb = key.map(|k| Tmdb::new(transport.clone(), k));
+    let anilist = AniList::new(transport.as_ref()).await;
+    let wikipedia = Wikipedia::new(transport.as_ref()).await;
+    let sources = Sources {
+        tmdb: tmdb.as_ref(),
+        anilist: Some(&anilist),
+        wikipedia: Some(&wikipedia),
+    };
+    let report = keep_current(
+        db,
+        &mut embedder,
+        &mut companion,
+        header.watermark,
+        &sources,
+        PER_LAUNCH,
+    )
+    .await?;
+    let record = format!(
+        r#"{{"waiting":{},"asked":{},"tmdb":{},"anilist":{},"wikipedia":{},"embedded":{},"total":{}}}"#,
+        report.waiting,
+        report.asked,
+        report.tmdb,
+        report.anilist,
+        report.wikipedia,
+        report.embedded,
+        companion.len()
+    );
+    ProfileRepository::new(db)
+        .set_setting(LAST_KEY, &record)
+        .await
+        .map_err(step)?;
+    Ok(Some(report))
 }

@@ -1,6 +1,6 @@
-//! Meaning for what is new (ADR-0054 step 2, migration 0030): the titles the catalogue gained
-//! after the published meaning file, which the launch job describes and embeds into the
-//! companion graph beside the published one.
+//! Meaning for what has none (ADR-0054 step 2, migration 0030): the core titles the published
+//! meaning file does not hold (gained since, or without a synopsis when it was made), which
+//! the launch job describes and embeds into the companion graph beside the published one.
 
 use crate::db::{Db, DbError};
 use crate::repositories::catalogue::{CORE_TIER, MIN_SYNOPSIS};
@@ -23,6 +23,16 @@ pub struct Awaiting {
     pub described: bool,
 }
 
+/// When a title nobody could describe is asked about again: soon for a recent one (its
+/// article is often written in the weeks after it comes out), rarely for an old one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Retry {
+    /// Released this year or later counts as recent.
+    pub recent_year: i64,
+    pub recent_days: i64,
+    pub other_days: i64,
+}
+
 /// What the job has done, all launches together: for Settings.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct MeaningCounts {
@@ -39,14 +49,17 @@ impl<'a> MeaningRepository<'a> {
         Self { db }
     }
 
-    /// Core titles past `after` (the published file's last id) that have no vector yet and
-    /// are worth a turn: described already, never asked, or last asked more than
-    /// `retry_days` ago (a new film's article is often written weeks after it comes out).
-    /// Most-voted first, so a launch's cap takes what people look for.
+    /// Core titles with no vector in either graph, worth a turn: described already, never
+    /// asked, or last asked longer ago than `retry` allows. Most-voted first, so a launch's
+    /// cap takes what people look for.
+    ///
+    /// The published graph holds the core titles up to `after` (the published file's last
+    /// id) that were described when it was made; this job never touches those, so a title
+    /// at or before `after`, described, with no row here, is in it.
     pub async fn awaiting(
         &self,
         after: i64,
-        retry_days: i64,
+        retry: Retry,
         limit: i64,
     ) -> Result<Vec<Awaiting>, DbError> {
         let described =
@@ -57,16 +70,20 @@ impl<'a> MeaningRepository<'a> {
                LEFT JOIN new_meaning n ON n.media_item_id = m.id
                LEFT JOIN external_ids i ON i.media_item_id = m.id AND i.source = 'imdb'
                LEFT JOIN external_ids a ON a.media_item_id = m.id AND a.source = 'anilist'
-              WHERE m.id > ? AND {CORE_TIER}
+              WHERE {CORE_TIER}
                 AND n.embedded_at IS NULL
+                AND NOT (m.id <= ? AND {described} AND n.media_item_id IS NULL)
                 AND ({described} OR n.asked_at IS NULL
-                     OR n.asked_at < datetime('now', '-' || ? || ' days'))
+                     OR n.asked_at < datetime('now', '-' ||
+                          CASE WHEN m.release_year >= ? THEN ? ELSE ? END || ' days'))
               ORDER BY m.rating_votes DESC NULLS LAST, m.id
               LIMIT ?"
         );
         let rows: Vec<AwaitingRow> = sqlx::query_as(&sql)
             .bind(after)
-            .bind(retry_days)
+            .bind(retry.recent_year)
+            .bind(retry.recent_days)
+            .bind(retry.other_days)
             .bind(limit)
             .fetch_all(self.db.pool())
             .await?;

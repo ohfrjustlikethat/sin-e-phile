@@ -43,6 +43,10 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            MovieLens' rolling release when it changed, join it, and
                            store each title's best 50 neighbours. --ml25m builds from
                            the fixed ml-25m.zip in datasets/ (the evaluation's set).
+  ingest meaning           what the app does after every launch's check (ADR-0054):
+                           up to 2,000 titles the catalogue gained since the published
+                           meaning file get a synopsis and a vector in the companion
+                           graph beside it.
   ingest repair-variants   recompute titles.variant for rows the region-over-
                            language bug labelled english. Narrow and re-runnable.
   ingest keep              what the app does hourly: finish an interrupted refresh,
@@ -177,6 +181,7 @@ async fn main() -> Result<(), JobError> {
             )
             .await
         }
+        "meaning" => meaning(&db, &dir).await,
         "repair-variants" => repair_variants(&db).await,
         "refresh" => refresh(&db, &dir.join("datasets")).await,
         "keep" => keep(&db, &dir.join("datasets")).await,
@@ -679,6 +684,26 @@ async fn episodes(
 /// (ADR-0054): MovieLens' rolling release, fetched, joined and built only when it changed.
 /// `--ml25m` builds from the fixed ml-25m archive in datasets/ instead (the release the
 /// evaluation is measured on).
+async fn meaning(db: &Db, dir: &Path) -> Result<(), JobError> {
+    let transport: std::sync::Arc<dyn sinephile_metadata_api::Transport> =
+        std::sync::Arc::new(sinephile_metadata_api::HttpTransport::new());
+    let started = std::time::Instant::now();
+    match sinephile_catalogue::meaning::at_launch(db, dir, transport).await? {
+        Some(r) => println!(
+            "meaning: {} waiting, {} asked; described by TMDB {}, AniList {}, Wikipedia {}; {} embedded; {:.1} s",
+            r.waiting,
+            r.asked,
+            r.tmdb,
+            r.anilist,
+            r.wikipedia,
+            r.embedded,
+            started.elapsed().as_secs_f64()
+        ),
+        None => println!("meaning: no model, published file or graph here yet"),
+    }
+    Ok(())
+}
+
 async fn neighbours(db: &Db, datasets: &Path, ml25m: bool) -> Result<(), JobError> {
     use sinephile_catalogue::movielens::Release;
     use sinephile_catalogue::neighbours::{self, Outcome};

@@ -3269,3 +3269,25 @@ Bourgeoisie were "close to The Godfather and Oppenheimer"; under the second, "lo
 Stalker and Solaris". Every candidate from the meaning pool is close to some mode, so closeness never told one apart;
 the people who loved the same titles did. "Close to" is now what a title gets when closeness is what sets it apart,
 which is the case of a title nobody has rated (17.6).
+
+### 17.6: meaning for titles without it, on a copy of the development catalogue (2026-11-18)
+
+`ingest --data-dir <copy> meaning` (`sinephile_catalogue::meaning::at_launch`, what the app runs after each launch's
+catalogue check), against the live services, no TMDB key (so AniList and Wikipedia only). The published meaning file
+holds 119,874 titles; the catalogue has 874,755 core titles.
+
+| Run (on 3bd324e and after) | Waiting | Described: AniList / Wikipedia | Embedded | Time |
+|---|---|---|---|---|
+| 1. only the titles past the published file | 2,000 | 0 / 16 | 16 | 60.6 s |
+| 2. every core title without a vector (A44) | 2,000 | 103 / 67 | 170 | 115.6 s |
+| 3. as 2, with the opening of articles whose lead was short | 2,000 | 69 / 119 | 188 | 186.0 s |
+
+- Run 1 found what "the titles a refresh added" are: 19,052 core titles past the file, mostly this year's, the most voted
+  with 4,741 votes; Wikipedia had an article for 23 of the first 2,000. Meanwhile 1,331 core titles with 10,000 votes or
+  more had no vector (Doctor Who, One Punch Man, Solo Leveling, Delicatessen), which led to A44.
+- Run 2: One Punch Man and Solo Leveling described by AniList, Dept. Q by Wikipedia (306 characters), all embedded.
+  1,518 of the 2,000 Wikipedia leads were under the 300-character rule (Delicatessen's is 248): the reason for run 3.
+- Run 3: up to 100 openings a launch (1,200 characters, into the plot), most-voted first.
+- After the three, the companion graph holds 374 vectors in 298 KB. The waiting query takes 2.85 s over the core tier
+  (logged as slow; once a launch, in the background). Doctor Who has no IMDb link on Wikidata for its id, so only a
+  TMDB key describes it.

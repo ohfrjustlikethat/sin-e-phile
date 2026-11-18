@@ -94,27 +94,36 @@ async fn synopsis(db: &Db, id: i64) -> Option<String> {
 async fn new_titles_are_described_by_the_first_source_that_can_and_embedded() {
     let dir = tempfile::tempdir().expect("tempdir");
     let db = Db::open_in(dir.path()).await.expect("open");
-    // In the published file already: never touched.
+    // In the published file already (described when it was made): never touched.
     let published = film(&db, "Published", 9_000, Some("tt0100000"), None).await;
     let wiki_film = film(&db, "Wiki Film", 600, Some("tt0100001"), None).await;
     let tmdb_film = film(&db, "Overview Film", 500, Some("tt0100005"), None).await;
     let anime = film(&db, "A Door to the Sea", 400, None, Some("2001")).await;
     let described = film(&db, "Described", 300, Some("tt0100003"), None).await;
+    let short_lead = film(&db, "Short Lead", 250, Some("tt0100006"), None).await;
     let nobody = film(&db, "Nobody Wrote It Up", 200, Some("tt0100004"), None).await;
-    sqlx::query("UPDATE media_items SET synopsis = ? WHERE id = ?")
-        .bind(long("Already described."))
-        .bind(described)
-        .execute(db.pool())
-        .await
-        .expect("synopsis");
+    // `described` has a synopsis already; `published` had one when the file was made.
+    for (id, text) in [
+        (described, "Already described."),
+        (published, "In the file."),
+    ] {
+        sqlx::query("UPDATE media_items SET synopsis = ? WHERE id = ?")
+            .bind(long(text))
+            .bind(id)
+            .execute(db.pool())
+            .await
+            .expect("synopsis");
+    }
 
     // TMDB is asked first, for each undescribed title with an IMDb id, in vote order. The
     // fakes answer last pushed first.
     let tmdb_fake = Arc::new(FakeTransport::new());
-    tmdb_fake.push(Response::new(
-        200,
-        r#"{"movie_results":[],"tv_results":[]}"#,
-    ));
+    for _ in [nobody, short_lead] {
+        tmdb_fake.push(Response::new(
+            200,
+            r#"{"movie_results":[],"tv_results":[]}"#,
+        ));
+    }
     // `long` has no quotes or backslashes, so it goes into JSON as it is.
     tmdb_fake.push(Response::new(
         200,
@@ -135,18 +144,28 @@ async fn new_titles_are_described_by_the_first_source_that_can_and_embedded() {
             long("")
         ),
     ));
+    // Wikipedia: the mappings, the leads, then the opening of the article whose lead was a
+    // sentence (asked last, so pushed first).
     let wiki_fake = FakeTransport::new();
     wiki_fake.push(Response::new(
         200,
         format!(
-            r#"{{"batchcomplete":true,"query":{{"pages":[{{"title":"Wiki Film","extract":"{}"}}]}}}}"#,
+            r#"{{"query":{{"pages":[{{"title":"Short Lead","extract":"{}"}}]}}}}"#,
+            long("Short Lead is a 2026 film. Plot.")
+        ),
+    ));
+    wiki_fake.push(Response::new(
+        200,
+        format!(
+            r#"{{"batchcomplete":true,"query":{{"pages":[{{"title":"Wiki Film","extract":"{}"}},{{"title":"Short Lead","extract":"Short Lead is a 2026 film."}}]}}}}"#,
             long("Wiki Film is a 2026 film.")
         ),
     ));
     wiki_fake.push(Response::new(
         200,
         r#"{"results":{"bindings":[
-            {"imdb":{"value":"tt0100001"},"article":{"value":"https://en.wikipedia.org/wiki/Wiki_Film"}}
+            {"imdb":{"value":"tt0100001"},"article":{"value":"https://en.wikipedia.org/wiki/Wiki_Film"}},
+            {"imdb":{"value":"tt0100006"},"article":{"value":"https://en.wikipedia.org/wiki/Short_Lead"}}
         ]}}"#,
     ));
 
@@ -167,15 +186,15 @@ async fn new_titles_are_described_by_the_first_source_that_can_and_embedded() {
     assert_eq!(
         report,
         Report {
-            waiting: 5,
-            asked: 4,
+            waiting: 6,
+            asked: 5,
             tmdb: 1,
             anilist: 1,
-            wikipedia: 1,
-            embedded: 4,
+            wikipedia: 2,
+            embedded: 5,
         }
     );
-    for id in [wiki_film, tmdb_film, anime, described] {
+    for id in [wiki_film, tmdb_film, anime, described, short_lead] {
         assert!(companion.contains(id), "{id} has its vector");
     }
     assert!(!companion.contains(nobody), "nothing to embed");
@@ -186,6 +205,12 @@ async fn new_titles_are_described_by_the_first_source_that_can_and_embedded() {
     );
 
     // Wikipedia's lead, not TMDB's too-short overview; AniList's text without its tags.
+    // A lead too short to index, then the article's opening, which is long enough.
+    assert!(synopsis(&db, short_lead)
+        .await
+        .unwrap()
+        .starts_with("Short Lead is a 2026 film. Plot."));
+    assert_eq!(wiki_fake.requests.lock().unwrap().len(), 3);
     assert!(synopsis(&db, wiki_film)
         .await
         .unwrap()
@@ -212,9 +237,9 @@ async fn new_titles_are_described_by_the_first_source_that_can_and_embedded() {
     assert_eq!(
         MeaningRepository::new(&db).counts().await.unwrap(),
         MeaningCounts {
-            asked: 4,
-            described: 3,
-            embedded: 4
+            asked: 5,
+            described: 4,
+            embedded: 5
         }
     );
 
@@ -247,9 +272,9 @@ async fn new_titles_are_described_by_the_first_source_that_can_and_embedded() {
     )
     .await
     .expect("rebuilt");
-    assert_eq!(rebuilt.embedded, 4);
+    assert_eq!(rebuilt.embedded, 5);
     assert_eq!(rebuilt.asked, 0, "no source, nobody asked");
-    assert_eq!(fresh.len(), 4);
+    assert_eq!(fresh.len(), 5);
 }
 
 #[tokio::test]

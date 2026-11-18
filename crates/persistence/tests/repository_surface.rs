@@ -769,6 +769,19 @@ async fn profile_repository_surface() {
     repo.set_setting("theme", "dark")
         .await
         .expect("set_setting");
+    // setting_written: the value and when it was written
+    let (value, written) = repo
+        .setting_written("theme")
+        .await
+        .expect("setting_written")
+        .expect("written");
+    assert_eq!(value, "dark");
+    assert_eq!(written.len(), 19, "{written}");
+    assert!(repo
+        .setting_written("never")
+        .await
+        .expect("setting_written")
+        .is_none());
     repo.set_setting("theme", "light")
         .await
         .expect("set_setting (conflict path)");
@@ -2402,8 +2415,9 @@ async fn media_facts_surface() {
 
 #[tokio::test]
 async fn meaning_repository_surface() {
-    // ADR-0054 step 2: titles past the published meaning file, described and embedded.
-    use sinephile_persistence::repositories::{MeaningCounts, MeaningRepository};
+    // ADR-0054 step 2: core titles the published meaning file does not hold, described and
+    // embedded.
+    use sinephile_persistence::repositories::{MeaningCounts, MeaningRepository, Retry};
     let db = Db::in_memory().await.expect("open");
     let media = MediaRepository::new(&db);
     let mut films = Vec::new();
@@ -2416,7 +2430,6 @@ async fn meaning_repository_surface() {
                 .unwrap(),
         );
     }
-    // All core, the later ones more voted; the first is "published" (at or before `after`).
     for (k, id) in films.iter().enumerate() {
         sqlx::query("UPDATE media_items SET in_core = 1, rating_votes = ? WHERE id = ?")
             .bind(100 * k as i64)
@@ -2425,6 +2438,12 @@ async fn meaning_repository_surface() {
             .await
             .unwrap();
     }
+    // films[1] is old: a gap in the published file rather than a new title.
+    sqlx::query("UPDATE media_items SET release_year = 1991 WHERE id = ?")
+        .bind(films[1])
+        .execute(db.pool())
+        .await
+        .unwrap();
     sqlx::query("INSERT INTO external_ids (media_item_id, source, external_id) VALUES (?, 'imdb', 'tt0000004'), (?, 'anilist', '777')")
         .bind(films[4])
         .bind(films[4])
@@ -2432,64 +2451,89 @@ async fn meaning_repository_surface() {
         .await
         .unwrap();
     let long = "a synopsis long enough to be worth a vector. ".repeat(8);
-    sqlx::query("UPDATE media_items SET synopsis = ? WHERE id = ?")
-        .bind(&long)
-        .bind(films[2])
-        .execute(db.pool())
-        .await
-        .unwrap();
+    // films[0] was described when the file was made (in the published graph); films[2] is
+    // described but past it.
+    for id in [films[0], films[2]] {
+        sqlx::query("UPDATE media_items SET synopsis = ? WHERE id = ?")
+            .bind(&long)
+            .bind(id)
+            .execute(db.pool())
+            .await
+            .unwrap();
+    }
+    let after = films[1];
+    let retry = Retry {
+        recent_year: 2025,
+        recent_days: 7,
+        other_days: 90,
+    };
     let repo = MeaningRepository::new(&db);
     let ids = |a: &[sinephile_persistence::repositories::Awaiting]| {
         a.iter().map(|w| w.id).collect::<Vec<_>>()
     };
+    let asked_ago = |id: i64, days: i64| {
+        let db = &db;
+        async move {
+            sqlx::query(
+                "UPDATE new_meaning SET asked_at = datetime('now', ?) WHERE media_item_id = ?",
+            )
+            .bind(format!("-{days} days"))
+            .bind(id)
+            .execute(db.pool())
+            .await
+            .unwrap();
+        }
+    };
 
-    // awaiting: past `after`, most-voted first, with ids and whether it is described
-    let all = repo.awaiting(films[0], 7, 10).await.unwrap();
+    // awaiting: everything without a vector, the old gap included, most-voted first
+    let all = repo.awaiting(after, retry, 10).await.unwrap();
     assert_eq!(ids(&all), vec![films[4], films[3], films[2], films[1]]);
     assert_eq!(all[0].imdb_id.as_deref(), Some("tt0000004"));
     assert_eq!(all[0].anilist_id, Some(777));
     assert!(!all[0].described);
     assert!(all[2].described);
-    assert_eq!(ids(&repo.awaiting(films[0], 7, 2).await.unwrap()).len(), 2);
+    assert_eq!(repo.awaiting(after, retry, 2).await.unwrap().len(), 2);
 
-    // asked: not asked again within the retry window; a described title still waits
+    // asked: not asked again within the window; a described title still waits
     repo.asked(&[films[1], films[2], films[3], films[4]])
         .await
         .unwrap();
     assert_eq!(
-        ids(&repo.awaiting(films[0], 7, 10).await.unwrap()),
+        ids(&repo.awaiting(after, retry, 10).await.unwrap()),
         vec![films[2]]
     );
-    // ...and asked again once it is old
-    sqlx::query(
-        "UPDATE new_meaning SET asked_at = datetime('now', '-8 days') WHERE media_item_id = ?",
-    )
-    .bind(films[3])
-    .execute(db.pool())
-    .await
-    .unwrap();
+    // a recent title after a week; an old one not until its longer wait is over
+    asked_ago(films[3], 8).await;
+    asked_ago(films[1], 8).await;
     assert_eq!(
-        ids(&repo.awaiting(films[0], 7, 10).await.unwrap()),
+        ids(&repo.awaiting(after, retry, 10).await.unwrap()),
         vec![films[3], films[2]]
     );
+    asked_ago(films[1], 91).await;
+    assert_eq!(
+        ids(&repo.awaiting(after, retry, 10).await.unwrap()),
+        vec![films[3], films[2], films[1]]
+    );
 
-    // described: the synopsis is stored, and the title is ready to embed
+    // described: the synopsis is stored and the title is ready to embed, the old gap too
+    // (described now, at or before `after`, but not the published file's)
     repo.described(films[4], &long, "wikipedia").await.unwrap();
-    let ready = repo.awaiting(films[0], 7, 10).await.unwrap();
-    assert_eq!(ids(&ready), vec![films[4], films[3], films[2]]);
-    assert!(ready[0].described);
+    repo.described(films[1], &long, "anilist").await.unwrap();
+    let ready = repo.awaiting(after, retry, 10).await.unwrap();
+    assert_eq!(ids(&ready), vec![films[4], films[3], films[2], films[1]]);
+    assert!(ready[0].described && ready[3].described);
 
     // embedded: never offered again
     repo.embedded(&[films[4], films[2]]).await.unwrap();
     assert_eq!(
-        ids(&repo.awaiting(films[0], 7, 10).await.unwrap()),
-        vec![films[3]]
+        ids(&repo.awaiting(after, retry, 10).await.unwrap()),
+        vec![films[3], films[1]]
     );
     assert_eq!(
         repo.counts().await.unwrap(),
         MeaningCounts {
             asked: 4,
-            described: 1,
+            described: 2,
             embedded: 2
         }
     );
@@ -2497,7 +2541,107 @@ async fn meaning_repository_surface() {
     // forget_embedded: a lost companion makes them wait again
     assert_eq!(repo.forget_embedded().await.unwrap(), 2);
     assert_eq!(
-        ids(&repo.awaiting(films[0], 7, 10).await.unwrap()),
-        vec![films[4], films[3], films[2]]
+        ids(&repo.awaiting(after, retry, 10).await.unwrap()),
+        vec![films[4], films[3], films[2], films[1]]
     );
+}
+
+#[tokio::test]
+async fn neighbour_sources_surface() {
+    // ADR-0054 step 3: AniList's and TMDB's rows beside MovieLens', by source.
+    use sinephile_persistence::repositories::{NeighbourRepository, NeighbourSource};
+    let db = Db::in_memory().await.expect("open");
+    let media = MediaRepository::new(&db);
+    let mut f = Vec::new();
+    for k in 0..6 {
+        let title = format!("Film {k}");
+        f.push(
+            media
+                .insert(&NewMediaItem::film(&title, 2000 + k))
+                .await
+                .unwrap(),
+        );
+    }
+    let repo = NeighbourRepository::new(&db);
+
+    // typical_scores: empty before the matrix; then MovieLens' mean at each rank
+    assert!(repo.typical_scores(3).await.unwrap().is_empty());
+    repo.replace_all(&[
+        (f[0], f[1], 0.4),
+        (f[0], f[2], 0.2),
+        (f[1], f[0], 0.6),
+        (f[1], f[2], 0.4),
+    ])
+    .await
+    .unwrap();
+    let typical = repo.typical_scores(3).await.unwrap();
+    assert_eq!(typical.len(), 2);
+    assert!(
+        (typical[0] - 0.5).abs() < 1e-6 && (typical[1] - 0.3).abs() < 1e-6,
+        "{typical:?}"
+    );
+
+    // replace_for: one title's rows from one source; itself and repeats left out
+    repo.replace_for(
+        f[0],
+        NeighbourSource::Tmdb,
+        &[(f[3], 0.5), (f[0], 0.9), (f[3], 0.1), (f[1], 0.45)],
+    )
+    .await
+    .unwrap();
+    // of: any source, a pair two sources agree on once at its best score
+    assert_eq!(
+        repo.of(f[0], 10).await.unwrap(),
+        vec![(f[3], 0.5), (f[1], 0.45), (f[2], 0.2)]
+    );
+    assert_eq!(repo.of_many(&[f[0]]).await.unwrap().len(), 3);
+    // asked again: the old rows for that source go, the others stay
+    repo.replace_for(f[0], NeighbourSource::Tmdb, &[(f[4], 0.3)])
+        .await
+        .unwrap();
+    assert_eq!(
+        repo.of(f[0], 10).await.unwrap(),
+        vec![(f[1], 0.4), (f[4], 0.3), (f[2], 0.2)]
+    );
+    // answered with nothing: recorded as asked all the same
+    repo.replace_for(f[5], NeighbourSource::AniList, &[])
+        .await
+        .unwrap();
+
+    // due: not asked of that source this week, in the order given
+    assert_eq!(
+        repo.due(NeighbourSource::Tmdb, &[f[5], f[0], f[1]], 7)
+            .await
+            .unwrap(),
+        vec![f[5], f[1]]
+    );
+    assert_eq!(
+        repo.due(NeighbourSource::AniList, &[f[5], f[0]], 7)
+            .await
+            .unwrap(),
+        vec![f[0]]
+    );
+    sqlx::query("UPDATE neighbours_asked SET asked_at = datetime('now', '-8 days')")
+        .execute(db.pool())
+        .await
+        .unwrap();
+    assert_eq!(
+        repo.due(NeighbourSource::Tmdb, &[f[0]], 7).await.unwrap(),
+        vec![f[0]]
+    );
+
+    // last_asked: when, and how many titles have rows
+    let (at, titles) = repo.last_asked(NeighbourSource::Tmdb).await.unwrap();
+    assert!(at.is_some());
+    assert_eq!(titles, 1);
+    assert_eq!(
+        repo.last_asked(NeighbourSource::MovieLens).await.unwrap().0,
+        None
+    );
+
+    // a MovieLens rebuild replaces only MovieLens' rows; titles counts only them
+    assert_eq!(repo.titles().await.unwrap(), 2);
+    repo.replace_all(&[(f[2], f[0], 0.7)]).await.unwrap();
+    assert_eq!(repo.titles().await.unwrap(), 1);
+    assert_eq!(repo.of(f[0], 10).await.unwrap(), vec![(f[4], 0.3)]);
 }

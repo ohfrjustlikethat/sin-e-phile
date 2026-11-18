@@ -56,6 +56,17 @@ this order, never holding the window back (§2.3's cold start):
 7. **Recommendations follow.** Home's rails are ranked again after each step lands, and Settings says, per source, when
    it last updated and what it added.
 
+## Amendment, 2026-11-18 (A44, spec_version 4.7.1): every title without meaning
+
+Step 2 said "each title the catalogue gained since the last launch". Run on a copy of the development catalogue, those
+were 19,052 core titles past the published file, the most voted with 4,741 votes, and Wikipedia described 23 of the first
+2,000; meanwhile 1,331 core titles with 10,000 votes or more had no vector, because they had no synopsis long enough
+when the file was made (Doctor Who, One Punch Man, Solo Leveling, Delicatessen). The wording would never have reached
+them: the snapshot this ADR exists to end. So step 2 covers **every core title the published file does not hold**,
+gained since or left out, most-voted first, under the same cap of 2,000 a launch. A title nobody could describe is asked
+again after a week when it came out in the last year (its article is often written in the weeks after), otherwise
+after 90 days, so old gaps do not take every launch's turn.
+
 ## Consequences
 
 - A title the catalogue gains can be recommended on the launch that gains it, with a reason: Phase 17 exit criterion

@@ -60,6 +60,22 @@ pub fn wikipedia_limit() -> Limit {
 /// misuse. Named here so the batching cannot drift past it by accident.
 pub const EXTRACTS_PER_REQUEST: usize = 20;
 
+/// How much of an article [`Wikipedia::opening`] asks for: the API's own maximum, which
+/// runs past a short lead into the section after it (for a film, usually its plot).
+pub const OPENING_CHARS: usize = 1200;
+
+/// The request for one article's opening: the whole text cut at [`OPENING_CHARS`], not the
+/// lead alone (`exintro`), and so one article a request (the API returns several extracts
+/// only of leads).
+fn opening_url(article: &str) -> String {
+    format!(
+        "{WIKIPEDIA_ENDPOINT}?action=query&format=json&formatversion=2\
+         &prop=extracts&explaintext=1&exsectionformat=plain&exchars={OPENING_CHARS}\
+         &redirects=1&titles={}",
+        encode(article)
+    )
+}
+
 /// The most IMDb ids one [`Wikipedia::mappings_for`] asks about: a `VALUES` list this long
 /// answers in a second or two, far inside WDQS's 60-second limit, and keeps the URL short.
 pub const MAPPINGS_PER_REQUEST: usize = 100;
@@ -189,6 +205,17 @@ impl<'a> Wikipedia<'a> {
             .header("user-agent", USER_AGENT);
         let response = self.execute(WDQS_HOST, request).await?;
         parse_mappings(&response.body)
+    }
+
+    /// One article's opening as plain text ([`OPENING_CHARS`]): for a title whose lead is a
+    /// sentence of production facts, too short to index (ADR-0054). `None` when Wikipedia
+    /// has no such article.
+    pub async fn opening(&self, article: &str) -> Result<Option<Extract>, WikiError> {
+        let request = Request::get(opening_url(article))
+            .header("accept", "application/json")
+            .header("user-agent", USER_AGENT);
+        let response = self.execute(WIKIPEDIA_HOST, request).await?;
+        Ok(parse_extracts(&response.body)?.into_iter().next())
     }
 
     /// Lead extracts for up to [`EXTRACTS_PER_REQUEST`] articles.
@@ -523,6 +550,14 @@ mod tests {
         assert!(!query.contains("nm0000001"), "{query}");
         assert_eq!(ids_query(&["nm1".to_string()]), None);
         assert_eq!(ids_query(&[]), None);
+    }
+
+    #[test]
+    fn an_opening_is_the_whole_text_cut_short_not_the_lead() {
+        let url = opening_url("Delicatessen (film)");
+        assert!(url.contains("exchars=1200"), "{url}");
+        assert!(!url.contains("exintro"), "{url}");
+        assert!(url.contains("titles=Delicatessen%20%28film%29"), "{url}");
     }
 
     #[test]

@@ -200,6 +200,36 @@ pub(crate) fn build_meaning_when_on_disk(app: &AppHandle) {
     });
 }
 
+/// Meaning for what the catalogue gained (ADR-0054 step 2), after each launch's check, in
+/// the background: `sinephile_catalogue::meaning::at_launch`. Not while the published graph
+/// is still being fetched or built; when it embedded anything, search reopens both graphs
+/// and Home is asked to rank again.
+pub(crate) fn extend_meaning(app: &AppHandle) {
+    if !optional_assets().complete || RUNNING.load(Ordering::SeqCst) {
+        return;
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<AppState>();
+        let (Some(db), Some(dir)) = (state.db(), state.data_dir()) else {
+            return;
+        };
+        match sinephile_catalogue::meaning::at_launch(&db, &dir, state.http.clone()).await {
+            Ok(Some(report)) => {
+                tracing::info!(?report, "meaning for new titles");
+                if report.embedded > 0 {
+                    state.set_engine(engine_for(&dir));
+                    let _ = app.emit("catalogue-refreshed", ());
+                }
+            }
+            Ok(None) => tracing::info!("meaning for new titles: no meaning here yet"),
+            Err(error) => {
+                tracing::warn!(%error, "meaning for new titles stopped; the next launch resumes")
+            }
+        }
+    });
+}
+
 /// A new install's setup (ADR-0050): once the catalogue is searchable, search by meaning is
 /// fetched without a button, as setup says it will be. In the background; its progress is
 /// the same `asset-progress` the button's would be.
