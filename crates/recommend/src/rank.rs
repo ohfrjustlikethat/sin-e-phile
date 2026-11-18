@@ -50,7 +50,10 @@ pub struct Candidate {
     pub vector: Vec<f32>,
 }
 
-/// How much each part of the score counts. Chosen on MovieLens' tuning users in 17.4.
+/// How much each part of the score counts, chosen on MovieLens' tuning users
+/// (`eval recommend --whole --tune`, docs/eval-results.md): the best Recall@20 of 108
+/// settings. The matrix's half weight is not a demotion: its part is the largest of the
+/// three and the steepest, so at 1 it crowded out titles near a taste mode.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Weights {
     pub near: f32,
@@ -62,7 +65,7 @@ pub struct Weights {
 
 pub const WEIGHTS: Weights = Weights {
     near: 1.0,
-    loved: 1.0,
+    loved: 0.5,
     popular: 0.15,
     axes: 0.2,
     playable: 0.1,
@@ -82,8 +85,9 @@ pub const CAPS: Caps = Caps {
     per_year: 5,
 };
 
-/// How much repeating an earlier pick costs, 0 (none) to 1 (only novelty counts).
-pub const DIVERSITY: f32 = 0.3;
+/// How much repeating an earlier pick costs, 0 (none) to 1 (only novelty counts). Chosen with
+/// [`WEIGHTS`].
+pub const DIVERSITY: f32 = 0.15;
 
 /// Why a title is in the rail.
 #[derive(Debug, Clone, PartialEq)]
@@ -143,11 +147,15 @@ fn scored(c: &Candidate, p: &Parts, i: usize, w: &Weights) -> (f32, Reason) {
     let popular = w.popular * p.popular[i];
     let score =
         near + loved + popular + w.axes * c.axes + if c.playable { w.playable } else { 0.0 };
-    let reason = if loved > 0.0 && loved >= near && loved >= popular {
+    // The reason is what sets the title apart, so closeness counts only above "unrelated":
+    // the score maps cosine 0 to half the part, which every title with a vector gets, and
+    // counted whole it outvoted three loved titles pointing here (the tuned weights showed it).
+    let distinct_near = w.near * c.near.map_or(0.0, |(_, s)| s.max(0.0));
+    let reason = if loved > 0.0 && loved >= distinct_near && loved >= popular {
         let mut by: Vec<(i64, f32)> = c.loved_with.clone();
         by.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
         Reason::LovedWith(by.into_iter().take(3).map(|(id, _)| id).collect())
-    } else if let Some((mode, _)) = c.near.filter(|_| near >= popular) {
+    } else if let Some((mode, _)) = c.near.filter(|_| distinct_near >= popular) {
         Reason::Mode(mode)
     } else {
         Reason::Popular

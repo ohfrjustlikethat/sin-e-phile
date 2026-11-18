@@ -60,7 +60,9 @@ async fn the_rail_mixes_meaning_and_people_who_loved_the_same_and_says_why() {
         (solaris, vec![0.98, 0.2]),
         (seen_it, vec![0.99, 0.1]),
         (near_in_meaning, vec![0.95, 0.31]),
-        (both, vec![0.9, 0.44]),
+        // Only modestly close in meaning (cosine 0.4): the matrix is what sets it apart, so its
+        // reason names the loved films, whatever the tuned weights.
+        (both, vec![0.4, 0.92]),
         (blockbuster, vec![0.0, 1.0]),
         // Come and See has no vector: only the matrix can bring it.
     ]));

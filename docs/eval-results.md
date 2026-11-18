@@ -3197,3 +3197,14 @@ best of the 108):
 Both are structural, and together they bring the whole recommender back to the matrix alone's level (+72.1% on tuning
 users) and past it. Taken: up to 500 loved titles asked (one query of about 25,000 rows), and caps of 2/2/5 in a rail
 of twenty, so no director, franchise or year takes more than a quarter of it.
+
+**Tuning sweep again, with 500 loved titles asked and caps 2/2/5** (2,000 tuning users, 108 settings, 583 s; per user
+modes 7 ms, axes 14 ms, gathering 31 ms, the rest ranking 108 settings): popularity 0.1627; best **near 1, loved 0.5,
+popular 0.15, diversity 0.15: Recall@20 0.2906 (+78.6%)**, coverage 7.8% at 2,000 users; the range across settings
++74.7% to +78.6%, coverage 7.2-8.4%; no rail over a cap. Taken as `rank::WEIGHTS` and `rank::DIVERSITY`. Ranking a
+user's candidates: p50 2.94 ms, p95 3.21 ms.
+
+With these weights a pick's reason changed: the score maps an unrelated title's closeness (cosine 0) to half its part,
+and counted whole that floor outvoted three loved titles pointing to a title. A reason now weighs closeness only above
+unrelated (`max(0, cosine)`); the score is unchanged, so the numbers above stand
+(`rank::tests::a_title_loved_alongside_what_you_loved_ranks_first_and_says_why` failed before the change).

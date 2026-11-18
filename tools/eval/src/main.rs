@@ -149,6 +149,7 @@ async fn main() {
                 recommend::whole(
                     Path::new(&data_dir),
                     args.iter().any(|a| a == "--tune"),
+                    args.iter().any(|a| a == "--check"),
                     limit,
                     asked,
                     caps,

@@ -307,9 +307,13 @@ fn settings(tune: bool) -> Vec<Setting> {
 /// `asked`: how many loved titles' neighbours are asked for (the app's
 /// `hybrid::LIKED_ASKED` by default); `caps`: the rail's caps (the app's `rank::CAPS` by
 /// default). Both are for finding where recall goes, not for the reported run.
+/// `check`: the tuning users under the app's own setting, for what a sweep over a few
+/// thousand users cannot show (coverage needs them all).
+#[allow(clippy::too_many_arguments)]
 pub async fn whole(
     data_dir: &Path,
     tune: bool,
+    check: bool,
     limit: Option<usize>,
     asked: Option<usize>,
     caps: Option<rank::Caps>,
@@ -317,10 +321,18 @@ pub async fn whole(
     let caps = caps.unwrap_or(rank::CAPS);
     use sinephile_taste::hybrid;
     let path = data_dir.join("datasets").join("ml-25m.zip");
-    let judge = if tune { Part::Tune } else { Part::Test };
+    let judge = if tune || check {
+        Part::Tune
+    } else {
+        Part::Test
+    };
     println!(
         "recommend --whole — the hybrid recommender against popularity, Recall@{K}, {} users\n",
-        if tune { "tuning" } else { "test" }
+        if judge == Part::Tune {
+            "tuning"
+        } else {
+            "test"
+        }
     );
     let db = sinephile_persistence::Db::open_in(data_dir).await?;
     let (mut engine, _) = crate::search::engine(data_dir)?;
@@ -392,7 +404,7 @@ pub async fn whole(
         users.len()
     );
 
-    let settings = settings(tune);
+    let settings = settings(tune && !check);
     let mut tallies: Vec<Tally> = settings.iter().map(|_| Tally::default()).collect();
     let mut popularity = 0.0;
     let mut rank_ms: Vec<f64> = Vec::new();
@@ -515,7 +527,7 @@ pub async fn whole(
             best = Some((recall, i));
         }
     }
-    if tune {
+    if tune && !check {
         if let Some((recall, i)) = best {
             let s = settings[i];
             println!(
