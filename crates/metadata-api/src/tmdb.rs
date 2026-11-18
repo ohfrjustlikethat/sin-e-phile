@@ -61,6 +61,13 @@ struct Posted {
     poster_path: Option<String>,
     #[serde(default)]
     backdrop_path: Option<String>,
+    #[serde(default)]
+    overview: Option<String>,
+}
+
+/// Only an IMDb id (`tt` and digits) goes into a request path.
+fn is_imdb_id(id: &str) -> bool {
+    id.len() > 2 && id.starts_with("tt") && id[2..].bytes().all(|b| b.is_ascii_digit())
 }
 
 /// TMDB's image server, at a width that suits a 176–236 px card at 125% (Phase 16).
@@ -152,7 +159,7 @@ impl Tmdb {
         pick: fn(Posted) -> Option<String>,
         base: &str,
     ) -> Result<Option<String>, TmdbError> {
-        if !imdb_id.starts_with("tt") || !imdb_id[2..].chars().all(|c| c.is_ascii_digit()) {
+        if !is_imdb_id(imdb_id) {
             return Ok(None);
         }
         let body = self
@@ -166,6 +173,25 @@ impl Tmdb {
             .find_map(pick)
             .filter(|p| p.starts_with('/') && !p.contains(".."))
             .map(|p| format!("{base}{p}")))
+    }
+
+    /// A title's overview, its story in a paragraph, by IMDb id (ADR-0054: what a title the
+    /// catalogue just gained means). `None` when TMDB has no such title or no overview.
+    pub async fn overview(&self, imdb_id: &str) -> Result<Option<String>, TmdbError> {
+        if !is_imdb_id(imdb_id) {
+            return Ok(None);
+        }
+        let body = self
+            .get(&format!("/find/{imdb_id}?external_source=imdb_id"))
+            .await?;
+        let f: Found = serde_json::from_str(&body)
+            .map_err(|e| TmdbError::Unavailable(format!("find: {e}")))?;
+        Ok(f.movie_results
+            .into_iter()
+            .chain(f.tv_results)
+            .find_map(|p| p.overview)
+            .map(|o| o.trim().to_string())
+            .filter(|o| !o.is_empty()))
     }
 
     /// What is showing now, as IMDb ids, in TMDB's order (most popular first).
@@ -229,6 +255,35 @@ mod tests {
             asked[0].starts_with("https://api.themoviedb.org/3/movie/now_playing?page=1&api_key=")
         );
         assert!(asked[1].contains("/movie/11/external_ids?api_key="));
+    }
+
+    #[tokio::test]
+    async fn an_overview_is_found_by_imdb_id() {
+        let fake = Arc::new(FakeTransport::new());
+        fake.push(Response::new(
+            200,
+            r#"{"movie_results":[{"poster_path":null,"overview":"  A ferryman keeps a promise.  "}],"tv_results":[]}"#,
+        ));
+        assert_eq!(
+            client(&fake)
+                .overview("tt0000001")
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("A ferryman keeps a promise.")
+        );
+        fake.push(Response::new(
+            200,
+            r#"{"movie_results":[],"tv_results":[]}"#,
+        ));
+        assert_eq!(client(&fake).overview("tt0000002").await.unwrap(), None);
+        // Not an IMDb id: nothing is asked.
+        assert_eq!(client(&fake).overview("../x").await.unwrap(), None);
+        let asked = fake.requests.lock().unwrap().len();
+        assert_eq!(asked, 2);
+        assert!(fake.requests.lock().unwrap()[0]
+            .url
+            .contains("/find/tt0000001?external_source=imdb_id&api_key="));
     }
 
     #[tokio::test]

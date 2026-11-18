@@ -22,6 +22,7 @@ pub mod index;
 pub mod job;
 pub mod load;
 pub mod matching;
+pub mod meaning;
 pub mod measure;
 pub mod movielens;
 pub mod neighbours;

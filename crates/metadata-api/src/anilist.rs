@@ -239,6 +239,56 @@ impl<'a> AniList<'a> {
         .await
     }
 
+    /// Up to 50 anime by AniList id, with their descriptions as plain text ([`plain`]):
+    /// ADR-0054, what an anime the catalogue just gained means, with no key.
+    pub async fn descriptions(&self, ids: &[i64]) -> Result<Vec<(i64, String)>, AniListError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let ids = &ids[..ids.len().min(50)];
+        let query = "query ($ids: [Int]) { Page(perPage: 50) { \
+                     media(id_in: $ids, type: ANIME) { id description(asHtml: false) } } }";
+        let variables = serde_json::json!({ "ids": ids }).to_string();
+        let body = format!(
+            r#"{{"query":{},"variables":{variables}}}"#,
+            json_string(query)
+        );
+        let response = self.execute(&body).await?;
+
+        #[derive(Deserialize)]
+        struct Described {
+            id: i64,
+            description: Option<String>,
+        }
+        #[derive(Deserialize)]
+        struct Described50 {
+            media: Vec<Described>,
+        }
+        #[derive(Deserialize)]
+        struct Data {
+            #[serde(rename = "Page")]
+            page: Described50,
+        }
+        let parsed: GraphQlResponse<Data> = serde_json::from_str(&response.body)
+            .map_err(|e| AniListError::Shape(format!("{e}: {}", truncate(&response.body))))?;
+        if let Some(errors) = parsed.errors {
+            return Err(AniListError::Api(
+                errors
+                    .iter()
+                    .map(|e| e.message.as_str())
+                    .collect::<Vec<_>>()
+                    .join("; "),
+            ));
+        }
+        Ok(parsed
+            .data
+            .map(|d| d.page.media)
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|m| Some((m.id, plain(m.description.as_deref()?)?)))
+            .collect())
+    }
+
     /// One title by MyAnimeList id — the cross-mapping AniList gives away free.
     pub async fn media_by_mal(&self, mal_id: i64) -> Result<Option<Media>, AniListError> {
         let query =
@@ -549,6 +599,29 @@ struct GraphQlResponse<T> {
 #[derive(Debug, Deserialize)]
 struct GraphQlError {
     message: String,
+}
+
+/// An AniList description as plain text: its tags (`<br>`, `<i>`) gone, the closing credit
+/// line (`(Source: ...)`) dropped, spaces collapsed. `None` when nothing is left.
+pub fn plain(description: &str) -> Option<String> {
+    let mut text = String::with_capacity(description.len());
+    let mut in_tag = false;
+    for c in description.chars() {
+        match c {
+            '<' => {
+                in_tag = true;
+                text.push(' ');
+            }
+            '>' if in_tag => in_tag = false,
+            _ if !in_tag => text.push(c),
+            _ => {}
+        }
+    }
+    if let Some(at) = text.rfind("(Source:") {
+        text.truncate(at);
+    }
+    let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    (!text.is_empty()).then_some(text)
 }
 
 /// One page of results.

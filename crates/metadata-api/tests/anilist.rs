@@ -536,3 +536,36 @@ async fn a_search_is_cached_under_the_shorter_search_ttl() {
         .expect("query");
     assert_eq!(resource, Resource::Search.as_str());
 }
+
+#[tokio::test]
+async fn descriptions_come_back_as_plain_text_by_id() {
+    // ADR-0054: a new anime's meaning, from its AniList description.
+    let transport = FakeTransport::new();
+    transport.push(Response::new(
+        200,
+        r#"{"data":{"Page":{"media":[
+            {"id":11,"description":"A boy <i>finds</i> a door.<br><br>It opens onto the sea.\n\n(Source: a publisher)"},
+            {"id":12,"description":null},
+            {"id":13,"description":"<br>"}
+        ]}}}"#,
+    ));
+    let client = AniList::new(&transport).await;
+    let got = client.descriptions(&[11, 12, 13]).await.unwrap();
+    assert_eq!(
+        got,
+        vec![(11, "A boy finds a door. It opens onto the sea.".to_string())]
+    );
+    // Cloned out in one statement: a guard kept alive here would deadlock the next lock.
+    let body = transport.requests.lock().unwrap()[0]
+        .body
+        .clone()
+        .unwrap_or_default();
+    assert!(body.contains("id_in: $ids"), "{body}");
+    assert!(body.contains(r#""ids":[11,12,13]"#), "{body}");
+    assert!(client.descriptions(&[]).await.unwrap().is_empty());
+    assert_eq!(
+        transport.requests.lock().unwrap().len(),
+        1,
+        "nothing asked for none"
+    );
+}
