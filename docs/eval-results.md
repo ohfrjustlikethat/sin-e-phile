@@ -3343,3 +3343,21 @@ code, calibrated, 2,000 tuning users; ranking p95 7.52 ms with a build beside it
 0.1 is best, and 0 is within 0.002 of it (equal by the rule, so the larger): **people 0.1**. A heavier weight fills the
 rail with a loved director's other work, which MovieLens' held-out likes reward less and less. (Coverage here is over
 2,000 users; it grows with the number of users judged, so it is not comparable with the test run's 15,640.)
+
+### 17.6: the ratings refresh, one chunk of 200 (2026-11-18)
+
+Found by launching the release build on the copy while IMDb's files had been republished: the app log
+(`slow statement`) showed 15.9 s and 19.8 s for chunks of the ratings refresh written as `UPDATE ... FROM` (95e17cc,
+never pushed). Timed on the copy (3.27 million titles, 200 real IMDb ids, each in a rolled-back transaction, Python's
+SQLite 3.49):
+
+| Form | One chunk |
+|---|---|
+| `UPDATE ... FROM` with the rising columns | 17,329.8 ms |
+| the same, join order forced with `CROSS JOIN` | 187,520.4 ms |
+| the correlated form before 17.6 | 7.2 ms |
+| **the correlated form with the rising columns (5c70542)** | **8.2 ms** |
+
+A refresh is about 8,000 chunks: hours against about a minute. The cause: no planner statistics for `external_ids`, so
+the planner put it outside, by `source` alone. `a_ratings_chunk_touches_only_its_own_rows` reproduces those statistics
+on 300,000 titles: 2.8 s a chunk on the `FROM` form (fails), well under 400 ms on the correlated one.

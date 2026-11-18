@@ -319,3 +319,23 @@ async fn rising_now_follows_new_releases_with_what_each_gained() {
         Some("+1,000 ratings")
     );
 }
+
+#[tokio::test]
+async fn the_taste_preview_is_homes_taste_rail() {
+    // 17.6: the profile's "Where your taste points so far" is Home's rail of that name, not a
+    // second answer to the same question. Without the meaning index, both are empty.
+    let db = Db::in_memory().await.unwrap();
+    film(&db, "Heat", 1995, 900_000, &["Crime"]).await;
+    let me = ProfileRepository::new(&db).ensure_default().await.unwrap();
+    let cache = Default::default();
+    let home = rails(&db, None, me, false, None, &cache).await.unwrap();
+    let preview = sinephile_taste::home::taste_rail(&db, None, me, false, None, &cache)
+        .await
+        .unwrap();
+    let taste: Vec<i64> = home
+        .iter()
+        .find(|r| r.key == "taste")
+        .map(|r| r.items.clone())
+        .unwrap_or_default();
+    assert_eq!(preview, taste);
+}

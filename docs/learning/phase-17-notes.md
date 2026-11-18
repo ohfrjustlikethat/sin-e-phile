@@ -21,6 +21,13 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
   you loved". `eval recommend --rail 1` prints a profile's whole rail with its reasons.
 - **The evaluation** (`eval recommend`): an 80/10/10 split of users by hash, a fifth of each judged user's likes held
   out, Recall@20 against popularity, and coverage.
+- **Calibration** (17.6): each taste mode fills at most its share of a rail, so a profile of seven films and two anime
+  gets fifteen films and five anime, not twenty films.
+- **Current on every launch** (17.6, ADR-0054): titles without meaning get a synopsis and a vector in a companion
+  graph beside the published one (2,000 a launch, most-voted first); AniList's and TMDB's recommendations stand beside
+  MovieLens', asked weekly for what each profile loved; a title nobody has rated reaches a rail through its director
+  ("By Andrei Tarkovsky, who made Stalker and Solaris"); "Rising now" shows what gained most ratings at the last
+  update; Settings says when each source last updated and what it did.
 
 ## 2. Why
 
@@ -33,6 +40,11 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
   matrix recommends noise (0.9 fell below popularity). The tuning users decide where between.
 - **Measured on people it never saw**: a recommender judged on the users it learned from looks better than it is.
   The split is by hash, so it is the same on every run, and a test pins that no user is in two parts.
+- **Recall is not the only good**: held-out likes follow a person's larger taste, so the most "accurate" rail ignores
+  their smaller ones. Calibration gave up 1.9 points of recall for rails that mix as the profile does, and nearly
+  tripled the share of the catalogue that reaches someone.
+- **Nothing derived may be a snapshot** (the author's rule): the published meaning file and MovieLens both stop at a
+  date, so the app extends the first itself and sets live sources beside the second.
 
 ## 3. New concepts
 
@@ -53,15 +65,31 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
 - **Recall@K and coverage**, and why a popularity baseline is the honest one — `tools/eval/src/recommend.rs`.
 - **CPU work off the async runtime** (`spawn_blocking`) — `crates/catalogue/src/neighbours.rs:39`.
 - **Scaling each part of a score over the candidates** before weighting, so a weight says how much a part counts —
-  `crates/recommend/src/rank.rs:132`.
+  `crates/recommend/src/rank.rs:153`.
 - **A reason from the part furthest above the median candidate**, not the biggest part: a part every candidate has
-  (closeness) tells none of them apart — `crates/recommend/src/rank.rs:164`.
+  (closeness) tells none of them apart — `crates/recommend/src/rank.rs:196`.
 - **Maximal marginal relevance**: score minus similarity to what is already picked —
-  `crates/recommend/src/rank.rs:266`.
-- **Hard caps as a filter, not a penalty** — `crates/recommend/src/rank.rs:257`.
-- **A proxy, said to be one**: a franchise read from the title — `crates/recommend/src/rank.rs:309`.
+  `crates/recommend/src/rank.rs:376`.
+- **Hard caps as a filter, not a penalty** — `crates/recommend/src/rank.rs:367`.
+- **A proxy, said to be one**: a franchise read from the title — `crates/recommend/src/rank.rs:429`.
+- **Calibration by quota, shared out by largest remainder** (Steck 2018): slots in proportion to shares, adding up to
+  the rail exactly — `crates/recommend/src/rank.rs:268`; miscalibration as KL divergence —
+  `tools/eval/src/recommend.rs:221`.
 - **A trait as a seam**: the meaning index behind `Meaning`, so a test can stand in a few vectors —
-  `crates/taste/src/hybrid.rs:70`.
+  `crates/taste/src/hybrid.rs:79`.
+- **A growable graph beside a read-only one**: the published graph memory-mapped, the companion in memory, searches
+  merged by distance — `crates/vector-index/src/lib.rs:330`, `crates/vector-index/src/lib.rs:427`.
+- **Save whole or not at all**: write a part file, then rename over the old — `crates/vector-index/src/lib.rs:488`.
+- **`block_in_place`** for CPU work on a multi-threaded async runtime, and why a single-threaded test cannot use it —
+  `crates/catalogue/src/meaning.rs:134`.
+- **Scores matched by rank across sources**: a live list's k-th row is worth what MovieLens' k-th neighbour averages —
+  `crates/catalogue/src/live.rs:67`.
+- **`UPDATE ... FROM`**, and every right-hand side reading the row as it was, to keep a value's predecessor —
+  `crates/catalogue/src/refresh.rs:160`.
+- **Window functions** (`ROW_NUMBER() OVER (PARTITION BY ...)`): each maker's newest few in one query —
+  `crates/persistence/src/repositories/media.rs:359`.
+- **Compute at write time, read a list at render time**: rising is ranked once per refresh, not per Home —
+  `crates/persistence/src/repositories/media.rs:424`.
 - **`Send` versus `Sync`**: a future holding `&T` across `.await` needs `T: Sync`; holding `&mut T` needs only
   `T: Send` — `crates/taste/src/hybrid.rs:101`, `crates/taste/src/home.rs:219`.
 - **`WITHOUT ROWID` tables** keyed by their primary key — `crates/persistence/migrations/0029_item_neighbours.up.sql:10`.
@@ -84,5 +112,5 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
 3. Why is the matrix built item by item with a dense array, rather than counting every pair in a hash map?
 4. Why are the users who tune `alpha` different from the users who judge it, and what would go wrong if they were the
    same?
-5. Recall@20 went up 74% over popularity, but coverage is only 16%. What does each number say, and why does the
-   phase ask for both?
+5. Calibration took Recall@20 from +72.7% to +61.4% over popularity and coverage from 16.6% to 43.5%. What does each
+   number say about a rail, and why was that trade taken?

@@ -265,7 +265,7 @@ wrong film through is worse than a smaller shelf.
 **The analogy:** a good video shop's regulars each have a card; the clerk who knows your card does not
 recommend from someone else's.
 
-### Taste and discovery — the reason to use this at all `✅ Phase 15 · ⬜ Phases 17–18`
+### Taste and discovery — the reason to use this at all `✅ Phases 15, 17 · ⬜ Phase 18`
 
 The taste model does not average you into one vector, because someone who loves both
 Tarkovsky and slasher films is not described by their midpoint. Positive signals are
@@ -274,11 +274,13 @@ fade. It also learns *negative* preferences from what you abandon, and where you
 it: bailing at 5 minutes and at 80 minutes mean different things. A taste screen says the
 modes back in sentences and lets you correct each one. That much exists (Phase 15).
 
-Still to come (Phases 17–18): recommendations combine content similarity against each mode with **collaborative
-filtering** — "people who loved this also loved" — precomputed offline, so there is
-no server and no other users involved.
+Recommendations (Phase 17) combine closeness to each mode with **collaborative filtering** — "people who loved
+this also loved" — built on this machine from MovieLens' ratings, so there is no server and no other users involved;
+AniList's and TMDB's recommendations stand beside it, and a film nobody has rated yet reaches you through the people
+who made what you loved. Each of your taste modes gets its share of the rail, every card says why it is there, and
+everything they are built from is brought up to date at each launch.
 
-On top sits a **contextual bandit** choosing between *strategies*: safe-familiar,
+Still to come (Phase 18): a **contextual bandit** choosing between *strategies*: safe-familiar,
 adjacent-stretch, cross-mode bridge, blind-spot, canon-gap, deep-cut. It learns which
 kind of suggestion you actually act on. There is a hard **exploration floor**, so
 even a maximally conservative user still gets genuine discovery — a filter bubble is
@@ -414,6 +416,16 @@ recommendations across modes with a popularity prior, axes with the statements a
 modes described in sentences, corrections per profile, and a model cache rebuilt in the
 background after a watch. The taste screen is reached from Settings → Profiles and from Who's
 watching?. How it all fits: `docs/specs/taste-model.md`.
+
+### The recommender ✅ `Phase 17`
+
+`crates/recommend` (the item-item matrix and the ranker) and `crates/taste/src/hybrid.rs` (the candidates): about a
+thousand candidates from four pools, one score, a rail picked for variety within caps and calibrated to the profile's
+taste modes, and a reason for each pick. Kept current at every launch (ADR-0054): MovieLens' newest release, meaning
+for titles without it (`crates/catalogue/src/meaning.rs`), AniList's and TMDB's recommendations
+(`crates/catalogue/src/live.rs`), "Rising now", and each source's last update in Settings. Judged on MovieLens users it
+never learned from (`eval recommend --whole`). How it all fits: `docs/specs/recommender.md`; the story:
+`docs/case-studies/recommender.md`.
 
 ### Ready to watch ✅ `Phase 16`
 

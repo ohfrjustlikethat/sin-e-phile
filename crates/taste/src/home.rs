@@ -89,6 +89,25 @@ fn thousands(n: i64) -> String {
     }
 }
 
+/// Home's "Where your taste points" alone (Phase 17): what the profile's settings preview
+/// under the same name, so the two never disagree. (It was Phase 14's single averaged seed,
+/// which named different films: seen in the real window, 17.6.)
+pub async fn taste_rail(
+    db: &Db,
+    semantic: Option<&mut Semantic>,
+    profile: i64,
+    kids: bool,
+    love: Option<&str>,
+    cache: &crate::model::ModelCache,
+) -> Result<Vec<i64>, DbError> {
+    Ok(rails(db, semantic, profile, kids, love, cache)
+        .await?
+        .into_iter()
+        .find(|r| r.key == "taste")
+        .map(|r| r.items)
+        .unwrap_or_default())
+}
+
 pub async fn rails(
     db: &Db,
     semantic: Option<&mut Semantic>,
