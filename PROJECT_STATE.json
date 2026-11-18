@@ -27,8 +27,8 @@
       {
         "id": "17.3",
         "text": "Explanations: every recommendation carries a reason built from the signal that put it there (the liked titles behind a CF score, the mode behind a content score, the axis behind a boost), tested so that every reason names something true of the profile (E4); Home's taste rails use the ranker and show the reasons, pad-complete.",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "1cad203"
       },
       {
         "id": "17.4",
@@ -72,7 +72,7 @@
         "id": "E4",
         "text": "Every recommendation has a truthful explanation.",
         "met": true,
-        "evidence": "c183f27: a reason is built from the part that added most to the score and names only what is true: crates/recommend/src/rank.rs every_reason_names_something_true_of_the_candidate (a property over 300 mixed candidates, seen to fail with every Mode reason forced to mode 0); crates/taste/tests/hybrid.rs end to end over a real database (matrix-only titles say 'Loved by people who loved Stalker', meaning-only ones 'Close to Stalker and Solaris, which you loved'); crates/taste/src/hybrid.rs a_note_names_only_titles_the_profile_loved. Home's 'Where your taste points' carries each pick's reason as its card's note."
+        "evidence": "c183f27: a reason is built from the part that added most to the score and names only what is true: crates/recommend/src/rank.rs every_reason_names_something_true_of_the_candidate (a property over 300 mixed candidates, seen to fail with every Mode reason forced to mode 0); crates/taste/tests/hybrid.rs end to end over a real database (matrix-only titles say 'Loved by people who loved Stalker', meaning-only ones 'Close to Stalker and Solaris, which you loved'); crates/taste/src/hybrid.rs a_note_names_only_titles_the_profile_loved. Home's 'Where your taste points' carries each pick's reason as its card's note. 17.3, the real window (1cad203, 2026-11-18): the release build on a copy of the development data (SINEPHILE_DATA_DIR), a profile given five loved films; Home's 'Where your taste points' shows each card's reason (screenshot looked at, not kept: it was a scratch run). The whole rail, `cargo run --release -p eval -- recommend --rail 1`: under the first reason rule 20 of 20 said 'Close to', Pickpocket 'close to The Godfather and Oppenheimer'; the reason is now the part furthest above the median candidate, and the same twenty say 'Loved by people who loved ...' naming only loved titles. crates/recommend/src/rank.rs a_reason_is_what_lifts_a_title_above_the_typical_candidate, seen to fail on the first rule (Mode(1) for LovedWith)."
       },
       {
         "id": "E5",
@@ -1982,7 +1982,7 @@
           "id": "E4",
           "text": "Every recommendation has a truthful explanation.",
           "met": true,
-          "evidence": "c183f27: a reason is built from the part that added most to the score and names only what is true: crates/recommend/src/rank.rs every_reason_names_something_true_of_the_candidate (a property over 300 mixed candidates, seen to fail with every Mode reason forced to mode 0); crates/taste/tests/hybrid.rs end to end over a real database (matrix-only titles say 'Loved by people who loved Stalker', meaning-only ones 'Close to Stalker and Solaris, which you loved'); crates/taste/src/hybrid.rs a_note_names_only_titles_the_profile_loved. Home's 'Where your taste points' carries each pick's reason as its card's note."
+          "evidence": "c183f27: a reason is built from the part that added most to the score and names only what is true: crates/recommend/src/rank.rs every_reason_names_something_true_of_the_candidate (a property over 300 mixed candidates, seen to fail with every Mode reason forced to mode 0); crates/taste/tests/hybrid.rs end to end over a real database (matrix-only titles say 'Loved by people who loved Stalker', meaning-only ones 'Close to Stalker and Solaris, which you loved'); crates/taste/src/hybrid.rs a_note_names_only_titles_the_profile_loved. Home's 'Where your taste points' carries each pick's reason as its card's note. 17.3, the real window (1cad203, 2026-11-18): the release build on a copy of the development data (SINEPHILE_DATA_DIR), a profile given five loved films; Home's 'Where your taste points' shows each card's reason (screenshot looked at, not kept: it was a scratch run). The whole rail, `cargo run --release -p eval -- recommend --rail 1`: under the first reason rule 20 of 20 said 'Close to', Pickpocket 'close to The Godfather and Oppenheimer'; the reason is now the part furthest above the median candidate, and the same twenty say 'Loved by people who loved ...' naming only loved titles. crates/recommend/src/rank.rs a_reason_is_what_lifts_a_title_above_the_typical_candidate, seen to fail on the first rule (Mode(1) for LovedWith)."
         },
         {
           "id": "E5",
@@ -2019,8 +2019,8 @@
         {
           "id": "17.3",
           "text": "Explanations: every recommendation carries a reason built from the signal that put it there (the liked titles behind a CF score, the mode behind a content score, the axis behind a boost), tested so that every reason names something true of the profile (E4); Home's taste rails use the ranker and show the reasons, pad-complete.",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "1cad203"
         },
         {
           "id": "17.4",
@@ -2567,7 +2567,7 @@
       ]
     }
   ],
-  "next_action": "Phase 17: (1) 17.3, see Home's 'Where your taste points' in the real window: copy data/ to a scratch folder (SINEPHILE_DATA_DIR, never the author's), give a profile a few loved films, and check each card's reason; (2) 17.6 (ADR-0054), in this order: meaning vectors for titles a refresh adds (a companion index beside the published one, crates/vector-index/src/lib.rs has no insert), live AniList and TMDB neighbours stored beside MovieLens' by source (a source column on item_neighbours, migration 0030), people neighbours for an unrated title, IMDb's previous votes for a rising signal, each source's last update in Settings, and E7's end-to-end test; (3) 17.5, the case study docs/case-studies/recommender.md with the numbers in docs/eval-results.md.",
+  "next_action": "Phase 17: (1) 17.6 (ADR-0054), in this order: (a) meaning vectors for titles a refresh adds: a companion index beside the published one in crates/vector-index/src/lib.rs (VectorIndex gains an in-memory `added` usearch index saved to vector-index-<model>.added.usearch; search merges both, vector() reads both, insert() adds), a persistence query for indexable titles without a vector, synopses from AniList (anime) / TMDB (profile key) / Wikipedia via Wikidata, embedded and inserted after the catalogue check in crates/catalogue/src/bootstrap.rs, capped at 2,000 a launch; (b) live AniList and TMDB neighbours by source (migration 0030 adds item_neighbours.source; NeighbourRepository::replace_all replaces only MovieLens rows), refreshed weekly; (c) people neighbours for an unrated title; (d) IMDb's previous votes for a rising signal; (e) each source's last update in Settings; (f) E7's end-to-end test; (2) 17.5, the case study docs/case-studies/recommender.md with the numbers in docs/eval-results.md and a screenshot of the rail from the release build on a scratch copy.",
   "blockers": [
     {
       "id": "B16",
