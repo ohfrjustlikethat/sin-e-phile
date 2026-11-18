@@ -2630,3 +2630,33 @@ every title without a vector, retrying after 7 days (released in the last year) 
 launch; TMDB with the first profile's own key that has one (the result is a fact about a title, shared like the
 catalogue); live rows scored by rank against MovieLens' mean; AniList 200 and TMDB 25 titles a launch. **Spec
 amendments:** A44, spec_version 4.7.1 (ADR-0054 amended, CLAUDE.md resynced).
+
+## 2026-11-18 — 17.6 finished, 17.5, Phase 17 closed
+
+- **Calibration**: the copy's rail gave a profile of seven films and two anime twenty films. Each taste mode now fills
+  at most its share (largest remainder), and the picks are interleaved so a smaller taste is on screen, not at places
+  16 to 20. Test users: Recall@20 +60.9% (E1), coverage 45.7% (E2), no rail over a cap and ILD 0.418 (E3),
+  miscalibration 0.008.
+- **Makers** reach a title nobody has rated ("By Andrei Tarkovsky, who made Stalker and Solaris"); weight 0.1 by a rule
+  recorded before the sweep. **Rising now** from IMDb's vote counts. **Settings** lists each source's last update.
+  **E7** end to end in `crates/catalogue/tests/staying_current.rs`.
+- **Found on the copy, not by the tests**: the ratings refresh rewritten as `UPDATE ... FROM` took 17 s a chunk (hours a
+  refresh; never pushed; back to 8 ms, with a test that reproduces the real planner statistics); titles the meaning job
+  described would have failed the published file's verification at the next index rebuild (fixed, tested); Settings'
+  taste preview named different films from Home's rail of the same name (now the same rail); two Settings lines read
+  wrongly.
+
+**Retrospective (Phase 17).** *Went well:* every setting chosen on tuning users by a rule written down before its run;
+each fix seen to fail first; the real window and a real copy found six problems no metric or fixture did. *Went
+wrong:* the first full recommender was worse than its matrix (two of my structural choices); reasons were true but
+useless until looked at; recall hid that one taste took the whole rail; a refresh statement that read well was
+catastrophically slow on real data. *Change:* run the launch's chain on a copy of real data before calling a staying-
+current step done, and measure calibration from a harness's first day. **Carried:** E5 (Tier 0 timing) to the Phase 19
+author batch; Phase 5 E3/E4 (meaning nDCG 0.0472, unchanged) on to Phase 18, whose mood shelves are built from semantic
+queries; I41 ("Playable now") to Phase 19, a browsing rail beside its Home overhaul, because this phase grew by
+ADR-0054's whole subtask. I40 was done in Phase 16 (0fc2922).
+
+**Decisions taken (none reserved):** calibration by quota with interleaving, taking 11.8 points of lift for coverage
+and mixed rails; the makers' pool (directors and creators, ten newest each, 150 kept) at weight 0.1; rising kept as the
+200 biggest gains at each refresh; the taste preview shows Home's rail; titles the meaning job describes belong to the
+companion, never the published graph. **Spec amendments:** A44 (4.7.1), recorded earlier today.

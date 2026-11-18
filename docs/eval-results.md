@@ -3361,3 +3361,40 @@ SQLite 3.49):
 A refresh is about 8,000 chunks: hours against about a minute. The cause: no planner statistics for `external_ids`, so
 the planner put it outside, by `source` alone. `a_ratings_chunk_touches_only_its_own_rows` reproduces those statistics
 on 300,000 titles: 2.8 s a chunk on the `FROM` form (fails), well under 400 ms on the correlated one.
+
+### 17.6: the whole recommender as the app now runs it, on the test users (2026-11-18)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- recommend --whole` on eca974f (calibrated, the makers' pool
+and part at 0.1; 5c70542's interleaving changes only the order, so every number below holds for it), 15,640 test users,
+1,496 s with builds and the app running beside it:
+
+| Setting | Recall@20 | against popularity | coverage | ILD | miscalibration | over caps |
+|---|---|---|---|---|---|---|
+| **the app's** | **0.2639** | **+60.9%** | **45.7%** | **0.418** | **0.008** | **0** |
+| the same candidates in score order | 0.2834 | +72.8% | 17.0% | 0.404 | 0.664 | 0 |
+
+**E1 met** (+60.9% > 40%), **E2 met** (45.7% > 15%), **E3 met** (no rail over a cap; 0.418 against 0.404).
+Candidates per user: median 1,051, max 1,144 (the makers' pool adds about a hundred). Ranking one user's candidates:
+p50 2.30 ms, p95 7.36 ms, max 13.75 ms on this machine under load; E5's 150 ms is for Tier 0 and stays to be measured
+there. Against the first build of the whole recommender (c183f27: +72.7%, 16.6%): 11.8 points of lift given for
+coverage nearly tripled and rails that mix as the profile does.
+
+### Phase 17 regression check before merge (2026-11-18)
+
+Every harness on the copy of the development data (`SINEPHILE_DATA_DIR=<copy> target/release/eval.exe all`, then
+`vector --report`), on f8d8e58, release build, after three launches' meaning had been added to the copy:
+
+| Metric | Recorded before | Now |
+|---|---|---|
+| Search E2 exact-title top-1 | 43/43 | **43/43** |
+| Search E1 p50 / p95, warm | 6.4 / 15.2 ms | **6.5 / 14.5 ms** (34.5 ms p95 in a first run with builds beside it) |
+| Search E3 meaning nDCG@10 | 0.0472 | **0.0472** (carried on to Phase 18) |
+| Search E3 filter nDCG@10 | 1.0000 | **1.0000** |
+| HNSW recall@10 (published graph) | 0.9760 | **0.9760**, index p95 1.85 ms |
+| Subtitles aligned / false accepts | 80/80, 0/10 | **80/80, 0/10** |
+| Identification E1 top-1, tuning / held out | 99.05% / 100% | **99.05% / 100.00%** |
+| Identification E2 false-confident at 0.75 | 0.39% / 0.00% | **0.39% / 0.00%** |
+
+No metric regressed. The first `eval all` refused at the vector harness ("the index holds 119874 vectors and the
+catalogue offers ..."): A44's job had written synopses for titles inside the published file, which then counted as the
+file's own. Fixed in f8d8e58 before this run.

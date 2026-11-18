@@ -1724,8 +1724,8 @@ Size: **S** one commit · **M** a subtask · **L** several subtasks.
 |---|---|---|---|---|
 | I38 | A "Finish setting up" card on Home until it is done: library, a source, subtitles, downloads; each line opens its setting | 16 | M | 6000ceb |
 | I39 | A working Watchlist page now (a grid of what was saved); Phase 20 deepens it | 16 | S | 2cd797f |
-| I40 | Films and TV Shows show a simple working grid (the library first, then widely loved) until Phase 19 builds them | 17 | M | |
-| I41 | "Playable now": a rail of public-domain films from the built-in Internet Archive source, so a fresh install can play something at once | 17 | M | |
+| I40 | Films and TV Shows show a simple working grid (the library first, then widely loved) until Phase 19 builds them | 17 | M | 0fc2922 |
+| I41 | "Playable now": a rail of public-domain films from the built-in Internet Archive source, so a fresh install can play something at once | 19 | M | |
 | I42 | "I have 90 minutes": a length limit on Surprise me and on Home | 18 | S | |
 | I43 | A mark on every tile for "on this PC" and "can stream" | 19 | S | |
 | I44 | Home per profile: hide, pin and reorder rails | 19 | M | |
