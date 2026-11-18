@@ -93,6 +93,37 @@ fn unit(v: &[f32]) -> Vec<f32> {
     }
 }
 
+/// The profile's best-loved titles, strongest first: the ones whose neighbours are asked for.
+pub fn strongest(liked: &[(i64, f64)]) -> Vec<i64> {
+    strongest_n(liked, LIKED_ASKED)
+}
+
+/// [`strongest`], `n` of them: the evaluation tries other counts.
+pub fn strongest_n(liked: &[(i64, f64)], n: usize) -> Vec<i64> {
+    let mut by: Vec<(i64, f64)> = liked.iter().copied().filter(|(_, w)| *w > 0.0).collect();
+    by.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+    by.into_iter().take(n).map(|(id, _)| id).collect()
+}
+
+/// The stored neighbours of the best-loved titles, by the title they point to: each with the
+/// loved titles that point there and the matrix's score. Titles already met are left out.
+pub async fn loved_with(
+    db: &Db,
+    liked: &[(i64, f64)],
+    met: &HashSet<i64>,
+) -> Result<HashMap<i64, Vec<(i64, f32)>>, DbError> {
+    let mut out: HashMap<i64, Vec<(i64, f32)>> = HashMap::new();
+    for (from, to, score) in NeighbourRepository::new(db)
+        .of_many(&strongest(liked))
+        .await?
+    {
+        if !met.contains(&to) {
+            out.entry(to).or_default().push((from, score));
+        }
+    }
+    Ok(out)
+}
+
 /// A rail of `k` for a profile: `modes` and `met` from the taste model, `liked` its weighed
 /// titles (`modes::weigh`), `playable` what is in its library now.
 #[allow(clippy::too_many_arguments)]
@@ -106,6 +137,29 @@ pub async fn rail(
     playable: &HashSet<i64>,
     k: usize,
 ) -> Result<Vec<Pick>, DbError> {
+    let loved = loved_with(db, liked, met).await?;
+    let candidates = candidates(db, semantic, modes, met, &loved, axes, playable).await?;
+    Ok(rank::rank(
+        &candidates,
+        &rank::WEIGHTS,
+        &rank::CAPS,
+        rank::DIVERSITY,
+        k,
+    ))
+}
+
+/// The described candidates [`rail`] ranks, with the neighbours given rather than read: the
+/// evaluation passes a matrix built without the users it judges, and ranks the same
+/// candidates under each setting it tries (`eval recommend --whole`).
+pub async fn candidates(
+    db: &Db,
+    semantic: &mut (dyn Meaning + Send),
+    modes: &[Mode],
+    met: &HashSet<i64>,
+    loved_with: &HashMap<i64, Vec<(i64, f32)>>,
+    axes: &Axes,
+    playable: &HashSet<i64>,
+) -> Result<Vec<Candidate>, DbError> {
     // Meaning: each mode's nearest, mode by mode so a small mode is not drowned.
     let mut pool: Vec<i64> = Vec::new();
     let mut seen: HashSet<i64> = met.clone();
@@ -127,19 +181,6 @@ pub async fn rail(
     }
 
     // People who loved the same: the neighbours of the best-loved titles.
-    let mut strongest: Vec<(i64, f64)> = liked.iter().copied().filter(|(_, w)| *w > 0.0).collect();
-    strongest.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
-    let asked: Vec<i64> = strongest
-        .iter()
-        .take(LIKED_ASKED)
-        .map(|(id, _)| *id)
-        .collect();
-    let mut loved_with: HashMap<i64, Vec<(i64, f32)>> = HashMap::new();
-    for (from, to, score) in NeighbourRepository::new(db).of_many(&asked).await? {
-        if !met.contains(&to) {
-            loved_with.entry(to).or_default().push((from, score));
-        }
-    }
     let mut by_love: Vec<(i64, f32)> = loved_with
         .iter()
         .map(|(id, from)| (*id, from.iter().map(|(_, s)| s).sum()))
@@ -202,13 +243,7 @@ pub async fn rail(
             }
         })
         .collect();
-    Ok(rank::rank(
-        &candidates,
-        &rank::WEIGHTS,
-        &rank::CAPS,
-        rank::DIVERSITY,
-        k,
-    ))
+    Ok(candidates)
 }
 
 /// A pick's reason in words, naming only what is true of the profile (E4): the titles it

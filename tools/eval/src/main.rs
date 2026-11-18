@@ -124,12 +124,44 @@ async fn main() {
                     .map(|v| v.split(',').filter_map(|x| x.parse().ok()).collect())
                     .unwrap_or_else(|| default.to_vec())
             };
-            recommend::run(
-                Path::new(&data_dir),
-                args.iter().any(|a| a == "--tune"),
-                &list("--alpha", &[0.3, 0.5, 0.7, 0.9]),
-                &list("--shrink", &[0.0, 2.0, 5.0, 10.0]),
-            )
+            if args.iter().any(|a| a == "--whole") {
+                let limit = args
+                    .iter()
+                    .position(|a| a == "--limit")
+                    .and_then(|i| args.get(i + 1))
+                    .and_then(|n| n.parse().ok());
+                let value = |flag: &str| {
+                    args.iter()
+                        .position(|a| a == flag)
+                        .and_then(|i| args.get(i + 1))
+                        .cloned()
+                };
+                let asked = value("--asked").and_then(|n| n.parse().ok());
+                // `--caps 2,1,3`: per director, per franchise, per year.
+                let caps = value("--caps").and_then(|c| {
+                    let n: Vec<usize> = c.split(',').filter_map(|x| x.parse().ok()).collect();
+                    (n.len() == 3).then(|| sinephile_recommend::rank::Caps {
+                        per_director: n[0],
+                        per_franchise: n[1],
+                        per_year: n[2],
+                    })
+                });
+                recommend::whole(
+                    Path::new(&data_dir),
+                    args.iter().any(|a| a == "--tune"),
+                    limit,
+                    asked,
+                    caps,
+                )
+                .await
+            } else {
+                recommend::run(
+                    Path::new(&data_dir),
+                    args.iter().any(|a| a == "--tune"),
+                    &list("--alpha", &[0.3, 0.5, 0.7, 0.9]),
+                    &list("--shrink", &[0.0, 2.0, 5.0, 10.0]),
+                )
+            }
         }
         "modes" => modes::run(Path::new(&data_dir), args.iter().any(|a| a == "--prove")).await,
         "import" => {

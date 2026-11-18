@@ -195,6 +195,10 @@ pub fn rank(
             .then(candidates[a].id.cmp(&candidates[b].id))
     });
     let mut picked: Vec<usize> = Vec::new();
+    // Each candidate's closeness to the most similar pick so far, kept as picks are made:
+    // comparing every candidate with every pick again in each round cost 26 ms for a
+    // thousand candidates; updating with the newest pick alone gives the same answer.
+    let mut repeat = vec![0.0f32; candidates.len()];
     let mut directors: HashMap<i64, usize> = HashMap::new();
     let mut franchises: HashMap<&str, usize> = HashMap::new();
     let mut years: HashMap<i64, usize> = HashMap::new();
@@ -214,11 +218,7 @@ pub fn rank(
             if over {
                 continue;
             }
-            let repeat = picked
-                .iter()
-                .map(|&j| cosine(&c.vector, &candidates[j].vector).max(0.0))
-                .fold(0.0, f32::max);
-            let value = (1.0 - diversity) * (scores[i].0 - lo) / span - diversity * repeat;
+            let value = (1.0 - diversity) * (scores[i].0 - lo) / span - diversity * repeat[i];
             if best.is_none_or(|(v, _)| value > v) {
                 best = Some((value, slot));
             }
@@ -226,6 +226,14 @@ pub fn rank(
         let Some((_, slot)) = best else { break };
         let i = left.remove(slot);
         let c = &candidates[i];
+        if diversity > 0.0 {
+            for &j in &left {
+                let s = cosine(&candidates[j].vector, &c.vector).max(0.0);
+                if s > repeat[j] {
+                    repeat[j] = s;
+                }
+            }
+        }
         for d in &c.directors {
             *directors.entry(*d).or_default() += 1;
         }
