@@ -1,11 +1,14 @@
 //! Home's taste rail through Phase 17's hybrid ranker (`sinephile_recommend::rank`).
 //!
 //! This module gathers and describes; the ranker decides. About a thousand candidates come
-//! from three places, each capped so none crowds out the others:
+//! from four places, each capped so none crowds out the others:
 //!
 //! - **Meaning** (Layer 1): the titles nearest each taste mode in the meaning index.
 //! - **People who loved the same** (Layer 2): the stored neighbours of the titles the
-//!   profile loved most, from the item-item matrix.
+//!   profile loved most, from MovieLens' matrix and AniList's and TMDB's recommendations.
+//! - **Made by the same people** (ADR-0054 step 5): the newest work of whoever directed or
+//!   created what the profile loved, which reaches a title the day it arrives, before
+//!   anyone has rated it.
 //! - **Widely seen**: the most-voted titles, so a thin profile still has a rail.
 //!
 //! Each is then described as the ranker needs it (closeness to the nearest mode, which liked
@@ -32,6 +35,10 @@ const LIKED_ASKED: usize = 500;
 const LOVED: usize = 400;
 /// The most-voted titles in the pool.
 const POPULAR: i64 = 100;
+/// Loved titles whose makers' work is asked for, each maker's newest, and the most kept.
+const MADE_ASKED: usize = 100;
+const PER_MAKER: i64 = 10;
+const MADE: usize = 150;
 
 /// The profile's axes on one title, -1 to 1: shares of its decade, length, best genre and
 /// best director among what the profile liked, less its strongest avoided genre or director.
@@ -107,6 +114,28 @@ pub fn strongest_n(liked: &[(i64, f64)], n: usize) -> Vec<i64> {
     by.into_iter().take(n).map(|(id, _)| id).collect()
 }
 
+/// The newest work of whoever directed or created the best-loved titles, by title: each with
+/// the loved titles it shares a maker with and that maker; and the makers' names, for the
+/// notes. Titles already met are left out.
+pub async fn made_alike(
+    db: &Db,
+    liked: &[(i64, f64)],
+    met: &HashSet<i64>,
+) -> Result<(HashMap<i64, Vec<(i64, i64)>>, HashMap<i64, String>), DbError> {
+    let mut made: HashMap<i64, Vec<(i64, i64)>> = HashMap::new();
+    let mut names = HashMap::new();
+    for (loved, person, name, title) in MediaRepository::new(db)
+        .made_alike(&strongest_n(liked, MADE_ASKED), PER_MAKER)
+        .await?
+    {
+        if !met.contains(&title) {
+            made.entry(title).or_default().push((loved, person));
+            names.insert(person, name);
+        }
+    }
+    Ok((made, names))
+}
+
 /// The stored neighbours of the best-loved titles, by the title they point to: each with the
 /// loved titles that point there and the matrix's score. Titles already met are left out.
 pub async fn loved_with(
@@ -127,7 +156,8 @@ pub async fn loved_with(
 }
 
 /// A rail of `k` for a profile: `modes` and `met` from the taste model, `liked` its weighed
-/// titles (`modes::weigh`), `playable` what is in its library now.
+/// titles (`modes::weigh`), `playable` what is in its library now. With the picks, the names
+/// of the makers a reason may name (for [`note`]).
 #[allow(clippy::too_many_arguments)]
 pub async fn rail(
     db: &Db,
@@ -138,27 +168,34 @@ pub async fn rail(
     axes: &Axes,
     playable: &HashSet<i64>,
     k: usize,
-) -> Result<Vec<Pick>, DbError> {
+) -> Result<(Vec<Pick>, HashMap<i64, String>), DbError> {
     let loved = loved_with(db, liked, met).await?;
-    let candidates = candidates(db, semantic, modes, met, &loved, axes, playable).await?;
-    Ok(rank::rank(
+    let (made, makers) = made_alike(db, liked, met).await?;
+    let candidates = candidates(db, semantic, modes, met, &loved, &made, axes, playable).await?;
+    // Each mode held to its share of the profile (calibration, `rank::quotas`).
+    let shares: Vec<f32> = modes.iter().map(|m| m.weight as f32).collect();
+    let picks = rank::rank(
         &candidates,
         &rank::WEIGHTS,
         &rank::CAPS,
         rank::DIVERSITY,
+        &shares,
         k,
-    ))
+    );
+    Ok((picks, makers))
 }
 
 /// The described candidates [`rail`] ranks, with the neighbours given rather than read: the
 /// evaluation passes a matrix built without the users it judges, and ranks the same
 /// candidates under each setting it tries (`eval recommend --whole`).
+#[allow(clippy::too_many_arguments)]
 pub async fn candidates(
     db: &Db,
     semantic: &mut (dyn Meaning + Send),
     modes: &[Mode],
     met: &HashSet<i64>,
     loved_with: &HashMap<i64, Vec<(i64, f32)>>,
+    made: &HashMap<i64, Vec<(i64, i64)>>,
     axes: &Axes,
     playable: &HashSet<i64>,
 ) -> Result<Vec<Candidate>, DbError> {
@@ -199,6 +236,15 @@ pub async fn candidates(
         }
     }
 
+    // Made by the same people: those sharing a maker with the most loved titles first.
+    let mut by_maker: Vec<(i64, usize)> = made.iter().map(|(id, m)| (*id, m.len())).collect();
+    by_maker.sort_by(|a, b| b.1.cmp(&a.1).then(b.0.cmp(&a.0)));
+    for (id, _) in by_maker.into_iter().take(MADE) {
+        if seen.insert(id) {
+            pool.push(id);
+        }
+    }
+
     // Widely seen.
     let media = MediaRepository::new(db);
     for (id, _) in media.most_voted_with_votes(POPULAR).await? {
@@ -235,6 +281,7 @@ pub async fn candidates(
                 id: f.id,
                 near,
                 loved_with: loved_with.get(&f.id).cloned().unwrap_or_default(),
+                made_by: made.get(&f.id).cloned().unwrap_or_default(),
                 votes: f.votes.unwrap_or(0),
                 year: f.year,
                 directors: f.directors.iter().map(|(p, _)| *p).collect(),
@@ -249,8 +296,14 @@ pub async fn candidates(
 }
 
 /// A pick's reason in words, naming only what is true of the profile (E4): the titles it
-/// loved that point here, or the loved titles its taste mode is made of.
-pub fn note(pick: &Pick, modes: &[Mode], titles: &HashMap<i64, String>) -> String {
+/// loved that point here, who made it and what of theirs it loved, or the loved titles its
+/// taste mode is made of. `people` names the makers.
+pub fn note(
+    pick: &Pick,
+    modes: &[Mode],
+    titles: &HashMap<i64, String>,
+    people: &HashMap<i64, String>,
+) -> String {
     let named = |ids: &[i64]| -> String {
         let names: Vec<&str> = ids
             .iter()
@@ -281,6 +334,15 @@ pub fn note(pick: &Pick, modes: &[Mode], titles: &HashMap<i64, String>) -> Strin
                 "Close to your taste".into()
             } else {
                 format!("Close to {like}, which you loved")
+            }
+        }
+        Reason::MadeBy { person, loved } => {
+            let what = named(loved);
+            match (people.get(person), what.is_empty()) {
+                (Some(who), false) => format!("By {who}, who made {what}"),
+                (Some(who), true) => format!("By {who}, whose work you loved"),
+                (None, false) => format!("From the maker of {what}"),
+                (None, true) => "From a maker whose work you loved".into(),
             }
         }
         Reason::Popular => "Widely loved".into(),
@@ -341,25 +403,45 @@ mod tests {
             score: 1.0,
             reason,
         };
+        let none: HashMap<i64, String> = HashMap::new();
         assert_eq!(
-            note(&pick(Reason::LovedWith(vec![2, 1, 3])), &modes, &titles),
+            note(
+                &pick(Reason::LovedWith(vec![2, 1, 3])),
+                &modes,
+                &titles,
+                &none
+            ),
             "Loved by people who loved Solaris, Stalker and Mirror"
         );
         assert_eq!(
-            note(&pick(Reason::LovedWith(vec![1])), &modes, &titles),
+            note(&pick(Reason::LovedWith(vec![1])), &modes, &titles, &none),
             "Loved by people who loved Stalker"
         );
         assert_eq!(
-            note(&pick(Reason::Mode(0)), &modes, &titles),
+            note(&pick(Reason::Mode(0)), &modes, &titles, &none),
             "Close to Stalker and Solaris, which you loved"
         );
         assert_eq!(
-            note(&pick(Reason::Mode(5)), &modes, &titles),
+            note(&pick(Reason::Mode(5)), &modes, &titles, &none),
             "Close to your taste"
         );
         assert_eq!(
-            note(&pick(Reason::Popular), &modes, &titles),
+            note(&pick(Reason::Popular), &modes, &titles, &none),
             "Widely loved"
+        );
+        let makers: HashMap<i64, String> = [(77, "Andrei Tarkovsky".to_string())].into();
+        let made = |loved: Vec<i64>| Reason::MadeBy { person: 77, loved };
+        assert_eq!(
+            note(&pick(made(vec![1, 2])), &modes, &titles, &makers),
+            "By Andrei Tarkovsky, who made Stalker and Solaris"
+        );
+        assert_eq!(
+            note(&pick(made(vec![1])), &modes, &titles, &none),
+            "From the maker of Stalker"
+        );
+        assert_eq!(
+            note(&pick(made(vec![404])), &modes, &titles, &makers),
+            "By Andrei Tarkovsky, whose work you loved"
         );
     }
 }

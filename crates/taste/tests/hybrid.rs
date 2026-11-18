@@ -83,7 +83,7 @@ async fn the_rail_mixes_meaning_and_people_who_loved_the_same_and_says_why() {
     let met: HashSet<i64> = [stalker, solaris, seen_it].into();
     let liked = [(stalker, 1.0), (solaris, 0.8)];
 
-    let picks = rail(
+    let (picks, _) = rail(
         &db,
         &mut hand,
         &modes,
@@ -121,12 +121,12 @@ async fn the_rail_mixes_meaning_and_people_who_loved_the_same_and_says_why() {
         .into();
     let said = picks.iter().find(|p| p.id == both).unwrap();
     assert_eq!(
-        note(said, &modes, &titles),
+        note(said, &modes, &titles, &HashMap::new()),
         "Loved by people who loved Stalker and Solaris"
     );
     let said = picks.iter().find(|p| p.id == near_in_meaning).unwrap();
     assert_eq!(
-        note(said, &modes, &titles),
+        note(said, &modes, &titles, &HashMap::new()),
         "Close to Stalker and Solaris, which you loved"
     );
 }

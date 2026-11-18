@@ -3306,3 +3306,26 @@ anime recommended beside one; with seven films to two anime, the larger taste ta
 it (it rewards the majority). Calibration (a rail's mix of taste modes matching the profile's, Steck 2018) is the
 remedy, measured against E1-E3 before it is kept. Home built in 63-96 ms warm (368 ms on the first, cold, read after
 migration 0031 rewrote the table).
+
+### 17.6: calibration by taste mode, on the test users (2026-11-18)
+
+Each taste mode may fill at most its share of a rail (largest-remainder apportionment, every mode at least one slot;
+`rank::quotas`), so a rail mixes as the profile does (Steck 2018). Measured with the same harness on the same 15,640
+test users, `SINEPHILE_DATA_DIR=<copy> eval recommend --whole` (on afa2ec0 plus the ranker change; 1,257 s, the machine
+also building), against the recorded run without it:
+
+| Setting | Recall@20 | against popularity | coverage | ILD | miscalibration (KL) |
+|---|---|---|---|---|---|
+| uncalibrated (c183f27, recorded above) | 0.2834 | +72.7% | 16.6% | 0.407 | not measured |
+| **calibrated (the app's now)** | **0.2648** | **+61.4%** | **43.5%** | **0.417** | **0.008** |
+| the same candidates in score order | 0.2830 | +72.5% | 16.4% | 0.404 | 0.683 |
+
+E1 met (+61.4% > 40%), E2 met (43.5%), E3 met (no rail over a cap; 0.417 against 0.404). Ranking p50 1.75 ms, p95
+6.29 ms on this machine with a build running beside it. **The trade, taken knowingly:** 1.9 points of recall (held-out
+likes follow the larger taste, so recall rewards a rail that does) for coverage nearly tripled and a rail whose mix
+follows the profile's: on the copy, a profile of seven films and two anime got 15 films and 5 anime instead of 20 films.
+
+**The rule for the maker's weight, fixed before its run:** `eval recommend --whole --tune --people 0,0.1,0.25,0.5
+--limit 2000` on tuning users, calibrated; the weight with the best Recall@20; two within 0.002 of each other count as
+equal, and the larger is taken, because what the part is for (a title nobody has rated) is what held-out MovieLens likes
+cannot measure.

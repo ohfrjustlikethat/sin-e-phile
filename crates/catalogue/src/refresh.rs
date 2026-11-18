@@ -152,19 +152,29 @@ async fn apply(
             })
             .collect();
 
+        // A count that changed keeps the one before it and when (migration 0032): what a
+        // title gained since IMDb's last update is what "Rising now" ranks by (ADR-0054
+        // step 6). The right-hand sides all read the row as it was. A title rated for the
+        // first time has nothing before it, so it does not "gain" its whole count.
         let sql = format!(
             "WITH incoming(tconst, rating, votes) AS (VALUES {})
              UPDATE media_items
-                SET rating = (SELECT rating FROM incoming
-                               JOIN external_ids e ON e.external_id = incoming.tconst
-                              WHERE e.source = 'imdb' AND e.media_item_id = media_items.id),
-                    rating_votes = (SELECT votes FROM incoming
-                                     JOIN external_ids e ON e.external_id = incoming.tconst
-                                    WHERE e.source = 'imdb' AND e.media_item_id = media_items.id),
+                SET rating = n.rating,
+                    previous_votes = CASE
+                        WHEN media_items.rating_votes IS NOT NULL
+                         AND media_items.rating_votes IS NOT n.votes
+                        THEN media_items.rating_votes ELSE media_items.previous_votes END,
+                    votes_changed_at = CASE
+                        WHEN media_items.rating_votes IS NOT NULL
+                         AND media_items.rating_votes IS NOT n.votes
+                        THEN datetime('now') ELSE media_items.votes_changed_at END,
+                    rating_votes = n.votes,
                     updated_at = datetime('now')
-              WHERE id IN (SELECT e.media_item_id FROM external_ids e
-                            JOIN incoming ON incoming.tconst = e.external_id
-                           WHERE e.source = 'imdb')",
+               FROM (SELECT e.media_item_id AS id, incoming.rating, incoming.votes
+                       FROM incoming
+                       JOIN external_ids e ON e.external_id = incoming.tconst
+                      WHERE e.source = 'imdb') AS n
+              WHERE media_items.id = n.id",
             values.join(", ")
         );
 

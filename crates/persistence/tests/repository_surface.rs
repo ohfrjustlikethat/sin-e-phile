@@ -2694,3 +2694,142 @@ async fn external_ids_in_batches_surface() {
         .unwrap()
         .is_empty());
 }
+
+#[tokio::test]
+async fn made_alike_surface() {
+    // ADR-0054 step 5: a title nobody has rated reaches a profile through its maker.
+    let db = Db::in_memory().await.expect("open");
+    let media = MediaRepository::new(&db);
+    let person = |name: &'static str| {
+        let db = &db;
+        async move {
+            sqlx::query_scalar::<_, i64>("INSERT INTO people (name) VALUES (?) RETURNING id")
+                .bind(name)
+                .fetch_one(db.pool())
+                .await
+                .unwrap()
+        }
+    };
+    let credit = |item: i64, who: i64, role: &'static str| {
+        let db = &db;
+        async move {
+            sqlx::query("INSERT INTO credits (media_item_id, person_id, role) VALUES (?, ?, ?)")
+                .bind(item)
+                .bind(who)
+                .bind(role)
+                .execute(db.pool())
+                .await
+                .unwrap();
+        }
+    };
+    let maker = person("A Director").await;
+    let creator = person("A Creator").await;
+    let actor = person("An Actor").await;
+    let loved = media
+        .insert(&NewMediaItem::film("Loved", 1979))
+        .await
+        .unwrap();
+    let older = media
+        .insert(&NewMediaItem::film("Older", 1972))
+        .await
+        .unwrap();
+    let newer = media
+        .insert(&NewMediaItem::film("Newer", 2026))
+        .await
+        .unwrap();
+    let middle = media
+        .insert(&NewMediaItem::film("Middle", 1986))
+        .await
+        .unwrap();
+    let acted = media
+        .insert(&NewMediaItem::film("Acted In", 2025))
+        .await
+        .unwrap();
+    let show = media
+        .insert(&NewMediaItem::film("A Show", 2024))
+        .await
+        .unwrap();
+    let loved_show = media
+        .insert(&NewMediaItem::film("Loved Show", 2020))
+        .await
+        .unwrap();
+    for item in [loved, older, newer, middle] {
+        credit(item, maker, "director").await;
+    }
+    credit(loved, actor, "actor").await;
+    credit(acted, actor, "actor").await;
+    credit(loved_show, creator, "creator").await;
+    credit(show, creator, "creator").await;
+
+    // newest first, at most two each; the loved title itself and an actor's work left out
+    let rows = media.made_alike(&[loved, loved_show], 2).await.unwrap();
+    let mine: Vec<(i64, i64)> = rows
+        .iter()
+        .filter(|r| r.0 == loved)
+        .map(|r| (r.1, r.3))
+        .collect();
+    // the director's two newest (Newer, Middle); Older is past the limit
+    assert_eq!(mine, vec![(maker, newer), (maker, middle)]);
+    assert!(rows.iter().all(|r| r.3 != acted));
+    assert!(rows.contains(&(loved_show, creator, "A Creator".to_string(), show)));
+    let wider = media.made_alike(&[loved], 4).await.unwrap();
+    let titles: Vec<i64> = wider.iter().map(|r| r.3).collect();
+    assert_eq!(titles, vec![newer, middle, older]);
+    assert_eq!(wider[0].2, "A Director");
+    assert!(media.made_alike(&[], 4).await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn rising_surface() {
+    // ADR-0054 step 6: what gained most in its last change, lately.
+    let db = Db::in_memory().await.expect("open");
+    let media = MediaRepository::new(&db);
+    let mut ids = Vec::new();
+    for (k, (votes, previous, when)) in [
+        (50_000, Some(40_000), "now"),      // gained 10,000
+        (9_000, Some(1_000), "now"),        // gained 8,000
+        (80_000, Some(79_000), "now"),      // gained 1,000
+        (90_000, Some(10_000), "-30 days"), // gained 80,000, but a month ago
+        (30_000, None, "now"),              // first rated: nothing before it
+        (700, Some(100), "now"),            // too few votes to count
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let id = media
+            .insert(&NewMediaItem::film(format!("Film {k}"), 2026))
+            .await
+            .unwrap();
+        sqlx::query(
+            "UPDATE media_items SET rating_votes = ?, previous_votes = ?,
+                    votes_changed_at = datetime('now', ?) WHERE id = ?",
+        )
+        .bind(votes)
+        .bind(previous)
+        .bind(if when == "now" { "+0 days" } else { when })
+        .bind(id)
+        .execute(db.pool())
+        .await
+        .unwrap();
+        ids.push(id);
+    }
+    assert_eq!(
+        media.rising(2, 1_000, 10).await.unwrap(),
+        vec![(ids[0], 10_000), (ids[1], 8_000), (ids[2], 1_000)]
+    );
+    assert_eq!(media.rising(2, 1_000, 1).await.unwrap().len(), 1);
+    assert_eq!(
+        media.rising(60, 1_000, 1).await.unwrap(),
+        vec![(ids[3], 80_000)]
+    );
+
+    // keep_rising / kept_rising: the list kept for Home, best first
+    assert!(media.kept_rising().await.unwrap().is_empty());
+    assert_eq!(media.keep_rising(2, 1_000, 2).await.unwrap(), 2);
+    assert_eq!(
+        media.kept_rising().await.unwrap(),
+        vec![(ids[0], 10_000), (ids[1], 8_000)]
+    );
+    assert_eq!(media.keep_rising(2, 1_000_000, 2).await.unwrap(), 0);
+    assert!(media.kept_rising().await.unwrap().is_empty());
+}

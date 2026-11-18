@@ -72,6 +72,23 @@ const NEW_RELEASE_VOTES: i64 = 1_000;
 
 const PER_RAIL: usize = 20;
 
+/// 12400 as "12,400".
+fn thousands(n: i64) -> String {
+    let digits = n.unsigned_abs().to_string();
+    let mut out = String::new();
+    for (i, d) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(d);
+    }
+    if n < 0 {
+        format!("-{out}")
+    } else {
+        out
+    }
+}
+
 pub async fn rails(
     db: &Db,
     semantic: Option<&mut Semantic>,
@@ -237,7 +254,7 @@ pub async fn rails(
                 .chain(library_titles.library_titles(true).await?)
                 .collect();
             let want = PER_RAIL * if kids { 6 } else { 1 };
-            let picks =
+            let (picks, makers) =
                 crate::hybrid::rail(db, &mut **s, modes, &met, &weighed, &axes, &playable, want)
                     .await?;
             // The titles the reasons name: what was loved, and what each mode is made of.
@@ -245,6 +262,7 @@ pub async fn rails(
                 .iter()
                 .flat_map(|p| match &p.reason {
                     sinephile_recommend::rank::Reason::LovedWith(ids) => ids.clone(),
+                    sinephile_recommend::rank::Reason::MadeBy { loved, .. } => loved.clone(),
                     _ => Vec::new(),
                 })
                 .chain(modes.iter().flat_map(|m| m.members.iter().take(2).copied()))
@@ -256,12 +274,26 @@ pub async fn rails(
                 .map(|f| (f.id, f.title))
                 .collect();
             for p in &picks {
-                taste_notes.insert(p.id, crate::hybrid::note(p, modes, &titles));
+                taste_notes.insert(p.id, crate::hybrid::note(p, modes, &titles, &makers));
             }
             picks.into_iter().map(|p| p.id).collect()
         }
         None => Vec::new(),
     };
+    // Rising now (ADR-0054 step 6): what gained the most ratings at the catalogue's last
+    // refresh, kept by the refresh itself; the profile's own titles left out.
+    let mut rising_notes = HashMap::new();
+    let rising: Vec<i64> = media
+        .kept_rising()
+        .await?
+        .into_iter()
+        .filter(|(id, _)| !seen.contains(id))
+        .map(|(id, gained)| {
+            rising_notes.insert(id, format!("+{} ratings", thousands(gained)));
+            id
+        })
+        .collect();
+
     let shown: HashSet<i64> = seen
         .iter()
         .chain(taste.iter())
@@ -282,6 +314,7 @@ pub async fn rails(
         ("new_episodes", "New episodes of your shows", new_episodes),
         ("library", "Your library", library),
         ("new", "New releases", new_releases),
+        ("rising", "Rising now", rising),
         ("taste", "Where your taste points", taste),
         ("watchlist", "On your watchlist", saved),
         ("loved", "Widely loved", loved),
@@ -292,6 +325,7 @@ pub async fn rails(
                 "new_episodes" => Some(&episode_notes),
                 "continue" => Some(&continue_notes),
                 "taste" => Some(&taste_notes),
+                "rising" => Some(&rising_notes),
                 _ => None,
             };
             let notes = from.map_or_else(HashMap::new, |from| {

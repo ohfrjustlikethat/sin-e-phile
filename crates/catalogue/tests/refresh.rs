@@ -223,6 +223,43 @@ async fn ratings_are_re_applied_over_the_whole_catalogue() {
             .await
             .expect("after");
     assert_eq!(after, vec![(Some(91), Some(9_999)), (Some(33), Some(12))]);
+
+    // ADR-0054 step 6: a count that changed keeps the one before it, and when.
+    let kept = |db: &Db| {
+        let db = db.clone();
+        async move {
+            sqlx::query_as::<_, (Option<i64>, bool)>(
+                "SELECT previous_votes, votes_changed_at IS NOT NULL FROM media_items ORDER BY id",
+            )
+            .fetch_all(db.pool())
+            .await
+            .expect("kept")
+        }
+    };
+    assert_eq!(
+        kept(&db).await,
+        vec![(Some(5_000), true), (Some(5_000), true)]
+    );
+    // The next refresh: one unchanged keeps what it had; one that moved keeps its last.
+    sqlx::query("UPDATE media_items SET votes_changed_at = 'then'")
+        .execute(db.pool())
+        .await
+        .expect("mark");
+    let votes: HashMap<u32, i64> = [(100u32, 9_999i64), (200, 40)].into_iter().collect();
+    let averages: HashMap<u32, i64> = [(100u32, 91i64), (200, 35)].into_iter().collect();
+    let mut job = Job::begin(&db, "refresh again").await.expect("job");
+    refresh::ratings(&mut job, Arc::new(votes), Arc::new(averages))
+        .await
+        .expect("ratings");
+    job.finish().await.expect("finish");
+    let when: Vec<(Option<i64>, String)> =
+        sqlx::query_as("SELECT previous_votes, votes_changed_at FROM media_items ORDER BY id")
+            .fetch_all(db.pool())
+            .await
+            .expect("when");
+    assert_eq!(when[0], (Some(5_000), "then".to_string()), "unchanged");
+    assert_eq!(when[1].0, Some(12), "moved from 12 to 40");
+    assert_ne!(when[1].1, "then");
 }
 
 #[tokio::test]

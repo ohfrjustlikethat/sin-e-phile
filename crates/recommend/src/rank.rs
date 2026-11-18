@@ -36,6 +36,10 @@ pub struct Candidate {
     /// The profile's liked titles whose stored neighbours include this one, each with the
     /// matrix's score.
     pub loved_with: Vec<(i64, f32)>,
+    /// The profile's loved titles made by someone who made this one too, each with that
+    /// person (a director or creator): how a title nobody has rated reaches a profile
+    /// (ADR-0054 step 5).
+    pub made_by: Vec<(i64, i64)>,
     /// IMDb votes: how widely seen.
     pub votes: i64,
     pub year: Option<i64>,
@@ -60,6 +64,8 @@ pub struct Candidate {
 pub struct Weights {
     pub near: f32,
     pub loved: f32,
+    /// Made by someone who made what the profile loved.
+    pub people: f32,
     pub popular: f32,
     pub axes: f32,
     pub playable: f32,
@@ -68,6 +74,7 @@ pub struct Weights {
 pub const WEIGHTS: Weights = Weights {
     near: 1.0,
     loved: 0.5,
+    people: 0.25,
     popular: 0.0,
     axes: 0.2,
     playable: 0.1,
@@ -96,6 +103,8 @@ pub const DIVERSITY: f32 = 0.15;
 pub enum Reason {
     /// Loved by people who loved these, strongest first (at most three).
     LovedWith(Vec<i64>),
+    /// Made by `person`, who made these loved titles too (at most two).
+    MadeBy { person: i64, loved: Vec<i64> },
     /// Close to this taste mode.
     Mode(usize),
     /// Widely loved, and the closest the profile's taste comes to anything here.
@@ -115,8 +124,18 @@ pub struct Pick {
 struct Parts {
     near: Vec<f32>,
     loved: Vec<f32>,
+    /// How many loved titles share a maker with it, over the most any candidate has.
+    people: Vec<f32>,
     popular: Vec<f32>,
-    typical: [f32; 3],
+    typical: [f32; 4],
+}
+
+/// The distinct loved titles a candidate shares a maker with.
+fn made_count(c: &Candidate) -> usize {
+    let mut loved: Vec<i64> = c.made_by.iter().map(|(l, _)| *l).collect();
+    loved.sort_unstable();
+    loved.dedup();
+    loved.len()
 }
 
 /// The middle value (the lower of the two middles for an even count); 0 for none.
@@ -150,10 +169,21 @@ fn parts(candidates: &[Candidate]) -> Parts {
         .iter()
         .map(|c| ((c.votes.max(0) + 1) as f32).ln() / top)
         .collect();
-    let typical = [median(&near), median(&loved), median(&popular)];
+    let max_made = candidates.iter().map(made_count).max().unwrap_or(0).max(1) as f32;
+    let people: Vec<f32> = candidates
+        .iter()
+        .map(|c| made_count(c) as f32 / max_made)
+        .collect();
+    let typical = [
+        median(&near),
+        median(&loved),
+        median(&people),
+        median(&popular),
+    ];
     Parts {
         near,
         loved,
+        people,
         popular,
         typical,
     }
@@ -164,9 +194,10 @@ fn parts(candidates: &[Candidate]) -> Parts {
 fn scored(c: &Candidate, p: &Parts, i: usize, w: &Weights) -> (f32, Reason) {
     let near = w.near * p.near[i];
     let loved = w.loved * p.loved[i];
+    let made = w.people * p.people[i];
     let popular = w.popular * p.popular[i];
     let score =
-        near + loved + popular + w.axes * c.axes + if c.playable { w.playable } else { 0.0 };
+        near + loved + made + popular + w.axes * c.axes + if c.playable { w.playable } else { 0.0 };
     // WHY ABOVE A TYPICAL CANDIDATE, NOT THE BIGGEST PART. Every candidate the meaning pool
     // brings is close to some mode, so closeness is large for all of them, and as the
     // biggest part it named a mode for every pick: the real window (17.3) showed twenty of
@@ -175,9 +206,10 @@ fn scored(c: &Candidate, p: &Parts, i: usize, w: &Weights) -> (f32, Reason) {
     // title against the others, so the part that ranked it is the one where it beats the
     // typical candidate by most: each part minus its median, weighted as in the score.
     let lift = |part: f32, typical: f32, weight: f32| weight * (part - typical);
-    let [near_typical, loved_typical, popular_typical] = p.typical;
+    let [near_typical, loved_typical, people_typical, popular_typical] = p.typical;
     let near_lift = c.near.map(|_| lift(p.near[i], near_typical, w.near));
     let loved_lift = (loved > 0.0).then(|| lift(p.loved[i], loved_typical, w.loved));
+    let made_lift = (!c.made_by.is_empty()).then(|| lift(p.people[i], people_typical, w.people));
     // "Widely loved" only of what is more widely seen than most candidates.
     let popular_lift =
         (p.popular[i] > popular_typical).then(|| lift(p.popular[i], popular_typical, w.popular));
@@ -186,10 +218,28 @@ fn scored(c: &Candidate, p: &Parts, i: usize, w: &Weights) -> (f32, Reason) {
         (Some(_), None) => true,
         (None, _) => false,
     };
-    let reason = if beats(loved_lift, near_lift) && beats(loved_lift, popular_lift) {
+    let reason = if beats(loved_lift, near_lift)
+        && beats(loved_lift, popular_lift)
+        && beats(loved_lift, made_lift)
+    {
         let mut by: Vec<(i64, f32)> = c.loved_with.clone();
         by.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
         Reason::LovedWith(by.into_iter().take(3).map(|(id, _)| id).collect())
+    } else if beats(made_lift, near_lift) && beats(made_lift, popular_lift) {
+        // The person behind most of the loved titles it shares, and two of those titles.
+        let mut per: HashMap<i64, Vec<i64>> = HashMap::new();
+        for &(l, person) in &c.made_by {
+            let titles = per.entry(person).or_default();
+            if !titles.contains(&l) {
+                titles.push(l);
+            }
+        }
+        let (person, mut loved) = per
+            .into_iter()
+            .max_by(|a, b| a.1.len().cmp(&b.1.len()).then(b.0.cmp(&a.0)))
+            .expect("made_by is not empty");
+        loved.truncate(2);
+        Reason::MadeBy { person, loved }
     } else if let Some((mode, _)) = c.near.filter(|_| beats(near_lift, popular_lift)) {
         Reason::Mode(mode)
     } else {
@@ -205,13 +255,64 @@ fn cosine(a: &[f32], b: &[f32]) -> f32 {
     a.iter().zip(b).map(|(x, y)| x * y).sum()
 }
 
+/// The most of a rail of `k` each taste mode may fill: its share of the profile, the slots
+/// shared out by largest remainder so they add up to `k`, and every mode at least one.
+///
+/// WHY: the loved part sums a candidate's neighbours over everything the profile loved, so
+/// a larger taste outscores a smaller one title for title. A profile of seven arthouse
+/// films and two anime got twenty arthouse films (17.6, on a copy of the development data).
+/// Holding each mode to its share is calibration (Steck, "Calibrated Recommendations",
+/// 2018): the rail's mix follows the profile's.
+pub fn quotas(shares: &[f32], k: usize) -> Vec<usize> {
+    let total: f32 = shares.iter().filter(|s| **s > 0.0).sum();
+    if total <= 0.0 {
+        return vec![k; shares.len()];
+    }
+    let exact: Vec<f32> = shares
+        .iter()
+        .map(|s| k as f32 * s.max(0.0) / total)
+        .collect();
+    let mut quota: Vec<usize> = exact.iter().map(|e| e.floor() as usize).collect();
+    // The slots the floors leave go to the largest remainders.
+    let mut order: Vec<usize> = (0..exact.len()).collect();
+    order.sort_by(|&a, &b| {
+        (exact[b] - exact[b].floor())
+            .total_cmp(&(exact[a] - exact[a].floor()))
+            .then(a.cmp(&b))
+    });
+    let mut spare = k.saturating_sub(quota.iter().sum());
+    for &m in &order {
+        if spare == 0 {
+            break;
+        }
+        quota[m] += 1;
+        spare -= 1;
+    }
+    // A mode too small for a slot of its own still gets one, from the largest.
+    for m in 0..quota.len() {
+        if shares[m] > 0.0 && quota[m] == 0 {
+            if let Some(big) = (0..quota.len()).max_by_key(|&j| (quota[j], std::cmp::Reverse(j))) {
+                if quota[big] > 1 {
+                    quota[big] -= 1;
+                    quota[m] = 1;
+                }
+            }
+        }
+    }
+    quota
+}
+
 /// A rail of `k` from `candidates`: scored, then picked one at a time by maximal marginal
-/// relevance within the caps.
+/// relevance within the caps, each taste mode within its quota ([`quotas`] of `shares`,
+/// the modes' shares of the profile in the order `Candidate::near` names them; empty for
+/// none). When only over-quota candidates are left, the quota gives way: a short rail
+/// would serve nobody.
 pub fn rank(
     candidates: &[Candidate],
     weights: &Weights,
     caps: &Caps,
     diversity: f32,
+    shares: &[f32],
     k: usize,
 ) -> Vec<Pick> {
     if candidates.is_empty() || k == 0 {
@@ -247,8 +348,15 @@ pub fn rank(
     let mut directors: HashMap<i64, usize> = HashMap::new();
     let mut franchises: HashMap<&str, usize> = HashMap::new();
     let mut years: HashMap<i64, usize> = HashMap::new();
+    let quota = quotas(shares, k);
+    let mut per_mode = vec![0usize; quota.len()];
+    let over_quota = |c: &Candidate, per_mode: &[usize]| {
+        c.near
+            .is_some_and(|(m, _)| quota.get(m).is_some_and(|q| per_mode[m] >= *q))
+    };
     while picked.len() < k {
         let mut best: Option<(f32, usize)> = None;
+        let mut best_over: Option<(f32, usize)> = None;
         for (slot, &i) in left.iter().enumerate() {
             let c = &candidates[i];
             let over = c
@@ -264,11 +372,18 @@ pub fn rank(
                 continue;
             }
             let value = (1.0 - diversity) * (scores[i].0 - lo) / span - diversity * repeat[i];
-            if best.is_none_or(|(v, _)| value > v) {
-                best = Some((value, slot));
+            let into = if over_quota(c, &per_mode) {
+                &mut best_over
+            } else {
+                &mut best
+            };
+            if into.is_none_or(|(v, _)| value > v) {
+                *into = Some((value, slot));
             }
         }
-        let Some((_, slot)) = best else { break };
+        let Some((_, slot)) = best.or(best_over) else {
+            break;
+        };
         let i = left.remove(slot);
         let c = &candidates[i];
         if diversity > 0.0 {
@@ -287,6 +402,9 @@ pub fn rank(
         }
         if let Some(y) = c.year {
             *years.entry(y).or_default() += 1;
+        }
+        if let Some(n) = c.near.and_then(|(m, _)| per_mode.get_mut(m)) {
+            *n += 1;
         }
         picked.push(i);
     }
@@ -357,7 +475,7 @@ mod tests {
             near: Some((1, 0.6)),
             ..film(2)
         };
-        let rail = rank(&[near_only, strong], &WEIGHTS, &CAPS, 0.0, 2);
+        let rail = rank(&[near_only, strong], &WEIGHTS, &CAPS, 0.0, &[], 2);
         assert_eq!(rail[0].id, 1);
         // The three strongest, strongest first.
         assert_eq!(rail[0].reason, Reason::LovedWith(vec![902, 901, 903]));
@@ -385,13 +503,47 @@ mod tests {
             loved_with: vec![(902, 1.0)],
             ..film(2)
         });
-        let rail = rank(&c, &WEIGHTS, &CAPS, 0.0, c.len());
+        let rail = rank(&c, &WEIGHTS, &CAPS, 0.0, &[], c.len());
         let reason = |id: i64| rail.iter().find(|p| p.id == id).unwrap().reason.clone();
         assert_eq!(reason(1), Reason::LovedWith(vec![901]));
         assert_eq!(reason(2), Reason::LovedWith(vec![902]));
         for id in 10..20 {
             assert_eq!(reason(id), Reason::Mode(0), "{id}");
         }
+    }
+
+    #[test]
+    fn each_taste_mode_fills_no_more_than_its_share_of_the_rail() {
+        // Seven loved films to two loved anime: thirty strong film candidates loved beside
+        // several loved titles, ten weaker anime ones loved beside one. Without quotas the
+        // films take all eight; with them the anime get the share the profile gives them.
+        let mut c: Vec<Candidate> = (1..=30)
+            .map(|i| Candidate {
+                near: Some((0, 0.8)),
+                loved_with: vec![(901, 0.3), (902, 0.3), (903, 0.3)],
+                ..film(i)
+            })
+            .collect();
+        c.extend((100..110).map(|i| Candidate {
+            near: Some((1, 0.8)),
+            loved_with: vec![(904, 0.29)],
+            ..film(i)
+        }));
+        let anime = |rail: &[Pick]| rail.iter().filter(|p| p.id >= 100).count();
+        assert_eq!(anime(&rank(&c, &WEIGHTS, &CAPS, 0.0, &[], 8)), 0);
+        let shares = [7.0 / 9.0, 2.0 / 9.0];
+        assert_eq!(quotas(&shares, 8), vec![6, 2]);
+        let rail = rank(&c, &WEIGHTS, &CAPS, 0.0, &shares, 8);
+        assert_eq!(rail.len(), 8);
+        assert_eq!(anime(&rail), 2, "{rail:?}");
+        // Only one mode has candidates left: its quota gives way rather than leave the
+        // rail short.
+        let films_only: Vec<Candidate> = c.iter().filter(|x| x.id < 100).cloned().collect();
+        assert_eq!(rank(&films_only, &WEIGHTS, &CAPS, 0.0, &shares, 8).len(), 8);
+        // A mode the rail cannot hold a share of still gets one slot.
+        assert_eq!(quotas(&[0.98, 0.02], 20), vec![19, 1]);
+        assert_eq!(quotas(&[7.0, 2.0], 20).iter().sum::<usize>(), 20);
+        assert_eq!(quotas(&[], 20), Vec::<usize>::new());
     }
 
     #[test]
@@ -413,7 +565,7 @@ mod tests {
             near: Some((0, 0.4)),
             ..film(i)
         }));
-        let rail = rank(&c, &WEIGHTS, &CAPS, 0.0, 20);
+        let rail = rank(&c, &WEIGHTS, &CAPS, 0.0, &[], 20);
         let ids: Vec<i64> = rail.iter().map(|p| p.id).collect();
         assert_eq!(
             ids.iter().filter(|i| (1..=6).contains(*i)).count(),
@@ -464,12 +616,12 @@ mod tests {
             ..film(4)
         };
         let c = [first, copy, other, weak];
-        let plain: Vec<i64> = rank(&c, &WEIGHTS, &CAPS, 0.0, 2)
+        let plain: Vec<i64> = rank(&c, &WEIGHTS, &CAPS, 0.0, &[], 2)
             .iter()
             .map(|p| p.id)
             .collect();
         assert_eq!(plain, vec![1, 2]);
-        let varied: Vec<i64> = rank(&c, &WEIGHTS, &CAPS, DIVERSITY, 2)
+        let varied: Vec<i64> = rank(&c, &WEIGHTS, &CAPS, DIVERSITY, &[], 2)
             .iter()
             .map(|p| p.id)
             .collect();
@@ -502,6 +654,7 @@ mod tests {
             &WEIGHTS,
             &CAPS,
             0.0,
+            &[],
             3,
         )
         .iter()
@@ -521,13 +674,16 @@ mod tests {
                 loved_with: (0..(i % 5))
                     .map(|k| (1_000 + k, ((i + k) % 7) as f32 / 7.0))
                     .collect(),
+                made_by: (0..(i % 4))
+                    .map(|k| (2_000 + k, 3_000 + (i + k) % 3))
+                    .collect(),
                 votes: (i * 9_973) % 2_000_000,
                 year: Some(1950 + i % 70),
                 directors: vec![i % 40],
                 ..Default::default()
             })
             .collect();
-        let rail = rank(&candidates, &WEIGHTS, &CAPS, DIVERSITY, 60);
+        let rail = rank(&candidates, &WEIGHTS, &CAPS, DIVERSITY, &[], 60);
         assert_eq!(rail.len(), 60);
         for pick in &rail {
             let c = candidates.iter().find(|c| c.id == pick.id).unwrap();
@@ -539,9 +695,51 @@ mod tests {
                     }
                 }
                 Reason::Mode(m) => assert_eq!(c.near.map(|(mode, _)| mode), Some(*m), "{pick:?}"),
+                Reason::MadeBy { person, loved } => {
+                    assert!(!loved.is_empty() && loved.len() <= 2);
+                    for l in loved {
+                        assert!(c.made_by.contains(&(*l, *person)), "{pick:?}");
+                    }
+                }
                 Reason::Popular => {}
             }
         }
+    }
+
+    #[test]
+    fn a_title_nobody_has_rated_reaches_the_profile_through_its_maker() {
+        // ADR-0054 step 5: a new film with no neighbours and a weak vector, by the director
+        // of two loved films, among candidates close to a mode. It enters the rail, and
+        // says who made it and what of theirs the profile loved.
+        let mut c: Vec<Candidate> = (1..=20)
+            .map(|i| Candidate {
+                near: Some((0, 0.5)),
+                ..film(i)
+            })
+            .collect();
+        c.push(Candidate {
+            near: Some((0, 0.3)),
+            made_by: vec![(901, 77), (902, 77), (903, 78)],
+            year: Some(2026),
+            ..film(100)
+        });
+        let rail = rank(&c, &WEIGHTS, &CAPS, 0.0, &[], 5);
+        let new = rail.iter().find(|p| p.id == 100).expect("in the rail");
+        assert_eq!(
+            new.reason,
+            Reason::MadeBy {
+                person: 77,
+                loved: vec![901, 902]
+            }
+        );
+        // With no weight on it, the maker does not lift it past the closer ones.
+        let none = Weights {
+            people: 0.0,
+            ..WEIGHTS
+        };
+        assert!(!rank(&c, &none, &CAPS, 0.0, &[], 5)
+            .iter()
+            .any(|p| p.id == 100));
     }
 
     #[test]
@@ -579,7 +777,7 @@ mod tests {
             })
             .collect();
         let started = std::time::Instant::now();
-        let rail = rank(&candidates, &WEIGHTS, &CAPS, DIVERSITY, 20);
+        let rail = rank(&candidates, &WEIGHTS, &CAPS, DIVERSITY, &[], 20);
         assert_eq!(rail.len(), 20);
         assert!(
             started.elapsed().as_millis() < 1_000,

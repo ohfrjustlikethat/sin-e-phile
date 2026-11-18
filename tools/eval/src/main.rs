@@ -161,6 +161,10 @@ async fn main() {
                     limit,
                     asked,
                     caps,
+                    !args.iter().any(|a| a == "--uncalibrated"),
+                    args.iter()
+                        .any(|a| a == "--people")
+                        .then(|| list("--people", &[0.0])),
                 )
                 .await
             } else {

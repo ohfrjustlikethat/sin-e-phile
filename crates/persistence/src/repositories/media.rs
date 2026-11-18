@@ -9,6 +9,9 @@ use sqlx::Row;
 
 use crate::db::{Db, DbError};
 
+/// Where [`MediaRepository::keep_rising`] keeps its list (settings).
+pub const RISING_KEY: &str = "catalogue.rising";
+
 /// Genres a kids profile never shows, whatever else a title is filed under.
 const KIDS_EXCLUDED: &str = "'Adult', 'Horror', 'Thriller', 'Crime', 'War', 'Film-Noir'";
 use crate::model::{IdSource, MediaItem, MediaKind, NewMediaItem, Title, TitleVariant};
@@ -347,6 +350,113 @@ impl<'a> MediaRepository<'a> {
                     character: (!character.is_empty()).then_some(character),
                 },
             )
+            .collect())
+    }
+
+    /// The other work of whoever directed or created `loved`, newest first, at most
+    /// `per_person` each: (loved title, person, their name, other title). How a title nobody
+    /// has rated yet reaches a profile that loved its maker's earlier ones (ADR-0054 step 5).
+    pub async fn made_alike(
+        &self,
+        loved: &[i64],
+        per_person: i64,
+    ) -> Result<Vec<(i64, i64, String, i64)>, DbError> {
+        let mut out = Vec::new();
+        for chunk in loved.chunks(500) {
+            let marks = vec!["?"; chunk.len()].join(",");
+            let sql = format!(
+                "WITH makers AS (
+                     SELECT DISTINCT media_item_id AS loved, person_id FROM credits
+                      WHERE role IN ('director', 'creator') AND media_item_id IN ({marks})),
+                 works AS (
+                     SELECT k.person_id, c.media_item_id AS title,
+                            ROW_NUMBER() OVER (PARTITION BY k.person_id
+                                ORDER BY m.release_year IS NULL, m.release_year DESC, m.id DESC)
+                                AS newest
+                       FROM (SELECT DISTINCT person_id FROM makers) k
+                       JOIN credits c ON c.person_id = k.person_id
+                                     AND c.role IN ('director', 'creator')
+                       JOIN media_items m ON m.id = c.media_item_id AND m.kind <> 'episode')
+                 SELECT mk.loved, mk.person_id, p.name, w.title
+                   FROM makers mk
+                   JOIN works w ON w.person_id = mk.person_id AND w.newest <= ?
+                   JOIN people p ON p.id = mk.person_id
+                  WHERE w.title <> mk.loved
+                  ORDER BY mk.loved, mk.person_id, w.newest"
+            );
+            let mut query = sqlx::query_as::<_, (i64, i64, String, i64)>(&sql);
+            for id in chunk {
+                query = query.bind(id);
+            }
+            out.extend(query.bind(per_person).fetch_all(self.db.pool()).await?);
+        }
+        Ok(out)
+    }
+
+    /// What gained the most votes in its last change, among titles whose count changed in
+    /// the last `days`, films and series, not adult, with at least `min_votes`: (title,
+    /// votes gained). Rising now (ADR-0054 step 6, migration 0032).
+    pub async fn rising(
+        &self,
+        days: i64,
+        min_votes: i64,
+        limit: i64,
+    ) -> Result<Vec<(i64, i64)>, DbError> {
+        Ok(sqlx::query_as(
+            "SELECT id, rating_votes - previous_votes AS gained
+               FROM media_items INDEXED BY idx_media_items_votes_changed
+              WHERE previous_votes IS NOT NULL
+                AND votes_changed_at >= datetime('now', '-' || ?1 || ' days')
+                AND rating_votes >= ?2 AND rating_votes > previous_votes AND is_adult = 0
+                AND kind IN ('film', 'anime_film', 'series', 'anime_series')
+              ORDER BY gained DESC, id LIMIT ?3",
+        )
+        .bind(days)
+        .bind(min_votes)
+        .bind(limit)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
+    /// Work out what is rising after a ratings refresh and keep it, best first, so Home
+    /// reads a list rather than ranking every changed title (a refresh changes hundreds of
+    /// thousands). Returns how many were kept.
+    pub async fn keep_rising(
+        &self,
+        days: i64,
+        min_votes: i64,
+        kept: i64,
+    ) -> Result<usize, DbError> {
+        let rising = self.rising(days, min_votes, kept).await?;
+        let value = rising
+            .iter()
+            .map(|(id, gained)| format!("{id}:{gained}"))
+            .collect::<Vec<_>>()
+            .join(",");
+        sqlx::query(
+            "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
+             ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')",
+        )
+        .bind(RISING_KEY)
+        .bind(value)
+        .execute(self.db.pool())
+        .await?;
+        Ok(rising.len())
+    }
+
+    /// What [`MediaRepository::keep_rising`] kept: (title, votes gained), best first.
+    pub async fn kept_rising(&self) -> Result<Vec<(i64, i64)>, DbError> {
+        let value: Option<String> = sqlx::query_scalar("SELECT value FROM settings WHERE key = ?")
+            .bind(RISING_KEY)
+            .fetch_optional(self.db.pool())
+            .await?;
+        Ok(value
+            .unwrap_or_default()
+            .split(',')
+            .filter_map(|pair| {
+                let (id, gained) = pair.split_once(':')?;
+                Some((id.parse().ok()?, gained.parse().ok()?))
+            })
             .collect())
     }
 

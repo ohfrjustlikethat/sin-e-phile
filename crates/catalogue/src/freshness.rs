@@ -168,6 +168,12 @@ pub async fn refresh_if_stale(
 /// Where the outcome of the last refresh that did something is kept, for Settings.
 pub const LAST_REFRESH: &str = "catalogue.last_refresh";
 
+/// Rising now: titles whose count changed in the last two days (this refresh's changes,
+/// whenever the last launch was), with at least a thousand votes, the best two hundred.
+pub const RISING_DAYS: i64 = 2;
+pub const RISING_MIN_VOTES: i64 = 1_000;
+pub const RISING_KEPT: i64 = 200;
+
 /// `refresh_if_stale`, or with `force` a refresh whatever the publisher says ("refresh
 /// now" in Settings).
 ///
@@ -257,6 +263,14 @@ async fn finish(db: &Db, datasets: &std::path::Path) -> Outcome {
         .await
     {
         tracing::warn!(%error, "refreshed, but could not record when");
+    }
+    // Rising now (ADR-0054 step 6): what gained most in this refresh, kept for Home.
+    match sinephile_persistence::repositories::MediaRepository::new(db)
+        .keep_rising(RISING_DAYS, RISING_MIN_VOTES, RISING_KEPT)
+        .await
+    {
+        Ok(n) => tracing::info!(rising = n, "rising now kept"),
+        Err(error) => tracing::warn!(%error, "rising now not kept"),
     }
     Outcome::Refreshed {
         titles_added: titles,
