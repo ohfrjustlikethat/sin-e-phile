@@ -3291,3 +3291,18 @@ holds 119,874 titles; the catalogue has 874,755 core titles.
 - After the three, the companion graph holds 374 vectors in 298 KB. The waiting query takes 2.85 s over the core tier
   (logged as slow; once a launch, in the background). Doctor Who has no IMDb link on Wikidata for its id, so only a
   TMDB key describes it.
+
+### 17.6: live neighbours on the copy (2026-11-18)
+
+`ingest --data-dir <copy> neighbours --live` (`sinephile_catalogue::live::at_launch`), real AniList, no TMDB key, the
+copy's profile given two loved anime (One Punch Man, Solo Leveling) beside its films: AniList asked about 2 titles,
+16 rows. One Punch Man's first are Mob Psycho 100 (0.288, MovieLens' mean at rank 1) and Mashle (0.248); Solo
+Leveling's, Sword Art Online and Tower of God. A second run asks nothing (a week has not passed).
+
+**What it showed about the ranker.** `eval recommend --rail 1` (now opening both graphs, as the app does): the same
+twenty arthouse films and no anime, though two of the profile's nine loved titles are anime. The loved part sums a
+candidate's neighbour scores over the loved titles, so a film loved beside four of the profile's films outscores an
+anime recommended beside one; with seven films to two anime, the larger taste takes every slot. Recall@20 does not see
+it (it rewards the majority). Calibration (a rail's mix of taste modes matching the profile's, Steck 2018) is the
+remedy, measured against E1-E3 before it is kept. Home built in 63-96 ms warm (368 ms on the first, cold, read after
+migration 0031 rewrote the table).

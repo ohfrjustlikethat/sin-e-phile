@@ -24,6 +24,20 @@ use crate::error::EvalError;
 /// number into a keyword-only measurement wearing a hybrid label — so the caller prints
 /// which one it got.
 pub(crate) fn engine(data_dir: &Path) -> Result<(Engine, bool), EvalError> {
+    engine_with(data_dir, VectorIndex::view)
+}
+
+/// The engine as the application opens it: the published graph and the companion of
+/// titles given meaning since (ADR-0054). For what a person would see, not for recall,
+/// whose exact answer is the published artefact alone.
+pub(crate) fn engine_as_app(data_dir: &Path) -> Result<(Engine, bool), EvalError> {
+    engine_with(data_dir, VectorIndex::open)
+}
+
+fn engine_with(
+    data_dir: &Path,
+    open: fn(&Path) -> Result<VectorIndex, sinephile_vector_index::VectorIndexError>,
+) -> Result<(Engine, bool), EvalError> {
     let models = Path::new("models");
     let model = models.join(sinephile_catalogue::assets::MODEL_FILE);
     let tokenizer = models.join(sinephile_catalogue::assets::TOKENIZER_FILE);
@@ -35,7 +49,7 @@ pub(crate) fn engine(data_dir: &Path) -> Result<(Engine, bool), EvalError> {
 
     let embedder = sinephile_embedder::Embedder::pinned(&model, &tokenizer)
         .map_err(|e| EvalError::Missing(e.to_string()))?;
-    let index = VectorIndex::view(&index)?;
+    let index = open(&index)?;
     Ok((Engine::hybrid(Semantic { index, embedder }), true))
 }
 

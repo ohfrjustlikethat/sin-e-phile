@@ -229,6 +229,52 @@ impl<'a> MediaRepository<'a> {
             .collect()
     }
 
+    /// Each of `items`' id at `source`, those that have one (ADR-0054: the titles a live
+    /// source is asked about, by its own ids).
+    pub async fn external_ids_of(
+        &self,
+        source: IdSource,
+        items: &[i64],
+    ) -> Result<HashMap<i64, String>, DbError> {
+        let mut out = HashMap::new();
+        for chunk in items.chunks(500) {
+            let marks = vec!["?"; chunk.len()].join(",");
+            let sql = format!(
+                "SELECT media_item_id, external_id FROM external_ids
+                 WHERE source = ? AND media_item_id IN ({marks})"
+            );
+            let mut query = sqlx::query_as::<_, (i64, String)>(&sql).bind(source.as_str());
+            for id in chunk {
+                query = query.bind(id);
+            }
+            out.extend(query.fetch_all(self.db.pool()).await?);
+        }
+        Ok(out)
+    }
+
+    /// The catalogue item behind each of `ids` at `source`, those the catalogue holds: a
+    /// live source answers in its own ids.
+    pub async fn items_by_external(
+        &self,
+        source: IdSource,
+        ids: &[String],
+    ) -> Result<HashMap<String, i64>, DbError> {
+        let mut out = HashMap::new();
+        for chunk in ids.chunks(500) {
+            let marks = vec!["?"; chunk.len()].join(",");
+            let sql = format!(
+                "SELECT external_id, media_item_id FROM external_ids
+                 WHERE source = ? AND external_id IN ({marks})"
+            );
+            let mut query = sqlx::query_as::<_, (String, i64)>(&sql).bind(source.as_str());
+            for id in chunk {
+                query = query.bind(id);
+            }
+            out.extend(query.fetch_all(self.db.pool()).await?);
+        }
+        Ok(out)
+    }
+
     /// This item's id at one external source (`imdb`, `tmdb`, `anilist`, …).
     pub async fn external_id(
         &self,

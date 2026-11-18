@@ -43,6 +43,8 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            MovieLens' rolling release when it changed, join it, and
                            store each title's best 50 neighbours. --ml25m builds from
                            the fixed ml-25m.zip in datasets/ (the evaluation's set).
+  ingest neighbours --live AniList's and TMDB's recommendations for what each profile
+                           loved, each title once a week (what the app does hourly).
   ingest meaning           what the app does after every launch's check (ADR-0054):
                            up to 2,000 titles the catalogue gained since the published
                            meaning file get a synopsis and a vector in the companion
@@ -172,6 +174,16 @@ async fn main() -> Result<(), JobError> {
                 .and_then(|s| sinephile_catalogue::movielens::Release::parse(s))
                 .unwrap_or(sinephile_catalogue::movielens::Release::Ml25m);
             movielens(&db, &dir.join("datasets"), set).await
+        }
+        "neighbours" if args.iter().any(|a| a == "--live") => {
+            let transport: std::sync::Arc<dyn sinephile_metadata_api::Transport> =
+                std::sync::Arc::new(sinephile_metadata_api::HttpTransport::new());
+            let r = sinephile_catalogue::live::at_launch(&db, transport).await?;
+            println!(
+                "live neighbours: AniList asked about {} titles, {} rows; TMDB asked about {}, {} rows",
+                r.anilist_asked, r.anilist_rows, r.tmdb_asked, r.tmdb_rows
+            );
+            Ok(())
         }
         "neighbours" => {
             neighbours(

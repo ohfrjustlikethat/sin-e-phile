@@ -58,6 +58,8 @@ struct Found {
 
 #[derive(Deserialize)]
 struct Posted {
+    #[serde(default)]
+    id: Option<i64>,
     poster_path: Option<String>,
     #[serde(default)]
     backdrop_path: Option<String>,
@@ -194,6 +196,44 @@ impl Tmdb {
             .filter(|o| !o.is_empty()))
     }
 
+    /// A title's own TMDB id by its IMDb id, and whether TMDB files it as a film or a series
+    /// (their ids are separate spaces).
+    pub async fn find(&self, imdb_id: &str) -> Result<Option<(Now, i64)>, TmdbError> {
+        if !is_imdb_id(imdb_id) {
+            return Ok(None);
+        }
+        let body = self
+            .get(&format!("/find/{imdb_id}?external_source=imdb_id"))
+            .await?;
+        let f: Found = serde_json::from_str(&body)
+            .map_err(|e| TmdbError::Unavailable(format!("find: {e}")))?;
+        Ok(f.movie_results
+            .into_iter()
+            .find_map(|p| p.id)
+            .map(|id| (Now::Films, id))
+            .or_else(|| {
+                f.tv_results
+                    .into_iter()
+                    .find_map(|p| p.id)
+                    .map(|id| (Now::Series, id))
+            }))
+    }
+
+    /// What TMDB recommends beside a title (ADR-0054 step 3, the profile's own key): its
+    /// first page, best first, as TMDB ids of the same kind.
+    pub async fn recommendations(&self, what: Now, tmdb_id: i64) -> Result<Vec<i64>, TmdbError> {
+        let kind = match what {
+            Now::Films => "movie",
+            Now::Series => "tv",
+        };
+        let body = self
+            .get(&format!("/{kind}/{tmdb_id}/recommendations?page=1"))
+            .await?;
+        let page: Page = serde_json::from_str(&body)
+            .map_err(|e| TmdbError::Unavailable(format!("recommendations: {e}")))?;
+        Ok(page.results.into_iter().map(|r| r.id).collect())
+    }
+
     /// What is showing now, as IMDb ids, in TMDB's order (most popular first).
     pub async fn now_imdb(&self, what: Now, pages: u32) -> Result<Vec<String>, TmdbError> {
         let mut out = Vec::new();
@@ -255,6 +295,35 @@ mod tests {
             asked[0].starts_with("https://api.themoviedb.org/3/movie/now_playing?page=1&api_key=")
         );
         assert!(asked[1].contains("/movie/11/external_ids?api_key="));
+    }
+
+    #[tokio::test]
+    async fn a_title_is_found_then_its_recommendations_are_asked() {
+        let fake = Arc::new(FakeTransport::new());
+        fake.push(Response::new(200, r#"{"results":[{"id":31},{"id":32}]}"#));
+        fake.push(Response::new(
+            200,
+            r#"{"movie_results":[],"tv_results":[{"id":77,"poster_path":null}]}"#,
+        ));
+        let tmdb = client(&fake);
+        let found = tmdb.find("tt0000001").await.unwrap();
+        assert_eq!(found, Some((Now::Series, 77)));
+        let (what, id) = found.unwrap();
+        assert_eq!(tmdb.recommendations(what, id).await.unwrap(), vec![31, 32]);
+        let asked: Vec<String> = fake
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|r| r.url.clone())
+            .collect();
+        assert!(asked[1]
+            .starts_with("https://api.themoviedb.org/3/tv/77/recommendations?page=1&api_key="));
+        assert_eq!(
+            tmdb.find("nm0000001").await.unwrap(),
+            None,
+            "not an IMDb id"
+        );
     }
 
     #[tokio::test]

@@ -289,6 +289,87 @@ impl<'a> AniList<'a> {
             .collect())
     }
 
+    /// Up to 50 anime's community recommendations (ADR-0054 step 3, no key): for each, the
+    /// titles its people recommend with their vote, best first, at most ten, leaving out the
+    /// ones voted down.
+    pub async fn recommendations(
+        &self,
+        ids: &[i64],
+    ) -> Result<Vec<(i64, Vec<(i64, i64)>)>, AniListError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let ids = &ids[..ids.len().min(50)];
+        let query = "query ($ids: [Int]) { Page(perPage: 50) { \
+                     media(id_in: $ids, type: ANIME) { id \
+                     recommendations(sort: RATING_DESC, perPage: 10) { \
+                     nodes { rating mediaRecommendation { id } } } } } }";
+        let variables = serde_json::json!({ "ids": ids }).to_string();
+        let body = format!(
+            r#"{{"query":{},"variables":{variables}}}"#,
+            json_string(query)
+        );
+        let response = self.execute(&body).await?;
+
+        #[derive(Deserialize)]
+        struct Target {
+            id: i64,
+        }
+        #[derive(Deserialize)]
+        struct Node {
+            rating: Option<i64>,
+            #[serde(rename = "mediaRecommendation")]
+            target: Option<Target>,
+        }
+        #[derive(Deserialize)]
+        struct Nodes {
+            nodes: Vec<Node>,
+        }
+        #[derive(Deserialize)]
+        struct Recommended {
+            id: i64,
+            recommendations: Option<Nodes>,
+        }
+        #[derive(Deserialize)]
+        struct Fifty {
+            media: Vec<Recommended>,
+        }
+        #[derive(Deserialize)]
+        struct Data {
+            #[serde(rename = "Page")]
+            page: Fifty,
+        }
+        let parsed: GraphQlResponse<Data> = serde_json::from_str(&response.body)
+            .map_err(|e| AniListError::Shape(format!("{e}: {}", truncate(&response.body))))?;
+        if let Some(errors) = parsed.errors {
+            return Err(AniListError::Api(
+                errors
+                    .iter()
+                    .map(|e| e.message.as_str())
+                    .collect::<Vec<_>>()
+                    .join("; "),
+            ));
+        }
+        Ok(parsed
+            .data
+            .map(|d| d.page.media)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|m| {
+                let mut recs: Vec<(i64, i64)> = m
+                    .recommendations
+                    .map(|r| r.nodes)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter_map(|n| Some((n.target?.id, n.rating.unwrap_or(0))))
+                    .filter(|(_, rating)| *rating > 0)
+                    .collect();
+                recs.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+                (m.id, recs)
+            })
+            .collect())
+    }
+
     /// One title by MyAnimeList id — the cross-mapping AniList gives away free.
     pub async fn media_by_mal(&self, mal_id: i64) -> Result<Option<Media>, AniListError> {
         let query =

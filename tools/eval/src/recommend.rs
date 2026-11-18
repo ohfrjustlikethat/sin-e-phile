@@ -612,7 +612,7 @@ pub async fn whole(
 /// shows eight), and what the case study quotes. Run it on a copy (`SINEPHILE_DATA_DIR`):
 /// Home keeps the profile's taste model in its cache.
 pub async fn rail(data_dir: &Path, profile: i64) -> Result<bool, EvalError> {
-    let (mut engine, hybrid) = crate::search::engine(data_dir)?;
+    let (mut engine, hybrid) = crate::search::engine_as_app(data_dir)?;
     if !hybrid {
         println!("rail: no meaning index here, and the taste rail needs one");
         return Ok(false);

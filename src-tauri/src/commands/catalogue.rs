@@ -195,6 +195,7 @@ pub async fn keep_current(app: AppHandle) {
     loop {
         start(app.clone(), false);
         showing_now(&app).await;
+        live_neighbours(&app).await;
         if last_airing.is_none_or(|t| t.elapsed() >= AIRING_EVERY) {
             last_airing = Some(std::time::Instant::now());
             airing(&app).await;
@@ -236,6 +237,23 @@ fn today() -> String {
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs() as i64);
     sinephile_subtitles::utc_day(secs)
+}
+
+/// AniList's and TMDB's recommendations beside MovieLens for what each profile loved, each
+/// title a week apart (ADR-0054 step 3, `sinephile_catalogue::live`). Hourly, so a title
+/// loved today is asked about within the hour.
+async fn live_neighbours(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let Some(db) = state.db() else { return };
+    match sinephile_catalogue::live::at_launch(&db, state.http.clone()).await {
+        Ok(report) => {
+            tracing::info!(?report, "live neighbours");
+            if report.anilist_rows + report.tmdb_rows > 0 {
+                let _ = app.emit("catalogue-refreshed", ());
+            }
+        }
+        Err(error) => tracing::warn!(%error, "live neighbours stopped; the next check resumes"),
+    }
 }
 
 /// For each profile with its own key, what is showing now, once a day.

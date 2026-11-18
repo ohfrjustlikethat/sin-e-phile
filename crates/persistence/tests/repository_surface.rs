@@ -2645,3 +2645,52 @@ async fn neighbour_sources_surface() {
     assert_eq!(repo.titles().await.unwrap(), 1);
     assert_eq!(repo.of(f[0], 10).await.unwrap(), vec![(f[4], 0.3)]);
 }
+
+#[tokio::test]
+async fn external_ids_in_batches_surface() {
+    // ADR-0054 step 3: a live source asked by its own ids, answering in them.
+    use sinephile_persistence::IdSource;
+    let db = Db::in_memory().await.expect("open");
+    let media = MediaRepository::new(&db);
+    let a = media.insert(&NewMediaItem::film("A", 2001)).await.unwrap();
+    let b = media.insert(&NewMediaItem::film("B", 2002)).await.unwrap();
+    let c = media.insert(&NewMediaItem::film("C", 2003)).await.unwrap();
+    media
+        .add_external_id(a, IdSource::Anilist, "11", 1.0)
+        .await
+        .unwrap();
+    media
+        .add_external_id(b, IdSource::Anilist, "12", 1.0)
+        .await
+        .unwrap();
+    media
+        .add_external_id(b, IdSource::Imdb, "tt0000012", 1.0)
+        .await
+        .unwrap();
+
+    // external_ids_of: those that have one at that source
+    let of = media
+        .external_ids_of(IdSource::Anilist, &[a, b, c])
+        .await
+        .unwrap();
+    assert_eq!(of.len(), 2);
+    assert_eq!(of[&a], "11");
+    assert_eq!(of[&b], "12");
+
+    // items_by_external: those the catalogue holds
+    let by = media
+        .items_by_external(
+            IdSource::Anilist,
+            &["12".to_string(), "99".to_string(), "11".to_string()],
+        )
+        .await
+        .unwrap();
+    assert_eq!(by.len(), 2);
+    assert_eq!(by["11"], a);
+    assert_eq!(by["12"], b);
+    assert!(media
+        .items_by_external(IdSource::Imdb, &["12".to_string()])
+        .await
+        .unwrap()
+        .is_empty());
+}
