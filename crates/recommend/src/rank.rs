@@ -74,7 +74,9 @@ pub struct Weights {
 pub const WEIGHTS: Weights = Weights {
     near: 1.0,
     loved: 0.5,
-    people: 0.25,
+    // By the rule fixed before its run (docs/eval-results.md, 17.6): 0.1 had the best recall
+    // on 2,000 tuning users, 0 within noise of it; 0.25 lost a twentieth of it.
+    people: 0.1,
     popular: 0.0,
     axes: 0.2,
     playable: 0.1,
@@ -718,7 +720,7 @@ mod tests {
             })
             .collect();
         c.push(Candidate {
-            near: Some((0, 0.3)),
+            near: Some((0, 0.4)),
             made_by: vec![(901, 77), (902, 77), (903, 78)],
             year: Some(2026),
             ..film(100)

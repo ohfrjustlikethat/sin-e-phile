@@ -3329,3 +3329,17 @@ follows the profile's: on the copy, a profile of seven films and two anime got 1
 --limit 2000` on tuning users, calibrated; the weight with the best Recall@20; two within 0.002 of each other count as
 equal, and the larger is taken, because what the part is for (a title nobody has rated) is what held-out MovieLens likes
 cannot measure.
+
+**The maker's weight, by that rule** (`eval recommend --whole --tune --people 0,0.1,0.25,0.5 --limit 2000`, on 95e17cc's
+code, calibrated, 2,000 tuning users; ranking p95 7.52 ms with a build beside it):
+
+| people | Recall@20 | against popularity | coverage | ILD |
+|---|---|---|---|---|
+| 0 | 0.2700 | +65.9% | 16.3% | 0.418 |
+| **0.1** | **0.2705** | **+66.2%** | **16.9%** | 0.418 |
+| 0.25 | 0.2566 | +57.6% | 20.1% | 0.418 |
+| 0.5 | 0.1812 | +11.3% | 24.0% | 0.420 |
+
+0.1 is best, and 0 is within 0.002 of it (equal by the rule, so the larger): **people 0.1**. A heavier weight fills the
+rail with a loved director's other work, which MovieLens' held-out likes reward less and less. (Coverage here is over
+2,000 users; it grows with the number of users judged, so it is not comparable with the test run's 15,640.)
