@@ -2583,3 +2583,26 @@ download again); the archive is deleted after a build, whatever its outcome. **S
 0.1) and diversity 0.3, to be tuned on MovieLens' tuning users in 17.4; "playable" means in the library, since what a
 source can play is only known when it is asked; a mode's reason names its two strongest loved titles. **Spec
 amendments:** none.
+
+## 2026-11-18 — 17.4: the whole recommender, judged; E1-E4 met
+
+- **`eval recommend --whole`** judges the app's own gathering and ranker on MovieLens users the matrix never learned
+  from: the matrix rebuilt in the harness from the build users onto catalogue titles, each judged user's shown likes a
+  profile, their held-out likes the answer. The rail was split at the neighbour seam (`loved_with` reads the stored
+  matrix, `candidates` takes neighbours given) so the harness and the app share every other line.
+- **The variety step was slow** (26 ms for a thousand candidates): each candidate's closeness to the nearest pick is now
+  kept as picks are made, identical results, about 1-4 ms.
+- **The whole recommender first found fewer favourites than the matrix alone** (+49% against +72%), whatever the
+  weights. A/B on the same 1,000 tuning users found two structural causes: only 60 loved titles were asked for
+  neighbours, and caps of one per franchise and three per year. Asking 500 and caps of 2/2/5: +71.7%.
+- **Tuned on the tuning users only**: 108 settings, then a coverage check over all 15,671 by a rule fixed before it ran
+  (coverage at least 16%): near 1, loved 0.5, popular 0, diversity 0.15. A reason rule was fixed on the way (closeness
+  counted only above "unrelated").
+- **The test users, once**: Recall@20 0.2834 against popularity 0.1641 (+72.7%, E1), coverage 16.6% (E2), no rail over a
+  cap and variety above the score order's (E3), reasons truthful (E4). E5 measured on this machine (p95 3.94 ms against
+  150 ms); its Tier 0 run is for the author batch. Each verdict seen to fail.
+
+**Decisions taken (none reserved):** caps of two per director, two per franchise and five per year, "dominated" read as
+more than a quarter of a rail; up to 500 loved titles asked; popularity enters as candidates but not as a push; the
+tuning rule for coverage stated before its run; E5 stays open until a Tier 0 machine measures it. **Spec amendments:**
+none.

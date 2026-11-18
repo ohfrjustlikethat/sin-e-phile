@@ -21,8 +21,8 @@
       {
         "id": "17.2",
         "text": "Layer 1 and Layer 3, the hybrid ranker: about 1,000 candidates cheaply (each taste mode's nearest in embedding space, the CF neighbours of what was liked, the popularity pool), scored by a blend of content similarity, CF, the popularity prior, the axes (boosts) and avoids (penalties), availability and freshness; maximal marginal relevance with caps per director, franchise and year; ranking 1,000 candidates timed (E5, under 150 ms).",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "c183f27"
       },
       {
         "id": "17.3",
@@ -33,8 +33,8 @@
       {
         "id": "17.4",
         "text": "fixtures/recommender/ and eval recommend: Recall@20 against popularity on a held-out split (E1, more than 40% relative), catalogue coverage over the users (E2, above 15%), intra-list diversity against a documented target and no rail dominated by one director, franchise or year (E3), ranking time (E5); seen to fail for each.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "c183f27"
       },
       {
         "id": "17.6",
@@ -53,32 +53,32 @@
       {
         "id": "E1",
         "text": "Recall@20 beats a popularity baseline by > 40% relative on a held-out split — i.e. `(recall_model / recall_baseline) - 1 > 0.40`, not 40 percentage points.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "c183f27 (2026-11-18): cargo run --release -p eval -- recommend --whole over MovieLens' 15,640 test users (a hash split; the matrix rebuilt from the build users only, the app's own gathering and ranker): Recall@20 0.2834 against popularity 0.1641, +72.7% relative (> 40%). Weights chosen on the tuning users only (--tune over 108 settings on 2,000, then --check over all 15,671). The verdict seen to fail: the matrix harness reports alpha 0.9 at -58.6%. docs/eval-results.md 'The whole recommender'."
       },
       {
         "id": "E2",
         "text": "Catalogue coverage > 15% — the recommender does not only ever surface the same 2,000 films.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "c183f27: cargo run --release -p eval -- recommend --whole, test users: coverage 16.6% of the 18,377 titles the build users liked five times or more (> 15%); tuning users 16.7% under the same setting, chosen by a rule fixed before it ran (coverage at least 16% over every tuning user). Seen to fail: --whole --limit 300 reports 3.8%, NOT met."
       },
       {
         "id": "E3",
         "text": "Intra-list diversity meets the documented target; no rail is dominated by one director, franchise, or year.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "c183f27: cargo run --release -p eval -- recommend --whole, test users: no rail over the app's caps (two per director, two per franchise, five per year in twenty; docs/specs/recommender.md section 3 documents the target), intra-list diversity 0.407 against 0.404 for the same candidates in score order. Seen to fail: --whole --limit 300 --caps 20,20,20, 196 of 300 rails over the app's caps, NOT met. Unit: crates/recommend/src/rank.rs no_more_than_two_by_one_director_two_per_franchise_five_per_year (seen to fail with the cap check removed), diversity_passes_over_a_near_copy_of_what_is_already_picked."
       },
       {
         "id": "E4",
         "text": "Every recommendation has a truthful explanation.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "c183f27: a reason is built from the part that added most to the score and names only what is true: crates/recommend/src/rank.rs every_reason_names_something_true_of_the_candidate (a property over 300 mixed candidates, seen to fail with every Mode reason forced to mode 0); crates/taste/tests/hybrid.rs end to end over a real database (matrix-only titles say 'Loved by people who loved Stalker', meaning-only ones 'Close to Stalker and Solaris, which you loved'); crates/taste/src/hybrid.rs a_note_names_only_titles_the_profile_loved. Home's 'Where your taste points' carries each pick's reason as its card's note."
       },
       {
         "id": "E5",
         "text": "Ranking 1,000 candidates completes in < 150 ms on Tier 0.",
         "met": false,
-        "evidence": null
+        "evidence": "MEASURED, Tier 2 only: c183f27, cargo run --release -p eval -- recommend --whole: ranking one user's real candidates (median 925, at most 1,000), release build, p50 1.23 ms, p95 3.94 ms, max 6.48 ms (budget 150 ms on Tier 0; 38 times inside it here). The Tier 0 run is the author's hardware: asked in the batched checks. Was 26 ms before the variety step kept each candidate's closeness incrementally (db1370a)."
       },
       {
         "id": "E6",
@@ -1963,32 +1963,32 @@
         {
           "id": "E1",
           "text": "Recall@20 beats a popularity baseline by > 40% relative on a held-out split — i.e. `(recall_model / recall_baseline) - 1 > 0.40`, not 40 percentage points.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "c183f27 (2026-11-18): cargo run --release -p eval -- recommend --whole over MovieLens' 15,640 test users (a hash split; the matrix rebuilt from the build users only, the app's own gathering and ranker): Recall@20 0.2834 against popularity 0.1641, +72.7% relative (> 40%). Weights chosen on the tuning users only (--tune over 108 settings on 2,000, then --check over all 15,671). The verdict seen to fail: the matrix harness reports alpha 0.9 at -58.6%. docs/eval-results.md 'The whole recommender'."
         },
         {
           "id": "E2",
           "text": "Catalogue coverage > 15% — the recommender does not only ever surface the same 2,000 films.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "c183f27: cargo run --release -p eval -- recommend --whole, test users: coverage 16.6% of the 18,377 titles the build users liked five times or more (> 15%); tuning users 16.7% under the same setting, chosen by a rule fixed before it ran (coverage at least 16% over every tuning user). Seen to fail: --whole --limit 300 reports 3.8%, NOT met."
         },
         {
           "id": "E3",
           "text": "Intra-list diversity meets the documented target; no rail is dominated by one director, franchise, or year.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "c183f27: cargo run --release -p eval -- recommend --whole, test users: no rail over the app's caps (two per director, two per franchise, five per year in twenty; docs/specs/recommender.md section 3 documents the target), intra-list diversity 0.407 against 0.404 for the same candidates in score order. Seen to fail: --whole --limit 300 --caps 20,20,20, 196 of 300 rails over the app's caps, NOT met. Unit: crates/recommend/src/rank.rs no_more_than_two_by_one_director_two_per_franchise_five_per_year (seen to fail with the cap check removed), diversity_passes_over_a_near_copy_of_what_is_already_picked."
         },
         {
           "id": "E4",
           "text": "Every recommendation has a truthful explanation.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "c183f27: a reason is built from the part that added most to the score and names only what is true: crates/recommend/src/rank.rs every_reason_names_something_true_of_the_candidate (a property over 300 mixed candidates, seen to fail with every Mode reason forced to mode 0); crates/taste/tests/hybrid.rs end to end over a real database (matrix-only titles say 'Loved by people who loved Stalker', meaning-only ones 'Close to Stalker and Solaris, which you loved'); crates/taste/src/hybrid.rs a_note_names_only_titles_the_profile_loved. Home's 'Where your taste points' carries each pick's reason as its card's note."
         },
         {
           "id": "E5",
           "text": "Ranking 1,000 candidates completes in < 150 ms on Tier 0.",
           "met": false,
-          "evidence": null
+          "evidence": "MEASURED, Tier 2 only: c183f27, cargo run --release -p eval -- recommend --whole: ranking one user's real candidates (median 925, at most 1,000), release build, p50 1.23 ms, p95 3.94 ms, max 6.48 ms (budget 150 ms on Tier 0; 38 times inside it here). The Tier 0 run is the author's hardware: asked in the batched checks. Was 26 ms before the variety step kept each candidate's closeness incrementally (db1370a)."
         },
         {
           "id": "E6",
@@ -2013,8 +2013,8 @@
         {
           "id": "17.2",
           "text": "Layer 1 and Layer 3, the hybrid ranker: about 1,000 candidates cheaply (each taste mode's nearest in embedding space, the CF neighbours of what was liked, the popularity pool), scored by a blend of content similarity, CF, the popularity prior, the axes (boosts) and avoids (penalties), availability and freshness; maximal marginal relevance with caps per director, franchise and year; ranking 1,000 candidates timed (E5, under 150 ms).",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "c183f27"
         },
         {
           "id": "17.3",
@@ -2025,8 +2025,8 @@
         {
           "id": "17.4",
           "text": "fixtures/recommender/ and eval recommend: Recall@20 against popularity on a held-out split (E1, more than 40% relative), catalogue coverage over the users (E2, above 15%), intra-list diversity against a documented target and no rail dominated by one director, franchise or year (E3), ranking time (E5); seen to fail for each.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "c183f27"
         },
         {
           "id": "17.6",
@@ -2567,7 +2567,7 @@
       ]
     }
   ],
-  "next_action": "Phase 17, 17.4: extend tools/eval/src/recommend.rs from the matrix alone to the whole recommender. For each judged MovieLens user, map their shown likes onto catalogue ids (external_ids 'movielens'), build taste modes from those titles' vectors (sinephile_taste::modes::modes over the meaning index), gather and rank with crates/taste/src/hybrid.rs `rail` (the matrix built from ml-25m's build users only, so nothing judged is learned from), and measure Recall@20 against popularity (E1), coverage (E2), intra-list diversity and the caps (E3), and ranking time for 1,000 candidates (E5); tune rank::WEIGHTS and DIVERSITY on the tuning users first, then the test users once. Then a look at Home's taste rail in the real window, and 17.6 (ADR-0054).",
+  "next_action": "Phase 17: (1) 17.3, see Home's 'Where your taste points' in the real window: copy data/ to a scratch folder (SINEPHILE_DATA_DIR, never the author's), give a profile a few loved films, and check each card's reason; (2) 17.6 (ADR-0054), in this order: meaning vectors for titles a refresh adds (a companion index beside the published one, crates/vector-index/src/lib.rs has no insert), live AniList and TMDB neighbours stored beside MovieLens' by source (a source column on item_neighbours, migration 0030), people neighbours for an unrated title, IMDb's previous votes for a rising signal, each source's last update in Settings, and E7's end-to-end test; (3) 17.5, the case study docs/case-studies/recommender.md with the numbers in docs/eval-results.md.",
   "blockers": [
     {
       "id": "B16",
