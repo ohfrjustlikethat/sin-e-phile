@@ -3,6 +3,8 @@
 //! Every SQL statement in the application lives in a repository like this one.
 //! Callers get typed methods; nothing above this layer knows the schema exists.
 
+use std::collections::HashMap;
+
 use sqlx::Row;
 
 use crate::db::{Db, DbError};
@@ -31,6 +33,19 @@ pub struct Appearance {
     pub kind: String,
     pub role: String,
     pub character: Option<String>,
+}
+
+/// What the recommender weighs about a title, read for many titles at once (Phase 17).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Facts {
+    pub id: i64,
+    pub title: String,
+    pub year: Option<i64>,
+    pub runtime_minutes: Option<i64>,
+    pub votes: Option<i64>,
+    pub genres: Vec<String>,
+    /// (person id, name), billing order.
+    pub directors: Vec<(i64, String)>,
 }
 
 pub struct MediaRepository<'a> {
@@ -290,6 +305,65 @@ impl<'a> MediaRepository<'a> {
     }
 
     /// A title's genres, by name (Phase 15's taste axes).
+    /// [`Facts`] for each of `ids` the catalogue holds, in no particular order: a rail's
+    /// thousand candidates in three queries per 500 rather than three per title.
+    pub async fn facts(&self, ids: &[i64]) -> Result<Vec<Facts>, DbError> {
+        let mut out: HashMap<i64, Facts> = HashMap::with_capacity(ids.len());
+        for chunk in ids.chunks(500) {
+            let marks = vec!["?"; chunk.len()].join(",");
+            let sql = format!(
+                "SELECT id, primary_title, release_year, runtime_minutes, rating_votes
+                 FROM media_items WHERE id IN ({marks})"
+            );
+            let mut q =
+                sqlx::query_as::<_, (i64, String, Option<i64>, Option<i64>, Option<i64>)>(&sql);
+            for id in chunk {
+                q = q.bind(id);
+            }
+            for (id, title, year, runtime_minutes, votes) in q.fetch_all(self.db.pool()).await? {
+                out.insert(
+                    id,
+                    Facts {
+                        id,
+                        title,
+                        year,
+                        runtime_minutes,
+                        votes,
+                        ..Default::default()
+                    },
+                );
+            }
+            let sql = format!(
+                "SELECT mg.media_item_id, g.name FROM media_genres mg JOIN genres g ON g.id = mg.genre_id
+                 WHERE mg.media_item_id IN ({marks}) ORDER BY g.name"
+            );
+            let mut q = sqlx::query_as::<_, (i64, String)>(&sql);
+            for id in chunk {
+                q = q.bind(id);
+            }
+            for (id, genre) in q.fetch_all(self.db.pool()).await? {
+                if let Some(f) = out.get_mut(&id) {
+                    f.genres.push(genre);
+                }
+            }
+            let sql = format!(
+                "SELECT c.media_item_id, p.id, p.name FROM credits c JOIN people p ON p.id = c.person_id
+                 WHERE c.role = 'director' AND c.media_item_id IN ({marks})
+                 ORDER BY c.billing IS NULL, c.billing, p.id"
+            );
+            let mut q = sqlx::query_as::<_, (i64, i64, String)>(&sql);
+            for id in chunk {
+                q = q.bind(id);
+            }
+            for (id, person, name) in q.fetch_all(self.db.pool()).await? {
+                if let Some(f) = out.get_mut(&id) {
+                    f.directors.push((person, name));
+                }
+            }
+        }
+        Ok(out.into_values().collect())
+    }
+
     pub async fn genres(&self, media_item_id: i64) -> Result<Vec<String>, DbError> {
         Ok(sqlx::query_scalar(
             "SELECT g.name FROM media_genres mg JOIN genres g ON g.id = mg.genre_id

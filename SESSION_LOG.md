@@ -2562,3 +2562,24 @@ last so E1-E6 keep their numbers. **Spec amendments:** 4.7.0, A43.
 
 **Decisions taken (none reserved):** no download without the release's validator (otherwise every launch would
 download again); the archive is deleted after a build, whatever its outcome. **Spec amendments:** none since 4.7.0.
+
+## 2026-11-18 — 17.1 closed; 17.2 the hybrid ranker, on Home
+
+- **17.1 measured on the app's own path**: `ingest neighbours` now runs the launch step. MovieLens' rolling release,
+  334.6 MB over verified HTTPS, joined and built: 25,032 titles, 1,251,574 rows, 130.5 s in all, 242 MB peak; run again,
+  one HEAD and `Current`. The release ends in 2023 (no *Oppenheimer*): MovieLens alone cannot keep the recommender
+  current, which ADR-0054's live sources answer.
+- **The ranker** (`crates/recommend/src/rank.rs`, pure): parts scaled over the candidates and weighted; maximal marginal
+  relevance; caps per director, franchise (read from the title, a stated proxy) and year; a reason from the largest
+  part. Tests include a truthful-reason property over 300 mixed candidates; caps and reasons each seen to fail.
+- **The gathering** (`crates/taste/src/hybrid.rs`): three capped pools, `MediaRepository::facts` (new, with a surface
+  line, seen to fail with actors read as directors), axes as a score, a `Meaning` trait so a test stands in for the
+  model-backed index. End to end over a real database: met titles left out (seen to fail with the pool's guard removed),
+  matrix-only titles reached, reasons and notes named correctly.
+- **Home**: "Where your taste points" uses the hybrid rail; each card's note is its reason. The statements key moved
+  into the taste crate so Home can read the axes.
+
+**Decisions taken (none reserved):** starting weights (closeness 1, loved-with 1, popularity 0.15, axes 0.2, playable
+0.1) and diversity 0.3, to be tuned on MovieLens' tuning users in 17.4; "playable" means in the library, since what a
+source can play is only known when it is asked; a mode's reason names its two strongest loved titles. **Spec
+amendments:** none.

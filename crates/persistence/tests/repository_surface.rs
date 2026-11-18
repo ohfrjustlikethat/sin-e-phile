@@ -2326,3 +2326,76 @@ async fn neighbour_repository_surface() {
         .unwrap();
     assert_eq!(repo.titles().await.unwrap(), 0);
 }
+
+#[tokio::test]
+async fn media_facts_surface() {
+    // Phase 17: what the recommender weighs, for many titles at once.
+    let db = Db::in_memory().await.expect("open");
+    let media = MediaRepository::new(&db);
+    let mut heat = NewMediaItem::film("Heat", 1995);
+    heat.runtime_minutes = Some(170);
+    let heat = media.insert(&heat).await.unwrap();
+    let thief = media
+        .insert(&NewMediaItem::film("Thief", 1981))
+        .await
+        .unwrap();
+    for (genre, id) in [("Crime", 1), ("Drama", 2)] {
+        sqlx::query("INSERT INTO genres (id, name) VALUES (?, ?)")
+            .bind(id)
+            .bind(genre)
+            .execute(db.pool())
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO media_genres (media_item_id, genre_id) VALUES (?, ?)")
+            .bind(heat)
+            .bind(id)
+            .execute(db.pool())
+            .await
+            .unwrap();
+    }
+    for (person, name, billing) in [(7, "Michael Mann", 1), (8, "A. Second", 2)] {
+        sqlx::query("INSERT INTO people (id, name) VALUES (?, ?)")
+            .bind(person)
+            .bind(name)
+            .execute(db.pool())
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO credits (media_item_id, person_id, role, billing) VALUES (?, ?, 'director', ?)",
+        )
+        .bind(heat)
+        .bind(person)
+        .bind(billing)
+        .execute(db.pool())
+        .await
+        .unwrap();
+    }
+    // An actor is not a director.
+    sqlx::query("INSERT INTO credits (media_item_id, person_id, role, character) VALUES (?, 8, 'actor', 'Someone')")
+        .bind(thief)
+        .execute(db.pool())
+        .await
+        .unwrap();
+
+    let mut facts = media.facts(&[heat, thief, 999_999]).await.unwrap();
+    facts.sort_by_key(|f| f.id);
+    assert_eq!(facts.len(), 2, "an id the catalogue lacks is left out");
+    assert_eq!(facts[0].title, "Heat");
+    assert_eq!(
+        (facts[0].year, facts[0].runtime_minutes),
+        (Some(1995), Some(170))
+    );
+    assert_eq!(
+        facts[0].genres,
+        vec!["Crime".to_string(), "Drama".to_string()]
+    );
+    assert_eq!(
+        facts[0].directors,
+        vec![
+            (7, "Michael Mann".to_string()),
+            (8, "A. Second".to_string())
+        ]
+    );
+    assert!(facts[1].genres.is_empty() && facts[1].directors.is_empty());
+    assert!(media.facts(&[]).await.unwrap().is_empty());
+}

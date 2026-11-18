@@ -12,7 +12,7 @@ use sinephile_taste::Statements;
 
 use crate::state::AppState;
 
-const STATEMENTS: &str = "taste.statements";
+const STATEMENTS: &str = sinephile_taste::STATEMENTS;
 const LOVE: &str = "taste.love";
 
 /// Each -1, 0 or 1; `None` when not answered (see `sinephile_taste::Statements`).

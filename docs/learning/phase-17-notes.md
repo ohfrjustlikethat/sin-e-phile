@@ -13,6 +13,11 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
 - **The matrix keeps up with MovieLens** (ADR-0054, the author's rule that the app is current on every launch): every
   launch asks GroupLens, with one HEAD request, whether its rolling release has changed; when it has, or when there is
   no matrix yet, it is fetched, joined onto the catalogue, built and stored, and the archive deleted.
+- **The hybrid ranker** (17.2, `crates/recommend/src/rank.rs`): about a thousand candidates from three pools (each
+  taste mode's nearest in meaning, the matrix neighbours of what the profile loved, the most-voted), one blended score,
+  a rail picked for variety within caps (two per director, one per franchise, three per year), and a reason for every
+  pick. Home's "Where your taste points" uses it, and each card says why: "Loved by people who loved Stalker and
+  Solaris", or "Close to Stalker and Solaris, which you loved".
 - **The evaluation** (`eval recommend`): an 80/10/10 split of users by hash, a fifth of each judged user's likes held
   out, Recall@20 against popularity, and coverage.
 
@@ -46,6 +51,17 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
 - **A deterministic split by hash** (splitmix64) — `crates/recommend/src/split.rs:21`.
 - **Recall@K and coverage**, and why a popularity baseline is the honest one — `tools/eval/src/recommend.rs`.
 - **CPU work off the async runtime** (`spawn_blocking`) — `crates/catalogue/src/neighbours.rs:39`.
+- **Scaling each part of a score over the candidates** before weighting, so a weight says how much a part counts —
+  `crates/recommend/src/rank.rs:112`.
+- **A reason from the largest contribution**, so it is true by construction — `crates/recommend/src/rank.rs:138`.
+- **Maximal marginal relevance**: score minus similarity to what is already picked —
+  `crates/recommend/src/rank.rs:221`.
+- **Hard caps as a filter, not a penalty** — `crates/recommend/src/rank.rs:205`.
+- **A proxy, said to be one**: a franchise read from the title — `crates/recommend/src/rank.rs:256`.
+- **A trait as a seam**: the meaning index behind `Meaning`, so a test can stand in a few vectors —
+  `crates/taste/src/hybrid.rs:70`.
+- **`Send` versus `Sync`**: a future holding `&T` across `.await` needs `T: Sync`; holding `&mut T` needs only
+  `T: Send` — `crates/taste/src/hybrid.rs:101`, `crates/taste/src/home.rs:219`.
 - **`WITHOUT ROWID` tables** keyed by their primary key — `crates/persistence/migrations/0029_item_neighbours.up.sql:10`.
 - **A validator** (`Last-Modified`/`ETag`) asked by HEAD: "has it changed?" for a few hundred bytes — 
   `crates/catalogue/src/freshness.rs:80`.

@@ -29,7 +29,7 @@ pub use library::{
     Candidate, CandidateFacts, FileMatch, LibraryFolder, LibraryRepository, LocalFile, MatchMethod,
     NewLocalFile, Probe, Upserted,
 };
-pub use media::{Appearance, Credit, MediaRepository};
+pub use media::{Appearance, Credit, Facts, MediaRepository};
 pub use neighbours::NeighbourRepository;
 pub use profiles::{NewProfile, Profile, ProfileRepository, Viewing, WatchScope};
 pub use search::{Hit, HitDetail, MatchReason, SearchRepository};

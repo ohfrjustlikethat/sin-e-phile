@@ -11,6 +11,7 @@ pub mod axes;
 pub mod continuing;
 pub mod describe;
 pub mod home;
+pub mod hybrid;
 pub mod model;
 pub mod modes;
 pub mod rounds;
@@ -104,6 +105,9 @@ pub fn mean(vectors: &[(Vec<f32>, f64)]) -> Option<Vec<f32>> {
 
 /// How much "what you love" counts against one five-star film: as much as three.
 pub const LOVE_WEIGHT: f64 = 3.0;
+
+/// Where a profile's [`Statements`] are kept (`profile_settings`).
+pub const STATEMENTS: &str = "taste.statements";
 
 /// A profile's seed taste vector: the catalogue vectors of what it liked (with their
 /// weights from `ProfileRepository::liked`), and "what you love" embedded as a query.

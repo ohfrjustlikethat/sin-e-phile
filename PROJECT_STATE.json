@@ -15,19 +15,19 @@
       {
         "id": "17.1",
         "text": "Layer 2, item-item collaborative filtering (crates/recommend, new): built on this machine from the MovieLens ratings streamed from the archive (never stored or shipped, ADR-0019/ADR-0044), positive co-occurrence normalised against popularity (cosine with shrinkage, or lift damped by log popularity, chosen on a tuning split) so an obscure favourite can outrank a blockbuster; the top neighbours per title persisted (migration 0029, repository methods with surface lines); titles with no ratings fall back to content neighbours (cold start).",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "9721428"
       },
       {
         "id": "17.2",
         "text": "Layer 1 and Layer 3, the hybrid ranker: about 1,000 candidates cheaply (each taste mode's nearest in embedding space, the CF neighbours of what was liked, the popularity pool), scored by a blend of content similarity, CF, the popularity prior, the axes (boosts) and avoids (penalties), availability and freshness; maximal marginal relevance with caps per director, franchise and year; ranking 1,000 candidates timed (E5, under 150 ms).",
-        "status": "not_started",
+        "status": "in_progress",
         "commit": null
       },
       {
         "id": "17.3",
         "text": "Explanations: every recommendation carries a reason built from the signal that put it there (the liked titles behind a CF score, the mode behind a content score, the axis behind a boost), tested so that every reason names something true of the profile (E4); Home's taste rails use the ranker and show the reasons, pad-complete.",
-        "status": "not_started",
+        "status": "in_progress",
         "commit": null
       },
       {
@@ -2007,19 +2007,19 @@
         {
           "id": "17.1",
           "text": "Layer 2, item-item collaborative filtering (crates/recommend, new): built on this machine from the MovieLens ratings streamed from the archive (never stored or shipped, ADR-0019/ADR-0044), positive co-occurrence normalised against popularity (cosine with shrinkage, or lift damped by log popularity, chosen on a tuning split) so an obscure favourite can outrank a blockbuster; the top neighbours per title persisted (migration 0029, repository methods with surface lines); titles with no ratings fall back to content neighbours (cold start).",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "9721428"
         },
         {
           "id": "17.2",
           "text": "Layer 1 and Layer 3, the hybrid ranker: about 1,000 candidates cheaply (each taste mode's nearest in embedding space, the CF neighbours of what was liked, the popularity pool), scored by a blend of content similarity, CF, the popularity prior, the axes (boosts) and avoids (penalties), availability and freshness; maximal marginal relevance with caps per director, franchise and year; ranking 1,000 candidates timed (E5, under 150 ms).",
-          "status": "not_started",
+          "status": "in_progress",
           "commit": null
         },
         {
           "id": "17.3",
           "text": "Explanations: every recommendation carries a reason built from the signal that put it there (the liked titles behind a CF score, the mode behind a content score, the axis behind a boost), tested so that every reason names something true of the profile (E4); Home's taste rails use the ranker and show the reasons, pad-complete.",
-          "status": "not_started",
+          "status": "in_progress",
           "commit": null
         },
         {
@@ -2567,7 +2567,7 @@
       ]
     }
   ],
-  "next_action": "Phase 17, 17.1 (last step): measure the app's own path on the development copy: make tools/ingest/src/main.rs `neighbours` call crates/catalogue/src/neighbours.rs `keep_current` (what bootstrap::run does at every launch), run it once to fetch MovieLens' rolling release over the real network, and record download size, join, build time and peak memory in docs/eval-results.md; run it again to see the one-HEAD 'Current' answer; then mark 17.1 complete. Then 17.2: the ranker in crates/recommend/src/rank.rs (candidates from each taste mode's nearest in the meaning index, NeighbourRepository::of_many over liked titles, and the popularity pool; a blended score; MMR with per-director, franchise and year caps; 1,000 candidates timed for E5). 17.6 (ADR-0054) after the ranker.",
+  "next_action": "Phase 17, 17.4: extend tools/eval/src/recommend.rs from the matrix alone to the whole recommender. For each judged MovieLens user, map their shown likes onto catalogue ids (external_ids 'movielens'), build taste modes from those titles' vectors (sinephile_taste::modes::modes over the meaning index), gather and rank with crates/taste/src/hybrid.rs `rail` (the matrix built from ml-25m's build users only, so nothing judged is learned from), and measure Recall@20 against popularity (E1), coverage (E2), intra-list diversity and the caps (E3), and ranking time for 1,000 candidates (E5); tune rank::WEIGHTS and DIVERSITY on the tuning users first, then the test users once. Then a look at Home's taste rail in the real window, and 17.6 (ADR-0054).",
   "blockers": [
     {
       "id": "B16",

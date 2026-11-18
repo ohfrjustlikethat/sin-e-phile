@@ -25,7 +25,7 @@ Recommendations that are right, that go beyond the obvious, and that can be expl
 
 ## Subtasks
 
-- [ ] **17.1** Layer 2, item-item collaborative filtering (crates/recommend, new): built on this machine from the MovieLens ratings streamed from the archive (never stored or shipped, ADR-0019/ADR-0044), positive co-occurrence normalised against popularity (cosine with shrinkage, or lift damped by log popularity, chosen on a tuning split) so an obscure favourite can outrank a blockbuster; the top neighbours per title persisted (migration 0029, repository methods with surface lines); titles with no ratings fall back to content neighbours (cold start).
+- [x] **17.1** Layer 2, item-item collaborative filtering (crates/recommend, new): built on this machine from the MovieLens ratings streamed from the archive (never stored or shipped, ADR-0019/ADR-0044), positive co-occurrence normalised against popularity (cosine with shrinkage, or lift damped by log popularity, chosen on a tuning split) so an obscure favourite can outrank a blockbuster; the top neighbours per title persisted (migration 0029, repository methods with surface lines); titles with no ratings fall back to content neighbours (cold start).
 - [ ] **17.2** Layer 1 and Layer 3, the hybrid ranker: about 1,000 candidates cheaply (each taste mode's nearest in embedding space, the CF neighbours of what was liked, the popularity pool), scored by a blend of content similarity, CF, the popularity prior, the axes (boosts) and avoids (penalties), availability and freshness; maximal marginal relevance with caps per director, franchise and year; ranking 1,000 candidates timed (E5, under 150 ms).
 - [ ] **17.3** Explanations: every recommendation carries a reason built from the signal that put it there (the liked titles behind a CF score, the mode behind a content score, the axis behind a boost), tested so that every reason names something true of the profile (E4); Home's taste rails use the ranker and show the reasons, pad-complete.
 - [ ] **17.4** fixtures/recommender/ and eval recommend: Recall@20 against popularity on a held-out split (E1, more than 40% relative), catalogue coverage over the users (E2, above 15%), intra-list diversity against a documented target and no rail dominated by one director, franchise or year (E3), ranking time (E5); seen to fail for each.
@@ -71,4 +71,11 @@ certificate fails Windows' own root store (curl: untrusted root) but passes the 
 downloader fetched `ml-latest-small.zip` over verified HTTPS on 2026-11-18. Subtask 17.6 and E7 carry the rest of
 "current on every launch".
 
+**17.2-17.3 so far (2026-11-18):** the ranker is pure (`crates/recommend/src/rank.rs`); the gathering is in
+`crates/taste/src/hybrid.rs` (three capped pools, `MediaRepository::facts` for a thousand titles in three queries per
+500, the axes as a -1..1 score); Home's taste rail uses it and its notes carry each pick's reason. Still to do: the
+weights and diversity tuned on MovieLens' tuning users and E1-E3, E5 measured on the whole recommender (17.4); a look at
+Home in the real window.
+
 ## Work log
+- **17.1** Layer 2, item-item collaborative filtering (crates/recommend, new): built on this machine from t · `9721428`
