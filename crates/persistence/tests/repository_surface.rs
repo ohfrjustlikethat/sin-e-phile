@@ -2399,3 +2399,105 @@ async fn media_facts_surface() {
     assert!(facts[1].genres.is_empty() && facts[1].directors.is_empty());
     assert!(media.facts(&[]).await.unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn meaning_repository_surface() {
+    // ADR-0054 step 2: titles past the published meaning file, described and embedded.
+    use sinephile_persistence::repositories::{MeaningCounts, MeaningRepository};
+    let db = Db::in_memory().await.expect("open");
+    let media = MediaRepository::new(&db);
+    let mut films = Vec::new();
+    for k in 0..5 {
+        let title = format!("Film {k}");
+        films.push(
+            media
+                .insert(&NewMediaItem::film(&title, 2026))
+                .await
+                .unwrap(),
+        );
+    }
+    // All core, the later ones more voted; the first is "published" (at or before `after`).
+    for (k, id) in films.iter().enumerate() {
+        sqlx::query("UPDATE media_items SET in_core = 1, rating_votes = ? WHERE id = ?")
+            .bind(100 * k as i64)
+            .bind(id)
+            .execute(db.pool())
+            .await
+            .unwrap();
+    }
+    sqlx::query("INSERT INTO external_ids (media_item_id, source, external_id) VALUES (?, 'imdb', 'tt0000004'), (?, 'anilist', '777')")
+        .bind(films[4])
+        .bind(films[4])
+        .execute(db.pool())
+        .await
+        .unwrap();
+    let long = "a synopsis long enough to be worth a vector. ".repeat(8);
+    sqlx::query("UPDATE media_items SET synopsis = ? WHERE id = ?")
+        .bind(&long)
+        .bind(films[2])
+        .execute(db.pool())
+        .await
+        .unwrap();
+    let repo = MeaningRepository::new(&db);
+    let ids = |a: &[sinephile_persistence::repositories::Awaiting]| {
+        a.iter().map(|w| w.id).collect::<Vec<_>>()
+    };
+
+    // awaiting: past `after`, most-voted first, with ids and whether it is described
+    let all = repo.awaiting(films[0], 7, 10).await.unwrap();
+    assert_eq!(ids(&all), vec![films[4], films[3], films[2], films[1]]);
+    assert_eq!(all[0].imdb_id.as_deref(), Some("tt0000004"));
+    assert_eq!(all[0].anilist_id, Some(777));
+    assert!(!all[0].described);
+    assert!(all[2].described);
+    assert_eq!(ids(&repo.awaiting(films[0], 7, 2).await.unwrap()).len(), 2);
+
+    // asked: not asked again within the retry window; a described title still waits
+    repo.asked(&[films[1], films[2], films[3], films[4]])
+        .await
+        .unwrap();
+    assert_eq!(
+        ids(&repo.awaiting(films[0], 7, 10).await.unwrap()),
+        vec![films[2]]
+    );
+    // ...and asked again once it is old
+    sqlx::query(
+        "UPDATE new_meaning SET asked_at = datetime('now', '-8 days') WHERE media_item_id = ?",
+    )
+    .bind(films[3])
+    .execute(db.pool())
+    .await
+    .unwrap();
+    assert_eq!(
+        ids(&repo.awaiting(films[0], 7, 10).await.unwrap()),
+        vec![films[3], films[2]]
+    );
+
+    // described: the synopsis is stored, and the title is ready to embed
+    repo.described(films[4], &long, "wikipedia").await.unwrap();
+    let ready = repo.awaiting(films[0], 7, 10).await.unwrap();
+    assert_eq!(ids(&ready), vec![films[4], films[3], films[2]]);
+    assert!(ready[0].described);
+
+    // embedded: never offered again
+    repo.embedded(&[films[4], films[2]]).await.unwrap();
+    assert_eq!(
+        ids(&repo.awaiting(films[0], 7, 10).await.unwrap()),
+        vec![films[3]]
+    );
+    assert_eq!(
+        repo.counts().await.unwrap(),
+        MeaningCounts {
+            asked: 4,
+            described: 1,
+            embedded: 2
+        }
+    );
+
+    // forget_embedded: a lost companion makes them wait again
+    assert_eq!(repo.forget_embedded().await.unwrap(), 2);
+    assert_eq!(
+        ids(&repo.awaiting(films[0], 7, 10).await.unwrap()),
+        vec![films[4], films[3], films[2]]
+    );
+}

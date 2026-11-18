@@ -1,0 +1,161 @@
+//! Meaning for what is new (ADR-0054 step 2, migration 0030): the titles the catalogue gained
+//! after the published meaning file, which the launch job describes and embeds into the
+//! companion graph beside the published one.
+
+use crate::db::{Db, DbError};
+use crate::repositories::catalogue::{CORE_TIER, MIN_SYNOPSIS};
+
+/// `(id, kind, imdb id, anilist id, described)` as `awaiting` reads it.
+type AwaitingRow = (i64, String, Option<String>, Option<String>, bool);
+
+pub struct MeaningRepository<'a> {
+    db: &'a Db,
+}
+
+/// A title waiting for its meaning.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Awaiting {
+    pub id: i64,
+    pub kind: String,
+    pub imdb_id: Option<String>,
+    pub anilist_id: Option<i64>,
+    /// It has a synopsis long enough to index already: embed it, ask nobody.
+    pub described: bool,
+}
+
+/// What the job has done, all launches together: for Settings.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct MeaningCounts {
+    /// Titles asked for a synopsis.
+    pub asked: i64,
+    /// Titles a source described.
+    pub described: i64,
+    /// Titles given a vector.
+    pub embedded: i64,
+}
+
+impl<'a> MeaningRepository<'a> {
+    pub fn new(db: &'a Db) -> Self {
+        Self { db }
+    }
+
+    /// Core titles past `after` (the published file's last id) that have no vector yet and
+    /// are worth a turn: described already, never asked, or last asked more than
+    /// `retry_days` ago (a new film's article is often written weeks after it comes out).
+    /// Most-voted first, so a launch's cap takes what people look for.
+    pub async fn awaiting(
+        &self,
+        after: i64,
+        retry_days: i64,
+        limit: i64,
+    ) -> Result<Vec<Awaiting>, DbError> {
+        let described =
+            format!("(m.synopsis IS NOT NULL AND length(trim(m.synopsis)) >= {MIN_SYNOPSIS})");
+        let sql = format!(
+            "SELECT m.id, m.kind, i.external_id, a.external_id, {described}
+               FROM media_items m
+               LEFT JOIN new_meaning n ON n.media_item_id = m.id
+               LEFT JOIN external_ids i ON i.media_item_id = m.id AND i.source = 'imdb'
+               LEFT JOIN external_ids a ON a.media_item_id = m.id AND a.source = 'anilist'
+              WHERE m.id > ? AND {CORE_TIER}
+                AND n.embedded_at IS NULL
+                AND ({described} OR n.asked_at IS NULL
+                     OR n.asked_at < datetime('now', '-' || ? || ' days'))
+              ORDER BY m.rating_votes DESC NULLS LAST, m.id
+              LIMIT ?"
+        );
+        let rows: Vec<AwaitingRow> = sqlx::query_as(&sql)
+            .bind(after)
+            .bind(retry_days)
+            .bind(limit)
+            .fetch_all(self.db.pool())
+            .await?;
+        Ok(rows
+            .into_iter()
+            .map(|(id, kind, imdb_id, anilist, described)| Awaiting {
+                id,
+                kind,
+                imdb_id,
+                anilist_id: anilist.and_then(|a| a.parse().ok()),
+                described,
+            })
+            .collect())
+    }
+
+    /// Record that these titles were asked for a synopsis now.
+    pub async fn asked(&self, ids: &[i64]) -> Result<(), DbError> {
+        let mut tx = self.db.pool().begin().await?;
+        for id in ids {
+            sqlx::query(
+                "INSERT INTO new_meaning (media_item_id, asked_at) VALUES (?, datetime('now'))
+                 ON CONFLICT (media_item_id) DO UPDATE SET asked_at = excluded.asked_at",
+            )
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Store a synopsis a source gave, and which source: one transaction, so a synopsis is
+    /// never kept without its source or the reverse.
+    pub async fn described(&self, id: i64, text: &str, source: &str) -> Result<(), DbError> {
+        let mut tx = self.db.pool().begin().await?;
+        sqlx::query("UPDATE media_items SET synopsis = ? WHERE id = ?")
+            .bind(text)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query(
+            "INSERT INTO new_meaning (media_item_id, source) VALUES (?, ?)
+             ON CONFLICT (media_item_id) DO UPDATE SET source = excluded.source",
+        )
+        .bind(id)
+        .bind(source)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Record that these titles' vectors are in the companion graph.
+    pub async fn embedded(&self, ids: &[i64]) -> Result<(), DbError> {
+        let mut tx = self.db.pool().begin().await?;
+        for id in ids {
+            sqlx::query(
+                "INSERT INTO new_meaning (media_item_id, embedded_at) VALUES (?, datetime('now'))
+                 ON CONFLICT (media_item_id) DO UPDATE SET embedded_at = excluded.embedded_at",
+            )
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// The companion graph is gone (deleted, or a new model): every vector it held is to be
+    /// made again. Returns how many titles that is.
+    pub async fn forget_embedded(&self) -> Result<u64, DbError> {
+        Ok(
+            sqlx::query("UPDATE new_meaning SET embedded_at = NULL WHERE embedded_at IS NOT NULL")
+                .execute(self.db.pool())
+                .await?
+                .rows_affected(),
+        )
+    }
+
+    pub async fn counts(&self) -> Result<MeaningCounts, DbError> {
+        let (asked, described, embedded): (i64, i64, i64) = sqlx::query_as(
+            "SELECT COUNT(asked_at), COUNT(source), COUNT(embedded_at) FROM new_meaning",
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+        Ok(MeaningCounts {
+            asked,
+            described,
+            embedded,
+        })
+    }
+}

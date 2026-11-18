@@ -60,6 +60,34 @@ pub fn wikipedia_limit() -> Limit {
 /// misuse. Named here so the batching cannot drift past it by accident.
 pub const EXTRACTS_PER_REQUEST: usize = 20;
 
+/// The most IMDb ids one [`Wikipedia::mappings_for`] asks about: a `VALUES` list this long
+/// answers in a second or two, far inside WDQS's 60-second limit, and keeps the URL short.
+pub const MAPPINGS_PER_REQUEST: usize = 100;
+
+/// The SPARQL asking which of `imdb_ids` have an English article, or `None` when none of
+/// them is an IMDb id. Only `tt` and digits are put into the query: an id is data, and
+/// anything else in it would be query text.
+fn ids_query(imdb_ids: &[String]) -> Option<String> {
+    let values: Vec<String> = imdb_ids
+        .iter()
+        .filter(|id| {
+            id.len() > 2 && id.starts_with("tt") && id[2..].bytes().all(|b| b.is_ascii_digit())
+        })
+        .map(|id| format!("\"{id}\""))
+        .collect();
+    if values.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "SELECT ?imdb ?article WHERE {{ \
+           VALUES ?imdb {{ {} }} \
+           ?item wdt:P345 ?imdb . \
+           ?article schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> . \
+         }}",
+        values.join(" ")
+    ))
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum WikiError {
     #[error("wikipedia transport: {0}")]
@@ -143,6 +171,22 @@ impl<'a> Wikipedia<'a> {
             .header("accept", "application/sparql-results+json")
             .header("user-agent", USER_AGENT);
 
+        let response = self.execute(WDQS_HOST, request).await?;
+        parse_mappings(&response.body)
+    }
+
+    /// Which of these IMDb ids (at most [`MAPPINGS_PER_REQUEST`]) have an English article.
+    ///
+    /// By id rather than by prefix ([`Wikipedia::mappings`]): ADR-0054 asks at launch about
+    /// the few titles the catalogue just gained, and a prefix sweep would be an hour.
+    pub async fn mappings_for(&self, imdb_ids: &[String]) -> Result<Vec<Mapping>, WikiError> {
+        let Some(query) = ids_query(&imdb_ids[..imdb_ids.len().min(MAPPINGS_PER_REQUEST)]) else {
+            return Ok(Vec::new());
+        };
+        let url = format!("{WDQS_ENDPOINT}?query={}", encode(&query));
+        let request = Request::get(url)
+            .header("accept", "application/sparql-results+json")
+            .header("user-agent", USER_AGENT);
         let response = self.execute(WDQS_HOST, request).await?;
         parse_mappings(&response.body)
     }
@@ -456,6 +500,29 @@ mod tests {
         }}"#;
         let extracts = parse_extracts(body).expect("parse");
         assert_eq!(extracts[0].answers(), "seven_samurai");
+    }
+
+    #[test]
+    fn asking_by_id_puts_only_imdb_ids_into_the_query() {
+        let ids: Vec<String> = [
+            "tt0047478",
+            "tt1\" } DELETE {",
+            "nm0000001",
+            "tt",
+            "tt0087544",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        let query = ids_query(&ids).expect("two are ids");
+        assert!(
+            query.contains("VALUES ?imdb { \"tt0047478\" \"tt0087544\" }"),
+            "{query}"
+        );
+        assert!(!query.contains("DELETE"), "{query}");
+        assert!(!query.contains("nm0000001"), "{query}");
+        assert_eq!(ids_query(&["nm1".to_string()]), None);
+        assert_eq!(ids_query(&[]), None);
     }
 
     #[test]
