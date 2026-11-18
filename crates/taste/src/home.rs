@@ -8,7 +8,7 @@
 use std::collections::{HashMap, HashSet};
 
 use sinephile_persistence::repositories::{
-    EpisodeRepository, LibraryRepository, MediaRepository, ProfileRepository,
+    CredentialRepository, EpisodeRepository, LibraryRepository, MediaRepository, ProfileRepository,
 };
 use sinephile_persistence::{Db, DbError};
 use sinephile_search_engine::Semantic;
@@ -71,6 +71,42 @@ const NEW_EPISODE_DAYS: i64 = 30;
 const NEW_RELEASE_VOTES: i64 = 1_000;
 
 const PER_RAIL: usize = 20;
+
+/// 12400 as "12,400".
+fn thousands(n: i64) -> String {
+    let digits = n.unsigned_abs().to_string();
+    let mut out = String::new();
+    for (i, d) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(d);
+    }
+    if n < 0 {
+        format!("-{out}")
+    } else {
+        out
+    }
+}
+
+/// Home's "Where your taste points" alone (Phase 17): what the profile's settings preview
+/// under the same name, so the two never disagree. (It was Phase 14's single averaged seed,
+/// which named different films: seen in the real window, 17.6.)
+pub async fn taste_rail(
+    db: &Db,
+    semantic: Option<&mut Semantic>,
+    profile: i64,
+    kids: bool,
+    love: Option<&str>,
+    cache: &crate::model::ModelCache,
+) -> Result<Vec<i64>, DbError> {
+    Ok(rails(db, semantic, profile, kids, love, cache)
+        .await?
+        .into_iter()
+        .find(|r| r.key == "taste")
+        .map(|r| r.items)
+        .unwrap_or_default())
+}
 
 pub async fn rails(
     db: &Db,
@@ -211,23 +247,72 @@ pub async fn rails(
             .collect()
     };
 
-    let taste = match &model {
+    // Where the profile's taste points (Phase 17): the hybrid ranker over meaning, people who
+    // loved the same, and popularity, with the profile's axes; each pick says why.
+    let mut taste_notes: HashMap<i64, String> = HashMap::new();
+    // Mutably: the meaning index is held across database awaits, which a shared reference
+    // could only do if it were Sync; it is Send.
+    let taste = match &mut model {
         Some((s, modes, met)) => {
+            let modes: &[crate::modes::Mode] = modes;
             let mut met = met.clone();
             met.extend(new_releases.iter().take(PER_RAIL).copied());
-            let pool = media.most_voted_with_votes(3_000).await?;
+            let weighed = crate::modes::weigh(&crate::model::signals(db, profile, today).await?);
+            let said = crate::Statements::parse(
+                CredentialRepository::new(db)
+                    .get(profile, crate::STATEMENTS)
+                    .await?
+                    .as_deref(),
+            );
+            let axes = crate::axes::axes(db, &weighed, &said).await?;
+            let library_titles = LibraryRepository::new(db);
+            let playable: HashSet<i64> = library_titles
+                .library_titles(false)
+                .await?
+                .into_iter()
+                .chain(library_titles.library_titles(true).await?)
+                .collect();
             let want = PER_RAIL * if kids { 6 } else { 1 };
-            crate::model::recommend_with_prior(
-                s,
-                modes,
-                want,
-                &met,
-                &pool,
-                crate::model::POPULARITY_PRIOR,
-            )
+            let (picks, makers) =
+                crate::hybrid::rail(db, &mut **s, modes, &met, &weighed, &axes, &playable, want)
+                    .await?;
+            // The titles the reasons name: what was loved, and what each mode is made of.
+            let named: Vec<i64> = picks
+                .iter()
+                .flat_map(|p| match &p.reason {
+                    sinephile_recommend::rank::Reason::LovedWith(ids) => ids.clone(),
+                    sinephile_recommend::rank::Reason::MadeBy { loved, .. } => loved.clone(),
+                    _ => Vec::new(),
+                })
+                .chain(modes.iter().flat_map(|m| m.members.iter().take(2).copied()))
+                .collect();
+            let titles: HashMap<i64, String> = media
+                .facts(&named)
+                .await?
+                .into_iter()
+                .map(|f| (f.id, f.title))
+                .collect();
+            for p in &picks {
+                taste_notes.insert(p.id, crate::hybrid::note(p, modes, &titles, &makers));
+            }
+            picks.into_iter().map(|p| p.id).collect()
         }
         None => Vec::new(),
     };
+    // Rising now (ADR-0054 step 6): what gained the most ratings at the catalogue's last
+    // refresh, kept by the refresh itself; the profile's own titles left out.
+    let mut rising_notes = HashMap::new();
+    let rising: Vec<i64> = media
+        .kept_rising()
+        .await?
+        .into_iter()
+        .filter(|(id, _)| !seen.contains(id))
+        .map(|(id, gained)| {
+            rising_notes.insert(id, format!("+{} ratings", thousands(gained)));
+            id
+        })
+        .collect();
+
     let shown: HashSet<i64> = seen
         .iter()
         .chain(taste.iter())
@@ -248,6 +333,7 @@ pub async fn rails(
         ("new_episodes", "New episodes of your shows", new_episodes),
         ("library", "Your library", library),
         ("new", "New releases", new_releases),
+        ("rising", "Rising now", rising),
         ("taste", "Where your taste points", taste),
         ("watchlist", "On your watchlist", saved),
         ("loved", "Widely loved", loved),
@@ -257,6 +343,8 @@ pub async fn rails(
             let from = match key {
                 "new_episodes" => Some(&episode_notes),
                 "continue" => Some(&continue_notes),
+                "taste" => Some(&taste_notes),
+                "rising" => Some(&rising_notes),
                 _ => None,
             };
             let notes = from.map_or_else(HashMap::new, |from| {

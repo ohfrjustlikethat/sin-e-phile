@@ -127,7 +127,8 @@ pub fn engine_for(dir: &std::path::Path) -> sinephile_search_engine::Engine {
     // The installed copy's model when there is one (ADR-0053), else the downloaded one.
     let files = assets::MeaningFiles::find(dir);
     match sinephile_embedder::Embedder::pinned(&files.model, &files.tokenizer) {
-        Ok(embedder) => match sinephile_vector_index::VectorIndex::view(
+        // `open`: the published graph and the titles given meaning since (ADR-0054).
+        Ok(embedder) => match sinephile_vector_index::VectorIndex::open(
             &sinephile_vector_index::index_path(dir),
         ) {
             Ok(index) => {
@@ -195,6 +196,36 @@ pub(crate) fn build_meaning_when_on_disk(app: &AppHandle) {
     tauri::async_runtime::spawn(async move {
         if let Err(e) = fetch_meaning(&app, Fetch::OnDiskOnly).await {
             tracing::warn!(error = %e, "search by meaning: the index was not built");
+        }
+    });
+}
+
+/// Meaning for what the catalogue gained (ADR-0054 step 2), after each launch's check, in
+/// the background: `sinephile_catalogue::meaning::at_launch`. Not while the published graph
+/// is still being fetched or built; when it embedded anything, search reopens both graphs
+/// and Home is asked to rank again.
+pub(crate) fn extend_meaning(app: &AppHandle) {
+    if !optional_assets().complete || RUNNING.load(Ordering::SeqCst) {
+        return;
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<AppState>();
+        let (Some(db), Some(dir)) = (state.db(), state.data_dir()) else {
+            return;
+        };
+        match sinephile_catalogue::meaning::at_launch(&db, &dir, state.http.clone()).await {
+            Ok(Some(report)) => {
+                tracing::info!(?report, "meaning for new titles");
+                if report.embedded > 0 {
+                    state.set_engine(engine_for(&dir));
+                    let _ = app.emit("catalogue-refreshed", ());
+                }
+            }
+            Ok(None) => tracing::info!("meaning for new titles: no meaning here yet"),
+            Err(error) => {
+                tracing::warn!(%error, "meaning for new titles stopped; the next launch resumes")
+            }
         }
     });
 }

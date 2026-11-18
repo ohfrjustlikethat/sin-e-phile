@@ -272,3 +272,70 @@ async fn with_a_tmdb_key_what_is_showing_now_leads_new_releases() {
     let new = r.iter().find(|x| x.key == "new").unwrap();
     assert_eq!(new.items, vec![showing, big], "showing now leads");
 }
+
+#[tokio::test]
+async fn rising_now_follows_new_releases_with_what_each_gained() {
+    // ADR-0054 step 6: what gained most at the catalogue's last refresh, kept by the
+    // refresh; a title the profile has already loved is left out.
+    let db = Db::in_memory().await.unwrap();
+    let media = MediaRepository::new(&db);
+    let climbing = film(&db, "Climbing", 2026, 50_000, &["Drama"]).await;
+    let steady = film(&db, "Steady", 2019, 900_000, &["Crime"]).await;
+    let loved = film(&db, "Already Loved", 2025, 30_000, &["Drama"]).await;
+    for (id, previous) in [(climbing, 37_600), (steady, 899_000), (loved, 10_000)] {
+        sqlx::query(
+            "UPDATE media_items SET previous_votes = ?, votes_changed_at = datetime('now')
+             WHERE id = ?",
+        )
+        .bind(previous)
+        .bind(id)
+        .execute(db.pool())
+        .await
+        .unwrap();
+    }
+    let me = ProfileRepository::new(&db).ensure_default().await.unwrap();
+    ProfileRepository::new(&db)
+        .rate(me, loved, Some(5))
+        .await
+        .unwrap();
+    assert_eq!(media.keep_rising(2, 1_000, 200).await.unwrap(), 3);
+
+    let r = rails(&db, None, me, false, None, &Default::default())
+        .await
+        .unwrap();
+    let rising = r.iter().find(|x| x.key == "rising").expect("a rising rail");
+    assert_eq!(rising.title, "Rising now");
+    assert_eq!(
+        rising.items,
+        vec![climbing, steady],
+        "best gain first, loved left out"
+    );
+    assert_eq!(
+        rising.notes.get(&climbing).map(String::as_str),
+        Some("+12,400 ratings")
+    );
+    assert_eq!(
+        rising.notes.get(&steady).map(String::as_str),
+        Some("+1,000 ratings")
+    );
+}
+
+#[tokio::test]
+async fn the_taste_preview_is_homes_taste_rail() {
+    // 17.6: the profile's "Where your taste points so far" is Home's rail of that name, not a
+    // second answer to the same question. Without the meaning index, both are empty.
+    let db = Db::in_memory().await.unwrap();
+    film(&db, "Heat", 1995, 900_000, &["Crime"]).await;
+    let me = ProfileRepository::new(&db).ensure_default().await.unwrap();
+    let cache = Default::default();
+    let home = rails(&db, None, me, false, None, &cache).await.unwrap();
+    let preview = sinephile_taste::home::taste_rail(&db, None, me, false, None, &cache)
+        .await
+        .unwrap();
+    let taste: Vec<i64> = home
+        .iter()
+        .find(|r| r.key == "taste")
+        .map(|r| r.items.clone())
+        .unwrap_or_default();
+    assert_eq!(preview, taste);
+}

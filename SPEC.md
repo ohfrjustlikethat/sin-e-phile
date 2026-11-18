@@ -129,6 +129,7 @@ Search or browse → pick something → the app decides **how** to get it → it
 - **Everything is one thing.** A film you have locally, a film available via a configured source, and a film you can stream directly are the same object in the UI with different availability badges. Search "The Batman" and see one card that knows it exists in your `D:\Films` folder in 1080p, is available in 4K from a configured source, and has a Hindi dub available.
 - **Quality is never withheld.** If 4K exists and your machine and connection can handle it, you get 4K. Selecting quality is a preference, not a paywall. (This is an explicit rebuke of commercial streamers, and belongs in the README.)
 - **Discovery is the product.** An app with everything is worthless without a reason to choose. The recommender is not a feature bolted on at the end — it is the thing that makes the catalogue navigable.
+- **Current on every launch.** New films, series and anime reach the catalogue, search by meaning and the recommendations at every launch, with nothing for the user to do. The catalogue's refresh (ADR-0030) is the trigger; everything derived from it follows in the background (ADR-0054): meaning vectors for every title without one (what it added, and what the published meaning file left out), "people who loved this also loved" kept live from AniList and TMDB beside MovieLens' newest release, neighbours for a title nobody has rated yet, and what is rising this week. Settings says when each source last updated.
 - **Setup is three screens.** A non-technical person can install this and be watching something in under two minutes without reading documentation.
 
 ---
@@ -334,7 +335,7 @@ Detect on first run, store in config, allow manual override in settings. Re-dete
 | **Tier 1 — Standard** | 8–16 GB RAM, hardware decode present, ≥ 4 cores | Everything in Tier 0, plus on-device embedding of new items, VAD-based subtitle alignment, up to 4K playback, full motion design, intro/credit detection. |
 | **Tier 2 — Capable** | ≥ 16 GB RAM, discrete GPU or strong iGPU, ≥ 6 cores | Everything, plus face recognition in the pause overlay, optional Whisper-based subtitle generation and alignment, background pre-embedding of the catalogue, higher-quality ANN parameters. |
 
-**Documents versus queries — the Tier 0 embedding rule stated precisely** (ADR-0015). *Tier 0 never embeds catalogue documents on device. Tier 0 does embed one short query per search.* The asymmetry is scale, not kind: embedding the catalogue is hundreds of thousands of forward passes over long composed documents, which is what this rule protects a weak machine from; embedding a query is a single forward pass over roughly 30 tokens. They differ by five or six orders of magnitude. ONNX Runtime is therefore required at runtime on **all** tiers, and `tiers.rs` gates only whether *document* embedding is permitted. Phase 1 Spike C must measure query-embedding latency specifically, the §2.3 80 ms p95 search budget is measured *including* it, and a Spike C p95 above ~30 ms escalates under §10.9 rather than widening the budget.
+**Documents versus queries — the Tier 0 embedding rule stated precisely** (ADR-0015). *Tier 0 never embeds catalogue documents on device. Tier 0 does embed one short query per search.* **A launch's batch is not the catalogue** (ADR-0054): every tier, Tier 0 included, embeds the core titles the published meaning file does not hold (what a refresh added, and what had no synopsis when the file was made), most-voted first, capped at 2,000 a launch and run while idle, so search by meaning and the recommender stay current. The asymmetry is scale, not kind: embedding the catalogue is hundreds of thousands of forward passes over long composed documents, which is what this rule protects a weak machine from; embedding a query is a single forward pass over roughly 30 tokens. They differ by five or six orders of magnitude. ONNX Runtime is therefore required at runtime on **all** tiers, and `tiers.rs` gates only whether *document* embedding is permitted. Phase 1 Spike C must measure query-embedding latency specifically, the §2.3 80 ms p95 search budget is measured *including* it, and a Spike C p95 above ~30 ms escalates under §10.9 rather than widening the budget.
 
 **Rules:**
 - Tier gating is a single module (`tiers.rs`) exposing `Capability::FaceRecognition`, `Capability::LocalEmbedding`, etc. No feature checks hardware directly.
@@ -1300,7 +1301,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 
 **Goal.** Recommendations that are right, that go beyond the obvious, and that can be explained.
 
-**Deliverables.** **Layer 1 — content-based**: similarity in embedding space against each taste mode, filtered and boosted by the explicit axes from Phase 15. **Layer 2 — item-item collaborative filtering**: precompute an item-item similarity matrix offline from MovieLens (and AniList/IMDb rating signals), shipped or built during ingestion, giving genuine "people who loved this also loved" signal with no server and no other users. Handle the popularity bias that raw co-occurrence produces — normalise so that a beloved obscure film can surface above a mediocre blockbuster. **Layer 3 — the hybrid ranker**: blend both signals with candidate generation (retrieve ~1,000 candidates cheaply, rank precisely), apply diversity constraints (maximal marginal relevance so a rail isn't eight films by one director), availability weighting (something you can actually watch right now ranks higher), and freshness. **Explanations**: every recommendation carries a human-readable reason grounded in the model ("Because you finished three Béla Tarr films", "Loved by people who share your taste in 1970s political thrillers"). Cold-start handling for items with no ratings. `fixtures/recommender/` and the recommender eval harness.
+**Deliverables.** **Layer 1 — content-based**: similarity in embedding space against each taste mode, filtered and boosted by the explicit axes from Phase 15. **Layer 2 — item-item collaborative filtering**: precompute an item-item similarity matrix offline from MovieLens (and AniList/IMDb rating signals), shipped or built during ingestion, giving genuine "people who loved this also loved" signal with no server and no other users. Handle the popularity bias that raw co-occurrence produces — normalise so that a beloved obscure film can surface above a mediocre blockbuster. **Layer 3 — the hybrid ranker**: blend both signals with candidate generation (retrieve ~1,000 candidates cheaply, rank precisely), apply diversity constraints (maximal marginal relevance so a rail isn't eight films by one director), availability weighting (something you can actually watch right now ranks higher), and freshness. **Explanations**: every recommendation carries a human-readable reason grounded in the model ("Because you finished three Béla Tarr films", "Loved by people who share your taste in 1970s political thrillers"). Cold-start handling for items with no ratings. **Staying current** (ADR-0054): on every launch, after the catalogue check, the core titles without a meaning vector (what it added, and what the published file left out), most-voted first and 2,000 a launch, get a synopsis (TMDB with the profile's key, AniList for anime, else Wikipedia through Wikidata) and a vector; AniList's community recommendations (anime, no key) and TMDB's recommendations (films and series, the profile's key) stand beside MovieLens in the neighbour graph, marked by source and asked again when a week old; the matrix is built from MovieLens' newest release and rebuilt when GroupLens publishes a new one (ml-25m stays the fixed evaluation set); a title nobody has rated gets neighbours by meaning and by shared people the day it arrives; IMDb's daily votes give the ranker what is rising; the rails are ranked again after each step, and Settings says when each source last updated. `fixtures/recommender/` and the recommender eval harness.
 
 **Exit criteria.**
 - [ ] Recall@20 beats a popularity baseline by > 40% **relative** on a held-out split — i.e. `(recall_model / recall_baseline) - 1 > 0.40`, not 40 percentage points.
@@ -1309,6 +1310,7 @@ Each phase spec below is copied into `docs/phases/phase-NN-<slug>.md` at the sta
 - [ ] Every recommendation has a truthful explanation.
 - [ ] Ranking 1,000 candidates completes in < 150 ms on Tier 0.
 - [ ] Case study written with real numbers.
+- [ ] A title the catalogue gains at a launch can be recommended on that same launch with a truthful reason, and each source (catalogue, meaning, MovieLens, AniList, TMDB) says when it last updated.
 
 **Learning note.** Collaborative versus content-based filtering; the item-item matrix and why it works without other users; popularity bias and how to correct it; candidate generation versus ranking; maximal marginal relevance; Recall@K and coverage.
 
@@ -1722,8 +1724,8 @@ Size: **S** one commit · **M** a subtask · **L** several subtasks.
 |---|---|---|---|---|
 | I38 | A "Finish setting up" card on Home until it is done: library, a source, subtitles, downloads; each line opens its setting | 16 | M | 6000ceb |
 | I39 | A working Watchlist page now (a grid of what was saved); Phase 20 deepens it | 16 | S | 2cd797f |
-| I40 | Films and TV Shows show a simple working grid (the library first, then widely loved) until Phase 19 builds them | 17 | M | |
-| I41 | "Playable now": a rail of public-domain films from the built-in Internet Archive source, so a fresh install can play something at once | 17 | M | |
+| I40 | Films and TV Shows show a simple working grid (the library first, then widely loved) until Phase 19 builds them | 17 | M | 0fc2922 |
+| I41 | "Playable now": a rail of public-domain films from the built-in Internet Archive source, so a fresh install can play something at once | 19 | M | |
 | I42 | "I have 90 minutes": a length limit on Surprise me and on Home | 18 | S | |
 | I43 | A mark on every tile for "on this PC" and "can stream" | 19 | S | |
 | I44 | Home per profile: hide, pin and reorder rails | 19 | M | |
@@ -1794,6 +1796,22 @@ Size: **S** one commit · **M** a subtask · **L** several subtasks.
 ## Amendments
 
 Every change to this document is recorded here: date, section, what changed, ADR.
+
+### spec_version 4.7.1 — 2026-11-18 (meaning for every title without it)
+
+Minor: a clarification of A43's scope, found by running it; no exit criterion changes.
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A44 | §3.3, §8, §15 Phase 17 | **Meaning for every core title without it, not only the titles a refresh added.** Run on a copy of the development catalogue, "the titles it added" were 19,052 core titles past the published meaning file, and the most voted had 4,741 votes; Wikipedia described 23 of the first 2,000. Meanwhile 1,331 core titles with 10,000 votes or more (Doctor Who, One Punch Man, Solo Leveling, Delicatessen) had no vector at all, because they had no synopsis long enough when the file was made, and A43's wording would never have reached them: a snapshot that never moves, which A43 forbids. The launch batch is now every core title the published file does not hold, most-voted first, under the same cap of 2,000 a launch; a title nobody could describe is asked again after a week if it came out in the last year, otherwise after 90 days. Tier 0 embeds at most the same 2,000 a launch. | [0054](docs/adr/0054-current-on-every-launch.md) |
+
+### spec_version 4.7.0 — 2026-11-18 (current on every launch)
+
+Minor: the author's requirement made explicit, with one exit criterion added to Phase 17 at their request.
+
+| # | Section | What changed | ADR |
+|---|---|---|---|
+| A43 | §3.3, §8, §15 Phase 17 | **Everything the app knows is current on every launch** (the author: "THIS APP NEEDS TO BE UPDATED ALL THE TIME ON EVERY LAUNCH"). The catalogue already refreshed at launch (ADR-0030, Phase 16); what is derived from it did not: the meaning index was the published file's titles only, and the item-item matrix was ml-25m's ratings, which end in 2019. Now, after the catalogue check: new titles get a synopsis and a vector on every tier (Tier 0 included, capped at 2,000 a launch; the catalogue itself is still never embedded on Tier 0, §8); AniList's and TMDB's recommendations stand beside MovieLens in the neighbour graph, refreshed weekly; the matrix follows MovieLens' newest release; a title nobody has rated gets neighbours by meaning and people; IMDb's votes give a rising signal; rails re-rank; Settings shows each source's last update. Phase 17 gains an exit criterion: a title gained at a launch can be recommended on that launch with a truthful reason. | [0054](docs/adr/0054-current-on-every-launch.md) |
 
 ### spec_version 4.6.0 — 2026-11-17 (search by meaning in the installer)
 

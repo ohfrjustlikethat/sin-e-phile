@@ -47,8 +47,17 @@
 //! the *middle* of the sequence: positions shift and the count still goes up.
 //! `sinephile_catalogue::index::verify_prefix` catches that by re-deriving documents at
 //! sampled positions and requiring them to quantise to the artefact's own bytes.
+//!
+//! # The companion: what the catalogue gained since the published file
+//!
+//! The published graph is mapped read-only and never changes. A title the catalogue gains
+//! later gets its vector at launch (ADR-0054) and goes into a second, small graph beside
+//! it ([`Companion`], [`added_path`]), held in memory: tens to a few thousand vectors a
+//! launch, against the published graph's hundred thousand. [`VectorIndex::open`] reads
+//! both and a search merges them by distance, so a new title is found by meaning the
+//! launch it gains a synopsis.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use sinephile_embedding::{Artefact, ArtefactError};
@@ -66,6 +75,12 @@ pub fn index_path(data_dir: &Path) -> std::path::PathBuf {
         "vector-index-{}.usearch",
         sinephile_embedding::MODEL
     ))
+}
+
+/// Where the titles added since the published file keep their vectors (ADR-0054): beside
+/// the published graph, named after it (`vector-index-<model>.added.usearch`).
+pub fn added_path(index_path: &Path) -> PathBuf {
+    index_path.with_extension("added.usearch")
 }
 
 /// Neighbours per node in the graph (HNSW's *M*).
@@ -157,6 +172,47 @@ pub struct BuildReport {
 
 pub struct VectorIndex {
     index: Index,
+    /// The companion graph ([`Companion`]), when [`VectorIndex::open`] found one.
+    added: Option<Index>,
+}
+
+/// The one shape every graph here has: cosine over int8, the same dials.
+fn options(dimensions: usize) -> IndexOptions {
+    IndexOptions {
+        dimensions,
+        metric: MetricKind::Cos,
+        quantization: ScalarKind::I8,
+        connectivity: CONNECTIVITY,
+        expansion_add: EXPANSION_ADD,
+        expansion_search: EXPANSION_SEARCH,
+        multi: false,
+    }
+}
+
+/// A stored vector by catalogue id, from one graph.
+fn stored(index: &Index, media_item_id: i64) -> Option<Vec<i8>> {
+    let key = u64::try_from(media_item_id).ok()?;
+    if !index.contains(key) {
+        return None;
+    }
+    let mut out = vec![0i8; index.dimensions()];
+    match index.get(key, &mut out) {
+        Ok(n) if n > 0 => Some(out),
+        _ => None,
+    }
+}
+
+fn neighbours(index: &Index, query: &[i8], k: usize) -> Result<Vec<Neighbour>, VectorIndexError> {
+    let matches = index.search(query, k)?;
+    Ok(matches
+        .keys
+        .iter()
+        .zip(matches.distances.iter())
+        .map(|(key, distance)| Neighbour {
+            media_item_id: *key as i64,
+            distance: *distance,
+        })
+        .collect())
 }
 
 impl VectorIndex {
@@ -211,15 +267,7 @@ impl VectorIndex {
         let ids = &ids[..artefact.header.count as usize];
 
         let started = Instant::now();
-        let index = Index::new(&IndexOptions {
-            dimensions: artefact.header.dimension as usize,
-            metric: MetricKind::Cos,
-            quantization: ScalarKind::I8,
-            connectivity: CONNECTIVITY,
-            expansion_add: EXPANSION_ADD,
-            expansion_search: EXPANSION_SEARCH,
-            multi: false,
-        })?;
+        let index = Index::new(&options(artefact.header.dimension as usize))?;
         // Reserved up front: usearch grows by reallocating, and 855,703 unplanned
         // growth steps is the difference between minutes and an afternoon.
         let indexable = ids.iter().filter(|id| id.is_some()).count();
@@ -271,7 +319,29 @@ impl VectorIndex {
     pub fn view(path: &Path) -> Result<Self, VectorIndexError> {
         let index = Index::restore_view(&path.to_string_lossy())?;
         index.change_expansion_search(EXPANSION_SEARCH);
-        Ok(Self { index })
+        Ok(Self { index, added: None })
+    }
+
+    /// What the application opens: the published graph, mapped ([`VectorIndex::view`]),
+    /// and the companion of titles added since ([`added_path`]) when there is one.
+    ///
+    /// The harnesses keep [`VectorIndex::view`]: their exact answer is the published
+    /// artefact, which the companion is not part of.
+    pub fn open(path: &Path) -> Result<Self, VectorIndexError> {
+        let mut index = Self::view(path)?;
+        let added = added_path(path);
+        if added.is_file() {
+            let graph = Index::restore(&added.to_string_lossy())?;
+            if graph.dimensions() != index.dimensions() {
+                return Err(VectorIndexError::Dimension {
+                    index: index.dimensions(),
+                    query: graph.dimensions(),
+                });
+            }
+            graph.change_expansion_search(EXPANSION_SEARCH);
+            index.added = Some(graph);
+        }
+        Ok(index)
     }
 
     /// Open a saved index by reading all of it into memory.
@@ -281,7 +351,7 @@ impl VectorIndex {
     pub fn load(path: &Path) -> Result<Self, VectorIndexError> {
         let index = Index::restore(&path.to_string_lossy())?;
         index.change_expansion_search(EXPANSION_SEARCH);
-        Ok(Self { index })
+        Ok(Self { index, added: None })
     }
 
     /// Override the search dial for one open index.
@@ -292,9 +362,13 @@ impl VectorIndex {
     /// chosen.
     pub fn set_expansion_search(&self, candidates: usize) {
         self.index.change_expansion_search(candidates);
+        if let Some(added) = &self.added {
+            added.change_expansion_search(candidates);
+        }
     }
 
-    /// The `k` nearest catalogue items to a quantised query vector.
+    /// The `k` nearest catalogue items to a quantised query vector, from the published
+    /// graph and the companion together, nearest first.
     pub fn search(&self, query: &[i8], k: usize) -> Result<Vec<Neighbour>, VectorIndexError> {
         if query.len() != self.index.dimensions() {
             return Err(VectorIndexError::Dimension {
@@ -302,34 +376,34 @@ impl VectorIndex {
                 query: query.len(),
             });
         }
-        let matches = self.index.search(query, k)?;
-        Ok(matches
-            .keys
-            .iter()
-            .zip(matches.distances.iter())
-            .map(|(key, distance)| Neighbour {
-                media_item_id: *key as i64,
-                distance: *distance,
-            })
-            .collect())
+        let mut hits = neighbours(&self.index, query, k)?;
+        if let Some(added) = self.added.as_ref().filter(|a| a.size() > 0) {
+            // A title is in one graph or the other (the companion holds only ids past the
+            // published file's last), but a duplicate would cost a slot, so the nearer wins.
+            hits.extend(neighbours(added, query, k)?);
+            hits.sort_by(|a, b| a.distance.total_cmp(&b.distance));
+            let mut seen = std::collections::HashSet::new();
+            hits.retain(|n| seen.insert(n.media_item_id));
+            hits.truncate(k);
+        }
+        Ok(hits)
     }
 
-    /// A catalogue item's own stored vector, if it is in the graph (Phase 14: the seed
+    /// A catalogue item's own stored vector, if it is in either graph (Phase 14: the seed
     /// of a taste is built from the vectors of what a person liked).
     pub fn vector(&self, media_item_id: i64) -> Option<Vec<i8>> {
-        let key = u64::try_from(media_item_id).ok()?;
-        if !self.index.contains(key) {
-            return None;
-        }
-        let mut out = vec![0i8; self.index.dimensions()];
-        match self.index.get(key, &mut out) {
-            Ok(n) if n > 0 => Some(out),
-            _ => None,
-        }
+        stored(&self.index, media_item_id)
+            .or_else(|| self.added.as_ref().and_then(|a| stored(a, media_item_id)))
     }
 
+    /// Titles in both graphs.
     pub fn len(&self) -> usize {
-        self.index.size()
+        self.index.size() + self.added_len()
+    }
+
+    /// Titles in the companion: those given a vector since the published file.
+    pub fn added_len(&self) -> usize {
+        self.added.as_ref().map_or(0, Index::size)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -345,6 +419,80 @@ impl VectorIndex {
     /// library's marketing.
     pub fn memory_usage(&self) -> usize {
         self.index.memory_usage()
+    }
+}
+
+/// The companion graph opened for writing (ADR-0054): the launch job inserts the vectors of
+/// titles the catalogue gained and saves it; [`VectorIndex::open`] reads it.
+pub struct Companion {
+    index: Index,
+    path: PathBuf,
+}
+
+impl Companion {
+    /// The companion beside the published graph at `index_path`, or a new empty one.
+    pub fn open(index_path: &Path, dimensions: usize) -> Result<Self, VectorIndexError> {
+        let path = added_path(index_path);
+        let index = if path.is_file() {
+            let index = Index::restore(&path.to_string_lossy())?;
+            if index.dimensions() != dimensions {
+                return Err(VectorIndexError::Dimension {
+                    index: dimensions,
+                    query: index.dimensions(),
+                });
+            }
+            index
+        } else {
+            Index::new(&options(dimensions))?
+        };
+        Ok(Self { index, path })
+    }
+
+    pub fn contains(&self, media_item_id: i64) -> bool {
+        u64::try_from(media_item_id).is_ok_and(|key| self.index.contains(key))
+    }
+
+    /// Add a title's vector, replacing the one it had: a synopsis can be rewritten.
+    pub fn insert(&mut self, media_item_id: i64, vector: &[i8]) -> Result<(), VectorIndexError> {
+        if media_item_id <= 0 {
+            return Err(VectorIndexError::NonPositiveId(media_item_id));
+        }
+        if vector.len() != self.index.dimensions() {
+            return Err(VectorIndexError::Dimension {
+                index: self.index.dimensions(),
+                query: vector.len(),
+            });
+        }
+        let key = media_item_id as u64;
+        if self.index.contains(key) {
+            self.index.remove(key)?;
+        }
+        // usearch adds only into reserved room; doubling keeps the growth steps few.
+        if self.index.size() + 1 > self.index.capacity() {
+            self.index.reserve((self.index.capacity() * 2).max(64))?;
+        }
+        self.index.add(key, vector)?;
+        Ok(())
+    }
+
+    pub fn len(&self) -> usize {
+        self.index.size()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Write it beside the published graph, whole or not at all: to a part file, then
+    /// renamed over the last one, so a crash mid-save leaves the previous companion.
+    pub fn save(&self) -> Result<(), VectorIndexError> {
+        let part = self.path.with_extension("usearch.part");
+        let part_string = part.to_string_lossy().to_string();
+        self.index.save(&part_string)?;
+        std::fs::rename(&part, &self.path).map_err(|source| VectorIndexError::Io {
+            path: self.path.to_string_lossy().to_string(),
+            source,
+        })
     }
 }
 
@@ -420,6 +568,65 @@ mod tests {
         );
         assert_eq!(index.vector(4_999), None, "not in the graph");
         assert_eq!(index.vector(-1), None);
+    }
+
+    #[test]
+    fn a_title_added_since_the_published_file_is_found_beside_it() {
+        // ADR-0054: the published graph never changes; a new title's vector goes into the
+        // companion, and the app's index answers from both.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("index.usearch");
+        let vectors = circle(64);
+        let ids: Vec<Option<i64>> = (0..64).map(|i| Some(5_000 + i)).collect();
+        VectorIndex::build(&artefact_of(vectors.clone()), &ids, &path, |_| {}).expect("build");
+
+        // Two new titles, each a copy of a published one's direction rotated a little.
+        let new_a: Vec<i8> = vec![118, 22, 0, 0];
+        let new_b: Vec<i8> = vec![-119, 10, 0, 0];
+        let mut companion = Companion::open(&path, 4).expect("open");
+        assert!(companion.is_empty());
+        companion.insert(90_001, &new_a).expect("insert");
+        companion.insert(90_002, &new_b).expect("insert");
+        // A rewritten synopsis replaces the vector rather than being refused or doubled.
+        companion.insert(90_002, &new_b).expect("replace");
+        assert_eq!(companion.len(), 2);
+        assert!(companion.contains(90_001));
+        companion.save().expect("save");
+        assert!(added_path(&path).is_file());
+        assert!(!added_path(&path).with_extension("usearch.part").exists());
+
+        let index = VectorIndex::open(&path).expect("open both");
+        assert_eq!(index.len(), 66);
+        assert_eq!(index.added_len(), 2);
+        let hits = index.search(&new_a, 3).expect("search");
+        assert_eq!(hits[0].media_item_id, 90_001, "{hits:?}");
+        assert!(
+            hits.windows(2).all(|w| w[0].distance <= w[1].distance),
+            "{hits:?}"
+        );
+        assert_eq!(index.vector(90_002), Some(new_b.clone()));
+        assert_eq!(
+            index.vector(5_010),
+            Some(vectors[10].clone()),
+            "published still read"
+        );
+
+        // The harnesses' view is the published graph alone.
+        let published = VectorIndex::view(&path).expect("view");
+        assert_eq!(published.len(), 64);
+        assert_eq!(published.vector(90_001), None);
+
+        // Reopened for writing, it keeps what it had and grows.
+        let mut again = Companion::open(&path, 4).expect("reopen");
+        assert_eq!(again.len(), 2);
+        again.insert(90_003, &[0, 120, 0, 0]).expect("insert");
+        assert_eq!(again.len(), 3);
+        assert!(
+            Companion::open(&path, 8).is_err(),
+            "a different model's companion"
+        );
+        assert!(again.insert(0, &new_a).is_err());
+        assert!(again.insert(90_004, &[1, 2]).is_err());
     }
 
     #[test]

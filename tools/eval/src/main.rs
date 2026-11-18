@@ -16,6 +16,7 @@ mod error;
 mod identify;
 mod imports;
 mod modes;
+mod recommend;
 mod relevance;
 mod scan;
 mod search;
@@ -113,6 +114,67 @@ async fn main() {
                 args.iter().any(|a| a == "--report"),
             )
             .await
+        }
+        "recommend" => {
+            // `--alpha 0.6,0.7 --shrink 0,2` narrows the tuning grid.
+            let list = |flag: &str, default: &[f32]| -> Vec<f32> {
+                args.iter()
+                    .position(|a| a == flag)
+                    .and_then(|i| args.get(i + 1))
+                    .map(|v| v.split(',').filter_map(|x| x.parse().ok()).collect())
+                    .unwrap_or_else(|| default.to_vec())
+            };
+            // `--rail 1`: profile 1's taste rail with every card's reason.
+            let rail = args
+                .iter()
+                .position(|a| a == "--rail")
+                .and_then(|i| args.get(i + 1))
+                .and_then(|n| n.parse().ok());
+            if let Some(profile) = rail {
+                recommend::rail(Path::new(&data_dir), profile).await
+            } else if args.iter().any(|a| a == "--whole") {
+                let limit = args
+                    .iter()
+                    .position(|a| a == "--limit")
+                    .and_then(|i| args.get(i + 1))
+                    .and_then(|n| n.parse().ok());
+                let value = |flag: &str| {
+                    args.iter()
+                        .position(|a| a == flag)
+                        .and_then(|i| args.get(i + 1))
+                        .cloned()
+                };
+                let asked = value("--asked").and_then(|n| n.parse().ok());
+                // `--caps 2,1,3`: per director, per franchise, per year.
+                let caps = value("--caps").and_then(|c| {
+                    let n: Vec<usize> = c.split(',').filter_map(|x| x.parse().ok()).collect();
+                    (n.len() == 3).then(|| sinephile_recommend::rank::Caps {
+                        per_director: n[0],
+                        per_franchise: n[1],
+                        per_year: n[2],
+                    })
+                });
+                recommend::whole(
+                    Path::new(&data_dir),
+                    args.iter().any(|a| a == "--tune"),
+                    args.iter().any(|a| a == "--check"),
+                    limit,
+                    asked,
+                    caps,
+                    !args.iter().any(|a| a == "--uncalibrated"),
+                    args.iter()
+                        .any(|a| a == "--people")
+                        .then(|| list("--people", &[0.0])),
+                )
+                .await
+            } else {
+                recommend::run(
+                    Path::new(&data_dir),
+                    args.iter().any(|a| a == "--tune"),
+                    &list("--alpha", &[0.3, 0.5, 0.7, 0.9]),
+                    &list("--shrink", &[0.0, 2.0, 5.0, 10.0]),
+                )
+            }
         }
         "modes" => modes::run(Path::new(&data_dir), args.iter().any(|a| a == "--prove")).await,
         "import" => {

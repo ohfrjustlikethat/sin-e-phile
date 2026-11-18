@@ -44,6 +44,11 @@ pub enum Release {
     /// 100,000 ratings. For tests, and for Tier 0 if the full set proves too slow —
     /// the mitigation ADR-0019 names.
     Small,
+    /// GroupLens' rolling release, which it updates as ratings accumulate. **What the app
+    /// builds its matrix from** (ADR-0054: nothing derived may be a snapshot that never
+    /// moves), checked at every launch by its validator. Not for evaluation: it changes,
+    /// so the numbers in docs/eval-results.md are measured on [`Release::Ml25m`].
+    Latest,
 }
 
 impl Release {
@@ -51,6 +56,7 @@ impl Release {
         match self {
             Release::Ml25m => "ml-25m",
             Release::Small => "ml-latest-small",
+            Release::Latest => "ml-latest",
         }
     }
 
@@ -66,6 +72,7 @@ impl Release {
         match raw {
             "ml-25m" | "25m" => Some(Release::Ml25m),
             "ml-latest-small" | "small" => Some(Release::Small),
+            "ml-latest" | "latest" => Some(Release::Latest),
             _ => None,
         }
     }
@@ -278,6 +285,85 @@ pub fn scan_ratings(path: &Path) -> Result<(i64, f64), JobError> {
     }
     // Minus the header.
     Ok(((lines - 1).max(0), started.elapsed().as_secs_f64()))
+}
+
+/// Every rating in the archive's `ratings.csv`, in the file's order (by user), handed to
+/// `each` as (user, movie, stars) and never stored (ADR-0019; 25 million would not fit, and
+/// need not). Phase 17 builds the item-item matrix from this stream. A malformed line is
+/// skipped. Returns how many ratings were read.
+pub fn ratings(path: &Path, mut each: impl FnMut(u32, u32, f32)) -> Result<u64, JobError> {
+    let mut zip = archive(path)?;
+    let entry = open_entry(&mut zip, "ratings.csv")?;
+    let mut reader = BufReader::with_capacity(1 << 20, entry);
+    let mut line = String::new();
+    let mut read = 0;
+    let mut header = true;
+    loop {
+        line.clear();
+        let got = reader
+            .read_line(&mut line)
+            .map_err(|e| JobError::step("movielens", e.to_string()))?;
+        if got == 0 {
+            break;
+        }
+        if std::mem::take(&mut header) {
+            continue;
+        }
+        let mut field = line.trim_end().split(',');
+        let (Some(user), Some(movie), Some(stars)) = (field.next(), field.next(), field.next())
+        else {
+            continue;
+        };
+        let (Ok(user), Ok(movie), Ok(stars)) = (user.parse(), movie.parse(), stars.parse()) else {
+            continue;
+        };
+        each(user, movie, stars);
+        read += 1;
+    }
+    Ok(read)
+}
+
+/// Join a MovieLens archive onto the catalogue: its `links.csv` matched by IMDb id, written
+/// as `external_ids` rows (and its Children's films as a genre), in one resumable job.
+/// Re-runnable: a new release's join replaces nothing and adds what is new. Shared by the
+/// app's launch step and `ingest movielens`.
+pub async fn join(db: &Db, path: &Path) -> Result<Measurement, JobError> {
+    let links = links(path)?;
+    let catalogue = catalogue_by_imdb(db).await?;
+    let mut measurement = Measurement {
+        links: links.len() as i64,
+        ..Default::default()
+    };
+    let mut pairs: Vec<(i64, i64)> = Vec::new();
+    for link in &links {
+        match catalogue.get(&link.imdb_id) {
+            Some(&media_item_id) => {
+                measurement.matched += 1;
+                pairs.push((media_item_id, link.movielens_id));
+            }
+            None => measurement.unmatched += 1,
+        }
+    }
+    let mut job = Job::begin(db, "movielens").await?;
+    load(&mut job, std::sync::Arc::new(pairs)).await?;
+    let children = children(path)?;
+    load_children(&mut job, std::sync::Arc::new(children)).await?;
+    job.finish().await?;
+    Ok(measurement)
+}
+
+/// Catalogue items by their MovieLens id: the join [`load`] wrote. What the item-item matrix
+/// is built over (Phase 17).
+pub async fn by_movielens_id(db: &Db) -> Result<HashMap<u32, i64>, JobError> {
+    let rows: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT external_id, media_item_id FROM external_ids WHERE source = 'movielens'",
+    )
+    .fetch_all(db.pool())
+    .await?;
+    Ok(rows
+        .into_iter()
+        .filter_map(|(movie, id)| movie.parse::<u32>().ok().map(|m| (m, id)))
+        .collect())
 }
 
 /// Catalogue items by the numeric part of their IMDb id.

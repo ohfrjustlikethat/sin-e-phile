@@ -29,6 +29,16 @@ fn archive(dir: &std::path::Path, links: &str, ratings: &str) -> std::path::Path
     zip.start_file("ml-test/ratings.csv", options)
         .expect("entry");
     zip.write_all(ratings.as_bytes()).expect("write");
+    // Every real archive has one; the join reads its Children's films.
+    zip.start_file("ml-test/movies.csv", options)
+        .expect("entry");
+    zip.write_all(
+        b"movieId,title,genres
+1,Toy Story (1995),Animation|Children
+2,Jumanji (1995),Adventure
+",
+    )
+    .expect("write");
     zip.finish().expect("finish");
     path
 }
@@ -267,4 +277,174 @@ async fn films_filed_under_children_get_a_children_genre_and_no_others_do() {
         0,
         "same IMDb genres, not a children's film"
     );
+}
+
+#[test]
+fn ratings_are_streamed_in_order_and_a_bad_line_is_skipped() {
+    // Phase 17 builds the item-item matrix from this stream.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let csv = "userId,movieId,rating,timestamp
+1,10,4.5,1
+1,20,3.0,2
+not,a,rating,3
+2,10,5.0,4
+";
+    let path = archive(dir.path(), &links_csv(), csv);
+    let mut seen = Vec::new();
+    let read =
+        ml::ratings(&path, |user, movie, stars| seen.push((user, movie, stars))).expect("read");
+    assert_eq!(read, 3);
+    assert_eq!(seen, vec![(1, 10, 4.5), (1, 20, 3.0), (2, 10, 5.0)]);
+}
+
+#[tokio::test]
+async fn the_matrix_is_built_over_the_films_we_hold_and_stored() {
+    // Phase 17, 17.1: ratings -> likes over catalogue titles -> neighbours, stored.
+    use sinephile_persistence::repositories::NeighbourRepository;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let db = Db::open_in(dir.path()).await.expect("open");
+    let toy = film(&db, "tt0114709", "Toy Story").await;
+    let jumanji = film(&db, "tt0113497", "Jumanji").await;
+
+    // Six people like both films we hold; they also like movie 3, which we do not hold, and
+    // movie 4's IMDb id is not in the catalogue. Three-star ratings are not likes.
+    let mut csv = String::from(
+        "userId,movieId,rating,timestamp
+",
+    );
+    for user in 1..=6 {
+        csv.push_str(&format!(
+            "{user},1,4.5,1
+{user},2,4.0,2
+{user},3,5.0,3
+{user},4,3.0,4
+"
+        ));
+    }
+    let path = archive(dir.path(), &links_csv(), &csv);
+    let links = ml::links(&path).expect("links");
+    let catalogue = ml::catalogue_by_imdb(&db).await.expect("catalogue");
+    let pairs: Vec<(i64, i64)> = links
+        .iter()
+        .filter_map(|l| catalogue.get(&l.imdb_id).map(|id| (*id, l.movielens_id)))
+        .collect();
+    let mut job = Job::begin(&db, "movielens").await.expect("begin");
+    ml::load(&mut job, Arc::new(pairs)).await.expect("load");
+    job.finish().await.expect("finish");
+
+    let built = sinephile_catalogue::neighbours::build(&db, &path)
+        .await
+        .expect("build");
+    assert_eq!(built.ratings, 24);
+    assert_eq!(built.likes, 12, "six people x the two films we hold");
+    assert_eq!((built.people, built.titles, built.rows), (6, 2, 2));
+
+    let repo = NeighbourRepository::new(&db);
+    let toy_row = repo.of(toy, 10).await.expect("of");
+    assert_eq!(toy_row.len(), 1);
+    assert_eq!(toy_row[0].0, jumanji);
+    assert!(toy_row[0].1 > 0.0);
+    assert_eq!(repo.of(jumanji, 10).await.expect("of")[0].0, toy);
+}
+
+/// Serve `body` to every GET on a thread, counting the GETs. HEAD is not served here: the
+/// launch check asks through the transport, which the test fakes.
+fn serve(body: Vec<u8>) -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+    use std::io::{BufRead, BufReader};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+    let url = format!("http://{}/ml-latest.zip", listener.local_addr().unwrap());
+    let gets = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counted = gets.clone();
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { return };
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut line = String::new();
+            while reader.read_line(&mut line).unwrap_or(0) > 0 && line != "\r\n" {
+                line.clear();
+            }
+            counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let head = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = stream.write_all(head.as_bytes());
+            let _ = stream.write_all(&body);
+        }
+    });
+    (url, gets)
+}
+
+#[tokio::test]
+async fn the_matrix_follows_movielens_newest_release_at_every_launch() {
+    // ADR-0054: one HEAD when nothing changed; a new release is fetched, joined and built;
+    // offline keeps what there is; no validator, no download.
+    use sinephile_catalogue::neighbours::{keep_current_from, Outcome};
+    use sinephile_metadata_api::{FakeTransport, Response, TransportError};
+    use std::sync::atomic::Ordering;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let db = Db::open_in(dir.path()).await.expect("open");
+    film(&db, "tt0114709", "Toy Story").await;
+    film(&db, "tt0113497", "Jumanji").await;
+    let mut csv = String::from("userId,movieId,rating,timestamp\n");
+    for user in 1..=6 {
+        csv.push_str(&format!("{user},1,4.5,1\n{user},2,4.0,2\n"));
+    }
+    let archive_path = archive(dir.path(), &links_csv(), &csv);
+    let (url, gets) = serve(std::fs::read(&archive_path).expect("read"));
+    let datasets = dir.path().join("datasets");
+    std::fs::create_dir_all(&datasets).unwrap();
+    let head = |modified: &str| Response::new(200, "").with_header("last-modified", modified);
+    let builds = std::sync::atomic::AtomicUsize::new(0);
+    let on_build = || {
+        builds.fetch_add(1, Ordering::SeqCst);
+    };
+
+    // No validator to be had: nothing fetched.
+    let offline = FakeTransport::new();
+    offline.push_error(TransportError::Network("offline".into()));
+    let outcome = keep_current_from(&db, &datasets, &offline, &url, &on_build).await;
+    assert_eq!(outcome, Outcome::Unreachable);
+    assert_eq!(gets.load(Ordering::SeqCst), 0);
+
+    // The first launch that can ask: fetched, joined, built, and the archive not kept.
+    let first = FakeTransport::new();
+    first.push(head("Tue, 01 Jul 2025 00:00:00 GMT"));
+    let outcome = keep_current_from(&db, &datasets, &first, &url, &on_build).await;
+    let Outcome::Built(built) = outcome else {
+        panic!("expected a build, got {outcome:?}");
+    };
+    assert_eq!((built.titles, built.rows), (2, 2));
+    assert_eq!(
+        (gets.load(Ordering::SeqCst), builds.load(Ordering::SeqCst)),
+        (1, 1)
+    );
+    assert!(
+        !datasets.join("ml-latest.zip").exists(),
+        "the archive is not kept"
+    );
+
+    // The next launch, the same release: one HEAD, nothing fetched.
+    let same = FakeTransport::new();
+    same.push(head("Tue, 01 Jul 2025 00:00:00 GMT"));
+    let outcome = keep_current_from(&db, &datasets, &same, &url, &on_build).await;
+    assert_eq!(outcome, Outcome::Current);
+    assert_eq!((same.request_count(), gets.load(Ordering::SeqCst)), (1, 1));
+
+    // GroupLens publishes anew: built again.
+    let newer = FakeTransport::new();
+    newer.push(head("Mon, 01 Jun 2026 00:00:00 GMT"));
+    let outcome = keep_current_from(&db, &datasets, &newer, &url, &on_build).await;
+    assert!(matches!(outcome, Outcome::Built(_)), "{outcome:?}");
+    assert_eq!(
+        (gets.load(Ordering::SeqCst), builds.load(Ordering::SeqCst)),
+        (2, 2)
+    );
+
+    // Offline, with a matrix: it stays.
+    let gone = FakeTransport::new();
+    gone.push_error(TransportError::Network("offline".into()));
+    let outcome = keep_current_from(&db, &datasets, &gone, &url, &on_build).await;
+    assert_eq!(outcome, Outcome::Unreachable);
+    assert_eq!(gets.load(Ordering::SeqCst), 2);
 }

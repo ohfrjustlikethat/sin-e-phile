@@ -1453,6 +1453,7 @@ dependencies = [
  "sinephile-imports",
  "sinephile-library",
  "sinephile-persistence",
+ "sinephile-recommend",
  "sinephile-search-engine",
  "sinephile-taste",
  "sinephile-torrent",
@@ -5464,11 +5465,14 @@ dependencies = [
  "futures-util",
  "md-5",
  "reqwest 0.12.24",
+ "serde_json",
  "sha2",
  "sinephile-embedder",
  "sinephile-embedding",
  "sinephile-metadata-api",
  "sinephile-persistence",
+ "sinephile-recommend",
+ "sinephile-taste",
  "sinephile-vector-index",
  "sqlx",
  "tempfile",
@@ -5629,6 +5633,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "sinephile-recommend"
+version = "0.1.0"
+
+[[package]]
 name = "sinephile-search-engine"
 version = "0.1.0"
 dependencies = [
@@ -5686,6 +5694,7 @@ dependencies = [
  "serde_json",
  "sinephile-embedding",
  "sinephile-persistence",
+ "sinephile-recommend",
  "sinephile-search-engine",
  "sqlx",
  "tokio",

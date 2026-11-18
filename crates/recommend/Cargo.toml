@@ -1,0 +1,12 @@
+[package]
+name = "sinephile-recommend"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "Recommendations (SPEC.md Phase 17): the item-item matrix built from ratings on this machine, and the ranker over it."
+
+# Logic, so it lives here and is tested here (ADR-0022). Standard library only: the
+# matrix is counting and sorting, and threads come from std::thread::scope.
+
+[dependencies]

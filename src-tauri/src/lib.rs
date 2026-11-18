@@ -146,6 +146,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::taste::taste_round,
             commands::catalogue::catalogue_status,
             commands::catalogue::refresh_catalogue,
+            commands::catalogue::staying_current,
             commands::catalogue::tmdb_status,
             commands::catalogue::set_tmdb_key,
             commands::catalogue::clear_tmdb_key,

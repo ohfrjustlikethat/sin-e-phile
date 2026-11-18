@@ -39,6 +39,16 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            Ratings are NOT stored — they are an input to the
                            on-device matrix (ADR-0019), and Phase 4's job is to
                            measure what that will cost.
+  ingest neighbours [--ml25m] what the app does at every launch (ADR-0054): fetch
+                           MovieLens' rolling release when it changed, join it, and
+                           store each title's best 50 neighbours. --ml25m builds from
+                           the fixed ml-25m.zip in datasets/ (the evaluation's set).
+  ingest neighbours --live AniList's and TMDB's recommendations for what each profile
+                           loved, each title once a week (what the app does hourly).
+  ingest meaning           what the app does after every launch's check (ADR-0054):
+                           up to 2,000 titles the catalogue gained since the published
+                           meaning file get a synopsis and a vector in the companion
+                           graph beside it.
   ingest repair-variants   recompute titles.variant for rows the region-over-
                            language bug labelled english. Narrow and re-runnable.
   ingest keep              what the app does hourly: finish an interrupted refresh,
@@ -165,6 +175,25 @@ async fn main() -> Result<(), JobError> {
                 .unwrap_or(sinephile_catalogue::movielens::Release::Ml25m);
             movielens(&db, &dir.join("datasets"), set).await
         }
+        "neighbours" if args.iter().any(|a| a == "--live") => {
+            let transport: std::sync::Arc<dyn sinephile_metadata_api::Transport> =
+                std::sync::Arc::new(sinephile_metadata_api::HttpTransport::new());
+            let r = sinephile_catalogue::live::at_launch(&db, transport).await?;
+            println!(
+                "live neighbours: AniList asked about {} titles, {} rows; TMDB asked about {}, {} rows",
+                r.anilist_asked, r.anilist_rows, r.tmdb_asked, r.tmdb_rows
+            );
+            Ok(())
+        }
+        "neighbours" => {
+            neighbours(
+                &db,
+                &dir.join("datasets"),
+                args.iter().any(|a| a == "--ml25m"),
+            )
+            .await
+        }
+        "meaning" => meaning(&db, &dir).await,
         "repair-variants" => repair_variants(&db).await,
         "refresh" => refresh(&db, &dir.join("datasets")).await,
         "keep" => keep(&db, &dir.join("datasets")).await,
@@ -663,13 +692,69 @@ async fn episodes(
 }
 
 /// MovieLens: join by IMDb id, and measure what the on-device matrix will cost.
+/// The item-item matrix (Phase 17). By default exactly what the app does at every launch
+/// (ADR-0054): MovieLens' rolling release, fetched, joined and built only when it changed.
+/// `--ml25m` builds from the fixed ml-25m archive in datasets/ instead (the release the
+/// evaluation is measured on).
+async fn meaning(db: &Db, dir: &Path) -> Result<(), JobError> {
+    let transport: std::sync::Arc<dyn sinephile_metadata_api::Transport> =
+        std::sync::Arc::new(sinephile_metadata_api::HttpTransport::new());
+    let started = std::time::Instant::now();
+    match sinephile_catalogue::meaning::at_launch(db, dir, transport).await? {
+        Some(r) => println!(
+            "meaning: {} waiting, {} asked; described by TMDB {}, AniList {}, Wikipedia {}; {} embedded; {:.1} s",
+            r.waiting,
+            r.asked,
+            r.tmdb,
+            r.anilist,
+            r.wikipedia,
+            r.embedded,
+            started.elapsed().as_secs_f64()
+        ),
+        None => println!("meaning: no model, published file or graph here yet"),
+    }
+    Ok(())
+}
+
+async fn neighbours(db: &Db, datasets: &Path, ml25m: bool) -> Result<(), JobError> {
+    use sinephile_catalogue::movielens::Release;
+    use sinephile_catalogue::neighbours::{self, Outcome};
+    let before = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
+    let built = if ml25m {
+        neighbours::build(db, &datasets.join(Release::Ml25m.filename())).await?
+    } else {
+        let transport = sinephile_metadata_api::HttpTransport::new();
+        let on_build = || println!("MovieLens has a release this copy has not built: fetching it");
+        match neighbours::keep_current(db, datasets, &transport, &on_build).await {
+            Outcome::Built(built) => built,
+            other => {
+                println!("neighbours: {other:?}");
+                return Ok(());
+            }
+        }
+    };
+    let after = std::fs::metadata(db.path()).map(|m| m.len()).unwrap_or(0);
+    println!(
+        "neighbours: {} ratings, {} likes by {} people over {} titles; {} rows; build {:.1} s, {:.1} MB fetched, {:.1} s in all; database {:+.1} MB",
+        built.ratings,
+        built.likes,
+        built.people,
+        built.titles,
+        built.rows,
+        built.seconds,
+        built.fetched as f64 / 1_048_576.0,
+        built.total_seconds,
+        (after as f64 - before as f64) / 1_048_576.0
+    );
+    Ok(())
+}
+
 async fn movielens(
     db: &Db,
     datasets: &Path,
     release: sinephile_catalogue::movielens::Release,
 ) -> Result<(), JobError> {
     use sinephile_catalogue::movielens as ml;
-    use std::sync::Arc;
     use std::time::Instant;
 
     let started = Instant::now();
@@ -700,34 +785,9 @@ async fn movielens(
         }
     }
 
-    let links = ml::links(&path)?;
-    tracing::info!("{} films in links.csv", links.len());
-    let catalogue = ml::catalogue_by_imdb(db).await?;
-
-    let mut measurement = ml::Measurement {
-        links: links.len() as i64,
-        ..Default::default()
-    };
-    let mut pairs: Vec<(i64, i64)> = Vec::new();
-    for link in &links {
-        match catalogue.get(&link.imdb_id) {
-            Some(media_item_id) => {
-                measurement.matched += 1;
-                pairs.push((*media_item_id, link.movielens_id));
-            }
-            None => measurement.unmatched += 1,
-        }
-    }
-
-    let mut job = Job::begin(db, "movielens").await?;
-    if job.is_resuming().await? {
-        tracing::info!("resuming a previous run");
-    }
-    ml::load(&mut job, Arc::new(pairs)).await?;
-    let children = ml::children(&path)?;
-    tracing::info!("{} films filed under Children", children.len());
-    ml::load_children(&mut job, Arc::new(children)).await?;
-    job.finish().await?;
+    // The same join the app runs at launch (ADR-0054).
+    let mut measurement = ml::join(db, &path).await?;
+    tracing::info!("{} films in links.csv", measurement.links);
 
     // The number ADR-0019 requires Phase 4 to produce: streaming every rating is the
     // floor on what the on-device item-item matrix costs on first run.

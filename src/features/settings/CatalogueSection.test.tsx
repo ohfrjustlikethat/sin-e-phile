@@ -8,6 +8,12 @@ const commands = {
     ok({ refreshed_at: new Date().toISOString(), titles_added: 1204, episodes_added: 87, running: false }),
   ),
   refreshCatalogue: vi.fn(() => ok(true)),
+  stayingCurrent: vi.fn(() =>
+    ok([
+      { name: "Meaning for new titles", updated_at: new Date().toISOString(), detail: "188 titles given meaning at the last update, 374 in all" },
+      { name: "TMDB's recommendations", updated_at: null, detail: "Used with a profile's own TMDB key; none is set" },
+    ]),
+  ),
 };
 vi.mock("@/lib/ipc", () => ({ commands }));
 const { CatalogueSection, when } = await import("./CatalogueSection");
@@ -38,6 +44,21 @@ describe("The catalogue keeps itself current (Phase 16)", () => {
       </QueryClientProvider>,
     );
     expect(await screen.findByText(/Building the catalogue for the first time: Building search, 64%\./)).toBeInTheDocument();
+  });
+
+  it("says, source by source, when each last updated and what it did (ADR-0054)", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <CatalogueSection />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText("Meaning for new titles")).toBeInTheDocument();
+    expect(
+      screen.getByText("Updated today. 188 titles given meaning at the last update, 374 in all."),
+    ).toBeInTheDocument();
+    // Without a time, the detail says what it is waiting for on its own.
+    expect(screen.getByText("Used with a profile's own TMDB key; none is set.")).toBeInTheDocument();
   });
 
   it("puts a time in words", () => {

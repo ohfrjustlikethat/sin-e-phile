@@ -27,6 +27,7 @@ const WHY: Record<string, string> = {
   new_episodes: "New in the shows you follow",
   library: "On this PC, newest first",
   new: "Out this year, by your taste",
+  rising: "Gaining the most ratings since the last update",
   taste: "From what you liked and what you said you love",
   watchlist: "What you saved",
   loved: "The films most people have seen and rated",

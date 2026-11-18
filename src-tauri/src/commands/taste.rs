@@ -7,12 +7,12 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use sinephile_persistence::repositories::{CredentialRepository, ProfileRepository};
+use sinephile_persistence::repositories::CredentialRepository;
 use sinephile_taste::Statements;
 
 use crate::state::AppState;
 
-const STATEMENTS: &str = "taste.statements";
+const STATEMENTS: &str = sinephile_taste::STATEMENTS;
 const LOVE: &str = "taste.love";
 
 /// Each -1, 0 or 1; `None` when not answered (see `sinephile_taste::Statements`).
@@ -118,35 +118,28 @@ pub async fn taste_preview(
         return Ok(Vec::new());
     };
     let me = state.profile().await?;
-    let liked = ProfileRepository::new(&db)
-        .liked(me)
-        .await
-        .map_err(|e| e.to_string())?;
     let love = CredentialRepository::new(&db)
         .get(me, LOVE)
         .await
         .map_err(|e| e.to_string())?;
     let limit = limit.unwrap_or(12).clamp(1, 60) as usize;
-    let seen: HashSet<i64> = liked.iter().map(|(id, _)| *id).collect();
-    let ids = {
+    let kids = crate::commands::profiles::kids(&state).await;
+    // Home's own taste rail, so the preview and Home name the same films (Phase 17).
+    let ids: Vec<i64> = {
         let mut engine = engine.lock().await;
         let Some(semantic) = engine.semantic_mut() else {
             return Ok(Vec::new());
         };
-        match sinephile_taste::seed(semantic, &liked, love.as_deref()) {
-            Some(seed) => sinephile_taste::nearest(semantic, &seed, limit * 3, &seen),
-            None => return Ok(Vec::new()),
-        }
-    };
-    // A kids profile sees only what suits children.
-    let ids = if crate::commands::profiles::kids(&state).await {
-        let ok = sinephile_persistence::repositories::MediaRepository::new(&db)
-            .suitable_for_children(&ids)
-            .await
-            .map_err(|e| e.to_string())?;
-        ids.into_iter().filter(|id| ok.contains(id)).collect()
-    } else {
-        ids
+        sinephile_taste::home::taste_rail(
+            &db,
+            Some(semantic),
+            me,
+            kids,
+            love.as_deref(),
+            &crate::commands::home::MODELS,
+        )
+        .await
+        .map_err(|e| e.to_string())?
     };
     let ids: Vec<i64> = ids.into_iter().take(limit).collect();
     let media = sinephile_persistence::repositories::MediaRepository::new(&db);

@@ -536,3 +536,63 @@ async fn a_search_is_cached_under_the_shorter_search_ttl() {
         .expect("query");
     assert_eq!(resource, Resource::Search.as_str());
 }
+
+#[tokio::test]
+async fn descriptions_come_back_as_plain_text_by_id() {
+    // ADR-0054: a new anime's meaning, from its AniList description.
+    let transport = FakeTransport::new();
+    transport.push(Response::new(
+        200,
+        r#"{"data":{"Page":{"media":[
+            {"id":11,"description":"A boy <i>finds</i> a door.<br><br>It opens onto the sea.\n\n(Source: a publisher)"},
+            {"id":12,"description":null},
+            {"id":13,"description":"<br>"}
+        ]}}}"#,
+    ));
+    let client = AniList::new(&transport).await;
+    let got = client.descriptions(&[11, 12, 13]).await.unwrap();
+    assert_eq!(
+        got,
+        vec![(11, "A boy finds a door. It opens onto the sea.".to_string())]
+    );
+    // Cloned out in one statement: a guard kept alive here would deadlock the next lock.
+    let body = transport.requests.lock().unwrap()[0]
+        .body
+        .clone()
+        .unwrap_or_default();
+    assert!(body.contains("id_in: $ids"), "{body}");
+    assert!(body.contains(r#""ids":[11,12,13]"#), "{body}");
+    assert!(client.descriptions(&[]).await.unwrap().is_empty());
+    assert_eq!(
+        transport.requests.lock().unwrap().len(),
+        1,
+        "nothing asked for none"
+    );
+}
+
+#[tokio::test]
+async fn recommendations_come_back_best_first_without_the_voted_down() {
+    // ADR-0054 step 3: what AniList's people recommend beside an anime, no key.
+    let transport = FakeTransport::new();
+    transport.push(Response::new(
+        200,
+        r#"{"data":{"Page":{"media":[
+            {"id":11,"recommendations":{"nodes":[
+                {"rating":5,"mediaRecommendation":{"id":21}},
+                {"rating":40,"mediaRecommendation":{"id":22}},
+                {"rating":-3,"mediaRecommendation":{"id":23}},
+                {"rating":9,"mediaRecommendation":null}
+            ]}},
+            {"id":12,"recommendations":null}
+        ]}}}"#,
+    ));
+    let client = AniList::new(&transport).await;
+    let got = client.recommendations(&[11, 12]).await.unwrap();
+    assert_eq!(got, vec![(11, vec![(22, 40), (21, 5)]), (12, vec![])]);
+    let body = transport.requests.lock().unwrap()[0]
+        .body
+        .clone()
+        .unwrap_or_default();
+    assert!(body.contains("recommendations(sort: RATING_DESC"), "{body}");
+    assert!(client.recommendations(&[]).await.unwrap().is_empty());
+}

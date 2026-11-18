@@ -2506,3 +2506,157 @@ test passed before its fix, which a check that has never been seen to fail would
 
 **Carry forward.** Before giving the author an installer: a fresh install and a second launch on a scratch folder, in
 the real window, as a standing step. To Phase 19's author batch: Phase 7 E7, Phase 14 E4 and E6, D89, D91.
+
+## 2026-11-18 — Phase 17 opened: the item-item matrix (17.1, first half)
+
+Phase 16 merged (14bf49a) after branch CI passed; the close recorded on main (f050b24) and Phase 17 opened from SPEC.md
+section 15 with the subtasks authored before ADR-0045's renumbering, the received author checks moved to Phase 19.
+
+- **`crates/recommend`** (new, std only): likes indexed by person and by item, co-occurrence item by item on scoped
+  threads, one score family (asymmetric cosine with shrinkage), the top 50 neighbours per title; a hash split of
+  MovieLens users, 80/10/10, so nothing is judged on the people it learned from.
+- **Tuned, then judged** (`eval recommend`): alpha 0.65 chosen on the tuning users as the best recall whose coverage
+  clears 15%; on the test users Recall@20 0.2855 against popularity 0.1640 (+74.1%), coverage 16.4%.
+- **Stored and built over the catalogue**: migration 0029, `NeighbourRepository` (surface lines),
+  `catalogue::neighbours::build`, `ingest neighbours`: 989,600 rows in 10.4 s on the development copy, 199 MB peak.
+  Found on the way: a row kept the room of everything its item touched, about 1 GB; one buffer per thread, 137 MB.
+- Every new test seen to fail by a mutation.
+
+**Decisions taken (none reserved):** the score is chosen by a rule fixed before the test users were read (best recall
+whose coverage clears 15%); the matrix is built from every MovieLens user in the app, and only the evaluation splits
+them; the first run will fetch ml-25m as enrichment (the brief's item 3 named MovieLens in stage B) and delete it once
+built. **Spec amendments:** none.
+
+## 2026-11-18 — Spec 4.7.0: current on every launch (ADR-0054)
+
+The author asked whether recommendations and what MovieLens gives them stay current, for films, shows and anime,
+and set the rule: "THIS APP NEEDS TO BE UPDATED ALL THE TIME ON EVERY LAUNCH". Checked against the code: the catalogue
+already refreshes at every launch and hourly (Phase 16, ADR-0030); everything derived from it did not: the meaning index
+holds the published file's 119,874 titles and nothing embeds a newer one (R3 promised it), and the item-item matrix is
+ml-25m's ratings, which end in 2019.
+
+ADR-0054 and A43: after each launch's catalogue check, new titles get a synopsis and a vector on every tier (Tier 0
+capped at 2,000 a launch); AniList's and TMDB's recommendations stand beside MovieLens in the neighbour graph, refreshed
+weekly; the matrix follows MovieLens' newest release; a title nobody has rated gets neighbours by meaning and people;
+IMDb's votes give a rising signal; rails re-rank; Settings shows each source's last update. Phase 17 gains E7 and
+subtask 17.6. CLAUDE.md resynced.
+
+**Decisions taken (none reserved):** the app builds from MovieLens' rolling release while the evaluation keeps ml-25m;
+Tier 0 embeds a launch's new titles, capped, which ADR-0015's reasoning (scale) allows; the new criterion is placed
+last so E1-E6 keep their numbers. **Spec amendments:** 4.7.0, A43.
+
+## 2026-11-18 — 17.1: the matrix follows MovieLens at every launch
+
+- **`bootstrap::run` asks every run** (launch, then hourly) whether MovieLens' rolling release has changed: one HEAD
+  through the app's transport; when it has, or there is no matrix yet, `neighbours::keep_current` fetches it, joins it
+  (`movielens::join`, now shared with `ingest movielens`), builds, remembers the validator only after success, and
+  deletes the archive. Offline, or with no validator, nothing is fetched and the matrix stays. A rebuilt matrix tells
+  Home to re-rank. Tested end to end with a local server and a faked transport (first build, unchanged, new release,
+  offline), the "already current" answer seen to fail by removing it.
+- **GroupLens' certificate**: curl through Windows' root store refuses it (untrusted root); the app's rustls downloader,
+  with Mozilla's roots, fetched `ml-latest-small.zip` over verified HTTPS. A check that would have retried without
+  verification was refused by the session's safety layer, rightly; it was not needed.
+- **Found and fixed: line endings.** Text-mode writes from Windows Python had turned SPEC.md, Cargo.toml, both tools'
+  `main.rs` and four catalogue sources from LF to CRLF, two of them inside Phase 17 commits; converted back, so the
+  next commit's diff shows the real changes. Recorded as a working rule.
+
+**Decisions taken (none reserved):** no download without the release's validator (otherwise every launch would
+download again); the archive is deleted after a build, whatever its outcome. **Spec amendments:** none since 4.7.0.
+
+## 2026-11-18 — 17.1 closed; 17.2 the hybrid ranker, on Home
+
+- **17.1 measured on the app's own path**: `ingest neighbours` now runs the launch step. MovieLens' rolling release,
+  334.6 MB over verified HTTPS, joined and built: 25,032 titles, 1,251,574 rows, 130.5 s in all, 242 MB peak; run again,
+  one HEAD and `Current`. The release ends in 2023 (no *Oppenheimer*): MovieLens alone cannot keep the recommender
+  current, which ADR-0054's live sources answer.
+- **The ranker** (`crates/recommend/src/rank.rs`, pure): parts scaled over the candidates and weighted; maximal marginal
+  relevance; caps per director, franchise (read from the title, a stated proxy) and year; a reason from the largest
+  part. Tests include a truthful-reason property over 300 mixed candidates; caps and reasons each seen to fail.
+- **The gathering** (`crates/taste/src/hybrid.rs`): three capped pools, `MediaRepository::facts` (new, with a surface
+  line, seen to fail with actors read as directors), axes as a score, a `Meaning` trait so a test stands in for the
+  model-backed index. End to end over a real database: met titles left out (seen to fail with the pool's guard removed),
+  matrix-only titles reached, reasons and notes named correctly.
+- **Home**: "Where your taste points" uses the hybrid rail; each card's note is its reason. The statements key moved
+  into the taste crate so Home can read the axes.
+
+**Decisions taken (none reserved):** starting weights (closeness 1, loved-with 1, popularity 0.15, axes 0.2, playable
+0.1) and diversity 0.3, to be tuned on MovieLens' tuning users in 17.4; "playable" means in the library, since what a
+source can play is only known when it is asked; a mode's reason names its two strongest loved titles. **Spec
+amendments:** none.
+
+## 2026-11-18 — 17.4: the whole recommender, judged; E1-E4 met
+
+- **`eval recommend --whole`** judges the app's own gathering and ranker on MovieLens users the matrix never learned
+  from: the matrix rebuilt in the harness from the build users onto catalogue titles, each judged user's shown likes a
+  profile, their held-out likes the answer. The rail was split at the neighbour seam (`loved_with` reads the stored
+  matrix, `candidates` takes neighbours given) so the harness and the app share every other line.
+- **The variety step was slow** (26 ms for a thousand candidates): each candidate's closeness to the nearest pick is now
+  kept as picks are made, identical results, about 1-4 ms.
+- **The whole recommender first found fewer favourites than the matrix alone** (+49% against +72%), whatever the
+  weights. A/B on the same 1,000 tuning users found two structural causes: only 60 loved titles were asked for
+  neighbours, and caps of one per franchise and three per year. Asking 500 and caps of 2/2/5: +71.7%.
+- **Tuned on the tuning users only**: 108 settings, then a coverage check over all 15,671 by a rule fixed before it ran
+  (coverage at least 16%): near 1, loved 0.5, popular 0, diversity 0.15. A reason rule was fixed on the way (closeness
+  counted only above "unrelated").
+- **The test users, once**: Recall@20 0.2834 against popularity 0.1641 (+72.7%, E1), coverage 16.6% (E2), no rail over a
+  cap and variety above the score order's (E3), reasons truthful (E4). E5 measured on this machine (p95 3.94 ms against
+  150 ms); its Tier 0 run is for the author batch. Each verdict seen to fail.
+
+**Decisions taken (none reserved):** caps of two per director, two per franchise and five per year, "dominated" read as
+more than a quarter of a rail; up to 500 loved titles asked; popularity enters as candidates but not as a push; the
+tuning rule for coverage stated before its run; E5 stays open until a Tier 0 machine measures it. **Spec amendments:**
+none.
+
+## 2026-11-18 — 17.3 seen in the real window; 17.6 begun (meaning for every title without it, live neighbours)
+
+- **17.3**: the release build on a scratch copy of the development data showed Home's taste rail with a reason on each
+  card, and `eval recommend --rail 1` the whole rail: twenty of twenty said "Close to", Pickpocket "close to The
+  Godfather". The reason is now the part furthest above the median candidate; the same twenty say "Loved by people who
+  loved ...". Seen to fail first (1cad203).
+- **Meaning for titles without it** (ADR-0054 step 2): a companion usearch graph beside the published one
+  (`VectorIndex::open` reads both, `Companion` writes), migration 0030 (`new_meaning`), the job in
+  `crates/catalogue/src/meaning.rs` (TMDB with a key, AniList for anime, Wikipedia through Wikidata by id, the
+  article's opening when the lead is short), wired after each launch's check.
+- **Found by running it, amended in the open (A44, 4.7.1)**: "the titles a refresh added" were 19,052 little-known
+  titles of this year; 1,331 core titles with 10,000+ votes (Doctor Who, One Punch Man, Solo Leveling) had no vector
+  at all. The batch is now every core title the published file does not hold, most-voted first, 2,000 a launch.
+  Three runs on the copy: 16, 170, 188 embedded.
+- **Live neighbours** (ADR-0054 step 3): migration 0031 (`item_neighbours.source`, `neighbours_asked`), AniList's and
+  TMDB's recommendations for each profile's liked titles, weekly, scored at MovieLens' mean for the same rank; hourly
+  with the catalogue check. On the copy they showed the rail giving the larger taste every slot: calibration next.
+
+**Decisions taken (none reserved):** a reason is the part furthest above the median candidate; the meaning batch covers
+every title without a vector, retrying after 7 days (released in the last year) or 90; up to 100 article openings a
+launch; TMDB with the first profile's own key that has one (the result is a fact about a title, shared like the
+catalogue); live rows scored by rank against MovieLens' mean; AniList 200 and TMDB 25 titles a launch. **Spec
+amendments:** A44, spec_version 4.7.1 (ADR-0054 amended, CLAUDE.md resynced).
+
+## 2026-11-18 — 17.6 finished, 17.5, Phase 17 closed
+
+- **Calibration**: the copy's rail gave a profile of seven films and two anime twenty films. Each taste mode now fills
+  at most its share (largest remainder), and the picks are interleaved so a smaller taste is on screen, not at places
+  16 to 20. Test users: Recall@20 +60.9% (E1), coverage 45.7% (E2), no rail over a cap and ILD 0.418 (E3),
+  miscalibration 0.008.
+- **Makers** reach a title nobody has rated ("By Andrei Tarkovsky, who made Stalker and Solaris"); weight 0.1 by a rule
+  recorded before the sweep. **Rising now** from IMDb's vote counts. **Settings** lists each source's last update.
+  **E7** end to end in `crates/catalogue/tests/staying_current.rs`.
+- **Found on the copy, not by the tests**: the ratings refresh rewritten as `UPDATE ... FROM` took 17 s a chunk (hours a
+  refresh; never pushed; back to 8 ms, with a test that reproduces the real planner statistics); titles the meaning job
+  described would have failed the published file's verification at the next index rebuild (fixed, tested); Settings'
+  taste preview named different films from Home's rail of the same name (now the same rail); two Settings lines read
+  wrongly.
+
+**Retrospective (Phase 17).** *Went well:* every setting chosen on tuning users by a rule written down before its run;
+each fix seen to fail first; the real window and a real copy found six problems no metric or fixture did. *Went
+wrong:* the first full recommender was worse than its matrix (two of my structural choices); reasons were true but
+useless until looked at; recall hid that one taste took the whole rail; a refresh statement that read well was
+catastrophically slow on real data. *Change:* run the launch's chain on a copy of real data before calling a staying-
+current step done, and measure calibration from a harness's first day. **Carried:** E5 (Tier 0 timing) to the Phase 19
+author batch; Phase 5 E3/E4 (meaning nDCG 0.0472, unchanged) on to Phase 18, whose mood shelves are built from semantic
+queries; I41 ("Playable now") to Phase 19, a browsing rail beside its Home overhaul, because this phase grew by
+ADR-0054's whole subtask. I40 was done in Phase 16 (0fc2922).
+
+**Decisions taken (none reserved):** calibration by quota with interleaving, taking 11.8 points of lift for coverage
+and mixed rails; the makers' pool (directors and creators, ten newest each, 150 kept) at weight 0.1; rising kept as the
+200 biggest gains at each refresh; the taste preview shows Home's rail; titles the meaning job describes belong to the
+companion, never the published graph. **Spec amendments:** A44 (4.7.1), recorded earlier today.

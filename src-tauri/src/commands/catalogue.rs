@@ -91,6 +91,33 @@ pub async fn catalogue_status(state: State<'_, AppState>) -> Result<CatalogueSta
     Ok(out)
 }
 
+/// One source the app keeps current, as Settings lists it (ADR-0054 step 7).
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct SourceStatus {
+    pub name: String,
+    /// ISO 8601 UTC; `None` before its first update.
+    pub updated_at: Option<String>,
+    pub detail: String,
+}
+
+/// Each source the app keeps current: when it last updated and what it did
+/// (`sinephile_catalogue::current`).
+#[tauri::command]
+#[specta::specta]
+pub async fn staying_current(state: State<'_, AppState>) -> Result<Vec<SourceStatus>, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    Ok(sinephile_catalogue::current::sources(&db)
+        .await
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .map(|s| SourceStatus {
+            name: s.name.to_string(),
+            updated_at: s.updated_at,
+            detail: s.detail,
+        })
+        .collect())
+}
+
 /// "Refresh now": a refresh whatever the publisher says, in the background.
 #[tauri::command]
 #[specta::specta]
@@ -162,11 +189,14 @@ fn start(app: AppHandle, force: bool) -> bool {
                     // The catalogue is searchable: an installed copy builds its meaning index
                     // now, from the files the installer carried (ADR-0053). Downloads nothing.
                     crate::commands::assets::build_meaning_when_on_disk(&app);
+                    // What it gained gets its meaning (ADR-0054 step 2).
+                    crate::commands::assets::extend_meaning(&app);
                     if r.akas {
                         // Files named by their romaji or English titles are worth another look.
                         crate::commands::library::scan_all(&app).await;
                     }
-                    if refreshed || r.built || r.akas || r.indexed > 0 {
+                    // A rebuilt item-item matrix changes what Home recommends (ADR-0054).
+                    if refreshed || r.built || r.akas || r.indexed > 0 || r.neighbours {
                         let _ = app.emit("catalogue-refreshed", ());
                     }
                 }
@@ -192,6 +222,7 @@ pub async fn keep_current(app: AppHandle) {
     loop {
         start(app.clone(), false);
         showing_now(&app).await;
+        live_neighbours(&app).await;
         if last_airing.is_none_or(|t| t.elapsed() >= AIRING_EVERY) {
             last_airing = Some(std::time::Instant::now());
             airing(&app).await;
@@ -233,6 +264,23 @@ fn today() -> String {
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs() as i64);
     sinephile_subtitles::utc_day(secs)
+}
+
+/// AniList's and TMDB's recommendations beside MovieLens for what each profile loved, each
+/// title a week apart (ADR-0054 step 3, `sinephile_catalogue::live`). Hourly, so a title
+/// loved today is asked about within the hour.
+async fn live_neighbours(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let Some(db) = state.db() else { return };
+    match sinephile_catalogue::live::at_launch(&db, state.http.clone()).await {
+        Ok(report) => {
+            tracing::info!(?report, "live neighbours");
+            if report.anilist_rows + report.tmdb_rows > 0 {
+                let _ = app.emit("catalogue-refreshed", ());
+            }
+        }
+        Err(error) => tracing::warn!(%error, "live neighbours stopped; the next check resumes"),
+    }
 }
 
 /// For each profile with its own key, what is showing now, once a day.

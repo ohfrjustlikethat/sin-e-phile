@@ -134,7 +134,7 @@ phase's metric, which is the kind of rot that otherwise goes unnoticed.
 | Filename identification | top-1 accuracy · false-confident rate | > 95% · **< 1%** |
 | Subtitle alignment | within 150 ms | > 90% |
 | Search relevance | nDCG@10 · exact-title top-1 | > 0.75 · **100%** (measured: meaning **0.047, not met**; filters 1.000; exact title **43/43**) |
-| Recommender quality | Recall@20 vs popularity baseline · catalogue coverage | **+40% relative** · > 15% |
+| Recommender quality | Recall@20 vs popularity baseline · catalogue coverage | **+40% relative** · > 15% (measured: **+60.9%** · **45.7%**, calibrated to each profile's tastes) |
 
 The false-confident rate matters more than the accuracy number. Being wrong while
 confident is the worst failure mode a file matcher has, and it is measured

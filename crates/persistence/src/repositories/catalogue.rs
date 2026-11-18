@@ -233,11 +233,17 @@ impl<'a> CatalogueRepository<'a> {
     /// So the vector half indexes only what has something to say. Nothing is lost: an
     /// item with no description is still found by exact title and by BM25, which handle
     /// titles better and more predictably than an embedding ever will.
+    ///
+    /// A title the launch's meaning job described (ADR-0054, migration 0030) is left out:
+    /// the published vector at its position was made from the text it had then, so the
+    /// published graph does not hold it, and its vector is the companion's.
     pub async fn core_ids_for_vectors(&self) -> Result<Vec<Option<i64>>, DbError> {
         let rows: Vec<(i64, i64)> = sqlx::query_as(&format!(
             "SELECT id,
                     CASE WHEN synopsis IS NOT NULL
                           AND length(trim(synopsis)) >= {MIN_SYNOPSIS}
+                          AND id NOT IN (SELECT media_item_id FROM new_meaning
+                                          WHERE source IS NOT NULL)
                          THEN 1 ELSE 0 END
                FROM media_items WHERE {CORE_TIER} ORDER BY id"
         ))

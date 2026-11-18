@@ -3108,3 +3108,293 @@ rounds, one default profile each time (seen to fail before the fix: "round 0: �
 profiles.name"; it passed before the fix too until the pool was warmed to eight open connections);
 `an_install_left_without_a_default_gets_its_first_profile_back` and
 `a_new_default_that_cannot_be_made_leaves_the_old_one_the_default`, each seen to fail.
+
+## Phase 17 — Recommendation Engine
+
+### The item-item matrix (17.1, 2026-11-18)
+
+`cargo run --release -p eval -- recommend [--tune]` over the local `ml-25m.zip` (25,000,095 ratings). Users split by a
+hash of their id (`crates/recommend/src/split.rs`): 80% build the matrix, 10% tune, 10% judge; a fifth of each judged
+user's likes (4.0 stars and up) held out. Recall@20 = hits / min(20, held out), averaged over users; popularity gets the
+same 20 slots with the most-liked titles the user has not liked. Coverage = the share of the matrix's titles that reach
+at least one judged user's 20.
+
+Built from 9,944,040 likes by 129,892 people over 18,503 titles (5 likes or more). Reading the ratings 2.5 s, indexing
+0.2 s, the matrix 0.4 s on 24 threads (Tier 2 dev machine), peak working set 137 MB. The first version held about 1 GB:
+each row kept the room of everything its item touched (`truncate` keeps capacity); one reused buffer per thread fixed it
+with identical results.
+
+**Tuning users** (15,672 judged; popularity 0.1665), score `c / (mass_i^(1-alpha) * mass_j^alpha) * c / (c + shrink)`:
+
+| alpha | shrink | Recall@20 | against popularity | coverage |
+|---|---|---|---|---|
+| 0.3 | 0 | 0.2668 | +60.3% | 4.0% |
+| 0.5 (cosine) | 0 | 0.2932 | +76.1% | 9.9% |
+| 0.55 | 3 | 0.2970 | +78.4% | 9.3% |
+| 0.6 | 0 | 0.2959 | +77.8% | 14.3% |
+| **0.65** | **0** | **0.2864** | **+72.1%** | **16.6%** |
+| 0.7 | 2 | 0.2719 | +63.3% | 15.4% |
+| 0.75 | 3 | 0.2467 | +48.2% | 16.5% |
+| 0.9 | 0 | 0.0690 | -58.6% | 25.1% |
+
+Rule, fixed before looking at the test users: the best recall whose coverage clears E2's 15%. Shrinkage helped recall
+only marginally where it helped at all, and always cost coverage. The harness reports a loss when there is one
+(alpha 0.9, -58.6%).
+
+**Test users** (15,641 judged), alpha 0.65, shrink 0: **Recall@20 0.2855 against popularity 0.1640, +74.1%**
+(E1 asks more than +40%); **coverage 16.4%** (E2 asks more than 15%). This is the matrix alone; E1 and E2 are measured
+again on the whole recommender in 17.4.
+
+**On the development copy** (`target/release/ingest neighbours`, 2026-11-18, every user, the films the catalogue holds):
+25,000,095 ratings, 12,402,053 likes by 162,342 people over 19,792 titles; 989,600 rows stored; **10.4 s end to end**,
+database +22.6 MB, peak working set 199 MB. Neighbours, read back: *Tokyo Story* — Late Spring, Early Summer, Ugetsu,
+Sansho the Bailiff, Floating Weeds, Sunrise, Ordet, A Man Escaped; *Stalker* — Solaris, The Mirror, Andrei Rublev,
+Nostalgia, The Sacrifice, Ivan's Childhood, Persona, Come and See; *Spirited Away* — seven Ghibli films and Grave of the
+Fireflies.
+
+**The app's own path, MovieLens' rolling release** (`target/release/ingest neighbours`, which calls the launch step
+`neighbours::keep_current`; 2026-11-18, development copy, real network): `ml-latest.zip` fetched over verified HTTPS
+(334.6 MB), joined, built and stored: 33,832,162 ratings, 16,844,614 likes by 324,303 people over **25,032 titles**
+(19,792 from ml-25m); 1,251,574 rows; the build 15.6 s, **130.5 s in all** (the download most of it); database
++20.9 MB; peak working set 242 MB; the archive deleted. **Run again: `Current`**, one HEAD, nothing fetched.
+
+How current it is: titles with neighbours by year, 2019: 662, 2020: 461, 2021: 400, 2022: 332, **2023: 77**, none
+later. *Past Lives* (2023) has neighbours (You Hurt My Feelings, Of an Age, …); *Oppenheimer* and *The Boy and the
+Heron* (2023) do not. GroupLens' rolling release stops in 2023, which is why ADR-0054 adds AniList's and TMDB's live
+recommendations and cold-start neighbours (17.6) rather than relying on MovieLens.
+
+### The whole recommender (17.4, 2026-11-18)
+
+`cargo run --release -p eval -- recommend --whole [--tune] [--limit N]`: the app's own gathering
+(`sinephile_taste::hybrid::candidates`) and ranker (`sinephile_recommend::rank`) on MovieLens users the matrix never
+learned from. The matrix is rebuilt in the harness from ml-25m's build users onto catalogue titles (129,892 people,
+18,377 titles); each judged user's shown likes become a profile (modes from their vectors in the meaning index, axes
+from the catalogue); the held-out likes are the answer; popularity gets the same 20 slots with the build users'
+most-liked titles not shown.
+
+**First trial** (300 test users, the starting setting near 1, loved 1, popular 0.15, diversity 0.3): Recall@20 0.2482
+against popularity 0.1730 (+43.5%); about 926 candidates a user. Ranking one user's candidates took p50 26.08 ms; the
+variety step compared every candidate with every pick in each round. Keeping each candidate's closeness to the nearest
+pick as picks are made: **p50 3.73 ms, p95 3.93 ms**, identical results (release build, Tier 2 dev machine).
+
+**Tuning sweep** (2,000 tuning users, 108 settings of near, loved, popular and diversity; 723 s): popularity 0.1627;
+every setting between **0.2497 and 0.2560 (+53.4% to +57.3%)**, best near 1, loved 0.5, popular 0.3, diversity 0.15.
+Coverage 7.3-8.9% (2,000 users fill only 40,000 slots, so this is not E2's measure). No rail over a cap. The weights
+barely matter; and the whole recommender finds fewer held-out favourites than the matrix alone did on the same kind of
+users (0.2864, +72.1%), so something structural costs recall. Suspects being measured: only 60 loved titles' neighbours
+are asked for (in the harness every like weighs the same, so which 60 is arbitrary), and three per year is a strict cap.
+
+**Where the recall went** (the same 1,000 tuning users each time, popularity 0.1665; the starting setting, then the
+best of the 108):
+
+| Variant | Starting setting | Best setting |
+|---|---|---|
+| A: as built (60 loved titles asked, caps 2/1/3) | 0.2484 (+49.2%) | 0.2537 (+52.4%) |
+| B: every loved title asked (`--asked 2000`) | 0.2650 (+59.2%) | 0.2706 (+62.6%) |
+| C: caps 2 per director, 2 per franchise, 5 per year (`--caps 2,2,5`) | 0.2691 (+61.6%) | 0.2735 (+64.3%) |
+| **D: both** | **0.2859 (+71.7%)** | **0.2906 (+74.6%)** |
+
+Both are structural, and together they bring the whole recommender back to the matrix alone's level (+72.1% on tuning
+users) and past it. Taken: up to 500 loved titles asked (one query of about 25,000 rows), and caps of 2/2/5 in a rail
+of twenty, so no director, franchise or year takes more than a quarter of it.
+
+**Tuning sweep again, with 500 loved titles asked and caps 2/2/5** (2,000 tuning users, 108 settings, 583 s; per user
+modes 7 ms, axes 14 ms, gathering 31 ms, the rest ranking 108 settings): popularity 0.1627; best **near 1, loved 0.5,
+popular 0.15, diversity 0.15: Recall@20 0.2906 (+78.6%)**, coverage 7.8% at 2,000 users; the range across settings
++74.7% to +78.6%, coverage 7.2-8.4%; no rail over a cap. Taken as `rank::WEIGHTS` and `rank::DIVERSITY`. Ranking a
+user's candidates: p50 2.94 ms, p95 3.21 ms.
+
+With these weights a pick's reason changed: the score maps an unrelated title's closeness (cosine 0) to half its part,
+and counted whole that floor outvoted three loved titles pointing to a title. A reason now weighs closeness only above
+unrelated (`max(0, cosine)`); the score is unchanged, so the numbers above stand
+(`rank::tests::a_title_loved_alongside_what_you_loved_ranks_first_and_says_why` failed before the change).
+
+**Every tuning user, the app's setting** (`eval recommend --whole --check`, 15,671 users, 877 s): popularity 0.1666;
+**Recall@20 0.2835 (+70.2%)**; **coverage 15.6%**; intra-list diversity 0.407 against 0.404 for the same candidates in
+score order; no rail over a cap. Ranking a user's candidates: p50 0.92 ms, p95 3.29 ms. Per user: modes 8 ms, axes
+14 ms, gathering 31 ms.
+
+Coverage clears E2 by 0.6 points, inside the difference two samples of users can make, so before the test users are
+read a margin is bought on the tuning users alone, by a rule fixed before it ran: of the app's setting and five more
+(popularity weight 0.15 or 0, diversity 0.15, 0.3 or 0.5), the best recall whose coverage over every tuning user is at
+least 16%.
+
+| Every tuning user (15,671) | Recall@20 | against popularity | coverage | ILD |
+|---|---|---|---|---|
+| popular 0.15, diversity 0.15 (the app's, then) | 0.2835 | +70.2% | 15.6% | 0.407 |
+| popular 0.15, diversity 0.3 | 0.2831 | +69.9% | 15.8% | 0.411 |
+| popular 0.15, diversity 0.5 | 0.2769 | +66.2% | 17.8% | 0.419 |
+| **popular 0, diversity 0.15** | **0.2835** | **+70.2%** | **16.7%** | 0.407 |
+| popular 0, diversity 0.3 | 0.2826 | +69.6% | 16.9% | 0.410 |
+| popular 0, diversity 0.5 | 0.2767 | +66.1% | 19.6% | 0.419 |
+
+By the rule: popular 0, diversity 0.15. Taking popularity's push away cost no recall to four places and widened
+coverage by 1.1 points; the most-voted still enter as candidates. No rail over a cap in any setting.
+
+**The test users, once** (`cargo run --release -p eval -- recommend --whole`, 2026-11-18; 15,640 users; 1,061 s;
+the app's setting: near 1, loved 0.5, popular 0, diversity 0.15, caps 2/2/5, 500 loved titles asked):
+
+| Criterion | Measured | Target |
+|---|---|---|
+| E1 | **Recall@20 0.2834 against popularity 0.1641: +72.7%** | more than +40% relative |
+| E2 | **coverage 16.6%** of the 18,377 titles MovieLens' build users liked five times or more | more than 15% |
+| E3 | **no rail over a cap** (two per director, two per franchise, five per year); intra-list diversity **0.407** against **0.404** for the same candidates in score order | at least the score order's, and no cap broken |
+| E5 | ranking one user's candidates (median 925, at most 1,000): **p50 1.23 ms, p95 3.94 ms, max 6.48 ms** | under 150 ms on Tier 0 |
+
+E5 is measured on the Tier 2 development machine (release build); the ranker is single-threaded and does about
+8 million multiply-adds for a thousand candidates, 38 times inside the budget here. A Tier 0 run is asked for in the
+batched author checks.
+
+**Each verdict seen to fail**: E1 by the matrix harness (alpha 0.9: -58.6% against popularity); E2 and E3 by
+`--whole --limit 300 --caps 20,20,20` (300 users fill too few slots for coverage, 3.8%: "NOT met"; ranked with loose
+caps, 196 of 300 rails break the app's caps: "NOT met"). The caps check judges against the app's caps whatever the
+ranking used, which is what made it able to fail.
+
+### 17.3: the taste rail in the real window, and its reasons (2026-11-18)
+
+A copy of the development data (`SINEPHILE_DATA_DIR`), profile 1 given five loved films (Stalker, Solaris, Tokyo
+Story, In the Mood for Love, Late Spring) beside its three liked ones; the release build's Home, then the whole rail
+with `cargo run --release -p eval -- recommend --rail 1` (Home's own `rails`, built in 53-55 ms):
+
+| Reason rule | Loved by people who loved | Close in meaning | Widely loved |
+|---|---|---|---|
+| the biggest part (96310a6) | 0 | **20** | 0 |
+| the part furthest above the typical candidate (this commit) | **20** | 0 | 0 |
+
+The picks are the same twenty, in the same order (the rule changes no score): Andrei Rublev, Early Summer, The Mirror,
+Wild Strawberries, A Man Escaped, The Passion of Joan of Arc, Ugetsu, L'Avventura, The Godfather Part II, Sunrise,
+Pickpocket, Harakiri, Floating Weeds, Persona, Sansho the Bailiff, Close-Up, Viridiana, Man with a Movie Camera, The
+Discreet Charm of the Bourgeoisie, La Dolce Vita. Under the first rule Pickpocket and The Discreet Charm of the
+Bourgeoisie were "close to The Godfather and Oppenheimer"; under the second, "loved by people who loved Tokyo Story,
+Stalker and Solaris". Every candidate from the meaning pool is close to some mode, so closeness never told one apart;
+the people who loved the same titles did. "Close to" is now what a title gets when closeness is what sets it apart,
+which is the case of a title nobody has rated (17.6).
+
+### 17.6: meaning for titles without it, on a copy of the development catalogue (2026-11-18)
+
+`ingest --data-dir <copy> meaning` (`sinephile_catalogue::meaning::at_launch`, what the app runs after each launch's
+catalogue check), against the live services, no TMDB key (so AniList and Wikipedia only). The published meaning file
+holds 119,874 titles; the catalogue has 874,755 core titles.
+
+| Run (on 3bd324e and after) | Waiting | Described: AniList / Wikipedia | Embedded | Time |
+|---|---|---|---|---|
+| 1. only the titles past the published file | 2,000 | 0 / 16 | 16 | 60.6 s |
+| 2. every core title without a vector (A44) | 2,000 | 103 / 67 | 170 | 115.6 s |
+| 3. as 2, with the opening of articles whose lead was short | 2,000 | 69 / 119 | 188 | 186.0 s |
+
+- Run 1 found what "the titles a refresh added" are: 19,052 core titles past the file, mostly this year's, the most voted
+  with 4,741 votes; Wikipedia had an article for 23 of the first 2,000. Meanwhile 1,331 core titles with 10,000 votes or
+  more had no vector (Doctor Who, One Punch Man, Solo Leveling, Delicatessen), which led to A44.
+- Run 2: One Punch Man and Solo Leveling described by AniList, Dept. Q by Wikipedia (306 characters), all embedded.
+  1,518 of the 2,000 Wikipedia leads were under the 300-character rule (Delicatessen's is 248): the reason for run 3.
+- Run 3: up to 100 openings a launch (1,200 characters, into the plot), most-voted first.
+- After the three, the companion graph holds 374 vectors in 298 KB. The waiting query takes 2.85 s over the core tier
+  (logged as slow; once a launch, in the background). Doctor Who has no IMDb link on Wikidata for its id, so only a
+  TMDB key describes it.
+
+### 17.6: live neighbours on the copy (2026-11-18)
+
+`ingest --data-dir <copy> neighbours --live` (`sinephile_catalogue::live::at_launch`), real AniList, no TMDB key, the
+copy's profile given two loved anime (One Punch Man, Solo Leveling) beside its films: AniList asked about 2 titles,
+16 rows. One Punch Man's first are Mob Psycho 100 (0.288, MovieLens' mean at rank 1) and Mashle (0.248); Solo
+Leveling's, Sword Art Online and Tower of God. A second run asks nothing (a week has not passed).
+
+**What it showed about the ranker.** `eval recommend --rail 1` (now opening both graphs, as the app does): the same
+twenty arthouse films and no anime, though two of the profile's nine loved titles are anime. The loved part sums a
+candidate's neighbour scores over the loved titles, so a film loved beside four of the profile's films outscores an
+anime recommended beside one; with seven films to two anime, the larger taste takes every slot. Recall@20 does not see
+it (it rewards the majority). Calibration (a rail's mix of taste modes matching the profile's, Steck 2018) is the
+remedy, measured against E1-E3 before it is kept. Home built in 63-96 ms warm (368 ms on the first, cold, read after
+migration 0031 rewrote the table).
+
+### 17.6: calibration by taste mode, on the test users (2026-11-18)
+
+Each taste mode may fill at most its share of a rail (largest-remainder apportionment, every mode at least one slot;
+`rank::quotas`), so a rail mixes as the profile does (Steck 2018). Measured with the same harness on the same 15,640
+test users, `SINEPHILE_DATA_DIR=<copy> eval recommend --whole` (on afa2ec0 plus the ranker change; 1,257 s, the machine
+also building), against the recorded run without it:
+
+| Setting | Recall@20 | against popularity | coverage | ILD | miscalibration (KL) |
+|---|---|---|---|---|---|
+| uncalibrated (c183f27, recorded above) | 0.2834 | +72.7% | 16.6% | 0.407 | not measured |
+| **calibrated (the app's now)** | **0.2648** | **+61.4%** | **43.5%** | **0.417** | **0.008** |
+| the same candidates in score order | 0.2830 | +72.5% | 16.4% | 0.404 | 0.683 |
+
+E1 met (+61.4% > 40%), E2 met (43.5%), E3 met (no rail over a cap; 0.417 against 0.404). Ranking p50 1.75 ms, p95
+6.29 ms on this machine with a build running beside it. **The trade, taken knowingly:** 1.9 points of recall (held-out
+likes follow the larger taste, so recall rewards a rail that does) for coverage nearly tripled and a rail whose mix
+follows the profile's: on the copy, a profile of seven films and two anime got 15 films and 5 anime instead of 20 films.
+
+**The rule for the maker's weight, fixed before its run:** `eval recommend --whole --tune --people 0,0.1,0.25,0.5
+--limit 2000` on tuning users, calibrated; the weight with the best Recall@20; two within 0.002 of each other count as
+equal, and the larger is taken, because what the part is for (a title nobody has rated) is what held-out MovieLens likes
+cannot measure.
+
+**The maker's weight, by that rule** (`eval recommend --whole --tune --people 0,0.1,0.25,0.5 --limit 2000`, on 95e17cc's
+code, calibrated, 2,000 tuning users; ranking p95 7.52 ms with a build beside it):
+
+| people | Recall@20 | against popularity | coverage | ILD |
+|---|---|---|---|---|
+| 0 | 0.2700 | +65.9% | 16.3% | 0.418 |
+| **0.1** | **0.2705** | **+66.2%** | **16.9%** | 0.418 |
+| 0.25 | 0.2566 | +57.6% | 20.1% | 0.418 |
+| 0.5 | 0.1812 | +11.3% | 24.0% | 0.420 |
+
+0.1 is best, and 0 is within 0.002 of it (equal by the rule, so the larger): **people 0.1**. A heavier weight fills the
+rail with a loved director's other work, which MovieLens' held-out likes reward less and less. (Coverage here is over
+2,000 users; it grows with the number of users judged, so it is not comparable with the test run's 15,640.)
+
+### 17.6: the ratings refresh, one chunk of 200 (2026-11-18)
+
+Found by launching the release build on the copy while IMDb's files had been republished: the app log
+(`slow statement`) showed 15.9 s and 19.8 s for chunks of the ratings refresh written as `UPDATE ... FROM` (95e17cc,
+never pushed). Timed on the copy (3.27 million titles, 200 real IMDb ids, each in a rolled-back transaction, Python's
+SQLite 3.49):
+
+| Form | One chunk |
+|---|---|
+| `UPDATE ... FROM` with the rising columns | 17,329.8 ms |
+| the same, join order forced with `CROSS JOIN` | 187,520.4 ms |
+| the correlated form before 17.6 | 7.2 ms |
+| **the correlated form with the rising columns (5c70542)** | **8.2 ms** |
+
+A refresh is about 8,000 chunks: hours against about a minute. The cause: no planner statistics for `external_ids`, so
+the planner put it outside, by `source` alone. `a_ratings_chunk_touches_only_its_own_rows` reproduces those statistics
+on 300,000 titles: 2.8 s a chunk on the `FROM` form (fails), well under 400 ms on the correlated one.
+
+### 17.6: the whole recommender as the app now runs it, on the test users (2026-11-18)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- recommend --whole` on eca974f (calibrated, the makers' pool
+and part at 0.1; 5c70542's interleaving changes only the order, so every number below holds for it), 15,640 test users,
+1,496 s with builds and the app running beside it:
+
+| Setting | Recall@20 | against popularity | coverage | ILD | miscalibration | over caps |
+|---|---|---|---|---|---|---|
+| **the app's** | **0.2639** | **+60.9%** | **45.7%** | **0.418** | **0.008** | **0** |
+| the same candidates in score order | 0.2834 | +72.8% | 17.0% | 0.404 | 0.664 | 0 |
+
+**E1 met** (+60.9% > 40%), **E2 met** (45.7% > 15%), **E3 met** (no rail over a cap; 0.418 against 0.404).
+Candidates per user: median 1,051, max 1,144 (the makers' pool adds about a hundred). Ranking one user's candidates:
+p50 2.30 ms, p95 7.36 ms, max 13.75 ms on this machine under load; E5's 150 ms is for Tier 0 and stays to be measured
+there. Against the first build of the whole recommender (c183f27: +72.7%, 16.6%): 11.8 points of lift given for
+coverage nearly tripled and rails that mix as the profile does.
+
+### Phase 17 regression check before merge (2026-11-18)
+
+Every harness on the copy of the development data (`SINEPHILE_DATA_DIR=<copy> target/release/eval.exe all`, then
+`vector --report`), on f8d8e58, release build, after three launches' meaning had been added to the copy:
+
+| Metric | Recorded before | Now |
+|---|---|---|
+| Search E2 exact-title top-1 | 43/43 | **43/43** |
+| Search E1 p50 / p95, warm | 6.4 / 15.2 ms | **6.5 / 14.5 ms** (34.5 ms p95 in a first run with builds beside it) |
+| Search E3 meaning nDCG@10 | 0.0472 | **0.0472** (carried on to Phase 18) |
+| Search E3 filter nDCG@10 | 1.0000 | **1.0000** |
+| HNSW recall@10 (published graph) | 0.9760 | **0.9760**, index p95 1.85 ms |
+| Subtitles aligned / false accepts | 80/80, 0/10 | **80/80, 0/10** |
+| Identification E1 top-1, tuning / held out | 99.05% / 100% | **99.05% / 100.00%** |
+| Identification E2 false-confident at 0.75 | 0.39% / 0.00% | **0.39% / 0.00%** |
+
+No metric regressed. The first `eval all` refused at the vector harness ("the index holds 119874 vectors and the
+catalogue offers ..."): A44's job had written synopses for titles inside the published file, which then counted as the
+file's own. Fixed in f8d8e58 before this run.

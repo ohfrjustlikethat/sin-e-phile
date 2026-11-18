@@ -152,15 +152,32 @@ async fn apply(
             })
             .collect();
 
+        // A count that changed keeps the one before it and when (migration 0032): what a
+        // title gained since IMDb's last update is what "Rising now" ranks by (ADR-0054
+        // step 6). The right-hand sides all read the row as it was. A title rated for the
+        // first time has nothing before it, so it does not "gain" its whole count.
+        //
+        // CORRELATED, NOT `UPDATE ... FROM`. The FROM form read naturally and took 17 s a
+        // chunk on the real catalogue (8 ms this way): the planner put `external_ids`
+        // outside, by `source` alone, and scanned 3.3 million IMDb ids for each chunk;
+        // forcing the order with CROSS JOIN took 187 s. Here the `WHERE id IN` touches
+        // only the chunk's rows, and each subquery is one primary-key probe and a scan of
+        // 200 constants. Guarded by `a_ratings_chunk_touches_only_its_own_rows`.
+        let new_votes = "(SELECT votes FROM incoming
+                            JOIN external_ids e ON e.external_id = incoming.tconst
+                           WHERE e.source = 'imdb' AND e.media_item_id = media_items.id)";
+        let moved = format!("rating_votes IS NOT NULL AND rating_votes IS NOT {new_votes}");
         let sql = format!(
             "WITH incoming(tconst, rating, votes) AS (VALUES {})
              UPDATE media_items
                 SET rating = (SELECT rating FROM incoming
                                JOIN external_ids e ON e.external_id = incoming.tconst
                               WHERE e.source = 'imdb' AND e.media_item_id = media_items.id),
-                    rating_votes = (SELECT votes FROM incoming
-                                     JOIN external_ids e ON e.external_id = incoming.tconst
-                                    WHERE e.source = 'imdb' AND e.media_item_id = media_items.id),
+                    previous_votes = CASE WHEN {moved} THEN rating_votes
+                                          ELSE previous_votes END,
+                    votes_changed_at = CASE WHEN {moved} THEN datetime('now')
+                                            ELSE votes_changed_at END,
+                    rating_votes = {new_votes},
                     updated_at = datetime('now')
               WHERE id IN (SELECT e.media_item_id FROM external_ids e
                             JOIN incoming ON incoming.tconst = e.external_id

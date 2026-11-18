@@ -10,7 +10,9 @@ pub mod credentials;
 pub mod downloads;
 pub mod episodes;
 pub mod library;
+pub mod meaning;
 pub mod media;
+pub mod neighbours;
 pub mod profiles;
 pub mod search;
 pub mod sources;
@@ -28,7 +30,9 @@ pub use library::{
     Candidate, CandidateFacts, FileMatch, LibraryFolder, LibraryRepository, LocalFile, MatchMethod,
     NewLocalFile, Probe, Upserted,
 };
-pub use media::{Appearance, Credit, MediaRepository};
+pub use meaning::{Awaiting, MeaningCounts, MeaningRepository, Retry};
+pub use media::{Appearance, Credit, Facts, MediaRepository, RISING_KEY};
+pub use neighbours::{NeighbourRepository, NeighbourSource};
 pub use profiles::{NewProfile, Profile, ProfileRepository, Viewing, WatchScope};
 pub use search::{Hit, HitDetail, MatchReason, SearchRepository};
 pub use sources::{

@@ -192,6 +192,7 @@ const FAKE = `(() => {
     subtitle_nudge: (a) => (window.__subDelay = (window.__subDelay ?? 0) + a.deltaMs),
     set_subtitle_settings: () => null,
     tmdb_status: () => ({ has_key: !!window.__tmdbKey, fetched_on: null }),
+    staying_current: () => [],
     // Phase 16: the catalogue keeps itself current.
     catalogue_status: () => ({ refreshed_at: "2026-11-08T06:21:10Z", titles_added: 885, episodes_added: 7951,
       running: false, ready: true, building: null, percent: 100 }),
