@@ -233,12 +233,11 @@ fn intra_list_diversity(
     (pairs > 0).then(|| sum / pairs as f64)
 }
 
-/// Whether a rail keeps the caps: never more than allowed per director, franchise or year.
-fn breaks_caps(
-    picks: &[rank::Pick],
-    by_id: &HashMap<i64, &rank::Candidate>,
-    caps: &rank::Caps,
-) -> bool {
+/// Whether a rail breaks the app's caps (`rank::CAPS`, E3's target): more than allowed per
+/// director, franchise or year. Always the app's, whatever `--caps` ranked under, so ranking
+/// with looser caps shows the check catching what they let through.
+fn breaks_caps(picks: &[rank::Pick], by_id: &HashMap<i64, &rank::Candidate>) -> bool {
+    let caps = &rank::CAPS;
     let mut directors: HashMap<i64, usize> = HashMap::new();
     let mut franchises: HashMap<String, usize> = HashMap::new();
     let mut years: HashMap<i64, usize> = HashMap::new();
@@ -257,6 +256,24 @@ fn breaks_caps(
     directors.values().any(|n| *n > caps.per_director)
         || franchises.values().any(|n| *n > caps.per_franchise)
         || years.values().any(|n| *n > caps.per_year)
+}
+
+/// The settings `--whole --check` tries over every tuning user: the app's own first, then
+/// less weight on popularity and more on variety, the two that widen coverage.
+fn coverage_settings() -> Vec<Setting> {
+    let mut out = Vec::new();
+    for popular in [rank::WEIGHTS.popular, 0.0] {
+        for diversity in [rank::DIVERSITY, 0.3, 0.5] {
+            out.push(Setting {
+                weights: rank::Weights {
+                    popular,
+                    ..rank::WEIGHTS
+                },
+                diversity,
+            });
+        }
+    }
+    out
 }
 
 /// The settings `--whole --tune` tries; without `--tune`, the app's own, then the same by score
@@ -404,7 +421,11 @@ pub async fn whole(
         users.len()
     );
 
-    let settings = settings(tune && !check);
+    let settings = if check {
+        coverage_settings()
+    } else {
+        settings(tune)
+    };
     let mut tallies: Vec<Tally> = settings.iter().map(|_| Tally::default()).collect();
     let mut popularity = 0.0;
     let mut rank_ms: Vec<f64> = Vec::new();
@@ -476,7 +497,7 @@ pub async fn whole(
                 tally.ild += d;
                 tally.ild_rails += 1;
             }
-            if breaks_caps(&picks, &by_id, &caps) {
+            if breaks_caps(&picks, &by_id) {
                 tally.over_caps += 1;
             }
         }
@@ -527,7 +548,29 @@ pub async fn whole(
             best = Some((recall, i));
         }
     }
-    if tune && !check {
+    if check {
+        // The rule, fixed before this ran (docs/eval-results.md): the best recall whose
+        // coverage over every tuning user is at least 16%, a point clear of E2's 15%.
+        let pick = settings
+            .iter()
+            .zip(&tallies)
+            .filter(|(_, t)| coverage_of(t) >= 0.16)
+            .max_by(|a, b| a.1.recall.total_cmp(&b.1.recall));
+        match pick {
+            Some((s, t)) => println!(
+                "\n  best with coverage of at least 16%: near {} loved {} popular {} diversity {} (Recall@{K} {:.4}, coverage {:.1}%)",
+                s.weights.near,
+                s.weights.loved,
+                s.weights.popular,
+                s.diversity,
+                t.recall / n,
+                coverage_of(t) * 100.0
+            ),
+            None => println!("\n  no setting reaches 16% coverage"),
+        }
+        return Ok(true);
+    }
+    if tune {
         if let Some((recall, i)) = best {
             let s = settings[i];
             println!(

@@ -51,9 +51,11 @@ pub struct Candidate {
 }
 
 /// How much each part of the score counts, chosen on MovieLens' tuning users
-/// (`eval recommend --whole --tune`, docs/eval-results.md): the best Recall@20 of 108
-/// settings. The matrix's half weight is not a demotion: its part is the largest of the
-/// three and the steepest, so at 1 it crowded out titles near a taste mode.
+/// (`eval recommend --whole --tune` and `--check`, docs/eval-results.md): the best Recall@20
+/// of 108 settings, then, over every tuning user, the best whose coverage clears E2's 15% by a
+/// point. The matrix's half weight is not a demotion: its part is the steepest, and at 1 it
+/// crowded out titles near a taste mode. Popularity weighs nothing: removing its push cost no
+/// recall and widened coverage from 15.6% to 16.7%; the most-voted still enter as candidates.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Weights {
     pub near: f32,
@@ -66,7 +68,7 @@ pub struct Weights {
 pub const WEIGHTS: Weights = Weights {
     near: 1.0,
     loved: 0.5,
-    popular: 0.15,
+    popular: 0.0,
     axes: 0.2,
     playable: 0.1,
 };

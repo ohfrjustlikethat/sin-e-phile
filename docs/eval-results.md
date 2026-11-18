@@ -3208,3 +3208,44 @@ With these weights a pick's reason changed: the score maps an unrelated title's 
 and counted whole that floor outvoted three loved titles pointing to a title. A reason now weighs closeness only above
 unrelated (`max(0, cosine)`); the score is unchanged, so the numbers above stand
 (`rank::tests::a_title_loved_alongside_what_you_loved_ranks_first_and_says_why` failed before the change).
+
+**Every tuning user, the app's setting** (`eval recommend --whole --check`, 15,671 users, 877 s): popularity 0.1666;
+**Recall@20 0.2835 (+70.2%)**; **coverage 15.6%**; intra-list diversity 0.407 against 0.404 for the same candidates in
+score order; no rail over a cap. Ranking a user's candidates: p50 0.92 ms, p95 3.29 ms. Per user: modes 8 ms, axes
+14 ms, gathering 31 ms.
+
+Coverage clears E2 by 0.6 points, inside the difference two samples of users can make, so before the test users are
+read a margin is bought on the tuning users alone, by a rule fixed before it ran: of the app's setting and five more
+(popularity weight 0.15 or 0, diversity 0.15, 0.3 or 0.5), the best recall whose coverage over every tuning user is at
+least 16%.
+
+| Every tuning user (15,671) | Recall@20 | against popularity | coverage | ILD |
+|---|---|---|---|---|
+| popular 0.15, diversity 0.15 (the app's, then) | 0.2835 | +70.2% | 15.6% | 0.407 |
+| popular 0.15, diversity 0.3 | 0.2831 | +69.9% | 15.8% | 0.411 |
+| popular 0.15, diversity 0.5 | 0.2769 | +66.2% | 17.8% | 0.419 |
+| **popular 0, diversity 0.15** | **0.2835** | **+70.2%** | **16.7%** | 0.407 |
+| popular 0, diversity 0.3 | 0.2826 | +69.6% | 16.9% | 0.410 |
+| popular 0, diversity 0.5 | 0.2767 | +66.1% | 19.6% | 0.419 |
+
+By the rule: popular 0, diversity 0.15. Taking popularity's push away cost no recall to four places and widened
+coverage by 1.1 points; the most-voted still enter as candidates. No rail over a cap in any setting.
+
+**The test users, once** (`cargo run --release -p eval -- recommend --whole`, 2026-11-18; 15,640 users; 1,061 s;
+the app's setting: near 1, loved 0.5, popular 0, diversity 0.15, caps 2/2/5, 500 loved titles asked):
+
+| Criterion | Measured | Target |
+|---|---|---|
+| E1 | **Recall@20 0.2834 against popularity 0.1641: +72.7%** | more than +40% relative |
+| E2 | **coverage 16.6%** of the 18,377 titles MovieLens' build users liked five times or more | more than 15% |
+| E3 | **no rail over a cap** (two per director, two per franchise, five per year); intra-list diversity **0.407** against **0.404** for the same candidates in score order | at least the score order's, and no cap broken |
+| E5 | ranking one user's candidates (median 925, at most 1,000): **p50 1.23 ms, p95 3.94 ms, max 6.48 ms** | under 150 ms on Tier 0 |
+
+E5 is measured on the Tier 2 development machine (release build); the ranker is single-threaded and does about
+8 million multiply-adds for a thousand candidates, 38 times inside the budget here. A Tier 0 run is asked for in the
+batched author checks.
+
+**Each verdict seen to fail**: E1 by the matrix harness (alpha 0.9: -58.6% against popularity); E2 and E3 by
+`--whole --limit 300 --caps 20,20,20` (300 users fill too few slots for coverage, 3.8%: "NOT met"; ranked with loose
+caps, 196 of 300 rails break the app's caps: "NOT met"). The caps check judges against the app's caps whatever the
+ranking used, which is what made it able to fail.
