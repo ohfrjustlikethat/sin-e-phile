@@ -2660,3 +2660,13 @@ ADR-0054's whole subtask. I40 was done in Phase 16 (0fc2922).
 and mixed rails; the makers' pool (directors and creators, ten newest each, 150 kept) at weight 0.1; rising kept as the
 200 biggest gains at each refresh; the taste preview shows Home's rail; titles the meaning job describes belong to the
 companion, never the published graph. **Spec amendments:** A44 (4.7.1), recorded earlier today.
+
+## 2026-11-19 — session end: Phase 17 closed, Phase 18 open
+
+- Phase 17 merged (90231e6), tagged `phase-17`, CI green on main; the record closed in 42fb7a6. Phase 18 (Discovery
+  Engine) is open on `phase/18-discovery-engine`, its doc at `docs/phases/phase-18-discovery-engine.md`.
+- **Resume with "continue"**: `next_action` in PROJECT_STATE.json starts 18.1 (`crates/recommend/src/strategy.rs`, the
+  six arms with honest labels). Real-window checks need a fresh scratch copy of `data/` (the last one lived in a
+  session scratchpad): copy with SQLite's backup API, run the release build with `SINEPHILE_DATA_DIR` pointing at it,
+  stop it by PID.
+- Waiting on the author (Phase 19 batch): Phase 17 E5 on a Tier 0 machine, Phase 7 E7, Phase 14 E4/E6, D89, D91.
