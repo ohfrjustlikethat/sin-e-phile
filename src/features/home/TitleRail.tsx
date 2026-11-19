@@ -5,7 +5,7 @@ import type { HomeCard, RailView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
 
 /** Rails of recommendations, whose cards can be told "not for me" (Phase 18). */
-const RECOMMENDED = new Set(["taste", "stretch", "bridge", "blind_spot", "canon", "deep_cut"]);
+const RECOMMENDED = new Set(["taste", "taste_more", "stretch", "bridge", "blind_spot", "canon", "deep_cut"]);
 
 /**
  * One rail of title cards: Home's, and since Phase 16 the catalogue's under Films and TV Shows. `why` is the small

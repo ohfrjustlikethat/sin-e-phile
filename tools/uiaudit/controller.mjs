@@ -170,6 +170,8 @@ const FAKE = `(() => {
       axes: ["You tend to walk out of war."],
     }),
     correct_taste: (a) => { window.__corrections[a.anchor] = a.correction; return null; },
+    // Phase 18: Surprise me chooses Sunrise.
+    surprise_me: () => ({ id: 7, note: "Like Stalker, but from the 1920s", on_this_pc: false }),
     home: () => [{ key: "loved", title: "Widely loved", items: [{ id: 7, title: "Sunrise", year: 1927,
       made_by: "F. W. Murnau", runtime_minutes: 94 }] },
       // Phase 16 E3: a rail long enough to run off the screen, for the right stick.
@@ -777,6 +779,17 @@ try {
   const back = await waitFor(() => evalJs(`!!document.activeElement?.closest('section[aria-label="For you"]')
       && document.activeElement?.hasAttribute("data-focus-tile")`), "the card back", 15).catch(() => false);
   check(back && (await calls("undismiss")).length === 1, "A on Undo takes it back, focus on the card again");
+  // Phase 18 (ADR-0043): RT is Surprise me, which opens its film's page; B comes back to Home.
+  await press(B.RT);
+  const surprised = await waitFor(
+    () => evalJs(`(document.querySelector('main article h1')?.textContent ?? "").includes("Sunrise")`),
+    "Surprise me's film", 20).catch(() => false);
+  check(surprised && (await calls("surprise_me")).length === 1, "RT (Surprise me) opens a film's page");
+  await press(B.B);
+  await waitFor(() => evalJs(`!!document.querySelector('section[aria-label="For you"]')`), "Home again", 20)
+    .catch(() => false);
+  // The page Surprise me opened asked for its sources; the search flow below counts its own from none.
+  await evalJs(`__calls = __calls.filter((c) => c[0] !== "prepare_play")`);
 
   await press(B.Y);
   const kb = await waitFor(() => evalJs(`!!document.querySelector('[aria-label="On-screen keyboard"]')`), "the keyboard", 20);

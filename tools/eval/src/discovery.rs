@@ -382,6 +382,7 @@ pub async fn novelty_run(
     let (mut taste_n, mut disc_n) = (Novel::default(), Novel::default());
     let mut per_arm: HashMap<Arm, Novel> = HashMap::new();
     let mut picks_per_arm: HashMap<Arm, usize> = HashMap::new();
+    let mut hits_per_arm: HashMap<Arm, usize> = HashMap::new();
     let mut rails_per_arm: HashMap<Arm, usize> = HashMap::new();
     let (mut recall_all, mut recall_pop, mut recall_taste) = (0.0, 0.0, 0.0);
     // Diagnostics: hits per card shown, by where it came from; and Phase 17's ranker asked
@@ -462,9 +463,22 @@ pub async fn novelty_run(
             LEAST,
             &mut Rng::new(u64::from(*user)),
         );
-        let familiar = plan[0].1.min(TASTE_RAIL).min(taste.len());
+        // The familiar's whole share, as Home shows it: the taste rail, and what is past its
+        // twenty in a second rail (Phase 17's ranker asked for that many).
+        let familiar_ids: Vec<i64> = rank::rank(
+            &candidates,
+            &rank::WEIGHTS,
+            &rank::CAPS,
+            rank::DIVERSITY,
+            &shares,
+            plan[0].1,
+        )
+        .into_iter()
+        .map(|p| p.id)
+        .collect();
+        let familiar = familiar_ids.len();
         let mut taken: HashSet<i64> = met.clone();
-        taken.extend(taste[..familiar].iter().copied());
+        taken.extend(familiar_ids.iter().copied());
         let rails = discover::planned(&gathered, &plan, &taken);
         let by_id: HashMap<i64, &strategy::Title> =
             gathered.titles.iter().map(|t| (t.id, t)).collect();
@@ -472,7 +486,7 @@ pub async fn novelty_run(
         for id in &taste {
             taste_n.add(novelty(*id, &j.liked_by, j.build_users));
         }
-        let mut everything: Vec<i64> = taste[..familiar].to_vec();
+        let mut everything: Vec<i64> = familiar_ids.clone();
         for rail in &rails {
             *rails_per_arm.entry(rail.arm).or_default() += 1;
             for d in &rail.picks {
@@ -480,6 +494,9 @@ pub async fn novelty_run(
                 disc_n.add(v);
                 per_arm.entry(rail.arm).or_default().add(v);
                 *picks_per_arm.entry(rail.arm).or_default() += 1;
+                if held.contains(&d.id) {
+                    *hits_per_arm.entry(rail.arm).or_default() += 1;
+                }
                 labels += 1;
                 if !by_id
                     .get(&d.id)
@@ -557,13 +574,15 @@ pub async fn novelty_run(
     );
     for arm in Arm::ALL {
         if let Some(v) = per_arm.get(&arm) {
+            let picks = picks_per_arm.get(&arm).copied().unwrap_or(0);
             println!(
-                "    {:>10}: {:.2} bits, {} picks in {} rails ({:.1}% left out)",
+                "    {:>10}: {:.2} bits, {} picks in {} rails ({:.1}% left out), held-out likes per card {:.4}",
                 arm.key(),
                 v.mean(),
-                picks_per_arm.get(&arm).copied().unwrap_or(0),
+                picks,
                 rails_per_arm.get(&arm).copied().unwrap_or(0),
-                v.unliked_share() * 100.0
+                v.unliked_share() * 100.0,
+                hits_per_arm.get(&arm).copied().unwrap_or(0) as f64 / picks.max(1) as f64
             );
         }
     }

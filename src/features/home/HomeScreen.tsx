@@ -1,11 +1,12 @@
 import { useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Skeleton } from "@/design-system";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button, Skeleton } from "@/design-system";
 import { useScreenHints, type Hint } from "@/design-system/focus/FocusLayer";
 import { commands } from "@/lib/ipc";
 import { onEvent } from "@/lib/events";
 import { SetupCard } from "./SetupCard";
 import { TitleRail } from "./TitleRail";
+import { LENGTHS, surpriseMe, useLength } from "./surprise";
 
 /**
  * Home, first version (SPEC.md Phase 14; Phase 18 overhauls it). Continue watching, where
@@ -28,6 +29,7 @@ const HINTS: Hint[] = [
   ["A", "Select"],
   ["B", "Back"],
   ["X", "Not for me…"],
+  ["RT", "Surprise me"],
   ["Y", "Search"],
   ["Menu", "Settings"],
 ];
@@ -39,6 +41,7 @@ const WHY: Record<string, string> = {
   new: "Out this year, by your taste",
   rising: "Gaining the most ratings since the last update",
   taste: "From what you liked and what you said you love",
+  taste_more: "The rest of what your taste points to: the more Comfort, the longer",
   // Phase 18's discovery rails: each card says why it is there.
   stretch: "Close to one of your tastes, one step outside it",
   bridge: "Close to two of your tastes at once",
@@ -51,7 +54,15 @@ const WHY: Record<string, string> = {
 
 export function HomeScreen() {
   // The hour: the part of the day the discovery engine learns and chooses in (Phase 18).
-  const home = useQuery({ queryKey: HOME, queryFn: () => ok(commands.home(new Date().getHours())) });
+  // "I have 90 minutes" (I42): the recommendation rails hold only what fits.
+  const maxMinutes = useLength((s) => s.maxMinutes);
+  const setMaxMinutes = useLength((s) => s.setMaxMinutes);
+  const home = useQuery({
+    queryKey: [...HOME, maxMinutes],
+    queryFn: () => ok(commands.home(new Date().getHours(), maxMinutes)),
+    // A new length keeps the rails on screen while the shorter ones come.
+    placeholderData: keepPreviousData,
+  });
   useScreenHints(HINTS);
   // New titles from the catalogue, and anything new in the library, show at once.
   const client = useQueryClient();
@@ -80,6 +91,29 @@ export function HomeScreen() {
   return (
     <div className="flex flex-col gap-12 pt-10 pb-24">
       <SetupCard />
+      {/* Surprise me (ADR-0043) and how long you have (I42). */}
+      <div className="flex flex-wrap items-center gap-6 px-16">
+        <Button variant="secondary" size="sm" onClick={() => void surpriseMe()}>
+          Surprise me
+        </Button>
+        <div role="radiogroup" aria-label="How long you have" className="flex items-center gap-4">
+          {LENGTHS.map((l) => (
+            <button
+              key={l.label}
+              type="button"
+              role="radio"
+              aria-checked={maxMinutes === l.minutes}
+              onClick={() => setMaxMinutes(l.minutes)}
+              className={[
+                "font-ui text-[13px] underline-offset-4",
+                maxMinutes === l.minutes ? "text-ink underline" : "text-ink-muted hover:text-ink",
+              ].join(" ")}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
+      </div>
       {home.data.map((r, i) => (
         <TitleRail key={r.key} rail={r} lead={i === 0} why={WHY[r.key] ?? ""} />
       ))}

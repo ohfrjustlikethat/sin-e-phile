@@ -384,9 +384,10 @@ export const commands = {
 	correctTaste: (anchor: number, correction: string | null) => typedError<null, string>(__TAURI_INVOKE("correct_taste", { anchor, correction })),
 	/**
 	 *  Home's rails. `hour` is the viewer's local hour (0 to 23): the part of the day the
-	 *  discovery engine learns and chooses in (Phase 18).
+	 *  discovery engine learns and chooses in (Phase 18). `max_minutes`: "I have 90 minutes"
+	 *  (I42), the recommendation rails holding only what runs no longer.
 	 */
-	home: (hour: number | null) => typedError<RailView[], string>(__TAURI_INVOKE("home", { hour })),
+	home: (hour: number | null, maxMinutes: number | null) => typedError<RailView[], string>(__TAURI_INVOKE("home", { hour, maxMinutes })),
 	/**  The watchlist page (Appendix F, I39): what this profile saved, newest first. */
 	watchlist: () => typedError<HomeCard[], string>(__TAURI_INVOKE("watchlist")),
 	/**
@@ -451,6 +452,17 @@ export const commands = {
 	/**  This profile's Comfort to Adventure setting, 0 to 1. */
 	discoveryBudget: () => typedError<number | null, string>(__TAURI_INVOKE("discovery_budget")),
 	setDiscoveryBudget: (value: number | null) => typedError<null, string>(__TAURI_INVOKE("set_discovery_budget", { value })),
+	/**
+	 *  Surprise me: one film this profile will probably like, from what Home recommends now,
+	 *  within `max_minutes` when given (I42). `None` when there is nothing to choose from.
+	 */
+	surpriseMe: (hour: number | null, maxMinutes: number | null) => typedError<{
+	id: number,
+	/**  Why it was chosen, as its card on Home says it. */
+	note: string | null,
+	/**  In the library: it plays at once. */
+	on_this_pc: boolean,
+} | null, string>(__TAURI_INVOKE("surprise_me", { hour, maxMinutes })),
 };
 
 /* Types */
@@ -1161,6 +1173,15 @@ export type SubtitleSettingsView = {
 	budget: number,
 	/**  What OpenSubtitles last said is left today, if it said. */
 	server_remaining: number | null,
+};
+
+/**  Surprise me's film (Phase 18, ADR-0043). */
+export type SurpriseView = {
+	id: number,
+	/**  Why it was chosen, as its card on Home says it. */
+	note: string | null,
+	/**  In the library: it plays at once. */
+	on_this_pc: boolean,
 };
 
 export type TasteInputView = {

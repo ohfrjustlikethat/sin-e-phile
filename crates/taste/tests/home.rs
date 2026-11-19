@@ -419,3 +419,68 @@ async fn the_bandit_learns_once_per_title_from_its_strongest_outcome() {
     assert_eq!(beliefs.belief(Arm::Canon, Context::Evening), (1.0, 2.0));
     assert_eq!(hidden, [b].into_iter().collect());
 }
+
+#[tokio::test]
+async fn surprise_me_picks_a_film_within_the_length_asked() {
+    // Phase 18 (ADR-0043) and I42: with no taste yet, from what is widely loved; films only;
+    // and "I have 90 minutes" leaves out what runs longer, or whose length is not known.
+    use sinephile_persistence::MediaKind;
+    use sinephile_taste::home::Ask;
+    use sinephile_taste::surprise::surprise;
+    let db = Db::in_memory().await.unwrap();
+    let media = MediaRepository::new(&db);
+    let mut long = NewMediaItem::film("Long", 1990);
+    long.rating_votes = Some(900_000);
+    long.runtime_minutes = Some(170);
+    let long = media.insert(&long).await.unwrap();
+    let mut short = NewMediaItem::film("Short", 1991);
+    short.rating_votes = Some(800_000);
+    short.runtime_minutes = Some(85);
+    let short = media.insert(&short).await.unwrap();
+    let mut unknown = NewMediaItem::film("Unknown length", 1992);
+    unknown.rating_votes = Some(700_000);
+    media.insert(&unknown).await.unwrap();
+    let mut show = NewMediaItem::film("A Show", 1993);
+    show.kind = Some(MediaKind::Series);
+    show.rating_votes = Some(950_000);
+    show.runtime_minutes = Some(30);
+    media.insert(&show).await.unwrap();
+    let me = ProfileRepository::new(&db).ensure_default().await.unwrap();
+    let models = sinephile_taste::model::ModelCache::default();
+
+    let mut seen = std::collections::HashSet::new();
+    for seed in 0..40 {
+        let s = surprise(&db, None, me, false, None, &models, Ask::default(), seed)
+            .await
+            .unwrap()
+            .expect("a film");
+        seen.insert(s.id);
+        assert!(!s.on_this_pc);
+    }
+    assert!(
+        seen.contains(&long) && seen.contains(&short),
+        "asking again gives another: {seen:?}"
+    );
+    assert_eq!(seen.len(), 3, "films only, never the series: {seen:?}");
+    let ninety = Ask {
+        max_minutes: Some(90),
+        ..Ask::default()
+    };
+    for seed in 0..20 {
+        let s = surprise(&db, None, me, false, None, &models, ninety, seed)
+            .await
+            .unwrap()
+            .expect("a film");
+        assert_eq!(s.id, short);
+    }
+    let ten = Ask {
+        max_minutes: Some(10),
+        ..Ask::default()
+    };
+    assert_eq!(
+        surprise(&db, None, me, false, None, &models, ten, 1)
+            .await
+            .unwrap(),
+        None
+    );
+}

@@ -18,6 +18,7 @@ pub mod modes;
 pub mod rounds;
 pub mod shelf;
 pub mod signals;
+pub mod surprise;
 
 use std::collections::HashSet;
 

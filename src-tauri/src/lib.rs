@@ -176,6 +176,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::home::undismiss,
             commands::home::discovery_budget,
             commands::home::set_discovery_budget,
+            commands::home::surprise_me,
         ])
         // `AssetProgress` travels as an EVENT payload, so no command signature mentions it
         // and specta would not export it. Registered explicitly rather than hand-written in

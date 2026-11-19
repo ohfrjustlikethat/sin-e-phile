@@ -100,7 +100,7 @@ export function FocusRing() {
   return createPortal(<div ref={ring} className="focus-ring" aria-hidden data-focus-ring-el />, document.body);
 }
 
-export type Hint = [button: "A" | "B" | "X" | "Y" | "LB" | "RB" | "View" | "Menu", action: string];
+export type Hint = [button: "A" | "B" | "X" | "Y" | "LB" | "RB" | "RT" | "View" | "Menu", action: string];
 
 export const DEFAULT_HINTS: Hint[] = [
   ["A", "Select"],

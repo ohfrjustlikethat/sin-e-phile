@@ -18,6 +18,14 @@ const commands = {
   ),
   subtitleSettings: vi.fn(() => ok({ has_key: false })),
   torrentSettings: vi.fn(() => ok({ bind_interface: null as string | null })),
+  // Phase 18: Surprise me.
+  surpriseMe: vi.fn((_hour: number | null, _max: number | null) =>
+    ok({ id: 7, note: "Like Stalker, but from the 1920s", on_this_pc: false } as {
+      id: number;
+      note: string | null;
+      on_this_pc: boolean;
+    } | null),
+  ),
 };
 vi.mock("@/lib/ipc", () => ({ commands }));
 // jsdom has no layout: the rail measures nothing, and renders its first cards.
@@ -84,5 +92,19 @@ describe("Home, first version (Phase 14)", () => {
     const card = await screen.findByRole("region", { name: "Finish setting up" });
     fireEvent.click(within(card).getByRole("button", { name: "Hide" }));
     expect(screen.queryByRole("region", { name: "Finish setting up" })).toBeNull();
+  });
+
+  it("Surprise me opens a film, within the length chosen (Phase 18, I42)", async () => {
+    useUi.setState({ detail: null });
+    renderHome();
+    await screen.findByRole("region", { name: "Widely loved" });
+    const lengths = screen.getByRole("radiogroup", { name: "How long you have" });
+    expect(within(lengths).getByRole("radio", { name: "Any length" })).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(within(lengths).getByRole("radio", { name: "Under 90 minutes" }));
+    await waitFor(() => expect(commands.home).toHaveBeenLastCalledWith(expect.any(Number), 90));
+    fireEvent.click(screen.getByRole("button", { name: "Surprise me" }));
+    await waitFor(() => expect(useUi.getState().detail).toBe(7));
+    expect(commands.surpriseMe).toHaveBeenLastCalledWith(expect.any(Number), 90);
+    fireEvent.click(within(lengths).getByRole("radio", { name: "Any length" }));
   });
 });

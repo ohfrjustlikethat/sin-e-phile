@@ -34,6 +34,7 @@ import { setWindowFullscreen } from "@/lib/fullscreen";
 import { useScrollMemory } from "@/lib/scrollMemory";
 import { BackBar, usePageName } from "./BackBar";
 import { handleBack } from "./backKey";
+import { surpriseMe } from "@/features/home/surprise";
 
 /** Full screen for the whole app window (ADR-0042: View, or picking the pad up), from any window state. */
 async function fullscreen(on?: boolean) {
@@ -174,6 +175,9 @@ export function App() {
               break;
             case "settings":
               useUi.getState().setSettingsOpen(true);
+              break;
+            case "surprise":
+              void surpriseMe();
               break;
             case "options":
               // What the keyboard's context-menu key does, sent to whatever has focus: a

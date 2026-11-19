@@ -31,7 +31,9 @@ export type NavAction =
   | { kind: "search" }
   | { kind: "settings" }
   /** X: options for whatever has focus, as the keyboard's context-menu key (Phase 18: "not for me"). */
-  | { kind: "options" };
+  | { kind: "options" }
+  /** RT: Surprise me, from anywhere while browsing (Phase 18, ADR-0043). */
+  | { kind: "surprise" };
 
 /** One frame of a pad: which buttons are down, and the sticks. */
 export interface PadFrame {
@@ -168,6 +170,8 @@ export function navAction(button: number): NavAction | null {
       return { kind: "search" };
     case BUTTON.X:
       return { kind: "options" };
+    case BUTTON.RT:
+      return { kind: "surprise" };
     case BUTTON.MENU:
       return { kind: "settings" };
     default:

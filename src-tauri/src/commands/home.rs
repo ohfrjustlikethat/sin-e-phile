@@ -38,10 +38,19 @@ pub struct RailView {
 }
 
 /// Home's rails. `hour` is the viewer's local hour (0 to 23): the part of the day the
-/// discovery engine learns and chooses in (Phase 18).
+/// discovery engine learns and chooses in (Phase 18). `max_minutes`: "I have 90 minutes"
+/// (I42), the recommendation rails holding only what runs no longer.
 #[tauri::command]
 #[specta::specta]
-pub async fn home(state: State<'_, AppState>, hour: Option<u32>) -> Result<Vec<RailView>, String> {
+pub async fn home(
+    state: State<'_, AppState>,
+    hour: Option<u32>,
+    max_minutes: Option<u32>,
+) -> Result<Vec<RailView>, String> {
+    let ask = sinephile_taste::home::Ask {
+        hour,
+        max_minutes: max_minutes.map(i64::from),
+    };
     let db = state.db().ok_or("the library is still opening")?;
     let me = state.profile().await?;
     let kids = crate::commands::profiles::kids(&state).await;
@@ -59,12 +68,12 @@ pub async fn home(state: State<'_, AppState>, hour: Option<u32>) -> Result<Vec<R
                 kids,
                 love.as_deref(),
                 &MODELS,
-                hour,
+                ask,
             )
             .await
         }
         None => {
-            sinephile_taste::home::rails_at(&db, None, me, kids, love.as_deref(), &MODELS, hour)
+            sinephile_taste::home::rails_at(&db, None, me, kids, love.as_deref(), &MODELS, ask)
                 .await
         }
     }
@@ -84,6 +93,77 @@ pub async fn home(state: State<'_, AppState>, hour: Option<u32>) -> Result<Vec<R
         });
     }
     Ok(out)
+}
+
+/// Surprise me's film (Phase 18, ADR-0043).
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct SurpriseView {
+    pub id: i32,
+    /// Why it was chosen, as its card on Home says it.
+    pub note: Option<String>,
+    /// In the library: it plays at once.
+    pub on_this_pc: bool,
+}
+
+/// Surprise me: one film this profile will probably like, from what Home recommends now,
+/// within `max_minutes` when given (I42). `None` when there is nothing to choose from.
+#[tauri::command]
+#[specta::specta]
+pub async fn surprise_me(
+    state: State<'_, AppState>,
+    hour: Option<u32>,
+    max_minutes: Option<u32>,
+) -> Result<Option<SurpriseView>, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let me = state.profile().await?;
+    let kids = crate::commands::profiles::kids(&state).await;
+    let love = CredentialRepository::new(&db)
+        .get(me, "taste.love")
+        .await
+        .map_err(|e| e.to_string())?;
+    let ask = sinephile_taste::home::Ask {
+        hour,
+        max_minutes: max_minutes.map(i64::from),
+    };
+    // A new draw at each press.
+    let seed = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos() as u64);
+    let chosen = match state.engine() {
+        Some(engine) => {
+            let mut engine = engine.lock().await;
+            sinephile_taste::surprise::surprise(
+                &db,
+                engine.semantic_mut(),
+                me,
+                kids,
+                love.as_deref(),
+                &MODELS,
+                ask,
+                seed,
+            )
+            .await
+        }
+        None => {
+            sinephile_taste::surprise::surprise(
+                &db,
+                None,
+                me,
+                kids,
+                love.as_deref(),
+                &MODELS,
+                ask,
+                seed,
+            )
+            .await
+        }
+    }
+    .map_err(|e| e.to_string())?;
+    Ok(chosen.map(|s| SurpriseView {
+        id: s.id as i32,
+        note: s.note,
+        on_this_pc: s.on_this_pc,
+    }))
 }
 
 /// What a viewer says of a recommended card (Phase 18).

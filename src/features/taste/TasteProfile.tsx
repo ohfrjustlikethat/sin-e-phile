@@ -239,7 +239,7 @@ function Examples({ films }: { films: TastePick[] }) {
 
 /** Home's taste rail as it stands, so a correction shows what it changed (Phase 16). */
 function HomePreview() {
-  const home = useQuery({ queryKey: ["home"], queryFn: () => ok(commands.home(new Date().getHours())) });
+  const home = useQuery({ queryKey: ["home"], queryFn: () => ok(commands.home(new Date().getHours(), null)) });
   const rail = home.data?.find((r) => r.key === "taste");
   if (!rail || rail.items.length === 0) return null;
   return (
