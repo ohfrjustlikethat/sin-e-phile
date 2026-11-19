@@ -3482,3 +3482,20 @@ each arm had about 8,500 rails (blind spot 7,821). Gathering a user's discovery 
 at least a bit of novelty kept; they have 0.93 bits to spare. Next: hits per card by arm, then the matrix's weight in
 the arms' relevance, judged on 2,000 users and then once more on all of them.
 
+### 18.2: three ways at E4's relevance, on the first 2,000 test users (2026-11-19)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- discovery --limit 2000`. The 2,000 track the whole set: on
+a1dd9a9 they give +27.6% (all 15,640: +28.8%) and +1.96 bits. Held-out likes per card by arm on a1dd9a9: canon 0.0597
+(popularity's own rate), bridge 0.0386, stretch 0.0357, blind spot 0.0116, deep cut 0.0021 (11.4 bits: a film with at
+most 15,000 IMDb votes is seldom a MovieLens favourite).
+
+| Approach | Recall@N against popularity | novelty over the taste rail |
+|---|---|---|
+| 1. each arm's picks by Phase 17's relevance (a1dd9a9; from +16.0% on 100 users) | +27.6% | +1.96 bits |
+| 2. the matrix's part weighed 1.5 in that relevance, not 0.5 (reverted) | +27.5% | +1.94 bits |
+| 3. the familiar's whole share shown (a second taste rail past twenty; 7c8377c) | **+33.2%** | **+2.02 bits** |
+
+The third is kept as a fix, not a tuning: at the middle budget the plan gave the familiar 30 slots and Home showed 20,
+so discovery had six cards in ten where the plan meant five. **E4 stays NOT met** (+33.2% against more than +40%):
+three distinct approaches, so the choice is recorded as blocker B17 in PROJECT_STATE.json (ADR-0040).
+

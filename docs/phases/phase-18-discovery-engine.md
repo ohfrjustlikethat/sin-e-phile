@@ -86,6 +86,19 @@ E1 bar.
 **18.3** dismissals (not for me, not right now, already seen) and the per-profile budget; one item per Home.
 **18.4** Surprise me, mood shelves, I42, and search-by-meaning quality (Phase 5 E3, E4). **18.5** the case study, E5.
 
+**Decisions taken 2026-11-19 (ADR-0040), and what the measurements changed:**
+- Countries and movements from Wikidata (ADR-0055, spec 4.8.0, A45); "never" of a country only once every met title
+  was asked. A blind-spot rail holds one region.
+- The bandit: probability matching over 100 joint draws, as few rails as fit, cap half of discovery (first 40%: E1's
+  first run missed its bar, +12/-6), floor 20%, ceiling 80%, half-life 60 days, three parts of the day borrowing 0.3.
+- E4's novelty leaves out titles no build user liked (fixed before its first run). Each arm's picks are ordered by Phase
+  17's relevance; Home shows the familiar's whole share (a second taste rail past twenty).
+- Pad: X is "options for what has focus" (not for me, not right now, already seen); RT is Surprise me. "Not for me" is
+  also a taste signal (as an early abandon), "already seen" makes a title met, "not right now" hides it 14 days.
+- Surprise me: films only, from what Home recommends now, on this PC first, at random among the best five. I42: any
+  length, under 90 minutes, under 2 hours; a title with no known length is left out under a limit.
+- E4 relevance short after three approaches: blocker B17, option A (a population prior estimated on tuning users) next.
+
 ## Work log
 - **18.1** The strategy arms (crates/recommend/src/strategy.rs, new): safe-familiar, adjacent-stretch (one  · `c362b80`
 - **18.3** The exploration budget and dismissals: a Comfort to Adventure setting per profile adapted by the · `d7b5afa`

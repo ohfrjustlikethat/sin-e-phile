@@ -2670,3 +2670,21 @@ companion, never the published graph. **Spec amendments:** A44 (4.7.1), recorded
   session scratchpad): copy with SQLite's backup API, run the release build with `SINEPHILE_DATA_DIR` pointing at it,
   stop it by PID.
 - Waiting on the author (Phase 19 batch): Phase 17 E5 on a Tier 0 machine, Phase 7 E7, Phase 14 E4/E6, D89, D91.
+
+## 2026-11-19 — Phase 18: the arms, Wikidata regions, the bandit, dismissals, Surprise me
+
+- **Built**: five discovery arms with labels re-derived by `holds` (18.1); countries and movements from Wikidata
+  (ADR-0055, migration 0033, spec 4.8.0); Thompson sampling over the arms with a floor and a cap (18.2); the bandit's
+  memory and dismissals (migration 0034), not for me / not right now / already seen on every recommended card (X on a
+  pad), Comfort to Adventure on the taste page (18.3); Surprise me (RT) and I42's length limit (18.4, part).
+- **Measured**: E1 met (+35/-21 points; first run missed at +12/-6, fixed by probability matching); E2 met (floor 20%
+  every day, every arm on 23%+ of days); E3 met (461,488 real labels, none false); E4 NOT met: novelty +2.02 bits (bar 1)
+  but Recall@N +33.2% over popularity (bar 40%) after three approaches, blocker B17 with option A taken next. Wikidata:
+  69,124 titles in 2,150 s, 93% with a country.
+- **Decisions**: listed in the phase doc's plan ("Decisions taken 2026-11-19"). **Spec amendment**: A45 (4.8.0).
+- **Lessons**: a 100-user trial said +42% where 15,640 users said +28.8%: judge on the full set, iterate on 2,000 (which
+  tracked it within a point). A plan's share means nothing if the screen does not show it: Home had dropped ten of the
+  familiar's thirty slots. Git Bash's `sed -i` turns CRLF into LF: edit CRLF files through Python.
+- **Resume**: `next_action` (B17 option A, then mood shelves and search-by-meaning quality). Waiting on the author:
+  nothing new; E5 (three films they had not heard of and want to watch) is asked at the phase's end, with the Phase 19
+  batch. Their profile has three ratings, so blind spots need ten met titles before they appear for them.
