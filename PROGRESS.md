@@ -16,11 +16,11 @@
 
 > Builds on Phase 17's recommender: its candidate pools, calibration and reasons are what the arms draw from. Receives Phase 5 E3 and E4 (search by meaning, carried on at Phase 17's close).
 
-### Subtasks — 0/5 complete
+### Subtasks — 2/5 complete
 
-- [~] **18.1** The strategy arms (crates/recommend/src/strategy.rs, new): safe-familiar, adjacent-stretch (one axis away from a taste mode), cross-mode bridge (between two of the profile's modes), blind-spot (a well-regarded region the profile never touched: a country, a decade, a movement), canon-gap (acclaimed work the taste predicts and the profile has not seen), deep-cut (highly rated obscurity near a mode); each yields candidates from Phase 17's pools and the meaning index with an honest label ('Because you loved Stalker', 'Your blind spot: Iranian New Wave'), tested so every label is true (E3).
+- [x] **18.1** The strategy arms (crates/recommend/src/strategy.rs, new): safe-familiar, adjacent-stretch (one axis away from a taste mode), cross-mode bridge (between two of the profile's modes), blind-spot (a well-regarded region the profile never touched: a country, a decade, a movement), canon-gap (acclaimed work the taste predicts and the profile has not seen), deep-cut (highly rated obscurity near a mode); each yields candidates from Phase 17's pools and the meaning index with an honest label ('Because you loved Stalker', 'Your blind spot: Iranian New Wave'), tested so every label is true (E3). · `c362b80`
 - [~] **18.2** The contextual bandit (Thompson sampling) over the arms, rewarded by outcomes (played, completed, abandoned early, watchlisted, dismissed), with an exploration floor and no arm dominating; a simulation harness (`eval discovery`) with simulated users whose reward patterns change (E1), a maximally conservative user who still gets discovery (E2), and the novelty metric, mean inverse popularity, against its target with relevance held (E4).
-- [ ] **18.3** The exploration budget and dismissals: a Comfort to Adventure setting per profile adapted by the bandit; 'not for me', 'not right now', 'already seen' on every recommended card (pad-reachable) feeding back; never the same item in two rails.
+- [x] **18.3** The exploration budget and dismissals: a Comfort to Adventure setting per profile adapted by the bandit; 'not for me', 'not right now', 'already seen' on every recommended card (pad-reachable) feeding back; never the same item in two rails. · `d7b5afa`
 - [ ] **18.4** Surprise me (one button and a pad shortcut: a film the viewer will probably like, from their taste and their sources, opened ready to play) and mood shelves from the semantic index offered to Home's rails, with I42 ('I have 90 minutes'). Search-by-meaning quality, carried from Phase 5 (E3 nDCG@10 0.0472, E4 the two named queries), is worked here, where mood shelves depend on it.
 - [ ] **18.5** The flagship case study (E6), the author's acceptance test on their own taste (E5, asked in the author batch), docs/specs, learning note, README and HOW_IT_WORKS, regression against every recorded number, close.
 
@@ -39,7 +39,7 @@
 
 ## What's next
 
-Phase 18, 18.2: E4 harness (eval discovery without --simulate: MovieLens test users, discover::gather with a facts cache shared across users, novelty = mean -log2 of build-user like share, discovery rails vs Phase 17's taste rail, Recall@N of all shown vs popularity@N; verdict fixed in docs/eval-results.md). Then the app's outcomes: migration 0034 (discovery_shown, dismissals), DiscoveryRepository, Home allocating by bandit::allocate with strategy arms run in the allocation's order.
+Phase 18: record the full `eval discovery` run (all MovieLens test users, on the scratch copy with regions asked) in docs/eval-results.md and E3/E4 evidence; then a real-window look with `eval recommend --rail 2` on a copy holding a probe profile; then 18.4: Surprise me (a command picking one film from the plan's arms, playable first, I42's length limit) and mood shelves from the meaning index (crates/taste), with search-by-meaning quality (Phase 5 E3 nDCG@10 0.0472, E4's two named queries) worked first.
 
 ---
 
