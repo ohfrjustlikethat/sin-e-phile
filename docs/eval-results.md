@@ -3499,3 +3499,18 @@ The third is kept as a fix, not a tuning: at the middle budget the plan gave the
 so discovery had six cards in ten where the plan meant five. **E4 stays NOT met** (+33.2% against more than +40%):
 three distinct approaches, so the choice is recorded as blocker B17 in PROJECT_STATE.json (ADR-0040).
 
+### 18.2, B17 option A: the rule for a population prior, fixed before any run (2026-11-20)
+
+A new profile's bandit starts flat, so every discovery arm starts equally likely, though on the test users their
+held-out likes per card differ thirtyfold (canon 0.060, deep cut 0.002) and their novelty threefold. A prior from
+relevance alone would leave only canon and bridges, and novelty would fail; so each arm's prior weighs both.
+
+1. **Measure** on the first 2,000 TUNING users (`eval discovery --tune --limit 2000`), with no prior: each discovery arm's
+   held-out likes per card `h` and mean novelty `n`.
+2. **Value**: `v = h / max(h) + n / max(n)` over the five discovery arms, so 0 to 2; the prior's mean is `v / 2`.
+3. **Strength**: `K` pseudo-trials per arm (`alpha += K * mean`, `beta += K * (1 - mean)`), used only in the draws that
+   share discovery's slots between its arms; discovery's share of Home is unchanged. `K` from {0, 2, 4, 8, 16}.
+4. **Choose** on the same 2,000 tuning users: the largest Recall@N against popularity whose novelty is at least
+   **1.2 bits** over the taste rail (a margin over E4's 1); a tie goes to the smaller `K`.
+5. **Judge** once on all test users (E4), and run `eval discovery --simulate` again (E1, E2) with the prior in place.
+
