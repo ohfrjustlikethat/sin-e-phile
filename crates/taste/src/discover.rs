@@ -19,9 +19,11 @@
 use std::collections::{HashMap, HashSet};
 
 use sinephile_persistence::repositories::{
-    EpisodeRepository, Facts, MediaRepository, RegionRepository,
+    CredentialRepository, DiscoveryRepository, EpisodeRepository, Facts, MediaRepository,
+    RegionRepository,
 };
 use sinephile_persistence::{Db, DbError};
+use sinephile_recommend::bandit::{Beliefs, Context, Outcome, Trial};
 use sinephile_recommend::strategy::{
     self, Arm, Axis, Discovery, Label, Profile, Region, Taste, Title,
 };
@@ -208,6 +210,115 @@ pub async fn gather(
         })
         .collect();
     Ok(Gathered { profile, titles })
+}
+
+/// Where a profile's Comfort to Adventure setting is kept, 0 (Comfort) to 1 (Adventure).
+pub const BUDGET_KEY: &str = "discovery.budget";
+/// Until a profile moves it: the middle.
+pub const BUDGET_DEFAULT: f64 = 0.5;
+/// How long "not right now" keeps a title off Home.
+pub const NOT_NOW_DAYS: f64 = 14.0;
+/// The slots a Home shares out between the arms (`bandit::allocate`): the taste rail shows at
+/// most twenty of the familiar's, and discovery between twelve (the floor) and 48.
+pub const SLOTS: usize = 60;
+/// The fewest slots a discovery rail is given: a rail's worth.
+pub const LEAST: usize = 6;
+
+/// A profile's Comfort to Adventure setting.
+pub async fn budget(db: &Db, profile: i64) -> Result<f64, DbError> {
+    Ok(CredentialRepository::new(db)
+        .get(profile, BUDGET_KEY)
+        .await?
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|v| v.is_finite())
+        .map_or(BUDGET_DEFAULT, |v| v.clamp(0.0, 1.0)))
+}
+
+/// Set it, 0 to 1.
+pub async fn set_budget(db: &Db, profile: i64, value: f64) -> Result<(), DbError> {
+    let value = if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        BUDGET_DEFAULT
+    };
+    CredentialRepository::new(db)
+        .set(profile, BUDGET_KEY, &format!("{value:.2}"))
+        .await
+}
+
+/// Record a dismissal (`"not_for_me"`, `"not_right_now"` or `"already_seen"`) said at `hour`
+/// (local, 0 to 23), in that part of the day.
+pub async fn dismiss(
+    db: &Db,
+    profile: i64,
+    id: i64,
+    kind: &str,
+    hour: Option<u32>,
+) -> Result<(), DbError> {
+    let context = hour.map_or(Context::Evening, Context::of_hour);
+    DiscoveryRepository::new(db)
+        .dismiss(profile, id, kind, context.key())
+        .await
+}
+
+/// An event's name as the bandit's outcome.
+fn outcome(event: &str) -> Option<Outcome> {
+    Some(match event {
+        "completed" => Outcome::Completed,
+        "played" => Outcome::Played,
+        "abandoned" => Outcome::AbandonedEarly,
+        "watchlisted" => Outcome::Watchlisted,
+        "not_for_me" => Outcome::NotForMe,
+        "not_right_now" => Outcome::NotRightNow,
+        "already_seen" => Outcome::AlreadySeen,
+        _ => return None,
+    })
+}
+
+/// What the bandit knows of a profile at `today` (days since 1970), and the titles Home
+/// leaves out for it: "not for me" and "already seen" always, "not right now" for
+/// [`NOT_NOW_DAYS`]. Each shown title counts once, by the strongest thing that came of it
+/// (`Outcome::strongest`), in the part of the day that happened in, aged from when.
+pub async fn memory(db: &Db, profile: i64, today: f64) -> Result<(Beliefs, HashSet<i64>), DbError> {
+    let repo = DiscoveryRepository::new(db);
+    let age = |at: &str| crate::model::day_of(at).map_or(0.0, |d| (today - d).max(0.0));
+    let mut by_title: HashMap<i64, Vec<(Arm, Context, Outcome, f64)>> = HashMap::new();
+    for h in repo.happened(profile).await? {
+        let (Some(arm), Some(context), Some(o)) = (
+            Arm::from_key(&h.arm),
+            Context::from_key(&h.context),
+            outcome(&h.event),
+        ) else {
+            continue;
+        };
+        by_title
+            .entry(h.media_item_id)
+            .or_default()
+            .push((arm, context, o, age(&h.at)));
+    }
+    let mut trials = Vec::new();
+    for events in by_title.values() {
+        let outcomes: Vec<Outcome> = events.iter().map(|e| e.2).collect();
+        let Some(strongest) = Outcome::strongest(&outcomes) else {
+            continue;
+        };
+        if let Some(&(arm, context, outcome, age_days)) = events.iter().find(|e| e.2 == strongest) {
+            trials.push(Trial {
+                arm,
+                context,
+                outcome,
+                age_days,
+            });
+        }
+    }
+    let hidden = repo
+        .dismissed(profile)
+        .await?
+        .into_iter()
+        .filter(|(_, kind, at)| kind != "not_right_now" || age(at) < NOT_NOW_DAYS)
+        .map(|(id, _, _)| id)
+        .collect();
+    Ok((Beliefs::from_trials(&trials), hidden))
 }
 
 /// One discovery rail: the arm, its title, its picks.

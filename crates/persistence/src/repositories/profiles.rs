@@ -355,8 +355,8 @@ impl<'a> ProfileRepository<'a> {
     }
 
     /// A cheap fingerprint of everything the taste model reads for a profile: it changes
-    /// whenever a viewing, a rating or the watchlist changes, so a cached model can be
-    /// trusted while it does not (Phase 15).
+    /// whenever a viewing, a rating, the watchlist or a dismissal (Phase 18) changes, so a
+    /// cached model can be trusted while it does not (Phase 15).
     pub async fn signal_fingerprint(&self, profile_id: i64) -> Result<String, DbError> {
         Ok(sqlx::query_scalar(
             "SELECT
@@ -365,7 +365,10 @@ impl<'a> ProfileRepository<'a> {
                  (SELECT COUNT(*) || '/' || COALESCE(MAX(rated_at), '') || '/' || COALESCE(SUM(stars * media_item_id), 0)
                     FROM ratings WHERE profile_id = ?1)
                  || ':' ||
-                 (SELECT COUNT(*) || '/' || COALESCE(SUM(media_item_id), 0) FROM watchlist_items WHERE profile_id = ?1)",
+                 (SELECT COUNT(*) || '/' || COALESCE(SUM(media_item_id), 0) FROM watchlist_items WHERE profile_id = ?1)
+                 || ':' ||
+                 (SELECT COUNT(*) || '/' || COALESCE(MAX(at), '') || '/' || COALESCE(SUM(media_item_id * length(kind)), 0)
+                    FROM dismissals WHERE profile_id = ?1)",
         )
         .bind(profile_id)
         .fetch_one(self.db.pool())

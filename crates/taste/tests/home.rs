@@ -339,3 +339,83 @@ async fn the_taste_preview_is_homes_taste_rail() {
         .unwrap_or_default();
     assert_eq!(preview, taste);
 }
+
+#[tokio::test]
+async fn a_dismissed_title_leaves_every_rail_and_not_right_now_comes_back() {
+    // Phase 18: "not for me" and "already seen" for good; "not right now" for a fortnight.
+    use sinephile_persistence::repositories::DiscoveryRepository;
+    let db = Db::in_memory().await.unwrap();
+    let heat = film(&db, "Heat", 1995, 900_000, &["Crime"]).await;
+    let thief = film(&db, "Thief", 1981, 800_000, &["Crime"]).await;
+    let ronin = film(&db, "Ronin", 1998, 700_000, &["Crime"]).await;
+    let me = ProfileRepository::new(&db).ensure_default().await.unwrap();
+    let loved = |r: Vec<sinephile_taste::home::Rail>| {
+        r.into_iter()
+            .find(|r| r.key == "loved")
+            .map(|r| r.items)
+            .unwrap_or_default()
+    };
+    let models = sinephile_taste::model::ModelCache::default();
+    let home = || rails(&db, None, me, false, None, &models);
+    assert_eq!(loved(home().await.unwrap()), vec![heat, thief, ronin]);
+
+    let discovery = DiscoveryRepository::new(&db);
+    discovery
+        .dismiss(me, heat, "not_for_me", "evening")
+        .await
+        .unwrap();
+    discovery
+        .dismiss(me, thief, "not_right_now", "evening")
+        .await
+        .unwrap();
+    assert_eq!(loved(home().await.unwrap()), vec![ronin]);
+
+    // A fortnight on, "not right now" has passed; "not for me" has not.
+    sqlx::query("UPDATE dismissals SET at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-15 days')")
+        .execute(db.pool())
+        .await
+        .unwrap();
+    assert_eq!(loved(home().await.unwrap()), vec![thief, ronin]);
+    // And taken back, it is as if it was never said.
+    discovery.undismiss(me, heat).await.unwrap();
+    assert_eq!(loved(home().await.unwrap()), vec![heat, thief, ronin]);
+}
+
+#[tokio::test]
+async fn the_bandit_learns_once_per_title_from_its_strongest_outcome() {
+    use sinephile_persistence::repositories::DiscoveryRepository;
+    use sinephile_recommend::bandit::Context;
+    use sinephile_recommend::strategy::Arm;
+    let db = Db::in_memory().await.unwrap();
+    let a = film(&db, "A", 1990, 1_000, &["Drama"]).await;
+    let b = film(&db, "B", 1991, 1_000, &["Drama"]).await;
+    let profiles = ProfileRepository::new(&db);
+    let me = profiles.ensure_default().await.unwrap();
+    let discovery = DiscoveryRepository::new(&db);
+    discovery
+        .record_shown(me, &[(a, "deep_cut"), (b, "canon")], "evening")
+        .await
+        .unwrap();
+    // A: played, then finished, then rated: one success, not three.
+    profiles
+        .record_viewing(me, a, 600, false, 600)
+        .await
+        .unwrap();
+    profiles
+        .record_viewing(me, a, 6_000, true, 6_000)
+        .await
+        .unwrap();
+    profiles.rate(me, a, Some(5)).await.unwrap();
+    // B: "not for me".
+    discovery
+        .dismiss(me, b, "not_for_me", "evening")
+        .await
+        .unwrap();
+    let today = sinephile_taste::model::day_of(&sinephile_taste::home::now_iso()).unwrap();
+    let (beliefs, hidden) = sinephile_taste::discover::memory(&db, me, today)
+        .await
+        .unwrap();
+    assert_eq!(beliefs.belief(Arm::DeepCut, Context::Evening), (2.0, 1.0));
+    assert_eq!(beliefs.belief(Arm::Canon, Context::Evening), (1.0, 2.0));
+    assert_eq!(hidden, [b].into_iter().collect());
+}

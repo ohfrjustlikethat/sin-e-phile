@@ -8,12 +8,16 @@
 use std::collections::{HashMap, HashSet};
 
 use sinephile_persistence::repositories::{
-    CredentialRepository, EpisodeRepository, LibraryRepository, MediaRepository, ProfileRepository,
+    CredentialRepository, DiscoveryRepository, EpisodeRepository, LibraryRepository,
+    MediaRepository, ProfileRepository,
 };
 use sinephile_persistence::{Db, DbError};
+use sinephile_recommend::bandit::Context;
+use sinephile_recommend::strategy::Arm;
 use sinephile_search_engine::Semantic;
 
-pub(crate) fn now_iso() -> String {
+/// Today, UTC, as "YYYY-MM-DD": what the taste model and the discovery engine age things by.
+pub fn now_iso() -> String {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs() as i64);
@@ -111,6 +115,7 @@ pub async fn taste_rail(
         .unwrap_or_default())
 }
 
+/// Home's rails at an unknown hour: [`rails_at`] in the evening.
 pub async fn rails(
     db: &Db,
     semantic: Option<&mut Semantic>,
@@ -118,6 +123,20 @@ pub async fn rails(
     kids: bool,
     love: Option<&str>,
     cache: &crate::model::ModelCache,
+) -> Result<Vec<Rail>, DbError> {
+    rails_at(db, semantic, profile, kids, love, cache, None).await
+}
+
+/// Home's rails, built at `hour` (0 to 23, the viewer's local time): the part of the day the
+/// discovery engine's bandit learns and chooses in (Phase 18).
+pub async fn rails_at(
+    db: &Db,
+    semantic: Option<&mut Semantic>,
+    profile: i64,
+    kids: bool,
+    love: Option<&str>,
+    cache: &crate::model::ModelCache,
+    hour: Option<u32>,
 ) -> Result<Vec<Rail>, DbError> {
     let profiles = ProfileRepository::new(db);
     let media = MediaRepository::new(db);
@@ -142,15 +161,20 @@ pub async fn rails(
         .collect();
     let liked = profiles.liked(profile).await?;
     let saved = profiles.watchlist(profile).await?;
+    let today = crate::model::day_of(&now_iso()).unwrap_or(0.0);
+    // What the discovery engine has learned of this profile, and what it dismissed: a
+    // dismissed title is never recommended, in any rail (Phase 18).
+    let (beliefs, hidden) = crate::discover::memory(db, profile, today).await?;
     let seen: HashSet<i64> = liked
         .iter()
         .map(|(id, _)| *id)
         .chain(continuing.iter().flat_map(|c| [c.card, c.plays]))
+        .chain(hidden.iter().copied())
         .collect();
+    let context = hour.map_or(Context::Evening, Context::of_hour);
 
     // The taste model (Phase 15), with the profile's corrections: built once, for the new
     // releases and the taste rail.
-    let today = crate::model::day_of(&now_iso()).unwrap_or(0.0);
     let year = (today / 365.2425 + 1970.0).floor() as i64;
     let mut model = None;
     if let Some(s) = semantic {
@@ -267,8 +291,10 @@ pub async fn rails(
     // Where the profile's taste points (Phase 17): the hybrid ranker over meaning, people who
     // loved the same, and popularity, with the profile's axes; each pick says why.
     let mut taste_notes: HashMap<i64, String> = HashMap::new();
-    // And the discovery rails (Phase 18): each arm's picks, none in another rail.
+    // And the discovery rails (Phase 18): each arm's picks, none in another rail, as many as
+    // the bandit's plan gives each; the taste rail as many as the plan gives the familiar.
     let mut discovery: Vec<(crate::discover::DiscoveryRail, HashMap<i64, String>)> = Vec::new();
+    let mut limits: HashMap<&'static str, usize> = HashMap::new();
     // Mutably: the meaning index is held across database awaits, which a shared reference
     // could only do if it were Sync; it is Send.
     let taste = match &mut model {
@@ -330,7 +356,32 @@ pub async fn rails(
             let mut cache = crate::discover::Cache::default();
             let gathered =
                 crate::discover::gather(db, &mut **s, modes, &met, &loved, &mut cache).await?;
-            let rails = crate::discover::rails(&gathered, want, &taken);
+            // The same plan all hour, so Home does not reshuffle at every refresh.
+            let seed = (profile as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15)
+                ^ ((today as u64) * 24 + u64::from(hour.unwrap_or(20)));
+            let plan = sinephile_recommend::bandit::allocate(
+                &beliefs,
+                context,
+                crate::discover::budget(db, profile).await?,
+                crate::discover::SLOTS,
+                crate::discover::LEAST,
+                &mut sinephile_recommend::bandit::Rng::new(seed),
+            );
+            for (arm, n) in &plan {
+                let key = if *arm == Arm::Familiar {
+                    "taste"
+                } else {
+                    arm.key()
+                };
+                limits.insert(key, (*n).min(PER_RAIL));
+            }
+            // A kids profile asks each arm for more: what does not suit children is left out
+            // below.
+            let asked: Vec<(Arm, usize)> = plan
+                .iter()
+                .map(|(arm, n)| (*arm, n * if kids { 6 } else { 1 }))
+                .collect();
+            let rails = crate::discover::planned(&gathered, &asked, &taken);
             let named = crate::discover::named(&rails, &gathered.profile);
             let names: HashMap<i64, String> = media
                 .facts(&named)
@@ -417,9 +468,22 @@ pub async fn rails(
     }
     lists.push(("watchlist", "On your watchlist".into(), saved, None));
     lists.push(("loved", "Widely loved".into(), loved, None));
+    let mut recorded: Vec<(i64, &'static str)> = Vec::new();
     for (key, title, ids, from) in lists {
-        let items: Vec<i64> = suits(ids).await?.into_iter().take(PER_RAIL).collect();
-        if !items.is_empty() {
+        let limit = limits.get(key).copied().unwrap_or(PER_RAIL);
+        let items: Vec<i64> = suits(ids).await?.into_iter().take(limit).collect();
+        let arm = if key == "taste" {
+            Some(Arm::Familiar)
+        } else {
+            Arm::from_key(key)
+        };
+        // A discovery rail of two or three looks like an accident.
+        let short =
+            arm.is_some_and(|a| a != Arm::Familiar) && items.len() < crate::discover::MIN_PICKS;
+        if !items.is_empty() && !short {
+            if let Some(arm) = arm {
+                recorded.extend(items.iter().map(|id| (*id, arm.key())));
+            }
             let notes = from.map_or_else(HashMap::new, |from| {
                 items
                     .iter()
@@ -443,5 +507,9 @@ pub async fn rails(
             });
         }
     }
+    // Which arm showed what, and when: what the bandit learns from (Phase 18).
+    DiscoveryRepository::new(db)
+        .record_shown(profile, &recorded, context.key())
+        .await?;
     Ok(out)
 }

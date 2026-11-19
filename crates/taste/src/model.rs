@@ -56,6 +56,18 @@ pub async fn signals(
     for id in profiles.watchlist(profile).await? {
         out.push((id, Signal::Watchlisted, 0.0));
     }
+    // Phase 18's dismissals: "not for me" against the title, "already seen" as met. "Not
+    // right now" says nothing of taste.
+    for (id, kind, at) in sinephile_persistence::repositories::DiscoveryRepository::new(db)
+        .dismissed(profile)
+        .await?
+    {
+        match kind.as_str() {
+            "not_for_me" => out.push((id, Signal::NotForMe, age(&at))),
+            "already_seen" => out.push((id, Signal::AlreadySeen, age(&at))),
+            _ => {}
+        }
+    }
     Ok(out)
 }
 

@@ -7,6 +7,7 @@
 pub mod backfill;
 pub mod catalogue;
 pub mod credentials;
+pub mod discovery;
 pub mod downloads;
 pub mod episodes;
 pub mod library;
@@ -25,6 +26,7 @@ pub use catalogue::{
     MIN_SYNOPSIS,
 };
 pub use credentials::{CredentialRepository, TmdbAccess};
+pub use discovery::{DiscoveryRepository, Happened};
 pub use downloads::{Download, DownloadRepository, DownloadState, NewDownload};
 pub use episodes::{EpisodeRepository, EpisodeRow};
 pub use library::{

@@ -30,6 +30,10 @@ pub enum Signal {
     /// Rated 1 to 5.
     Rated(i64),
     Watchlisted,
+    /// "Not for me" on a recommendation (Phase 18): as an abandon in the first minutes.
+    NotForMe,
+    /// "Already seen" on a recommendation: met, so never offered again, and no more.
+    AlreadySeen,
 }
 
 /// What an abandon says: at 5 minutes, "not for me" (−0.6); near the end, little (−0.1).
@@ -51,6 +55,8 @@ pub fn base(signal: &Signal) -> (f64, bool) {
         Signal::Rated(2) => (-0.6, false),
         Signal::Rated(_) => (-1.0, false),
         Signal::Watchlisted => (0.4, false),
+        Signal::NotForMe => (abandon_weight(0.0, None), false),
+        Signal::AlreadySeen => (0.0, false),
     }
 }
 

@@ -659,6 +659,19 @@ async fn profile_repository_surface() {
         f0,
         "and clearing it puts it back"
     );
+    // A dismissal moves it too (Phase 18: "not for me" is a taste signal).
+    let discovery = sinephile_persistence::repositories::DiscoveryRepository::new(&db);
+    discovery
+        .dismiss(first, film, "not_for_me", "evening")
+        .await
+        .unwrap();
+    assert_ne!(
+        repo.signal_fingerprint(first).await.unwrap(),
+        f0,
+        "a dismissal moves it"
+    );
+    discovery.undismiss(first, film).await.unwrap();
+    assert_eq!(repo.signal_fingerprint(first).await.unwrap(), f0);
 
     // ratings — every rating with its date
     repo.rate(first, film, Some(3)).await.unwrap();
@@ -3035,4 +3048,115 @@ async fn core_ids_for_vectors_surface() {
     let ours = meaning.described_ids(&ids).await.unwrap();
     assert_eq!(ours.len(), 2);
     assert!(ours.contains(&ids[1]) && ours.contains(&ids[2]));
+}
+
+#[tokio::test]
+async fn discovery_repository_surface() {
+    // Phase 18 (migration 0034): which arm showed what, and what came of it.
+    use sinephile_persistence::repositories::{DiscoveryRepository, Happened};
+    let db = Db::in_memory().await.expect("open");
+    let media = MediaRepository::new(&db);
+    let mut f = Vec::new();
+    for k in 0..6 {
+        let mut item = NewMediaItem::film(format!("Film {k}"), 2000 + k);
+        item.runtime_minutes = Some(100);
+        f.push(media.insert(&item).await.unwrap());
+    }
+    let profiles = ProfileRepository::new(&db);
+    let me = profiles.create("me", true).await.unwrap();
+    let them = profiles.create("them", false).await.unwrap();
+    let repo = DiscoveryRepository::new(&db);
+
+    // Viewed before it was shown: not the arm's doing.
+    sqlx::query(
+        "INSERT INTO watch_events (profile_id, media_item_id, started_at, completed)
+         VALUES (?, ?, '2020-01-01 10:00:00', 1)",
+    )
+    .bind(me)
+    .bind(f[5])
+    .execute(db.pool())
+    .await
+    .unwrap();
+
+    // record_shown: the first arm to show a title keeps it
+    repo.record_shown(
+        me,
+        &[
+            (f[0], "deep_cut"),
+            (f[1], "canon"),
+            (f[2], "familiar"),
+            (f[3], "stretch"),
+            (f[4], "blind_spot"),
+            (f[5], "bridge"),
+        ],
+        "evening",
+    )
+    .await
+    .unwrap();
+    repo.record_shown(me, &[(f[0], "canon")], "day")
+        .await
+        .unwrap();
+
+    // What happened after: finished, stopped in the first fifth, saved, rated, dismissed.
+    profiles
+        .record_viewing(me, f[0], 6_000, true, 6_000)
+        .await
+        .unwrap();
+    profiles
+        .record_viewing(me, f[1], 600, false, 600)
+        .await
+        .unwrap();
+    profiles.add_to_watchlist(me, f[2], None).await.unwrap();
+    profiles.rate(me, f[3], Some(2)).await.unwrap();
+    // Another profile's doings are not this profile's.
+    profiles
+        .record_viewing(them, f[4], 6_000, true, 6_000)
+        .await
+        .unwrap();
+    // dismiss: the latest kept, with the part of the day it was said in
+    repo.dismiss(me, f[4], "not_for_me", "late").await.unwrap();
+    repo.dismiss(me, f[4], "not_right_now", "late")
+        .await
+        .unwrap();
+
+    // happened
+    let mut got: Vec<(i64, String, String, String)> = repo
+        .happened(me)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(
+            |Happened {
+                 media_item_id,
+                 arm,
+                 context,
+                 event,
+                 ..
+             }| (media_item_id, arm, context, event),
+        )
+        .collect();
+    got.sort();
+    let s = |x: &str| x.to_string();
+    assert_eq!(
+        got,
+        vec![
+            (f[0], s("deep_cut"), s("evening"), s("completed")),
+            (f[1], s("canon"), s("evening"), s("abandoned")),
+            (f[2], s("familiar"), s("evening"), s("watchlisted")),
+            (f[3], s("stretch"), s("evening"), s("not_for_me")),
+            (f[4], s("blind_spot"), s("late"), s("not_right_now")),
+        ]
+    );
+    assert!(repo.happened(them).await.unwrap().is_empty());
+
+    // dismissed / undismiss
+    let dismissed = repo.dismissed(me).await.unwrap();
+    assert_eq!(dismissed.len(), 1);
+    assert_eq!(
+        (dismissed[0].0, dismissed[0].1.as_str()),
+        (f[4], "not_right_now")
+    );
+    assert!(repo.undismiss(me, f[4]).await.unwrap());
+    assert!(!repo.undismiss(me, f[4]).await.unwrap());
+    assert!(repo.dismissed(me).await.unwrap().is_empty());
 }

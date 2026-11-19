@@ -37,9 +37,11 @@ pub struct RailView {
     pub items: Vec<HomeCard>,
 }
 
+/// Home's rails. `hour` is the viewer's local hour (0 to 23): the part of the day the
+/// discovery engine learns and chooses in (Phase 18).
 #[tauri::command]
 #[specta::specta]
-pub async fn home(state: State<'_, AppState>) -> Result<Vec<RailView>, String> {
+pub async fn home(state: State<'_, AppState>, hour: Option<u32>) -> Result<Vec<RailView>, String> {
     let db = state.db().ok_or("the library is still opening")?;
     let me = state.profile().await?;
     let kids = crate::commands::profiles::kids(&state).await;
@@ -50,17 +52,21 @@ pub async fn home(state: State<'_, AppState>) -> Result<Vec<RailView>, String> {
     let rails = match state.engine() {
         Some(engine) => {
             let mut engine = engine.lock().await;
-            sinephile_taste::home::rails(
+            sinephile_taste::home::rails_at(
                 &db,
                 engine.semantic_mut(),
                 me,
                 kids,
                 love.as_deref(),
                 &MODELS,
+                hour,
             )
             .await
         }
-        None => sinephile_taste::home::rails(&db, None, me, kids, love.as_deref(), &MODELS).await,
+        None => {
+            sinephile_taste::home::rails_at(&db, None, me, kids, love.as_deref(), &MODELS, hour)
+                .await
+        }
     }
     .map_err(|e| e.to_string())?;
 
@@ -78,6 +84,76 @@ pub async fn home(state: State<'_, AppState>) -> Result<Vec<RailView>, String> {
         });
     }
     Ok(out)
+}
+
+/// What a viewer says of a recommended card (Phase 18).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, specta::Type, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Dismissal {
+    NotForMe,
+    NotRightNow,
+    AlreadySeen,
+}
+
+impl Dismissal {
+    fn key(self) -> &'static str {
+        match self {
+            Dismissal::NotForMe => "not_for_me",
+            Dismissal::NotRightNow => "not_right_now",
+            Dismissal::AlreadySeen => "already_seen",
+        }
+    }
+}
+
+/// "Not for me", "not right now" or "already seen" on a recommended card, said at `hour`
+/// (local, 0 to 23). Home leaves the title out from now on (`sinephile_taste::discover`).
+#[tauri::command]
+#[specta::specta]
+pub async fn dismiss(
+    state: State<'_, AppState>,
+    id: i32,
+    kind: Dismissal,
+    hour: Option<u32>,
+) -> Result<(), String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let me = state.profile().await?;
+    sinephile_taste::discover::dismiss(&db, me, i64::from(id), kind.key(), hour)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Take a dismissal back: the card's undo.
+#[tauri::command]
+#[specta::specta]
+pub async fn undismiss(state: State<'_, AppState>, id: i32) -> Result<(), String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let me = state.profile().await?;
+    sinephile_persistence::repositories::DiscoveryRepository::new(&db)
+        .undismiss(me, i64::from(id))
+        .await
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+/// This profile's Comfort to Adventure setting, 0 to 1.
+#[tauri::command]
+#[specta::specta]
+pub async fn discovery_budget(state: State<'_, AppState>) -> Result<f64, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let me = state.profile().await?;
+    sinephile_taste::discover::budget(&db, me)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn set_discovery_budget(state: State<'_, AppState>, value: f64) -> Result<(), String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let me = state.profile().await?;
+    sinephile_taste::discover::set_budget(&db, me, value)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// What a card shows for each title, in the order given; a title the catalogue no longer
