@@ -2688,3 +2688,23 @@ companion, never the published graph. **Spec amendments:** A44 (4.7.1), recorded
 - **Resume**: `next_action` (B17 option A, then mood shelves and search-by-meaning quality). Waiting on the author:
   nothing new; E5 (three films they had not heard of and want to watch) is asked at the phase's end, with the Phase 19
   batch. Their profile has three ratings, so blind spots need ten met titles before they appear for them.
+
+## 2026-11-20 — Phase 18: the prior, the real window, search by meaning, mood shelves
+
+- **Built**: a population prior for a new profile's bandit (B17 option A, by a rule fixed first); search by meaning's
+  popularity prior (0.4, chosen on a new tuning set of ten queries; the original eight judged once); mood shelves; the
+  real window's four fixes (a taste named by its film nearest the pick; co-productions are not stretches; stretches and
+  bridges need 1,000 votes; mood shelves by raw closeness plus popularity, films only, sentences without title words);
+  the E5 checklist in MANUAL_TESTS; the flagship case study drafted (docs/case-studies/discovery.md).
+- **Measured**: E4 met at +40.4% with the first prior, then **NOT met at +39.9%** (bar 40%) once the window's fixes changed
+  the arms, novelty +1.89 bits (blocker B18). The re-run of the prior's rule chose 16, which starved blind spots in E2's
+  simulation (2.5% of days); 2 was taken, keeping E1 (+35.1/-22.1) and E2 (16.7%); recorded as a departure. Search by
+  meaning 0.0472 to 0.3276 (target 0.75), known items first, E2 43/43, p95 17.4 ms. Regression check: nothing regressed.
+- **Decisions**: the prior's rule and its departure (docs/eval-results.md 18.5); the search prior and its tuning set;
+  mood sentences and films-only shelves; E4 left open (not carried) until a change chosen on tuning users is judged once.
+  **Spec amendments**: none.
+- **Lessons**: look at the real window before tuning a metric on arms the window may change; a rule fixed in advance
+  needs to say what happens when its own required check fails; title words in a meaning query find titles.
+- **Resume**: `next_action` (B18 first). Waiting on the author: E5 (MANUAL_TESTS, "Discovery on your own taste"), and
+  Phase 5 E3/E4's third carry at Phase 18's close.
+

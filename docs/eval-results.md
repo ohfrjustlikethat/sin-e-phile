@@ -3610,3 +3610,71 @@ Mood for Love*, *Memories of Murder*, *2046*, *The Grandmaster*, *Thirst*, *As T
 *Take Shelter*, *Talk to Her*: about grief or loss in part, but *Antichrist* and *Cries & Whispers* are the opposite of
 "not depressing", and *1984* does not belong. The negation is what the meaning model misses. **Half met.**
 
+### 18.5: the real window changed the arms, so the prior's rule was run again (2026-11-20)
+
+`eval recommend --rail 2` (a probe profile of 27 rated films on the copy) showed four things no metric had: a taste named
+by its strongest film though the pick was nearer another of its films (*Kiki's Delivery Service* "close to Tokyo
+Story"); co-productions as stretches (*Ghost in the Shell* "but from the United Kingdom"); obscure bridges (*Tokyo File
+212*); and mood shelves opening on a 1912 short. Fixed in 8ab7abe (see the case study). The stretch and bridge arms
+changed (1,000 votes; a country is a step out only when none of the film's are the taste's), so the rule above was run
+again from step 1, on the same 2,000 tuning users.
+
+**Step 1, no prior:** +38.8% (0.3565 against 0.2569), +1.98 bits. Per arm: stretch 0.0281 and 4.73 bits, bridge 0.0302
+and 5.60, blind spot 0.0109 and 4.15, canon 0.0494 and 3.65, deep cut 0.0018 and 11.35. **Means:** stretch 0.4928, bridge
+0.5524, blind spot 0.2931, canon 0.6608, deep cut 0.5182.
+
+| K | Recall@N against popularity | novelty over the taste rail |
+|---|---|---|
+| 0 | +38.8% | 1.98 bits |
+| 2 | +43.3% (0.3684) | 1.86 bits |
+| 4 | +43.0% (0.3679) | 1.74 bits |
+| 8 | +43.3% (0.3684) | 1.55 bits |
+| 16 | **+44.1% (0.3705)** | 1.40 bits |
+
+**The rule chose 16, and 16 failed E2** in the simulation step 5 requires (`eval discovery --simulate`): blind spots, with
+the lowest prior mean, were shown on only 2.5% of a refusing viewer's days against E2's 10% (E1 held: +29.6 / -18.3,
+94.7%). The rule did not say what then. A weight that breaks an exit criterion cannot ship, so **the next by the rule's
+own order that keeps E1 and E2 was taken: 2** (tied with 8 on Recall@N; a tie to the smaller), and this departure is
+recorded here rather than the rule rewritten. **E1 and E2 at 2** (0e06e59): E1 +35.1 / -22.1 points, rose for 98.8%;
+E2 floor 20.0% every day, no day without a rail, every arm on at least 16.7% of days. Both met.
+
+### 18.5: E4 judged on all test users with the fixed arms and the re-chosen prior: NOT met (2026-11-20)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- discovery` on 0e06e59 (the arms after the real window, prior
+weight 2), 15,640 test users, 1,934 s.
+
+| Measure | Value | Bar |
+|---|---|---|
+| novelty, taste rail / discovery rails | 3.74 / 5.63 bits | |
+| E4: discovery over the taste rail | **+1.89 bits** | at least +1: met |
+| E4: Recall@N of everything shown against popularity's top N | **0.3626 against 0.2593: +39.9%** | more than +40%: **NOT met** |
+| (the taste rail alone, Recall@20) | 0.2639 (unchanged) | |
+| E3: discovery labels checked | **467,741, none false** | met |
+
+Per arm: stretch 5.08 bits and 0.0248 a card (5,861 rails, down from 7,454: the co-production rule and the floor of
+votes), bridge 5.91 and 0.0301, blind spot 13 rails, canon 3.63 and 0.0494, deep cut 11.33 and 0.0017.
+
+**E4 is NOT met, by 0.1 point.** The +40.4% recorded above was measured on the arms before the real window's fixes; the
+fixes made the labels honest and cost half a point of relevance, and they stay. The test users have now judged two
+versions; a third version will be chosen on the tuning users (whose numbers run about 3.5 points above the test users'
+on every setting so far) and judged on the test users once.
+
+### Phase 18 regression check (2026-11-20)
+
+Every harness on the copy of the development data (`SINEPHILE_DATA_DIR=<copy> target/release/eval.exe all`, then
+`vector --report`), on 0e06e59's tree, release build, Tier 2 dev machine:
+
+| Metric | Recorded before (Phase 17 close) | Now |
+|---|---|---|
+| Search E2 exact-title top-1 | 43/43 | **43/43** |
+| Search E1 p50 / p95, warm | 6.5 / 14.5 ms | **7.6 / 17.4 ms** (max 70.2; the popularity prior's 200 nearest and their votes) |
+| Search E3 meaning nDCG@10 | 0.0472 | **0.3276** |
+| Search E3 filter nDCG@10 | 1.0000 | **1.0000** |
+| HNSW recall@10 (published graph) | 0.9760 | **0.9760**, index p95 1.38 ms |
+| Subtitles aligned / false accepts | 80/80, 0/10 | **80/80, 0/10** |
+| Identification E1 top-1, tuning / held out | 99.05% / 100% | **99.05% / 100.00%** |
+| Identification E2 false-confident at 0.75 | 0.39% / 0.00% | **0.39% / 0.00%** |
+| Recommender, the taste rail's Recall@20 on test users | 0.2639 | **0.2639** (`eval discovery`, above) |
+
+No quality metric regressed; search's p95 rose by 2.9 ms, inside its 80 ms budget, the measured cost of the prior.
+

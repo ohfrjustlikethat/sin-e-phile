@@ -60,13 +60,13 @@
         "id": "E3",
         "text": "Rail labels accurately describe why each item is there.",
         "met": true,
-        "evidence": "strategy::tests::every_label_of_every_arm_holds_on_generated_profiles (300 generated profiles, every pick's Label re-derived by strategy::holds; seen to fail with arms taking titles 0.1 short of close and with the blind spot ignoring met regions, 6784097); sinephile-taste tests/discover.rs every_label_holds_and_an_episode_counts_as_its_series; strategy::tests::a_blind_spot_rail_holds_one_region (a rail named for a region holds only it); and on real users: `eval discovery` on a1dd9a9 over 15,640 MovieLens test users checked 461,488 discovery labels with strategy::holds, none false (docs/eval-results.md, 18.2)."
+        "evidence": "strategy::tests::every_label_of_every_arm_holds_on_generated_profiles (300 generated profiles, every pick's Label re-derived by strategy::holds; seen to fail with arms taking titles 0.1 short of close and with the blind spot ignoring met regions, 6784097); sinephile-taste tests/discover.rs every_label_holds_and_an_episode_counts_as_its_series; strategy::tests::a_blind_spot_rail_holds_one_region (a rail named for a region holds only it); and on real users: `eval discovery` on a1dd9a9 over 15,640 MovieLens test users checked 461,488 discovery labels (467,741 on 0e06e59) with strategy::holds, none false (docs/eval-results.md, 18.2)."
       },
       {
         "id": "E4",
         "text": "Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.",
-        "met": true,
-        "evidence": "`eval discovery` (all 15,640 MovieLens test users, Home as a new profile sees it, the bandit's population prior at weight 2 chosen on tuning users by a rule fixed first; build of 193e4d4): discovery rails 1.81 bits more novel than the taste rail (bar 1) with Recall@N of everything shown 0.3639 against popularity's top N 0.2593, +40.4% (bar more than 40%): met, by 0.4 points. Taste rail alone unchanged at 0.2639. Seen to fail: the same harness before the prior gave +28.8% and +33.2% (NOT met), docs/eval-results.md 18.2."
+        "met": false,
+        "evidence": "NOT MET 2026-11-20 on the shipped arms: `eval discovery` on 0e06e59, all 15,640 MovieLens test users: discovery 1.89 bits more novel than the taste rail (bar 1) but Recall@N of everything shown 0.3626 against popularity's top N 0.2593, +39.9% (bar more than 40%). On the arms before the real window's fixes it measured +40.4% (193e4d4); the fixes (honest labels, a floor of votes) cost half a point and stay. docs/eval-results.md 18.2 to 18.5."
       },
       {
         "id": "E5",
@@ -2058,13 +2058,13 @@
           "id": "E3",
           "text": "Rail labels accurately describe why each item is there.",
           "met": true,
-          "evidence": "strategy::tests::every_label_of_every_arm_holds_on_generated_profiles (300 generated profiles, every pick's Label re-derived by strategy::holds; seen to fail with arms taking titles 0.1 short of close and with the blind spot ignoring met regions, 6784097); sinephile-taste tests/discover.rs every_label_holds_and_an_episode_counts_as_its_series; strategy::tests::a_blind_spot_rail_holds_one_region (a rail named for a region holds only it); and on real users: `eval discovery` on a1dd9a9 over 15,640 MovieLens test users checked 461,488 discovery labels with strategy::holds, none false (docs/eval-results.md, 18.2)."
+          "evidence": "strategy::tests::every_label_of_every_arm_holds_on_generated_profiles (300 generated profiles, every pick's Label re-derived by strategy::holds; seen to fail with arms taking titles 0.1 short of close and with the blind spot ignoring met regions, 6784097); sinephile-taste tests/discover.rs every_label_holds_and_an_episode_counts_as_its_series; strategy::tests::a_blind_spot_rail_holds_one_region (a rail named for a region holds only it); and on real users: `eval discovery` on a1dd9a9 over 15,640 MovieLens test users checked 461,488 discovery labels (467,741 on 0e06e59) with strategy::holds, none false (docs/eval-results.md, 18.2)."
         },
         {
           "id": "E4",
           "text": "Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.",
-          "met": true,
-          "evidence": "`eval discovery` (all 15,640 MovieLens test users, Home as a new profile sees it, the bandit's population prior at weight 2 chosen on tuning users by a rule fixed first; build of 193e4d4): discovery rails 1.81 bits more novel than the taste rail (bar 1) with Recall@N of everything shown 0.3639 against popularity's top N 0.2593, +40.4% (bar more than 40%): met, by 0.4 points. Taste rail alone unchanged at 0.2639. Seen to fail: the same harness before the prior gave +28.8% and +33.2% (NOT met), docs/eval-results.md 18.2."
+          "met": false,
+          "evidence": "NOT MET 2026-11-20 on the shipped arms: `eval discovery` on 0e06e59, all 15,640 MovieLens test users: discovery 1.89 bits more novel than the taste rail (bar 1) but Recall@N of everything shown 0.3626 against popularity's top N 0.2593, +39.9% (bar more than 40%). On the arms before the real window's fixes it measured +40.4% (193e4d4); the fixes (honest labels, a floor of votes) cost half a point and stay. docs/eval-results.md 18.2 to 18.5."
         },
         {
           "id": "E5",
@@ -2589,8 +2589,15 @@
       ]
     }
   ],
-  "next_action": "Phase 18, 18.5: a real-window look on the scratch copy (`eval recommend --rail 2`, the probe profile) and the release build with SINEPHILE_DATA_DIR at the copy; the flagship case study docs/case-study/discovery.md (E6); README and HOW_IT_WORKS; the regression check of every recorded number (`eval all` plus `vector --report`); then ask the author for E5 (three films they had not heard of and want to watch, after rating ten or more) in the batch, and close with Phase 5 E3/E4 carried a third time with their measured state (0.3276; grief not defensible), flagged to the author.",
-  "blockers": [],
+  "next_action": "Phase 18: B18 first (read it): pick one change on tuning users (`eval discovery --tune --limit 2000`), then judge once on all test users. Then 18.5's rest: README (search row 0.3276; a discovery line), the case study's final numbers (docs/case-studies/discovery.md), the regression check's numbers in docs/eval-results.md, and the author batch: E5 (docs/MANUAL_TESTS.md, 'Discovery on your own taste') and Phase 5 E3/E4's third carry.",
+  "blockers": [
+    {
+      "id": "B18",
+      "raised": "2026-11-20",
+      "needs_user": false,
+      "description": "Phase 18 E4 short by 0.1 point after the real window's fixes (+39.9% against more than 40%; novelty met at +1.89 bits). The test users have judged two versions; the next change is chosen on the first 2,000 TUNING users (about 3.5 points above the test users on every setting so far, so it needs about +44% there) and judged on the test users once. Candidates, cheapest first: the bridge and stretch arms ordered with the search prior's popularity term as well as relevance; deep cuts loved by people who loved the profile's titles before those only close in meaning. If that fails: carry E4 to Phase 19, whose Home overhaul decides which rails Home shows and how many cards, which is what this measure is of."
+    }
+  ],
   "decisions_pending": [
     {
       "id": "P1",
