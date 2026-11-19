@@ -3514,3 +3514,16 @@ relevance alone would leave only canon and bridges, and novelty would fail; so e
    **1.2 bits** over the taste rail (a margin over E4's 1); a tie goes to the smaller `K`.
 5. **Judge** once on all test users (E4), and run `eval discovery --simulate` again (E1, E2) with the prior in place.
 
+### 18.4: a popularity prior for search by meaning, the rule fixed before any run (2026-11-20)
+
+Phase 5's E3 (meaning nDCG@10 0.0472 against 0.75) is worked in Phase 18, where mood shelves depend on it. Its eight
+meaning queries are too few to choose a setting on and then be judged by, so a TUNING set of ten more, graded before any
+run, is `fixtures/search/meaning-tuning.tsv` (38 answers, every id checked against the catalogue's title).
+
+- **The change tried**: the meaning half retrieves its 200 nearest, scores each `cosine + lambda * ln(1 + votes) /
+  ln(1 + the most votes among them)`, and passes its best 50 to the fusion as now. Plot-first documents let 858,170
+  obscure plots outrank the films a person means (v3, 2026-10-25); votes say which are meant.
+- **Chosen** on the tuning set: `lambda` from {0, 0.05, 0.1, 0.2, 0.4}, the best meaning nDCG@10, a tie to the smaller.
+- **Judged** once on `semantic-queries.tsv` (E3 and E4's two named queries); E2 (43/43 exact titles) must hold, and
+  E1's p95 must stay inside the 80 ms budget.
+
