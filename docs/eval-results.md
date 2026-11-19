@@ -3418,6 +3418,10 @@ Written here before the first run of each harness, so a number cannot choose its
   MovieLens build users who liked it. **Met** when the discovery rails' mean novelty is at least 1 bit above Phase 17's
   taste rail on the same users, and Recall@N of everything Home's taste and discovery rails show stays more than 40%
   above popularity's top N (N the same).
+- **E4, made precise before its first run (2026-11-19, after E1 and E2 ran):** a title no build user liked has no share
+  (every film after ml-25m's 2019 cut-off among them), and counting it as the most novel would flatter discovery for the
+  wrong reason. Such titles are left out of both rails' means, and each rail's share left out is reported beside. Home
+  as a new profile sees it: no outcomes yet, the budget at its middle (0.5), 60 slots, the taste rail at most 20.
 
 ### 18.2: the bandit in simulation, E1 and E2 (2026-11-19)
 
