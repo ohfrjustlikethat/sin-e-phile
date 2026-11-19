@@ -21,7 +21,7 @@
       {
         "id": "18.2",
         "text": "The contextual bandit (Thompson sampling) over the arms, rewarded by outcomes (played, completed, abandoned early, watchlisted, dismissed), with an exploration floor and no arm dominating; a simulation harness (`eval discovery`) with simulated users whose reward patterns change (E1), a maximally conservative user who still gets discovery (E2), and the novelty metric, mean inverse popularity, against its target with relevance held (E4).",
-        "status": "not_started",
+        "status": "in_progress",
         "commit": null
       },
       {
@@ -47,14 +47,14 @@
       {
         "id": "E1",
         "text": "The bandit demonstrably shifts its strategy distribution in simulation when reward patterns change.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "eval discovery --simulate on fcc4110 (1,000 simulated viewers, 120 days, favourite arm changes day 61): new favourite's share of discovery 12.8% -> 47.8% (+35.0 points, bar +15), old 49.0% -> 28.0% (-21.0, bar -15), rose for 98.9% of viewers (bar 80%). Seen to fail with --frozen (+0.1 points, NOT met). First run on 7bc4ef3 missed the bar (+12.0/-6.0) and is recorded in docs/eval-results.md 18.2."
       },
       {
         "id": "E2",
         "text": "The exploration floor holds: even a maximally-conservative simulated user still receives genuine discovery.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "eval discovery --simulate on fcc4110: 1,000 maximally conservative viewers (Comfort, every discovery card 'not for me') for 120 days: discovery's least share on any day 20.0% (bar 20%), 0 of 120,000 days without a discovery rail, every discovery arm shown on at least 23.3% of each viewer's days (bar 10%). Seen to fail with --no-floor (0.0% on every day, NOT met). docs/eval-results.md 18.2."
       },
       {
         "id": "E3",
@@ -2045,14 +2045,14 @@
         {
           "id": "E1",
           "text": "The bandit demonstrably shifts its strategy distribution in simulation when reward patterns change.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "eval discovery --simulate on fcc4110 (1,000 simulated viewers, 120 days, favourite arm changes day 61): new favourite's share of discovery 12.8% -> 47.8% (+35.0 points, bar +15), old 49.0% -> 28.0% (-21.0, bar -15), rose for 98.9% of viewers (bar 80%). Seen to fail with --frozen (+0.1 points, NOT met). First run on 7bc4ef3 missed the bar (+12.0/-6.0) and is recorded in docs/eval-results.md 18.2."
         },
         {
           "id": "E2",
           "text": "The exploration floor holds: even a maximally-conservative simulated user still receives genuine discovery.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "eval discovery --simulate on fcc4110: 1,000 maximally conservative viewers (Comfort, every discovery card 'not for me') for 120 days: discovery's least share on any day 20.0% (bar 20%), 0 of 120,000 days without a discovery rail, every discovery arm shown on at least 23.3% of each viewer's days (bar 10%). Seen to fail with --no-floor (0.0% on every day, NOT met). docs/eval-results.md 18.2."
         },
         {
           "id": "E3",
@@ -2089,7 +2089,7 @@
         {
           "id": "18.2",
           "text": "The contextual bandit (Thompson sampling) over the arms, rewarded by outcomes (played, completed, abandoned early, watchlisted, dismissed), with an exploration floor and no arm dominating; a simulation harness (`eval discovery`) with simulated users whose reward patterns change (E1), a maximally conservative user who still gets discovery (E2), and the novelty metric, mean inverse popularity, against its target with relevance held (E4).",
-          "status": "not_started",
+          "status": "in_progress",
           "commit": null
         },
         {
@@ -2589,7 +2589,7 @@
       ]
     }
   ],
-  "next_action": "Phase 18, 18.1: write crates/recommend/src/strategy.rs (the six arms over described titles, Label as data, holds() re-deriving each claim, a generated-profile test that every label holds); then crates/taste/src/discover.rs gathering each arm's pool; then ADR-0055's Wikidata country (P495) and movement (P135) launch step. Plan in docs/phases/phase-18-discovery-engine.md.",
+  "next_action": "Phase 18, 18.2: E4 harness (eval discovery without --simulate: MovieLens test users, discover::gather with a facts cache shared across users, novelty = mean -log2 of build-user like share, discovery rails vs Phase 17's taste rail, Recall@N of all shown vs popularity@N; verdict fixed in docs/eval-results.md). Then the app's outcomes: migration 0034 (discovery_shown, dismissals), DiscoveryRepository, Home allocating by bandit::allocate with strategy arms run in the allocation's order.",
   "blockers": [],
   "decisions_pending": [
     {

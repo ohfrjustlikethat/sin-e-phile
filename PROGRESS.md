@@ -12,22 +12,24 @@
 
 **Phase 18 — Discovery Engine** (`in_progress`, branch `phase/18-discovery-engine`)
 
-0 of 6 exit criteria met with evidence.
+2 of 6 exit criteria met with evidence.
 
 > Builds on Phase 17's recommender: its candidate pools, calibration and reasons are what the arms draw from. Receives Phase 5 E3 and E4 (search by meaning, carried on at Phase 17's close).
 
 ### Subtasks — 0/5 complete
 
 - [~] **18.1** The strategy arms (crates/recommend/src/strategy.rs, new): safe-familiar, adjacent-stretch (one axis away from a taste mode), cross-mode bridge (between two of the profile's modes), blind-spot (a well-regarded region the profile never touched: a country, a decade, a movement), canon-gap (acclaimed work the taste predicts and the profile has not seen), deep-cut (highly rated obscurity near a mode); each yields candidates from Phase 17's pools and the meaning index with an honest label ('Because you loved Stalker', 'Your blind spot: Iranian New Wave'), tested so every label is true (E3).
-- [ ] **18.2** The contextual bandit (Thompson sampling) over the arms, rewarded by outcomes (played, completed, abandoned early, watchlisted, dismissed), with an exploration floor and no arm dominating; a simulation harness (`eval discovery`) with simulated users whose reward patterns change (E1), a maximally conservative user who still gets discovery (E2), and the novelty metric, mean inverse popularity, against its target with relevance held (E4).
+- [~] **18.2** The contextual bandit (Thompson sampling) over the arms, rewarded by outcomes (played, completed, abandoned early, watchlisted, dismissed), with an exploration floor and no arm dominating; a simulation harness (`eval discovery`) with simulated users whose reward patterns change (E1), a maximally conservative user who still gets discovery (E2), and the novelty metric, mean inverse popularity, against its target with relevance held (E4).
 - [ ] **18.3** The exploration budget and dismissals: a Comfort to Adventure setting per profile adapted by the bandit; 'not for me', 'not right now', 'already seen' on every recommended card (pad-reachable) feeding back; never the same item in two rails.
 - [ ] **18.4** Surprise me (one button and a pad shortcut: a film the viewer will probably like, from their taste and their sources, opened ready to play) and mood shelves from the semantic index offered to Home's rails, with I42 ('I have 90 minutes'). Search-by-meaning quality, carried from Phase 5 (E3 nDCG@10 0.0472, E4 the two named queries), is worked here, where mood shelves depend on it.
 - [ ] **18.5** The flagship case study (E6), the author's acceptance test on their own taste (E5, asked in the author batch), docs/specs, learning note, README and HOW_IT_WORKS, regression against every recorded number, close.
 
 ### Exit criteria
 
-- [ ] **E1** The bandit demonstrably shifts its strategy distribution in simulation when reward patterns change.
-- [ ] **E2** The exploration floor holds: even a maximally-conservative simulated user still receives genuine discovery.
+- [x] **E1** The bandit demonstrably shifts its strategy distribution in simulation when reward patterns change.
+      - *Evidence:* eval discovery --simulate on fcc4110 (1,000 simulated viewers, 120 days, favourite arm changes day 61): new favourite's share of discovery 12.8% -> 47.8% (+35.0 points, bar +15), old 49.0% -> 28.0% (-21.0, bar -15), rose for 98.9% of viewers (bar 80%). Seen to fail with --frozen (+0.1 points, NOT met). First run on 7bc4ef3 missed the bar (+12.0/-6.0) and is recorded in docs/eval-results.md 18.2.
+- [x] **E2** The exploration floor holds: even a maximally-conservative simulated user still receives genuine discovery.
+      - *Evidence:* eval discovery --simulate on fcc4110: 1,000 maximally conservative viewers (Comfort, every discovery card 'not for me') for 120 days: discovery's least share on any day 20.0% (bar 20%), 0 of 120,000 days without a discovery rail, every discovery arm shown on at least 23.3% of each viewer's days (bar 10%). Seen to fail with --no-floor (0.0% on every day, NOT met). docs/eval-results.md 18.2.
 - [ ] **E3** Rail labels accurately describe why each item is there.
 - [ ] **E4** Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.
 - [ ] **E5** The author tests it on their own taste and finds at least three films they hadn't heard of and want to watch. This is the real acceptance test.
@@ -37,7 +39,7 @@
 
 ## What's next
 
-Phase 18, 18.1: write crates/recommend/src/strategy.rs (the six arms over described titles, Label as data, holds() re-deriving each claim, a generated-profile test that every label holds); then crates/taste/src/discover.rs gathering each arm's pool; then ADR-0055's Wikidata country (P495) and movement (P135) launch step. Plan in docs/phases/phase-18-discovery-engine.md.
+Phase 18, 18.2: E4 harness (eval discovery without --simulate: MovieLens test users, discover::gather with a facts cache shared across users, novelty = mean -log2 of build-user like share, discovery rails vs Phase 17's taste rail, Recall@N of all shown vs popularity@N; verdict fixed in docs/eval-results.md). Then the app's outcomes: migration 0034 (discovery_shown, dismissals), DiscoveryRepository, Home allocating by bandit::allocate with strategy arms run in the allocation's order.
 
 ---
 
@@ -71,7 +73,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 15 | Taste Model | B | 5, 14 | 2 | 4/5 |
 | [x] | 16 | Ready to Watch | B | 15 | 3–4 | 9/9 |
 | [x] | 17 | Recommendation Engine | B | 15, 16 | 2–3 | 6/7 |
-| [~] | 18 | Discovery Engine 🏁 | B | 17 | 2 | 0/6 |
+| [~] | 18 | Discovery Engine 🏁 | B | 17 | 2 | 2/6 |
 | [ ] | 19 | Browsing Surfaces | B | 18 | 4–5 | 0/13 |
 | [ ] | 20 | Watchlist and External Sync | C | 19 | 1–2 | 0/5 |
 | [ ] | 21 | Windows Platform Integration | C | 12, 19 | 2–3 | 0/5 |
