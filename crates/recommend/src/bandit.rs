@@ -142,8 +142,25 @@ pub const BORROW: f64 = 0.3;
 pub const DISCOVERY_FLOOR: f64 = 0.2;
 /// Discovery's greatest share: the familiar always keeps a fifth.
 pub const DISCOVERY_CEILING: f64 = 0.8;
-/// The most of discovery's slots one discovery arm may take.
-pub const ARM_CAP: f64 = 0.4;
+/// The most of discovery's slots one discovery arm may take: half, so the others always have
+/// the other half. (0.4 first: with a rail's minimum for each arm shown, it kept a favourite
+/// that had changed at 30% of discovery for two months; docs/eval-results.md, 18.2.)
+pub const ARM_CAP: f64 = 0.5;
+/// The guards, together: what the app uses is [`GUARDS`]; the evaluation varies them to show
+/// its verdicts can fail (`eval discovery --simulate --no-floor`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Guards {
+    pub floor: f64,
+    pub ceiling: f64,
+    pub arm_cap: f64,
+}
+
+pub const GUARDS: Guards = Guards {
+    floor: DISCOVERY_FLOOR,
+    ceiling: DISCOVERY_CEILING,
+    arm_cap: ARM_CAP,
+};
+
 /// How far the profile's outcomes move discovery's share from where the budget puts it: a
 /// difference of 0.5 between the discovery arms' mean chance and the familiar's moves it 0.3.
 pub const ADAPT: f64 = 0.6;
@@ -263,7 +280,17 @@ impl Rng {
 /// moved by how the discovery arms have done against the familiar, within the floor and the
 /// ceiling.
 pub fn discovery_share(beliefs: &Beliefs, context: Context, budget: f64) -> f64 {
-    let start = DISCOVERY_FLOOR + (DISCOVERY_CEILING - DISCOVERY_FLOOR) * budget.clamp(0.0, 1.0);
+    discovery_share_within(beliefs, context, budget, &GUARDS)
+}
+
+/// [`discovery_share`] within other guards.
+pub fn discovery_share_within(
+    beliefs: &Beliefs,
+    context: Context,
+    budget: f64,
+    guards: &Guards,
+) -> f64 {
+    let start = guards.floor + (guards.ceiling - guards.floor) * budget.clamp(0.0, 1.0);
     let discovery: Vec<f64> = Arm::ALL
         .into_iter()
         .filter(|a| *a != Arm::Familiar)
@@ -271,23 +298,40 @@ pub fn discovery_share(beliefs: &Beliefs, context: Context, budget: f64) -> f64 
         .collect();
     let mean = discovery.iter().sum::<f64>() / discovery.len() as f64;
     let lead = mean - beliefs.mean(Arm::Familiar, context);
-    (start + ADAPT * lead).clamp(DISCOVERY_FLOOR, DISCOVERY_CEILING)
+    (start + ADAPT * lead).clamp(guards.floor, guards.ceiling)
 }
 
 /// The most slots one discovery arm may have when discovery has `discovery_slots`: [`ARM_CAP`]
 /// of them, but never fewer than `least`, or a short discovery could hold no rail at all.
 pub fn arm_cap(discovery_slots: usize, least: usize) -> usize {
-    ((discovery_slots as f64 * ARM_CAP).floor() as usize).max(least)
+    cap_within(discovery_slots, least, ARM_CAP)
 }
 
+fn cap_within(discovery_slots: usize, least: usize, cap: f64) -> usize {
+    ((discovery_slots as f64 * cap).floor() as usize).max(least)
+}
+
+/// Joint draws per allocation: how often each arm's draw is the highest of them is the
+/// chance, as the bandit believes, that it is the best (probability matching).
+pub const DRAWS: usize = 100;
+
 /// How many of `total` slots each arm gets this time: the familiar first, then the discovery
-/// arms, most promising first. Each discovery arm's chance is drawn from its belief.
+/// arms, most promising first.
 ///
 /// 1. Discovery's slots are [`discovery_share`] of `total`.
-/// 2. Arms are taken in the order of their draws while each can have `least` (a rail's
-///    worth); the rest get none this time, and their draws may be higher next time.
-/// 3. The slots above those `least`s go one at a time to the arm furthest below its share by
-///    draw, never past [`arm_cap`]; what the caps cannot place goes to the familiar.
+/// 2. **Each discovery arm's chance of being the best**: of [`DRAWS`] joint draws from the
+///    beliefs, how often its draw was the highest (one more each, so none is ever zero).
+///    This is Thompson sampling spread over a page: an arm gets slots as often as it could
+///    be the best one.
+/// 3. **As few rails as fit**: the arms most likely the best, as many as it takes to place
+///    discovery's slots under [`arm_cap`], and any other whose chance is worth a rail
+///    (`least` slots).
+/// 4. Each gets `least`; the rest go one at a time to the arm furthest below its chance's
+///    share, never past the cap; what the caps cannot place goes to the familiar.
+///
+/// Measured (docs/eval-results.md, 18.2): sharing by single draws over as many rails as fit
+/// gave every arm about a rail's minimum, and a favourite that changed moved its share by
+/// only 12 points in 60 days.
 pub fn allocate(
     beliefs: &Beliefs,
     context: Context,
@@ -296,26 +340,58 @@ pub fn allocate(
     least: usize,
     rng: &mut Rng,
 ) -> Vec<(Arm, usize)> {
-    let share = discovery_share(beliefs, context, budget);
+    allocate_within(beliefs, context, budget, total, least, &GUARDS, rng)
+}
+
+/// [`allocate`] within other guards.
+pub fn allocate_within(
+    beliefs: &Beliefs,
+    context: Context,
+    budget: f64,
+    total: usize,
+    least: usize,
+    guards: &Guards,
+    rng: &mut Rng,
+) -> Vec<(Arm, usize)> {
+    let share = discovery_share_within(beliefs, context, budget, guards);
     let discovery_slots = ((total as f64) * share).round() as usize;
-    let mut draws: Vec<(Arm, f64)> = Arm::ALL
+    let arms: Vec<Arm> = Arm::ALL
         .into_iter()
         .filter(|a| *a != Arm::Familiar)
-        .map(|a| {
-            let (alpha, beta) = beliefs.belief(a, context);
-            (a, rng.beta(alpha, beta))
-        })
         .collect();
-    draws.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
-    let cap = arm_cap(discovery_slots, least);
-    let shown = (discovery_slots / least.max(1)).min(draws.len());
-    let draws = &draws[..shown];
+    let beliefs_now: Vec<(f64, f64)> = arms.iter().map(|a| beliefs.belief(*a, context)).collect();
+    let mut wins = vec![1usize; arms.len()];
+    for _ in 0..DRAWS {
+        let best = beliefs_now
+            .iter()
+            .map(|(alpha, beta)| rng.beta(*alpha, *beta))
+            .enumerate()
+            .max_by(|a, b| a.1.total_cmp(&b.1))
+            .map_or(0, |(i, _)| i);
+        wins[best] += 1;
+    }
+    let mut chance: Vec<(Arm, f64)> = arms
+        .iter()
+        .zip(&wins)
+        .map(|(a, w)| (*a, *w as f64 / (DRAWS + arms.len()) as f64))
+        .collect();
+    chance.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+
+    let cap = cap_within(discovery_slots, least, guards.arm_cap);
+    let fit = discovery_slots / least.max(1);
+    let needed = discovery_slots.div_ceil(cap.max(1));
+    let worth = chance
+        .iter()
+        .filter(|(_, c)| c * discovery_slots as f64 >= least as f64)
+        .count();
+    let shown = needed.max(worth).min(fit).min(chance.len());
+    let chosen = &chance[..shown];
     let mut slots: Vec<usize> = vec![least; shown];
-    let weight: f64 = draws.iter().map(|(_, d)| d).sum::<f64>().max(1e-12);
+    let weight: f64 = chosen.iter().map(|(_, c)| c).sum::<f64>().max(1e-12);
     let mut left = discovery_slots - least * shown;
     while left > 0 {
         let furthest = (0..shown).filter(|&i| slots[i] < cap).max_by(|&i, &j| {
-            let behind = |k: usize| discovery_slots as f64 * draws[k].1 / weight - slots[k] as f64;
+            let behind = |k: usize| discovery_slots as f64 * chosen[k].1 / weight - slots[k] as f64;
             behind(i).total_cmp(&behind(j)).then(j.cmp(&i))
         });
         let Some(i) = furthest else { break };
@@ -323,7 +399,7 @@ pub fn allocate(
         left -= 1;
     }
     let mut out = vec![(Arm::Familiar, total - discovery_slots + left)];
-    out.extend(draws.iter().zip(slots).map(|((arm, _), n)| (*arm, n)));
+    out.extend(chosen.iter().zip(slots).map(|((arm, _), n)| (*arm, n)));
     out
 }
 

@@ -11,6 +11,7 @@
 use std::path::Path;
 
 mod advise;
+mod discovery;
 mod embed;
 mod error;
 mod identify;
@@ -176,6 +177,12 @@ async fn main() {
                 )
             }
         }
+        // Phase 18. `--simulate`: E1 and E2 on simulated viewers (`--no-floor` and `--frozen`
+        // show each verdict can fail).
+        "discovery" if args.iter().any(|a| a == "--simulate") => discovery::simulate(
+            args.iter().any(|a| a == "--no-floor"),
+            args.iter().any(|a| a == "--frozen"),
+        ),
         "modes" => modes::run(Path::new(&data_dir), args.iter().any(|a| a == "--prove")).await,
         "import" => {
             let from = args
