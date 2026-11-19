@@ -270,10 +270,9 @@ pub fn holds(label: &Label, title: &Title, profile: &Profile) -> bool {
             !profile.unknown.contains(&region.axis())
                 && title.close_to(profile, *mode)
                 && title.regions().contains(region)
-                && profile
-                    .modes
-                    .get(*mode)
-                    .is_some_and(|t| !t.regions.contains(region))
+                && profile.modes.get(*mode).is_some_and(|t| {
+                    !t.regions.contains(region) && !shares_place(title, t, region.axis())
+                })
         }
         Label::Between { a, b } => {
             a != b && title.close_to(profile, *a) && title.close_to(profile, *b)
@@ -372,7 +371,12 @@ fn by_score(mut scored: Vec<(f32, i64, Label)>) -> Vec<(i64, Label)> {
 fn outside(title: &Title, taste: &Taste, unknown: &HashSet<Axis>) -> Vec<Region> {
     let regions = title.regions();
     let mut axes: HashMap<Axis, Vec<Region>> = HashMap::new();
-    for r in regions {
+    for r in regions.iter().cloned() {
+        // A co-production from one of the mode's countries, or a film of one of its
+        // movements, has not left it ("Ghost in the Shell, but from the United Kingdom").
+        if shares_place(title, taste, r.axis()) {
+            continue;
+        }
         // Only an axis the mode says something about, and the profile is known on: a mode
         // with no countries known says nothing about a title's country.
         if !unknown.contains(&r.axis())
@@ -391,6 +395,27 @@ fn outside(title: &Title, taste: &Taste, unknown: &HashSet<Axis>) -> Vec<Region>
     }
 }
 
+/// Whether `title` has a country (or a movement, for that axis) the mode's titles have: a
+/// place is left only when none of the title's are the mode's. A genre is a step whatever
+/// else the title is ("Like The Seventh Seal, but horror").
+fn shares_place(title: &Title, taste: &Taste, axis: Axis) -> bool {
+    let values: &[String] = match axis {
+        Axis::Country => &title.countries,
+        Axis::Movement => &title.movements,
+        Axis::Decade | Axis::Genre => return false,
+    };
+    values.iter().any(|v| {
+        let r = match axis {
+            Axis::Country => Region::Country(v.clone()),
+            _ => Region::Movement(v.clone()),
+        };
+        taste.regions.contains(&r)
+    })
+}
+
+/// The fewest IMDb votes a stretch or a bridge has: obscurity is the deep cut's to offer.
+pub const ARM_VOTES: i64 = 1_000;
+
 /// **Stretch**: close to a mode and outside it on exactly one axis. Most relevant first
 /// ([`relevance`]), the modes in turn.
 pub fn stretch(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discovery> {
@@ -401,6 +426,7 @@ pub fn stretch(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discovery> 
             by_score(
                 titles
                     .iter()
+                    .filter(|t| t.votes >= ARM_VOTES)
                     .filter_map(|t| {
                         t.inside(profile, m)?;
                         let region = outside(t, taste, &profile.unknown).into_iter().next()?;
@@ -425,6 +451,7 @@ pub fn bridge(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discovery> {
             lists.push(by_score(
                 titles
                     .iter()
+                    .filter(|t| t.votes >= ARM_VOTES)
                     .filter_map(|t| {
                         t.inside(profile, a)?;
                         t.inside(profile, b)?;
@@ -882,6 +909,7 @@ mod tests {
         let nineties = Title {
             id: 10,
             near: vec![0.8, 0.1],
+            votes: 5_000,
             year: Some(1994),
             genres: vec!["Drama".into()],
             countries: vec!["SU".into()],
@@ -916,16 +944,47 @@ mod tests {
     }
 
     #[test]
+    fn a_co_production_from_the_modes_country_is_not_a_step_out() {
+        let p = drama_1970s();
+        let co = Title {
+            id: 18,
+            near: vec![0.8, 0.1],
+            votes: 9_000,
+            year: Some(1975),
+            genres: vec!["Drama".into()],
+            countries: vec!["SU".into(), "IT".into()],
+            ..Default::default()
+        };
+        assert!(stretch(std::slice::from_ref(&co), &p, 5).is_empty());
+        let label = Label::Stretch {
+            mode: 0,
+            region: Region::Country("IT".into()),
+        };
+        assert!(
+            !holds(&label, &co, &p),
+            "seen to fail: it still shares the mode's country"
+        );
+        let italian = Title {
+            countries: vec!["IT".into()],
+            ..co
+        };
+        assert!(holds(&label, &italian, &p));
+        assert_eq!(stretch(&[italian], &p, 5)[0].label, label);
+    }
+
+    #[test]
     fn a_bridge_is_close_to_both() {
         let p = drama_1970s();
         let both = Title {
             id: 11,
             near: vec![0.7, 0.65],
+            votes: 5_000,
             ..Default::default()
         };
         let one = Title {
             id: 12,
             near: vec![0.9, 0.5],
+            votes: 5_000,
             ..Default::default()
         };
         let picks = bridge(&[both.clone(), one.clone()], &p, 5);

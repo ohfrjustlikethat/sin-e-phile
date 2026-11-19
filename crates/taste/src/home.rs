@@ -396,7 +396,8 @@ pub async fn rails_at(
             // children, or runs longer, is left out below.
             let asked: Vec<(Arm, usize)> = plan.iter().map(|(arm, n)| (*arm, n * more)).collect();
             let rails = crate::discover::planned(&gathered, &asked, &taken);
-            let named = crate::discover::named(&rails, &gathered.profile);
+            let nearest = crate::discover::nearest_members(&mut **s, &gathered.profile, &rails);
+            let named = crate::discover::named(&rails, &gathered.profile, &nearest);
             let names: HashMap<i64, String> = media
                 .facts(&named)
                 .await?
@@ -411,7 +412,8 @@ pub async fn rails_at(
                     .iter()
                     .map(|d| {
                         let facts = by_id.get(&d.id).copied();
-                        let words = crate::discover::note(d, &gathered.profile, &names, facts);
+                        let words =
+                            crate::discover::note(d, &gathered.profile, &names, facts, &nearest);
                         (d.id, words)
                     })
                     .collect();

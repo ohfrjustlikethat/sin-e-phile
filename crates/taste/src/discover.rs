@@ -465,12 +465,15 @@ pub fn note(
     profile: &Profile,
     titles: &HashMap<i64, String>,
     facts: Option<&Title>,
+    nearest: &Nearest,
 ) -> String {
+    // A taste is named by its loved title nearest the pick, else by its strongest: a taste
+    // made of Tokyo Story and three Ghibli films is not "close to Tokyo Story" for Kiki's
+    // Delivery Service (seen in the real window, 2026-11-20).
     let mode_name = |m: usize| -> Option<&str> {
-        profile
-            .modes
-            .get(m)
-            .and_then(|t| t.members.first())
+        nearest
+            .get(&(m, pick.id))
+            .or_else(|| profile.modes.get(m).and_then(|t| t.members.first()))
             .and_then(|id| titles.get(id))
             .map(String::as_str)
     };
@@ -518,13 +521,67 @@ pub fn note(
     }
 }
 
-/// The profile's titles a note may name: each mode's first member and the loved titles deep
-/// cuts point to.
-pub fn named(rails: &[DiscoveryRail], profile: &Profile) -> Vec<i64> {
+/// For each pick whose label names a taste, by (mode, pick): the loved title of that taste
+/// nearest the pick in meaning.
+pub type Nearest = HashMap<(usize, i64), i64>;
+
+/// The loved titles a taste's label is said by: of each named mode's first [`MEMBERS_ASKED`]
+/// members, the one nearest each pick.
+pub fn nearest_members(
+    semantic: &mut (dyn Meaning + Send),
+    profile: &Profile,
+    rails: &[DiscoveryRail],
+) -> Nearest {
+    let mut vectors: HashMap<i64, Vec<f32>> = HashMap::new();
+    let mut vector = |id: i64, semantic: &mut (dyn Meaning + Send)| -> Option<Vec<f32>> {
+        if let Some(v) = vectors.get(&id) {
+            return Some(v.clone());
+        }
+        let v = unit(&semantic.vector(id)?);
+        vectors.insert(id, v.clone());
+        Some(v)
+    };
+    let mut out = Nearest::new();
+    for d in rails.iter().flat_map(|r| &r.picks) {
+        let modes: Vec<usize> = match d.label {
+            Label::Stretch { mode, .. } | Label::Canon { mode } | Label::DeepCutNear { mode } => {
+                vec![mode]
+            }
+            Label::Between { a, b } => vec![a, b],
+            Label::BlindSpot(_) | Label::DeepCutLoved { .. } => continue,
+        };
+        let Some(at) = vector(d.id, semantic) else {
+            continue;
+        };
+        for m in modes {
+            let Some(taste) = profile.modes.get(m) else {
+                continue;
+            };
+            let best = taste
+                .members
+                .iter()
+                .take(MEMBERS_ASKED)
+                .filter_map(|id| Some((*id, dot(&at, &vector(*id, semantic)?))))
+                .max_by(|a, b| a.1.total_cmp(&b.1).then(b.0.cmp(&a.0)));
+            if let Some((id, _)) = best {
+                out.insert((m, d.id), id);
+            }
+        }
+    }
+    out
+}
+
+/// How many of a taste's members, strongest first, a label may be said by.
+pub const MEMBERS_ASKED: usize = 30;
+
+/// The profile's titles a note may name: each mode's first member, the members nearest the
+/// picks, and the loved titles deep cuts point to.
+pub fn named(rails: &[DiscoveryRail], profile: &Profile, nearest: &Nearest) -> Vec<i64> {
     profile
         .modes
         .iter()
         .filter_map(|t| t.members.first().copied())
+        .chain(nearest.values().copied())
         .chain(rails.iter().flat_map(|r| {
             r.picks.iter().filter_map(|d| match d.label {
                 Label::DeepCutLoved { loved } => Some(loved),
@@ -571,7 +628,7 @@ mod tests {
     fn each_label_says_what_it_claims() {
         let p = profile();
         let t = titles();
-        let say = |label| note(&pick(label), &p, &t, None);
+        let say = |label| note(&pick(label), &p, &t, None, &Nearest::new());
         assert_eq!(
             say(Label::Stretch {
                 mode: 0,
@@ -627,9 +684,25 @@ mod tests {
                 &pick(Label::BlindSpot(Region::Decade(1950))),
                 &p,
                 &t,
-                Some(&rated)
+                Some(&rated),
+                &Nearest::new()
             ),
             "Rated 8.1 by 25,400 people"
+        );
+    }
+
+    #[test]
+    fn a_taste_is_named_by_its_title_nearest_the_pick() {
+        let p = profile();
+        let t = titles();
+        let nearest: Nearest = [((0, 9), 3)].into();
+        assert_eq!(
+            note(&pick(Label::Canon { mode: 0 }), &p, &t, None, &nearest),
+            "Acclaimed, and close to Mirror"
+        );
+        assert_eq!(
+            note(&pick(Label::Between { a: 0, b: 1 }), &p, &t, None, &nearest),
+            "Between Mirror and Spirited Away"
         );
     }
 

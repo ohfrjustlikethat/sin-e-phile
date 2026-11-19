@@ -11,7 +11,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
-use sinephile_persistence::repositories::MediaRepository;
+use sinephile_persistence::repositories::{MatchReason, MediaRepository, SearchRepository};
 use sinephile_persistence::{Db, DbError};
 
 use crate::hybrid::Meaning;
@@ -26,11 +26,14 @@ pub struct Mood {
     pub max_minutes: Option<i64>,
 }
 
+/// The sentences describe and avoid words a title might carry: "epic" put *Epic Movie* on
+/// "Big and sweeping", and "quiet" put *A Quiet Place* on "Quietly devastating" (the real
+/// window, 2026-11-20), since a document begins with its title.
 pub const MOODS: [Mood; 6] = [
     Mood {
         key: "mood_slow",
         title: "Slow and beautiful",
-        sentence: "a slow, contemplative and visually beautiful film of long quiet takes",
+        sentence: "a contemplative, visually beautiful film of long, unhurried takes",
         max_minutes: None,
     },
     Mood {
@@ -54,13 +57,13 @@ pub const MOODS: [Mood; 6] = [
     Mood {
         key: "mood_sweeping",
         title: "Big and sweeping",
-        sentence: "an epic, sweeping adventure on a grand scale",
+        sentence: "a grand adventure across vast landscapes and many years",
         max_minutes: None,
     },
     Mood {
         key: "mood_devastating",
         title: "Quietly devastating",
-        sentence: "a quiet, heartbreaking drama about loss",
+        sentence: "an understated, heartbreaking drama of loss and longing",
         max_minutes: None,
     },
 ];
@@ -69,10 +72,16 @@ pub const MOODS: [Mood; 6] = [
 pub const PER_DAY: usize = 2;
 /// Nearest titles a shelf chooses from.
 const POOL: usize = 300;
-/// How much closeness to the profile's nearest taste counts beside closeness to the mood.
-const TASTE: f32 = 0.5;
-/// How much being widely seen counts (`ln(1 + votes)`, over the most among the pool).
-const POPULAR: f32 = 0.2;
+/// How much closeness to the profile's nearest taste counts beside closeness to the mood: a
+/// quarter, so the shelf stays the mood's and two people's still differ.
+const TASTE: f32 = 0.25;
+/// How much being widely seen counts (`ln(1 + votes)`, over the most among the pool): search by
+/// meaning's own weight, chosen on its tuning set (`POPULARITY_PRIOR`), since a mood is a
+/// meaning query. (Scaled closeness and a fifth for popularity, the first version, put a
+/// 1912 short at the top of "Big and sweeping" in the real window, 2026-11-20.)
+const POPULAR: f32 = sinephile_search_engine::POPULARITY_PRIOR as f32;
+/// The fewest votes a title on a shelf has.
+const MIN_VOTES: i64 = 1_000;
 
 /// Today's moods: [`PER_DAY`] of [`MOODS`] in turn, `day` days since 1970.
 pub fn today(day: i64) -> Vec<Mood> {
@@ -82,9 +91,8 @@ pub fn today(day: i64) -> Vec<Mood> {
         .collect()
 }
 
-/// A title's place on a mood's shelf, from its closeness to the mood and to the profile's
-/// nearest taste (none without one), each scaled 0 to 1 over the shelf's pool, and how widely
-/// seen it is, 0 to 1: the mood counts twice the taste and five times the popularity.
+/// A title's place on a mood's shelf, from its cosine to the mood and to the profile's nearest
+/// taste (none without one), and how widely seen it is, 0 to 1.
 pub fn score(to_mood: f32, to_taste: Option<f32>, seen: f32) -> f32 {
     to_mood + TASTE * to_taste.unwrap_or(0.0) + POPULAR * seen
 }
@@ -126,7 +134,7 @@ fn dot(a: &[f32], b: &[f32]) -> f32 {
     a.iter().zip(b).map(|(x, y)| x * y).sum()
 }
 
-/// One mood's shelf of up to `k`: films and series alike, within its length, none of `taken`.
+/// One mood's shelf of up to `k`: films, within its length, none of `taken`.
 pub async fn shelf(
     db: &Db,
     semantic: &mut (dyn Meaning + Send),
@@ -138,6 +146,15 @@ pub async fn shelf(
 ) -> Result<Vec<i64>, DbError> {
     let direction = unit(vector);
     let near = semantic.nearest(&direction, POOL, taken);
+    // Films only: a mood is an evening's.
+    let films: HashSet<i64> = SearchRepository::new(db)
+        .describe(&near, MatchReason::Semantic)
+        .await?
+        .into_iter()
+        .filter(|h| h.kind == "film" || h.kind == "anime_film")
+        .map(|h| h.media_item_id)
+        .collect();
+    let near: Vec<i64> = near.into_iter().filter(|id| films.contains(id)).collect();
     let facts = MediaRepository::new(db).facts(&near).await?;
     let facts: HashMap<i64, _> = facts.into_iter().map(|f| (f.id, f)).collect();
     let most = near
@@ -151,6 +168,9 @@ pub async fn shelf(
         .iter()
         .filter_map(|id| {
             let f = facts.get(id)?;
+            if f.votes.unwrap_or(0) < MIN_VOTES {
+                return None;
+            }
             if let Some(max) = mood.max_minutes {
                 if !f.runtime_minutes.is_some_and(|m| m <= max) {
                     return None;
@@ -167,22 +187,9 @@ pub async fn shelf(
             Some((*id, dot(&direction, &v), to_taste, seen))
         })
         .collect();
-    // Closeness scaled to 0..1 over the pool before weighing, as Phase 17's ranker does: the
-    // cosines near a mood sit in a narrow band, and unscaled the taste part would outweigh it.
-    let span = |values: Vec<f32>| {
-        let lo = values.iter().copied().fold(f32::MAX, f32::min);
-        let hi = values.iter().copied().fold(f32::MIN, f32::max);
-        (lo, (hi - lo).max(1e-6))
-    };
-    let (mood_lo, mood_span) = span(raw.iter().map(|r| r.1).collect());
-    let (taste_lo, taste_span) = span(raw.iter().filter_map(|r| r.2).collect());
     let mut scored: Vec<(f32, i64)> = raw
         .iter()
-        .map(|(id, to_mood, to_taste, seen)| {
-            let m = (to_mood - mood_lo) / mood_span;
-            let t = to_taste.map(|c| (c - taste_lo) / taste_span);
-            (score(m, t, *seen), *id)
-        })
+        .map(|(id, to_mood, to_taste, seen)| (score(*to_mood, *to_taste, *seen), *id))
         .collect();
     scored.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
     Ok(scored.into_iter().take(k).map(|(_, id)| id).collect())
@@ -213,10 +220,9 @@ mod tests {
 
     #[test]
     fn the_mood_leads_and_taste_and_popularity_break_its_ties() {
-        // The pool's closest to the mood beats one 60% of the way down that fits the taste
-        // best, and one halfway down that fits it best and is the most seen.
-        assert!(score(1.0, Some(0.0), 0.0) > score(0.4, Some(1.0), 0.0));
-        assert!(score(1.0, Some(0.0), 0.0) > score(0.5, Some(0.5), 1.0));
+        // Clearly nearer the mood beats nearer the taste at equal fame; at equal closeness the
+        // taste and then the widely seen decide.
+        assert!(score(0.9, Some(0.3), 0.5) > score(0.6, Some(0.8), 0.5));
         assert!(score(0.7, Some(0.6), 0.0) > score(0.7, Some(0.2), 0.0));
         assert!(score(0.7, None, 1.0) > score(0.7, None, 0.1));
     }
