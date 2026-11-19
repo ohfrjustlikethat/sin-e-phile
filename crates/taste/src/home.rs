@@ -308,6 +308,8 @@ pub async fn rails_at(
     // the bandit's plan gives each; the taste rail as many as the plan gives the familiar.
     let mut discovery: Vec<(crate::discover::DiscoveryRail, HashMap<i64, String>)> = Vec::new();
     let mut limits: HashMap<&'static str, usize> = HashMap::new();
+    // And today's mood shelves (Phase 18): found by meaning, none repeating another rail.
+    let mut moods: Vec<(crate::mood::Mood, Vec<i64>)> = Vec::new();
     // Mutably: the meaning index is held across database awaits, which a shared reference
     // could only do if it were Sync; it is Send.
     let taste = match &mut model {
@@ -387,9 +389,9 @@ pub async fn rails_at(
                 .copied()
                 .collect();
             let loved = crate::hybrid::loved_with(db, &weighed, &met).await?;
-            let mut cache = crate::discover::Cache::default();
+            let mut facts = crate::discover::Cache::default();
             let gathered =
-                crate::discover::gather(db, &mut **s, modes, &met, &loved, &mut cache).await?;
+                crate::discover::gather(db, &mut **s, modes, &met, &loved, &mut facts).await?;
             // A kids profile, or a length limit, asks each arm for more: what does not suit
             // children, or runs longer, is left out below.
             let asked: Vec<(Arm, usize)> = plan.iter().map(|(arm, n)| (*arm, n * more)).collect();
@@ -415,6 +417,33 @@ pub async fn rails_at(
                     .collect();
                 discovery.push((rail, notes));
             }
+
+            let mut shelved: HashSet<i64> = taken.clone();
+            shelved.extend(
+                discovery
+                    .iter()
+                    .flat_map(|(r, _)| r.picks.iter().map(|d| d.id)),
+            );
+            for mood in crate::mood::today(today as i64) {
+                let Some(vector) = cache
+                    .moods
+                    .get(&mood, |text| s.embedder.embed_query(text).ok())
+                else {
+                    continue;
+                };
+                let ids = crate::mood::shelf(
+                    db,
+                    &mut **s,
+                    &mood,
+                    &vector,
+                    modes,
+                    &shelved,
+                    PER_RAIL * more,
+                )
+                .await?;
+                shelved.extend(ids.iter().copied());
+                moods.push((mood, ids));
+            }
             picked
         }
         None => Vec::new(),
@@ -428,6 +457,7 @@ pub async fn rails_at(
                 .iter()
                 .flat_map(|(r, _)| r.picks.iter().map(|d| &d.id)),
         )
+        .chain(moods.iter().flat_map(|(_, ids)| ids.iter()))
         .chain(saved.iter())
         .chain(new_releases.iter().take(PER_RAIL))
         .copied()
@@ -483,6 +513,9 @@ pub async fn rails_at(
             rail.picks.iter().map(|d| d.id).collect(),
             Some(notes),
         ));
+    }
+    for (mood, ids) in &moods {
+        lists.push((mood.key, mood.title.to_string(), ids.clone(), None));
     }
     lists.push(("watchlist", "On your watchlist".into(), saved, None));
     lists.push(("loved", "Widely loved".into(), loved, None));

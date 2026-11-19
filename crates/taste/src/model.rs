@@ -101,6 +101,8 @@ type Cached = (String, Vec<Mode>, HashSet<i64>);
 #[derive(Default)]
 pub struct ModelCache {
     inner: std::sync::Mutex<std::collections::HashMap<i64, Cached>>,
+    /// Each mood shelf's sentence, embedded once per run of the app (Phase 18).
+    pub moods: crate::mood::MoodVectors,
 }
 
 impl ModelCache {

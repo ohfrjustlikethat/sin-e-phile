@@ -1,7 +1,7 @@
 # The discovery engine (Phase 18)
 
-Status: 18.1 to 18.3 built (the arms and their labels, countries and movements, the bandit, the budget, dismissals).
-18.4 (Surprise me, mood shelves) extends this file when it lands.
+Status: 18.1 to 18.4 built (the arms and their labels, countries and movements, the bandit, the budget, dismissals,
+Surprise me, the length limit, mood shelves).
 
 ## 1. The arms
 
@@ -74,3 +74,19 @@ read from viewings (an episode counting for its series), the watchlist, ratings 
 `dismissals`, after the title was shown. "Not for me" and "already seen" leave every rail for good and are taste
 signals (the first weighs as an early abandon); "not right now" for 14 days. X on a pad, the context-menu key or a
 right click opens them on a recommended card; the card stands as an Undo, and a toast says what follows.
+
+## 7. Surprise me and "I have 90 minutes" (`crates/taste/src/surprise.rs`, I42)
+
+One film from what Home would recommend now (the taste rails and the discovery rails; for a profile with no taste yet,
+new releases and the widely loved), films only, what is on this PC first, at random among the best five, opened on its
+page. The Home button, and RT on a pad from anywhere while browsing. Home's length chips (any, under 90 minutes, under
+2 hours) narrow the recommendation rails and Surprise me; a title with no known length is left out under a limit, and
+what the profile started, saved or keeps on this PC is never cut.
+
+## 8. Mood shelves (`crates/taste/src/mood.rs`)
+
+Six moods, each a sentence asked of the meaning index as a query is ("a slow, contemplative and visually beautiful film
+of long quiet takes"), "Tense, under 100 minutes" with its length kept. A shelf is the mood's 300 nearest titles, each
+part scaled 0 to 1 over them, scored `mood + 0.5 x nearest taste + 0.2 x popularity` (`ln(1 + votes)` over the most
+among them), nothing another rail shows. Two moods a day, in turn; each sentence is embedded once per run of the app.
+

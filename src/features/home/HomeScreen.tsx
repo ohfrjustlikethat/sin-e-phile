@@ -34,6 +34,9 @@ const HINTS: Hint[] = [
   ["Menu", "Settings"],
 ];
 
+/** A mood shelf's line (Phase 18): two moods a day, in turn. */
+const MOOD = "A mood, found by what films are about rather than their genre";
+
 const WHY: Record<string, string> = {
   continue: "Where you left off",
   new_episodes: "New in the shows you follow",
@@ -115,7 +118,7 @@ export function HomeScreen() {
         </div>
       </div>
       {home.data.map((r, i) => (
-        <TitleRail key={r.key} rail={r} lead={i === 0} why={WHY[r.key] ?? ""} />
+        <TitleRail key={r.key} rail={r} lead={i === 0} why={WHY[r.key] ?? (r.key.startsWith("mood_") ? MOOD : "")} />
       ))}
     </div>
   );

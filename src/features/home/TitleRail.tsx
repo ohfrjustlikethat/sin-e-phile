@@ -13,7 +13,8 @@ const RECOMMENDED = new Set(["taste", "taste_more", "stretch", "bridge", "blind_
  */
 export function TitleRail({ rail, lead, why }: { rail: RailView; lead: boolean; why: string }) {
   const openDetail = useUi((s) => s.openDetail);
-  const recommended = RECOMMENDED.has(rail.key);
+  // Mood shelves (Phase 18) are recommendations too.
+  const recommended = RECOMMENDED.has(rail.key) || rail.key.startsWith("mood_");
   return (
     // No padding of its own: the rail's grid holds the page margin and the index column
     // (ADR-0024). Padding here as well pushed the column in and cut the rail short (Phase 16).

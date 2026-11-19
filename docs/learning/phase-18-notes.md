@@ -19,6 +19,12 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
   finishing what discovery chose pushes it up, abandoning it eases it down.
 - **Not for me, not right now, already seen** on every recommended card: X on a pad, the context-menu key, a right
   click. Each feeds the bandit, the first is also a taste signal, and every rail leaves the title out.
+- **Surprise me** (a Home button, RT on a pad): one film from what Home recommends now, on this PC first, opened on its
+  page; and **"I have 90 minutes"**, length chips that narrow Home and Surprise me.
+- **Mood shelves**: six moods as sentences searched by meaning ("Slow and beautiful", "Tense, under 100 minutes"), two
+  a day, each shelf leaning to the profile's own tastes.
+- **A population prior** for the bandit (blocker B17): what a profile with no history is likely to find in each arm,
+  from users set aside for tuning, so a new profile starts with the arms that tend to land.
 - **`eval discovery --simulate`** (E1, E2) and **`eval discovery`** (E4, E3 on real users).
 
 ## 2. Why
@@ -79,6 +85,17 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
   `tools/eval/src/discovery.rs`.
 - **A verdict written before its run**, and a first run that failed it recorded as it was — `docs/eval-results.md`
   (Phase 18).
+- **A prior as pseudo-trials**: a population's evidence counted as a few imaginary outcomes, which a profile's own
+  outweigh as they come — `crates/recommend/src/bandit.rs:169`.
+- **Tuning and test users kept apart for a choice**: the prior's weight chosen on one set, judged once on the other —
+  `tools/eval/src/discovery.rs` (`--tune`), `docs/eval-results.md` (B17's rule).
+- **A tuning fixture written before the run**, so a search setting is not chosen on the queries that judge it —
+  `fixtures/search/meaning-tuning.tsv`.
+- **Scaling parts over a pool before weighing**: cosines near a mood sit in a narrow band — `crates/taste/src/mood.rs:172`.
+- **A rotation by day**: two moods a day, every one within the week — `crates/taste/src/mood.rs:78`.
+- **Embedding once, keeping it**: a mood's sentence is the same all run — `crates/taste/src/mood.rs` (`MoodVectors`).
+- **Keeping the previous page while the next loads** (`placeholderData: keepPreviousData`), so a filter does not blank
+  the screen — `src/features/home/HomeScreen.tsx`.
 - **A pad button as a keyboard key**: X sends the context-menu key to whatever has focus — `src/app/App.tsx`
   (`case "options"`).
 - **Capture-phase listeners at the window**, to answer a synthetic Escape before the app's Back does —
