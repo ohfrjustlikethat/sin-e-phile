@@ -3527,3 +3527,86 @@ run, is `fixtures/search/meaning-tuning.tsv` (38 answers, every id checked again
 - **Judged** once on `semantic-queries.tsv` (E3 and E4's two named queries); E2 (43/43 exact titles) must hold, and
   E1's p95 must stay inside the 80 ms budget.
 
+### 18.2, B17 option A: the prior measured and chosen on tuning users (2026-11-20)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- discovery --tune --limit 2000 --prior-weight K`, the first
+2,000 tuning users, by the rule above.
+
+**Step 1, no prior:** Recall@N +38.8% over popularity (0.3566 against 0.2569), +1.95 bits. Per arm, held-out likes per
+card and novelty: stretch 0.0302 and 4.69 bits, bridge 0.0303 and 5.49, blind spot 0.0108 and 4.15, canon 0.0497 and
+3.64, deep cut 0.0018 and 11.35. **Step 2, the means** (`v / 2`): stretch 0.5104, bridge 0.5467, blind spot 0.2915,
+canon 0.6604, deep cut 0.5181.
+
+| K (pseudo-trials) | Recall@N against popularity | novelty over the taste rail |
+|---|---|---|
+| 0 | +38.8% | 1.95 bits |
+| **2** | **+44.1%** (0.3705) | **1.79 bits** |
+| 4 | +43.6% | 1.63 bits |
+| 8 | +43.0% | 1.50 bits |
+| 16 | +44.0% (0.3703) | 1.37 bits |
+
+**Chosen: K = 2** (the best relevance with at least 1.2 bits). At K = 2 a new profile's first Home almost never has a
+blind-spot rail (one of 2,000) while canon is in nearly every one; blind spots come with outcomes, which E2's re-run
+shows. **E1 and E2 with the prior** (`eval discovery --simulate`, on 193e4d4): E1 +35.2 / -22.2 points, rose for 98.9%
+(a blind spot that becomes the favourite goes from 10.3% to 47.3% of discovery); E2 floor 20.0% every day, no day
+without a rail, every arm on at least 16.7% of days. Both met.
+
+### 18.4: the search popularity prior measured on the tuning set (2026-11-20)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- search --tune-meaning`, on `fixtures/search/meaning-tuning.tsv`
+only:
+
+| prior | meaning nDCG@10 (10 queries) |
+|---|---|
+| 0 (as before) | 0.0215 |
+| 0.05 | 0.1136 |
+| 0.1 | 0.2210 |
+| 0.2 | 0.3816 |
+| **0.4** | **0.4213** |
+
+**Chosen: 0.4**, the grid's top, so a larger weight might do better; the grid was fixed first and is not extended after
+seeing it. Per query at 0.4: samurai 0.5064, stranded astronauts 0.2021, courtroom 0.3975, mafia saga 0.7156, dinosaurs
+0.7680, simulation 0.0000, silent stunts 0.2689, Japanese animated heroine 0.5945, zombies 0.4034, boxer 0.3561.
+
+### 18.2: E4 judged once on all test users, with the prior (2026-11-20)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- discovery`, the build of 193e4d4's tree (prior weight 2; the
+banner's HEAD read 394c3ef because the commit came after the build), 15,640 test users, 2,020 s.
+
+| Measure | Value | Bar |
+|---|---|---|
+| novelty, taste rail / discovery rails | 3.74 / 5.55 bits | |
+| E4: discovery over the taste rail | **+1.81 bits** | at least +1: met |
+| E4: Recall@N of everything shown against popularity's top N | **0.3639 against 0.2593: +40.4%** | more than +40%: **met** |
+| (the taste rail alone, Recall@20) | 0.2639 (unchanged) | |
+| (Phase 17's ranker asked for N) | 0.3772, +45.5% | |
+| E3: discovery labels checked | **467,875, none false** | met |
+
+Per arm: stretch 5.05 bits and 0.0276 a card, bridge 5.81 and 0.0301, blind spot 9 rails in 15,640 users, canon 3.63 and
+0.0495, deep cut 11.33 and 0.0017. **E4 met, by 0.4 points**: a margin that thin is stated as it is, not rounded up.
+
+### 18.4: search by meaning judged once with the prior at 0.4 (2026-11-20)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- search --report` on 890a469, release build, Tier 2 dev machine,
+nothing else running:
+
+| Measure | Recorded before (Phase 17 close) | Now | Target |
+|---|---|---|---|
+| E2 exact-title top-1 | 43/43 | **43/43** | 100% |
+| E1 latency p50 / p95 / max | 6.5 / 14.5 ms | **11.6 / 24.2 / 93.0 ms** | p95 < 80 ms (Tier 0) |
+| E3 meaning nDCG@10 (8 queries) | 0.0472 | **0.3276** | > 0.75: **NOT met** |
+| E3 filter nDCG@10 | 1.0000 | **1.0000** | |
+| topical nDCG@10 (6) | 0.0629 | **0.2307** | |
+| known-item MRR (2) | 0.0000, 0 of 2 in the top 10 | **1.0000, both first** | |
+
+Per query: grief 0.0000 (was 0.1505), hometown and nephew 0.7602 (was 0), Wong Kar-wai but Korean 0.2385 (was 0.0752),
+slow science fiction about memory 0.4770 (was 0), anime loneliness 0.1894 (was 0), heist 0.1505 (was 0), mountain
+documentaries 0.5028 (was 0.1518), neorealism 0.3028 (was 0). E1 rose by about 10 ms at p95: 200 nearest instead of 50,
+and one query for their votes.
+
+**Phase 5's E4 by eye** (`eval search --query`): "like Wong Kar-wai but Korean" now gives *Chungking Express*, *In the
+Mood for Love*, *Memories of Murder*, *2046*, *The Grandmaster*, *Thirst*, *As Tears Go By*, *3-Iron*: defensible.
+"Films about grief that aren't depressing" gives *Hereafter*, *Antichrist*, *The Queen*, *Cries & Whispers*, *1984*,
+*Take Shelter*, *Talk to Her*: about grief or loss in part, but *Antichrist* and *Cries & Whispers* are the opposite of
+"not depressing", and *1984* does not belong. The negation is what the meaning model misses. **Half met.**
+

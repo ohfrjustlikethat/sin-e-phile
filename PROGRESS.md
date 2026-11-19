@@ -12,16 +12,16 @@
 
 **Phase 18 — Discovery Engine** (`in_progress`, branch `phase/18-discovery-engine`)
 
-3 of 6 exit criteria met with evidence.
+4 of 6 exit criteria met with evidence.
 
 > Builds on Phase 17's recommender: its candidate pools, calibration and reasons are what the arms draw from. Receives Phase 5 E3 and E4 (search by meaning, carried on at Phase 17's close).
 
-### Subtasks — 2/5 complete
+### Subtasks — 4/5 complete
 
 - [x] **18.1** The strategy arms (crates/recommend/src/strategy.rs, new): safe-familiar, adjacent-stretch (one axis away from a taste mode), cross-mode bridge (between two of the profile's modes), blind-spot (a well-regarded region the profile never touched: a country, a decade, a movement), canon-gap (acclaimed work the taste predicts and the profile has not seen), deep-cut (highly rated obscurity near a mode); each yields candidates from Phase 17's pools and the meaning index with an honest label ('Because you loved Stalker', 'Your blind spot: Iranian New Wave'), tested so every label is true (E3). · `c362b80`
-- [~] **18.2** The contextual bandit (Thompson sampling) over the arms, rewarded by outcomes (played, completed, abandoned early, watchlisted, dismissed), with an exploration floor and no arm dominating; a simulation harness (`eval discovery`) with simulated users whose reward patterns change (E1), a maximally conservative user who still gets discovery (E2), and the novelty metric, mean inverse popularity, against its target with relevance held (E4).
+- [x] **18.2** The contextual bandit (Thompson sampling) over the arms, rewarded by outcomes (played, completed, abandoned early, watchlisted, dismissed), with an exploration floor and no arm dominating; a simulation harness (`eval discovery`) with simulated users whose reward patterns change (E1), a maximally conservative user who still gets discovery (E2), and the novelty metric, mean inverse popularity, against its target with relevance held (E4). · `193e4d4`
 - [x] **18.3** The exploration budget and dismissals: a Comfort to Adventure setting per profile adapted by the bandit; 'not for me', 'not right now', 'already seen' on every recommended card (pad-reachable) feeding back; never the same item in two rails. · `d7b5afa`
-- [ ] **18.4** Surprise me (one button and a pad shortcut: a film the viewer will probably like, from their taste and their sources, opened ready to play) and mood shelves from the semantic index offered to Home's rails, with I42 ('I have 90 minutes'). Search-by-meaning quality, carried from Phase 5 (E3 nDCG@10 0.0472, E4 the two named queries), is worked here, where mood shelves depend on it.
+- [x] **18.4** Surprise me (one button and a pad shortcut: a film the viewer will probably like, from their taste and their sources, opened ready to play) and mood shelves from the semantic index offered to Home's rails, with I42 ('I have 90 minutes'). Search-by-meaning quality, carried from Phase 5 (E3 nDCG@10 0.0472, E4 the two named queries), is worked here, where mood shelves depend on it. · `890a469`
 - [ ] **18.5** The flagship case study (E6), the author's acceptance test on their own taste (E5, asked in the author batch), docs/specs, learning note, README and HOW_IT_WORKS, regression against every recorded number, close.
 
 ### Exit criteria
@@ -32,7 +32,8 @@
       - *Evidence:* eval discovery --simulate on fcc4110: 1,000 maximally conservative viewers (Comfort, every discovery card 'not for me') for 120 days: discovery's least share on any day 20.0% (bar 20%), 0 of 120,000 days without a discovery rail, every discovery arm shown on at least 23.3% of each viewer's days (bar 10%). Seen to fail with --no-floor (0.0% on every day, NOT met). docs/eval-results.md 18.2.
 - [x] **E3** Rail labels accurately describe why each item is there.
       - *Evidence:* strategy::tests::every_label_of_every_arm_holds_on_generated_profiles (300 generated profiles, every pick's Label re-derived by strategy::holds; seen to fail with arms taking titles 0.1 short of close and with the blind spot ignoring met regions, 6784097); sinephile-taste tests/discover.rs every_label_holds_and_an_episode_counts_as_its_series; strategy::tests::a_blind_spot_rail_holds_one_region (a rail named for a region holds only it); and on real users: `eval discovery` on a1dd9a9 over 15,640 MovieLens test users checked 461,488 discovery labels with strategy::holds, none false (docs/eval-results.md, 18.2).
-- [ ] **E4** Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.
+- [x] **E4** Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.
+      - *Evidence:* `eval discovery` (all 15,640 MovieLens test users, Home as a new profile sees it, the bandit's population prior at weight 2 chosen on tuning users by a rule fixed first; build of 193e4d4): discovery rails 1.81 bits more novel than the taste rail (bar 1) with Recall@N of everything shown 0.3639 against popularity's top N 0.2593, +40.4% (bar more than 40%): met, by 0.4 points. Taste rail alone unchanged at 0.2639. Seen to fail: the same harness before the prior gave +28.8% and +33.2% (NOT met), docs/eval-results.md 18.2.
 - [ ] **E5** The author tests it on their own taste and finds at least three films they hadn't heard of and want to watch. This is the real acceptance test.
 - [ ] **E6** Case study written — this is the flagship one.
 
@@ -40,13 +41,13 @@
 
 ## What's next
 
-Phase 18, blocker B17 option A (read B17's ANALYSIS first): fix the rule in docs/eval-results.md before any run; add `--tune` to `eval discovery` (Part::Tune users) and a prior to crates/recommend/src/bandit.rs (pseudo-trials per discovery arm used in allocate_within's draws only, discovery_share unchanged), Home and the harness using it; choose on tuning users by the rule; re-run `eval discovery --simulate` (E1, E2) and `eval discovery` on all test users (E4). Then 18.4's rest: mood shelves from the meaning index, with search-by-meaning quality (Phase 5 E3 0.0472; measure a popularity prior in re-ranking first). Surprise me and I42 are done (7c8377c).
+Phase 18, 18.5: a real-window look on the scratch copy (`eval recommend --rail 2`, the probe profile) and the release build with SINEPHILE_DATA_DIR at the copy; the flagship case study docs/case-study/discovery.md (E6); README and HOW_IT_WORKS; the regression check of every recorded number (`eval all` plus `vector --report`); then ask the author for E5 (three films they had not heard of and want to watch, after rating ten or more) in the batch, and close with Phase 5 E3/E4 carried a third time with their measured state (0.3276; grief not defensible), flagged to the author.
 
 ---
 
 ## Blockers
 
-- **B17** Phase 18 E4: novelty is met (+2.02 bits over the taste rail; bar 1) but relevance is not (Recall@N of what Home shows +33.2% over popularity's top N on 2,000 test users; bar more than +40%). Three distinct approaches tried (relevance order within arms; the matrix's weight; the familiar's whole share), docs/eval-results.md 18.2. Options: (A) a population prior for the bandit among the discovery arms, each arm's chance of a held-out like estimated on the TUNING users and given as a few pseudo-trials, so a new profile starts with more canon and bridges and fewer deep cuts while every arm is still tried (projected to meet both; about half a session; E1 and E2 re-run); (B) carry E4 to Phase 19, whose Home orders rails by predicted engagement, with its measured state; (C) leave it not met. Taken: A (not a reserved decision); B if A falls short. ANALYSIS for A (2026-11-19, before building it): a prior from hit rates alone makes probability matching concentrate on canon and bridges (about +0.7 bits: novelty fails). Per arm on 2,000 users: canon 3.58 bits and 0.060 held-out likes a card, bridge 5.34/0.039, stretch 4.67/0.036, blind spot 4.13/0.012, deep cut 11.3/0.002. Blind spots cost relevance and buy little novelty; deep cuts buy the novelty. A mix like canon 9, bridge 9, stretch 6, deep cut 6 is estimated at about 5.9 bits and 0.037 a card, enough with the whole familiar share. So choose the prior on TUNING users by a rule fixed first: of a small grid of pseudo-trial weights, the best Recall@N whose novelty is at least +1.2 bits; then the test users once.
+None.
 
 ---
 
@@ -74,7 +75,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 15 | Taste Model | B | 5, 14 | 2 | 4/5 |
 | [x] | 16 | Ready to Watch | B | 15 | 3–4 | 9/9 |
 | [x] | 17 | Recommendation Engine | B | 15, 16 | 2–3 | 6/7 |
-| [~] | 18 | Discovery Engine 🏁 | B | 17 | 2 | 3/6 |
+| [~] | 18 | Discovery Engine 🏁 | B | 17 | 2 | 4/6 |
 | [ ] | 19 | Browsing Surfaces | B | 18 | 4–5 | 0/13 |
 | [ ] | 20 | Watchlist and External Sync | C | 19 | 1–2 | 0/5 |
 | [ ] | 21 | Windows Platform Integration | C | 12, 19 | 2–3 | 0/5 |

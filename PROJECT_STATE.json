@@ -21,8 +21,8 @@
       {
         "id": "18.2",
         "text": "The contextual bandit (Thompson sampling) over the arms, rewarded by outcomes (played, completed, abandoned early, watchlisted, dismissed), with an exploration floor and no arm dominating; a simulation harness (`eval discovery`) with simulated users whose reward patterns change (E1), a maximally conservative user who still gets discovery (E2), and the novelty metric, mean inverse popularity, against its target with relevance held (E4).",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "193e4d4"
       },
       {
         "id": "18.3",
@@ -33,8 +33,8 @@
       {
         "id": "18.4",
         "text": "Surprise me (one button and a pad shortcut: a film the viewer will probably like, from their taste and their sources, opened ready to play) and mood shelves from the semantic index offered to Home's rails, with I42 ('I have 90 minutes'). Search-by-meaning quality, carried from Phase 5 (E3 nDCG@10 0.0472, E4 the two named queries), is worked here, where mood shelves depend on it.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "890a469"
       },
       {
         "id": "18.5",
@@ -65,8 +65,8 @@
       {
         "id": "E4",
         "text": "Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "`eval discovery` (all 15,640 MovieLens test users, Home as a new profile sees it, the bandit's population prior at weight 2 chosen on tuning users by a rule fixed first; build of 193e4d4): discovery rails 1.81 bits more novel than the taste rail (bar 1) with Recall@N of everything shown 0.3639 against popularity's top N 0.2593, +40.4% (bar more than 40%): met, by 0.4 points. Taste rail alone unchanged at 0.2639. Seen to fail: the same harness before the prior gave +28.8% and +33.2% (NOT met), docs/eval-results.md 18.2."
       },
       {
         "id": "E5",
@@ -743,7 +743,7 @@
           "id": "E3",
           "text": "nDCG@10 > 0.75 on the semantic query set.",
           "met": false,
-          "evidence": "MEASURED 2026-11-18 at Phase 17's close, carried again (ADR-0036): `SINEPHILE_DATA_DIR=<copy> target/release/eval.exe all` at f8d8e58 -> meaning nDCG@10 0.0472 over 8 queries (unchanged since 814fc41), filter 1.0000 over 2; two graded answers are still outside the vector index (ceiling 0.7468). History: 2026-10-25 measured 0.0472 after five distinct attempts; docs/eval-results.md Session 19 and 'Phase 17 regression check'; docs/case-study/search.md.",
+          "evidence": "MEASURED 2026-11-20 in Phase 18 (18.4) with search by meaning's popularity prior at 0.4, chosen on a separate tuning set (fixtures/search/meaning-tuning.tsv, 0.0215 to 0.4213): `eval search --report` on 890a469 -> meaning nDCG@10 0.3276 over 8 queries (from 0.0472), filter 1.0000, known-item MRR 1.0000 (both first); E2 43/43; E1 p95 24.2 ms. Still below 0.75. History: docs/eval-results.md (Session 19, Phase 17 regression check, 18.4); docs/case-study/search.md.",
           "carried_to_phase": 18,
           "carried_reason": "Phase 17 built the recommender on the meaning index and gave titles without meaning a vector (ADR-0054), but it does not change how a query is embedded or ranked, so the number did not move. Phase 18's mood shelves are queries over the same semantic index; retrieval quality is their precondition, so the work moves there."
         },
@@ -751,7 +751,7 @@
           "id": "E4",
           "text": "\"films about grief that aren't depressing\" and \"like Wong Kar-wai but Korean\" both return defensible results — documented with screenshots in the case study.",
           "met": false,
-          "evidence": "DOCUMENTED, NOT MET, carried again (ADR-0036): the same two queries at f8d8e58 score as in docs/case-study/search.md (grief 0.1505, Wong Kar-wai 0.0752 at 814fc41; meaning nDCG unchanged at 0.0472, docs/eval-results.md 'Phase 17 regression check'), screenshots docs/case-study/shots/01-grief.png and 02-wong-kar-wai.png.",
+          "evidence": "HALF MET 2026-11-20 (Phase 18, 18.4, popularity prior 0.4, 890a469): 'like Wong Kar-wai but Korean' now gives Chungking Express, In the Mood for Love, Memories of Murder, 2046, Thirst, 3-Iron (nDCG 0.2385): defensible. 'films about grief that aren't depressing' gives Hereafter, Antichrist, The Queen, Cries & Whispers, 1984 (nDCG 0.0000): the negation is missed. docs/eval-results.md 18.4; earlier screenshots docs/case-study/shots/01-grief.png, 02-wong-kar-wai.png.",
           "carried_to_phase": 18,
           "carried_reason": "The same retrieval quality as E3; it moves with E3 to Phase 18, whose mood shelves are built from semantic queries."
         },
@@ -2063,8 +2063,8 @@
         {
           "id": "E4",
           "text": "Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "`eval discovery` (all 15,640 MovieLens test users, Home as a new profile sees it, the bandit's population prior at weight 2 chosen on tuning users by a rule fixed first; build of 193e4d4): discovery rails 1.81 bits more novel than the taste rail (bar 1) with Recall@N of everything shown 0.3639 against popularity's top N 0.2593, +40.4% (bar more than 40%): met, by 0.4 points. Taste rail alone unchanged at 0.2639. Seen to fail: the same harness before the prior gave +28.8% and +33.2% (NOT met), docs/eval-results.md 18.2."
         },
         {
           "id": "E5",
@@ -2089,8 +2089,8 @@
         {
           "id": "18.2",
           "text": "The contextual bandit (Thompson sampling) over the arms, rewarded by outcomes (played, completed, abandoned early, watchlisted, dismissed), with an exploration floor and no arm dominating; a simulation harness (`eval discovery`) with simulated users whose reward patterns change (E1), a maximally conservative user who still gets discovery (E2), and the novelty metric, mean inverse popularity, against its target with relevance held (E4).",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "193e4d4"
         },
         {
           "id": "18.3",
@@ -2101,8 +2101,8 @@
         {
           "id": "18.4",
           "text": "Surprise me (one button and a pad shortcut: a film the viewer will probably like, from their taste and their sources, opened ready to play) and mood shelves from the semantic index offered to Home's rails, with I42 ('I have 90 minutes'). Search-by-meaning quality, carried from Phase 5 (E3 nDCG@10 0.0472, E4 the two named queries), is worked here, where mood shelves depend on it.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "890a469"
         },
         {
           "id": "18.5",
@@ -2589,15 +2589,8 @@
       ]
     }
   ],
-  "next_action": "Phase 18, blocker B17 option A (read B17's ANALYSIS first): fix the rule in docs/eval-results.md before any run; add `--tune` to `eval discovery` (Part::Tune users) and a prior to crates/recommend/src/bandit.rs (pseudo-trials per discovery arm used in allocate_within's draws only, discovery_share unchanged), Home and the harness using it; choose on tuning users by the rule; re-run `eval discovery --simulate` (E1, E2) and `eval discovery` on all test users (E4). Then 18.4's rest: mood shelves from the meaning index, with search-by-meaning quality (Phase 5 E3 0.0472; measure a popularity prior in re-ranking first). Surprise me and I42 are done (7c8377c).",
-  "blockers": [
-    {
-      "id": "B17",
-      "raised": "2026-11-19",
-      "needs_user": false,
-      "description": "Phase 18 E4: novelty is met (+2.02 bits over the taste rail; bar 1) but relevance is not (Recall@N of what Home shows +33.2% over popularity's top N on 2,000 test users; bar more than +40%). Three distinct approaches tried (relevance order within arms; the matrix's weight; the familiar's whole share), docs/eval-results.md 18.2. Options: (A) a population prior for the bandit among the discovery arms, each arm's chance of a held-out like estimated on the TUNING users and given as a few pseudo-trials, so a new profile starts with more canon and bridges and fewer deep cuts while every arm is still tried (projected to meet both; about half a session; E1 and E2 re-run); (B) carry E4 to Phase 19, whose Home orders rails by predicted engagement, with its measured state; (C) leave it not met. Taken: A (not a reserved decision); B if A falls short. ANALYSIS for A (2026-11-19, before building it): a prior from hit rates alone makes probability matching concentrate on canon and bridges (about +0.7 bits: novelty fails). Per arm on 2,000 users: canon 3.58 bits and 0.060 held-out likes a card, bridge 5.34/0.039, stretch 4.67/0.036, blind spot 4.13/0.012, deep cut 11.3/0.002. Blind spots cost relevance and buy little novelty; deep cuts buy the novelty. A mix like canon 9, bridge 9, stretch 6, deep cut 6 is estimated at about 5.9 bits and 0.037 a card, enough with the whole familiar share. So choose the prior on TUNING users by a rule fixed first: of a small grid of pseudo-trial weights, the best Recall@N whose novelty is at least +1.2 bits; then the test users once."
-    }
-  ],
+  "next_action": "Phase 18, 18.5: a real-window look on the scratch copy (`eval recommend --rail 2`, the probe profile) and the release build with SINEPHILE_DATA_DIR at the copy; the flagship case study docs/case-study/discovery.md (E6); README and HOW_IT_WORKS; the regression check of every recorded number (`eval all` plus `vector --report`); then ask the author for E5 (three films they had not heard of and want to watch, after rating ten or more) in the batch, and close with Phase 5 E3/E4 carried a third time with their measured state (0.3276; grief not defensible), flagged to the author.",
+  "blockers": [],
   "decisions_pending": [
     {
       "id": "P1",
