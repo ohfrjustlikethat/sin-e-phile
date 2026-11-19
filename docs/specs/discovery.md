@@ -1,7 +1,7 @@
 # The discovery engine (Phase 18)
 
-Status: 18.1 built (the arms, their labels, countries and movements). 18.2 (the bandit), 18.3 (dismissals and the
-budget) and 18.4 (Surprise me, mood shelves) extend this file as they land.
+Status: 18.1 to 18.3 built (the arms and their labels, countries and movements, the bandit, the budget, dismissals).
+18.4 (Surprise me, mood shelves) extends this file when it lands.
 
 ## 1. The arms
 
@@ -39,7 +39,8 @@ ten titles met.
 ## 3. Countries and movements (ADR-0055)
 
 `crates/catalogue/src/regions.rs`, hourly beside the live neighbours: Wikidata's P495 (country of origin) and P135
-(movement), English labels, by IMDb id, 200 a query at one query in three seconds, 12,000 titles a run. Met titles
+(movement), English labels, by IMDb id, 200 a query, 12,000 titles a run (measured on the development copy: 69,124
+titles in 2,150 s, about 6 s a query with WDQS's own time, so a run is about six minutes). Met titles
 first, then films and series with 1,000 votes, most voted first. `title_regions` holds the answers and `regions_asked`
 every title asked. `ingest regions` runs it to the end on a data folder.
 
@@ -47,5 +48,29 @@ every title asked. `ingest regions` runs it to the end on a data folder.
 
 The pool: each mode's 1,000 nearest (asked of the whole index), the acclaimed (up to 6,000), and Phase 17's
 neighbours of what the profile loved. Facts from `MediaRepository::facts` (rating, countries and movements added in
-Phase 18). Home shows each arm with at least five picks as a rail after "Where your taste points", none repeating a
-title shown elsewhere on Home. Which arms and in what order is the bandit's (18.2); until then, `Arm::ALL`'s order.
+Phase 18). Home shows each arm the plan gives a rail, with at least five picks, after "Where your taste points", none
+repeating a title shown elsewhere on Home. Within an arm, picks are ordered by Phase 17's relevance (closeness to the
+nearest taste, plus half the matrix's part): the label says why a title may be in the arm, relevance which come first.
+
+## 5. The bandit (`crates/recommend/src/bandit.rs`)
+
+- **Beliefs**: per arm and part of the day (day 05-17, evening 17-23, late), `Beta(1 + successes, 1 + failures)`, each
+  outcome faded at a 60-day half-life, a part of the day borrowing 0.3 of the arm's evidence from the others.
+- **Rewards**: completed 1, watchlisted 0.7, played 0.6, not right now 0.25 (that part of the day only), abandoned in
+  the first fifth or not for me 0, already seen nothing. A title counts once, by its most decisive outcome.
+- **Discovery's share** of 60 slots: from 20% (Comfort) to 80% (Adventure) by the budget, moved by `0.6 x` how far the
+  discovery arms' mean chance leads the familiar's, never outside 20% to 80%. The taste rail shows at most 20.
+- **Allocation**: each discovery arm's chance of being the best, from 100 joint draws (probability matching); as few
+  rails as fit discovery's slots under the cap (half of discovery), plus any arm whose chance is worth a rail; each a
+  rail's minimum (6), the rest by chance. The plan is seeded by profile, day and hour, so Home holds still within an
+  hour. Arms choose in the plan's order.
+- **Measured** (docs/eval-results.md, 18.2): E1 a changed favourite moves +35 and -21 points of discovery in 60 days; E2
+  a viewer who refuses every discovery card still gets 20% of the slots, every arm on at least 23% of days.
+
+## 6. Memory and dismissals (migration 0034)
+
+`discovery_shown` keeps the arm that first showed each title to a profile, and the part of the day. What came of it is
+read from viewings (an episode counting for its series), the watchlist, ratings (4+ completed, 2 or less not for me) and
+`dismissals`, after the title was shown. "Not for me" and "already seen" leave every rail for good and are taste
+signals (the first weighs as an early abandon); "not right now" for 14 days. X on a pad, the context-menu key or a
+right click opens them on a recommended card; the card stands as an Undo, and a toast says what follows.

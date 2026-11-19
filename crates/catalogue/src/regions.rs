@@ -12,9 +12,9 @@
 //!    the acclaimed and widely seen are what the arms choose from. About 57,000 films in the
 //!    development catalogue.
 //!
-//! [`PER_RUN`] titles a run, [`REGIONS_PER_REQUEST`] a query, at WDQS's one query in three
-//! seconds: about three minutes of the hourly check's background, so every film with 1,000
-//! votes is asked within the first five hours the app is open. A title Wikidata does not
+//! [`PER_RUN`] titles a run, [`REGIONS_PER_REQUEST`] a query: about six minutes of the hourly
+//! check's background (measured: 69,124 titles in 2,150 s on the development copy), so every
+//! title with 1,000 votes is asked within the first six hours the app is open. A title Wikidata does not
 //! know, or says nothing of, is recorded as asked with nothing, and not asked again.
 
 use std::collections::HashMap;

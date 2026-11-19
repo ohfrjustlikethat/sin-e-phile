@@ -280,11 +280,15 @@ AniList's and TMDB's recommendations stand beside it, and a film nobody has rate
 who made what you loved. Each of your taste modes gets its share of the rail, every card says why it is there, and
 everything they are built from is brought up to date at each launch.
 
-Still to come (Phase 18): a **contextual bandit** choosing between *strategies*: safe-familiar,
-adjacent-stretch, cross-mode bridge, blind-spot, canon-gap, deep-cut. It learns which
-kind of suggestion you actually act on. There is a hard **exploration floor**, so
-even a maximally conservative user still gets genuine discovery — a filter bubble is
-an optimisation failure, not an inevitability.
+Discovery (Phase 18) adds five more ways of choosing beside "where your taste points": a **stretch** (close
+to a taste of yours, one step outside it: "Like Stalker, but from the 1990s"), a **bridge** between two of your
+tastes, your **blind spot** (acclaimed films from a decade, genre, country or movement you have never watched),
+the **canon** you have not seen, and **deep cuts** almost nobody has. Every label is a claim the app checks
+against the facts before it says it. A **bandit** (Thompson sampling) learns which kinds you actually finish and
+gives them more of Home, within a **floor**: even someone who refuses every discovery card still gets a fifth of
+Home's recommendations from them, because a filter bubble is an optimisation failure, not an inevitability. A
+Comfort to Adventure setting says where to start, and "not for me", "not right now" and "already seen" on any
+recommended card teach it. How it all fits: `docs/specs/discovery.md`.
 
 **The analogy:** a friend who knows your taste well enough to predict what you will
 like, but who is also willing to say "I know this is not your usual thing, but trust

@@ -27,8 +27,9 @@ belongs to (P135)**, by IMDb id, each as its English label.
 
 - **What is asked, in order**: every title some profile has met and that was never asked (an episode as its series),
   whatever its votes, then films and series with at least 1,000 votes, most voted first. 12,000 titles a run, 200 ids a
-  query, at WDQS's one query in three seconds: about three minutes of an hour's background. Measured on the copy,
-  994 titles in 16 s, 992 with a country, 24 with a movement.
+  query. Measured on a copy of the development catalogue: every eligible title, 69,124, in 2,150 s (about 6 s a query
+  with WDQS's own time), 64,560 with a country (93%) and 404 with a movement; so a run is about six minutes of an hour's
+  background, and the first six hours the app is open ask everything.
 - **Stored** in a new table (migration 0033, `title_regions`: title, axis, name), with `regions_asked` recording every
   title asked, answered or not, so a title Wikidata does not know is not asked again each hour.
 - **English names, not ISO codes.** The Soviet Union, West Germany, Czechoslovakia and Yugoslavia have no ISO 3166-1
