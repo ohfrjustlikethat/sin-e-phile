@@ -3398,3 +3398,52 @@ Every harness on the copy of the development data (`SINEPHILE_DATA_DIR=<copy> ta
 No metric regressed. The first `eval all` refused at the vector harness ("the index holds 119874 vectors and the
 catalogue offers ..."): A44's job had written synopses for titles inside the published file, which then counted as the
 file's own. Fixed in f8d8e58 before this run.
+
+## Phase 18 — Discovery Engine
+
+### Verdicts fixed before any run (2026-11-19)
+
+Written here before the first run of each harness, so a number cannot choose its own bar.
+
+- **E1** (`eval discovery --simulate`): 1,000 simulated viewers, 120 days, one allocation of 60 slots a day (the taste
+  rail shows at most 20 of the familiar's), three cards acted on a day (finished with the viewer's chance for its arm,
+  otherwise "not for me"). Each viewer has a favourite discovery arm (chance 0.7; other discovery arms 0.15; the
+  familiar 0.4) that changes to a different arm on day 61. **Met** when the new favourite's mean share of discovery's
+  slots over days 101-120 is at least 15 points above its share over days 41-60, the old favourite's at least 15 points
+  below, and the new favourite's share rose for at least 80% of viewers.
+- **E2** (same command): 1,000 maximally conservative viewers (Comfort; every familiar card finished with chance 0.9;
+  every discovery card "not for me") for 120 days. **Met** when on every day of every viewer discovery has at least 20%
+  of the slots and at least one rail's worth (6), and every discovery arm is shown on at least 10% of each viewer's days.
+- **E4** (`eval discovery`, MovieLens test users): novelty is mean self-information, `-log2(p)`, `p` a title's share of
+  MovieLens build users who liked it. **Met** when the discovery rails' mean novelty is at least 1 bit above Phase 17's
+  taste rail on the same users, and Recall@N of everything Home's taste and discovery rails show stays more than 40%
+  above popularity's top N (N the same).
+
+### 18.2: the bandit in simulation, E1 and E2 (2026-11-19)
+
+`cargo run --release -p eval -- discovery --simulate` (pure simulation, no data; a few seconds, Tier 2 dev machine).
+
+**First run, on 7bc4ef3** (each discovery arm's share by one Thompson draw, over as many rails as fit at six slots
+each, no arm above 40% of discovery): **E1 NOT met.** The old favourite's share of discovery went 31.2% to 25.2% (-6.0
+points), the new favourite's 17.3% to 29.3% (+12.0); it rose for 99.6% of viewers. E2 met (least 20.0%, no day without
+a rail, every arm on at least 27.5% of days). Cause: at 25 to 30 discovery slots, five arms at a rail's minimum of six
+fill nearly all of them, so a learned preference could only decide which arm was left out.
+
+**Changed** (the bar unchanged): an arm's share follows its chance of being the best arm, how often its draw is the
+highest of 100 joint draws (probability matching); only as many rails as it takes to place discovery's slots under the
+cap; the cap raised to half of discovery, since with a rail's minimum per arm 40% kept a changed favourite second.
+
+**On fcc4110:**
+
+| Measure | Value | Bar |
+|---|---|---|
+| E1: new favourite's share of discovery, days 41-60 to 101-120 | **12.8% to 47.8% (+35.0 points)** | at least +15 |
+| E1: old favourite's share | **49.0% to 28.0% (-21.0 points)** | at least -15 |
+| E1: viewers whose new favourite's share rose | **98.9%** | at least 80% |
+| (a viewer who warms to discovery on day 61: discovery's share of all slots) | 20.4% to 46.1% | (shown, not a bar) |
+| E2: discovery's least share on any day of any viewer | **20.0%** (mean 20.0%) | at least 20% |
+| E2: days without a discovery rail | **0** of 120,000 | none |
+| E2: the least any discovery arm was shown, of one viewer's days | **23.3%** | at least 10% |
+
+**E1 met. E2 met.** Each seen to fail: `--frozen` (beliefs never updated) gives +0.1 and +0.2 points and 50.0% rose, E1
+NOT met; `--no-floor` (floor 0) gives discovery 0.0% on all 120,000 days, E2 NOT met.
