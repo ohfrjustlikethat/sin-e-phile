@@ -10,9 +10,12 @@
 //!   within caps per director, franchise and year; a truthful reason for every pick.
 //! - [`split`]: which MovieLens users build the matrix, which tune it, and which judge it,
 //!   so a number in `docs/eval-results.md` is never measured on the people it learned from.
+//! - [`bandit`]: Phase 18's Thompson sampling over the arms: how much of Home each gets,
+//!   learned from outcomes, with an exploration floor and a cap.
 //! - [`strategy`]: Phase 18's discovery arms (stretch, bridge, blind spot, canon, deep cut),
 //!   each pick with a label that says what is true of it.
 
+pub mod bandit;
 pub mod cf;
 pub mod rank;
 pub mod split;
