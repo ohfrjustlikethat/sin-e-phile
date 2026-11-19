@@ -365,6 +365,24 @@ impl<'a> EpisodeRepository<'a> {
         }))
     }
 
+    /// The series of each of `ids` that is an episode: (episode, series). What a profile
+    /// watched episode by episode counts as the series where a whole title is meant (Phase 18).
+    pub async fn series_of_many(&self, ids: &[i64]) -> Result<Vec<(i64, i64)>, DbError> {
+        let mut out = Vec::new();
+        for chunk in ids.chunks(500) {
+            let sql = format!(
+                "SELECT media_item_id, series_id FROM episodes WHERE media_item_id IN ({})",
+                vec!["?"; chunk.len()].join(",")
+            );
+            let mut q = sqlx::query_as::<_, (i64, i64)>(&sql);
+            for id in chunk {
+                q = q.bind(id);
+            }
+            out.extend(q.fetch_all(self.db.pool()).await?);
+        }
+        Ok(out)
+    }
+
     /// Where an episode sits: (series, season, episode).
     pub async fn placement(
         &self,

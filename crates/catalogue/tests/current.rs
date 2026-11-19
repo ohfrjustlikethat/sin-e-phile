@@ -25,8 +25,13 @@ async fn each_source_says_when_it_last_updated_and_what_it_did() {
             "MovieLens",
             "AniList's recommendations",
             "TMDB's recommendations",
-            "Rising now"
+            "Rising now",
+            "Countries and movements"
         ]
+    );
+    assert_eq!(
+        named(&before, "Countries and movements").detail,
+        "Asked of Wikidata at the next hourly check"
     );
     assert!(before.iter().all(|s| s.updated_at.is_none()), "{before:?}");
     assert_eq!(

@@ -14,6 +14,7 @@ pub mod meaning;
 pub mod media;
 pub mod neighbours;
 pub mod profiles;
+pub mod regions;
 pub mod search;
 pub mod sources;
 pub mod subtitles;
@@ -34,6 +35,7 @@ pub use meaning::{Awaiting, MeaningCounts, MeaningRepository, Retry};
 pub use media::{Appearance, Credit, Facts, MediaRepository, RISING_KEY};
 pub use neighbours::{NeighbourRepository, NeighbourSource};
 pub use profiles::{NewProfile, Profile, ProfileRepository, Viewing, WatchScope};
+pub use regions::{RegionCounts, RegionRepository, Regions};
 pub use search::{Hit, HitDetail, MatchReason, SearchRepository};
 pub use sources::{
     AddonRow, BackendRow, DirectLinkRepository, DirectLinkRow, Sample, SourceRepository,

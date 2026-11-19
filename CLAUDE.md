@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **4.7.1**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **4.8.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -311,6 +311,11 @@ file in `meaning/` beside the exe (refused unless they hash as published), and t
 searchable. A copy without them falls back to ADR-0050: setup starts the 347 MB model and meaning index once the
 catalogue is searchable, and says so with the size; an existing install is offered it (Search, Settings), never fetched
 unasked. Every other optional download stays behind a button with its size (ADR-0014).
+
+**Countries and movements come from Wikidata** (ADR-0055): the IMDb datasets carry
+neither. The hourly check asks P495 and P135 by IMDb id (met titles first, then 1,000+
+votes), stored as English names in `title_regions`. No label says "never" of a country or
+movement until every title the profile met was asked (`strategy::Profile::unknown`).
 
 **TMDB is optional, and no key ever ships** (ADR-0013, ADR-0027). The app is fully
 functional on the offline IMDb + MovieLens catalogue with no key. Each user supplies

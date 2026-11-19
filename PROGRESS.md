@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 4.7.1** · 21 session(s) completed · last updated 2026-11-18
+**Spec version 4.8.0** · 21 session(s) completed · last updated 2026-11-19
 
 ---
 
@@ -18,7 +18,7 @@
 
 ### Subtasks — 0/5 complete
 
-- [ ] **18.1** The strategy arms (crates/recommend/src/strategy.rs, new): safe-familiar, adjacent-stretch (one axis away from a taste mode), cross-mode bridge (between two of the profile's modes), blind-spot (a well-regarded region the profile never touched: a country, a decade, a movement), canon-gap (acclaimed work the taste predicts and the profile has not seen), deep-cut (highly rated obscurity near a mode); each yields candidates from Phase 17's pools and the meaning index with an honest label ('Because you loved Stalker', 'Your blind spot: Iranian New Wave'), tested so every label is true (E3).
+- [~] **18.1** The strategy arms (crates/recommend/src/strategy.rs, new): safe-familiar, adjacent-stretch (one axis away from a taste mode), cross-mode bridge (between two of the profile's modes), blind-spot (a well-regarded region the profile never touched: a country, a decade, a movement), canon-gap (acclaimed work the taste predicts and the profile has not seen), deep-cut (highly rated obscurity near a mode); each yields candidates from Phase 17's pools and the meaning index with an honest label ('Because you loved Stalker', 'Your blind spot: Iranian New Wave'), tested so every label is true (E3).
 - [ ] **18.2** The contextual bandit (Thompson sampling) over the arms, rewarded by outcomes (played, completed, abandoned early, watchlisted, dismissed), with an exploration floor and no arm dominating; a simulation harness (`eval discovery`) with simulated users whose reward patterns change (E1), a maximally conservative user who still gets discovery (E2), and the novelty metric, mean inverse popularity, against its target with relevance held (E4).
 - [ ] **18.3** The exploration budget and dismissals: a Comfort to Adventure setting per profile adapted by the bandit; 'not for me', 'not right now', 'already seen' on every recommended card (pad-reachable) feeding back; never the same item in two rails.
 - [ ] **18.4** Surprise me (one button and a pad shortcut: a film the viewer will probably like, from their taste and their sources, opened ready to play) and mood shelves from the semantic index offered to Home's rails, with I42 ('I have 90 minutes'). Search-by-meaning quality, carried from Phase 5 (E3 nDCG@10 0.0472, E4 the two named queries), is worked here, where mood shelves depend on it.
@@ -37,13 +37,13 @@
 
 ## What's next
 
-Phase 18, 18.1: create crates/recommend/src/strategy.rs with the six arms as candidate generators over crates/taste/src/hybrid.rs's pools and the meaning index (safe-familiar = Phase 17's rail; adjacent-stretch = one axis from a mode; cross-mode bridge = the midpoint direction of two modes; blind-spot = a well-voted country or decade the profile has no titles from; canon-gap = top-rated titles near a mode the profile has not met; deep-cut = high rating, low votes, near a mode), each pick carrying a label that names only what is true; a property test that every label is true (E3). Plan first in docs/phases/phase-18-discovery-engine.md.
+Phase 18, 18.1: write crates/recommend/src/strategy.rs (the six arms over described titles, Label as data, holds() re-deriving each claim, a generated-profile test that every label holds); then crates/taste/src/discover.rs gathering each arm's pool; then ADR-0055's Wikidata country (P495) and movement (P135) launch step. Plan in docs/phases/phase-18-discovery-engine.md.
 
 ---
 
 ## Blockers
 
-- **B16** CI run 43916502166 failed on ProfilePicker.test.tsx (a digit typed right after a wrong PIN was swallowed on a slower runner). Fixed in the next commit (one state update); cleared when CI is green again.
+None.
 
 ---
 

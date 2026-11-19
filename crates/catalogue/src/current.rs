@@ -4,7 +4,7 @@
 
 use sinephile_persistence::repositories::{
     MeaningRepository, MediaRepository, NeighbourRepository, NeighbourSource, ProfileRepository,
-    RISING_KEY,
+    RegionRepository, RISING_KEY,
 };
 use sinephile_persistence::{Db, DbError};
 
@@ -162,6 +162,23 @@ pub async fn sources(db: &Db) -> Result<Vec<Source>, DbError> {
             (true, false) => "Starts at the next catalogue update".into(),
         },
         updated_at: rising_at,
+    });
+
+    // Countries and movements (Phase 18, ADR-0055).
+    let regions = RegionRepository::new(db).counts().await?;
+    out.push(Source {
+        name: "Countries and movements",
+        updated_at: written(crate::regions::LAST_KEY).await?.map(|(_, at)| at),
+        detail: if regions.asked > 0 {
+            format!(
+                "{} titles asked of Wikidata: {} with a country, {} with a movement",
+                n(regions.asked),
+                n(regions.with_country),
+                n(regions.with_movement)
+            )
+        } else {
+            "Asked of Wikidata at the next hourly check".into()
+        },
     });
     Ok(out)
 }

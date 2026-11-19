@@ -45,6 +45,9 @@ ingest — offline dataset ingestion (SPEC.md Phase 4)
                            the fixed ml-25m.zip in datasets/ (the evaluation's set).
   ingest neighbours --live AniList's and TMDB's recommendations for what each profile
                            loved, each title once a week (what the app does hourly).
+  ingest regions [--limit N] countries and movements from Wikidata (ADR-0055): what
+                           profiles met, then every title with 1,000 votes, never asked
+                           (what the app does hourly, 12,000 titles at a time).
   ingest meaning           what the app does after every launch's check (ADR-0054):
                            up to 2,000 titles the catalogue gained since the published
                            meaning file get a synopsis and a vector in the companion
@@ -192,6 +195,29 @@ async fn main() -> Result<(), JobError> {
                 args.iter().any(|a| a == "--ml25m"),
             )
             .await
+        }
+        "regions" => {
+            // Countries and movements from Wikidata (Phase 18, ADR-0055): the hourly check's
+            // step, run to the end (`--limit N` for fewer).
+            let limit = args
+                .iter()
+                .position(|a| a == "--limit")
+                .and_then(|i| args.get(i + 1))
+                .and_then(|n| n.parse::<usize>().ok())
+                .unwrap_or(usize::MAX);
+            let transport = sinephile_metadata_api::HttpTransport::new();
+            let wiki = sinephile_metadata_api::wikipedia::Wikipedia::new(&transport).await;
+            let started = std::time::Instant::now();
+            let r = sinephile_catalogue::regions::ask(&db, &wiki, limit).await?;
+            println!(
+                "regions: asked about {} titles in {:.0} s: {} with a country, {} with a movement{}",
+                r.asked,
+                started.elapsed().as_secs_f64(),
+                r.countries,
+                r.movements,
+                if r.finished { "" } else { " (Wikidata stopped answering)" }
+            );
+            Ok(())
         }
         "meaning" => meaning(&db, &dir).await,
         "repair-variants" => repair_variants(&db).await,

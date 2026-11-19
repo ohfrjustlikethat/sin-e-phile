@@ -104,6 +104,45 @@ fn ids_query(imdb_ids: &[String]) -> Option<String> {
     ))
 }
 
+/// The most IMDb ids one [`Wikipedia::regions_for`] asks about. Two optional joins a title
+/// answer in a few seconds for 200, and the query stays a GET of a few kilobytes.
+pub const REGIONS_PER_REQUEST: usize = 200;
+
+/// The SPARQL asking where each of `imdb_ids` comes from (P495, country of origin) and which
+/// film movement it belongs to (P135), each by its English label (Phase 18, ADR-0055); `None`
+/// when none of them is an IMDb id. Only `tt` and digits go into the query, as in
+/// [`ids_query`].
+fn regions_query(imdb_ids: &[String]) -> Option<String> {
+    let values: Vec<String> = imdb_ids
+        .iter()
+        .filter(|id| {
+            id.len() > 2 && id.starts_with("tt") && id[2..].bytes().all(|b| b.is_ascii_digit())
+        })
+        .map(|id| format!("\"{id}\""))
+        .collect();
+    if values.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "SELECT ?imdb ?country ?movement WHERE {{ \
+           VALUES ?imdb {{ {} }} \
+           ?item wdt:P345 ?imdb . \
+           OPTIONAL {{ ?item wdt:P495 ?c . ?c rdfs:label ?country . FILTER(LANG(?country) = \"en\") }} \
+           OPTIONAL {{ ?item wdt:P135 ?m . ?m rdfs:label ?movement . FILTER(LANG(?movement) = \"en\") }} \
+         }}",
+        values.join(" ")
+    ))
+}
+
+/// Where one title comes from and the movements it belongs to, as Wikidata names them; either
+/// may be empty (Wikidata knows the title and says nothing of it).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Placed {
+    pub imdb_id: String,
+    pub countries: Vec<String>,
+    pub movements: Vec<String>,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum WikiError {
     #[error("wikipedia transport: {0}")]
@@ -205,6 +244,22 @@ impl<'a> Wikipedia<'a> {
             .header("user-agent", USER_AGENT);
         let response = self.execute(WDQS_HOST, request).await?;
         parse_mappings(&response.body)
+    }
+
+    /// Where each of these IMDb ids (at most [`REGIONS_PER_REQUEST`]) comes from and which
+    /// film movements it belongs to (Phase 18, ADR-0055). An id Wikidata does not know is
+    /// simply absent from the answer.
+    pub async fn regions_for(&self, imdb_ids: &[String]) -> Result<Vec<Placed>, WikiError> {
+        let Some(query) = regions_query(&imdb_ids[..imdb_ids.len().min(REGIONS_PER_REQUEST)])
+        else {
+            return Ok(Vec::new());
+        };
+        let url = format!("{WDQS_ENDPOINT}?query={}", encode(&query));
+        let request = Request::get(url)
+            .header("accept", "application/sparql-results+json")
+            .header("user-agent", USER_AGENT);
+        let response = self.execute(WDQS_HOST, request).await?;
+        parse_regions(&response.body)
     }
 
     /// One article's opening as plain text ([`OPENING_CHARS`]): for a title whose lead is a
@@ -372,6 +427,50 @@ fn parse_mappings(body: &str) -> Result<Vec<Mapping>, WikiError> {
                 imdb_id: imdb.to_string(),
                 article,
             });
+        }
+    }
+    Ok(out)
+}
+
+/// SPARQL JSON results into one [`Placed`] per title: a title with two countries and two
+/// movements answers in four rows, one per pairing, so the names are gathered and repeats
+/// dropped. A row without an id is skipped, as in [`parse_mappings`].
+fn parse_regions(body: &str) -> Result<Vec<Placed>, WikiError> {
+    let value: serde_json::Value = serde_json::from_str(body).map_err(|e| WikiError::Shape {
+        host: WDQS_HOST.into(),
+        detail: e.to_string(),
+    })?;
+    let bindings = value["results"]["bindings"]
+        .as_array()
+        .ok_or_else(|| WikiError::Shape {
+            host: WDQS_HOST.into(),
+            detail: "results.bindings is not an array".into(),
+        })?;
+    let mut out: Vec<Placed> = Vec::new();
+    for binding in bindings {
+        let Some(imdb) = binding["imdb"]["value"].as_str() else {
+            continue;
+        };
+        let at = match out.iter().position(|p| p.imdb_id == imdb) {
+            Some(at) => at,
+            None => {
+                out.push(Placed {
+                    imdb_id: imdb.to_string(),
+                    ..Default::default()
+                });
+                out.len() - 1
+            }
+        };
+        let placed = &mut out[at];
+        for (key, names) in [
+            ("country", &mut placed.countries),
+            ("movement", &mut placed.movements),
+        ] {
+            if let Some(name) = binding[key]["value"].as_str().map(str::trim) {
+                if !name.is_empty() && !names.iter().any(|n| n == name) {
+                    names.push(name.to_string());
+                }
+            }
         }
     }
     Ok(out)
@@ -550,6 +649,68 @@ mod tests {
         assert!(!query.contains("nm0000001"), "{query}");
         assert_eq!(ids_query(&["nm1".to_string()]), None);
         assert_eq!(ids_query(&[]), None);
+    }
+
+    #[test]
+    fn regions_gather_every_pairing_into_one_title() {
+        // The real shape: one row per country and movement pairing, and a title Wikidata
+        // knows but says nothing of comes back with neither.
+        let body = r#"{"results":{"bindings":[
+            {"imdb":{"value":"tt0118849"},"country":{"value":"Iran"},"movement":{"value":"Iranian New Wave"}},
+            {"imdb":{"value":"tt0053198"},"country":{"value":"France"},"movement":{"value":"French New Wave"}},
+            {"imdb":{"value":"tt0053198"},"country":{"value":"France"},"movement":{"value":"Left Bank"}},
+            {"imdb":{"value":"tt0079944"},"country":{"value":"Soviet Union"}},
+            {"imdb":{"value":"tt0000001"}},
+            {"country":{"value":"Nowhere"}}
+        ]}}"#;
+        let placed = parse_regions(body).expect("parse");
+        assert_eq!(
+            placed,
+            vec![
+                Placed {
+                    imdb_id: "tt0118849".into(),
+                    countries: vec!["Iran".into()],
+                    movements: vec!["Iranian New Wave".into()],
+                },
+                Placed {
+                    imdb_id: "tt0053198".into(),
+                    countries: vec!["France".into()],
+                    movements: vec!["French New Wave".into(), "Left Bank".into()],
+                },
+                Placed {
+                    imdb_id: "tt0079944".into(),
+                    countries: vec!["Soviet Union".into()],
+                    movements: vec![],
+                },
+                Placed {
+                    imdb_id: "tt0000001".into(),
+                    ..Default::default()
+                },
+            ]
+        );
+        assert!(matches!(
+            parse_regions("{\"results\":{}}"),
+            Err(WikiError::Shape { .. })
+        ));
+    }
+
+    #[test]
+    fn asking_for_regions_puts_only_imdb_ids_into_the_query() {
+        let ids: Vec<String> = ["tt0118849", "tt1\" } DELETE {", "tt0079944"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let query = regions_query(&ids).expect("two are ids");
+        assert!(
+            query.contains("VALUES ?imdb { \"tt0118849\" \"tt0079944\" }"),
+            "{query}"
+        );
+        assert!(
+            query.contains("wdt:P495") && query.contains("wdt:P135"),
+            "{query}"
+        );
+        assert!(!query.contains("DELETE"), "{query}");
+        assert_eq!(regions_query(&[]), None);
     }
 
     #[test]

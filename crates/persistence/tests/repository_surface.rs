@@ -408,6 +408,13 @@ async fn episode_repository_surface() {
         None,
         "not an episode"
     );
+    // series_of_many: each episode's series; what is not an episode is left out
+    let mut of = repo.series_of_many(&[s2e1, series, s1e4]).await.unwrap();
+    of.sort_unstable();
+    let mut want = vec![(s2e1, series), (s1e4, series)];
+    want.sort_unstable();
+    assert_eq!(of, want);
+    assert!(repo.series_of_many(&[]).await.unwrap().is_empty());
 
     // set_next_airing / next_airing — no episode row needed; the newest replaces
     assert_eq!(repo.next_airing(series).await.expect("next_airing"), None);
@@ -2411,6 +2418,153 @@ async fn media_facts_surface() {
     );
     assert!(facts[1].genres.is_empty() && facts[1].directors.is_empty());
     assert!(media.facts(&[]).await.unwrap().is_empty());
+
+    // Phase 18: its rating, and the countries and movements Wikidata gave (migration 0033).
+    sqlx::query("UPDATE media_items SET rating = 83 WHERE id = ?")
+        .bind(heat)
+        .execute(db.pool())
+        .await
+        .unwrap();
+    sinephile_persistence::repositories::RegionRepository::new(&db)
+        .record(&[sinephile_persistence::repositories::Regions {
+            media_item_id: heat,
+            countries: vec!["United States".into()],
+            movements: vec!["New Hollywood".into()],
+        }])
+        .await
+        .unwrap();
+    let mut facts = media.facts(&[heat, thief]).await.unwrap();
+    facts.sort_by_key(|f| f.id);
+    assert_eq!(facts[0].rating, Some(83));
+    assert_eq!(facts[0].countries, vec!["United States".to_string()]);
+    assert_eq!(facts[0].movements, vec!["New Hollywood".to_string()]);
+    assert_eq!(facts[1].rating, None);
+    assert!(facts[1].countries.is_empty() && facts[1].movements.is_empty());
+}
+
+#[tokio::test]
+async fn media_acclaimed_surface() {
+    // Phase 18: films rated at least so high by at least so many, most voted first.
+    let db = Db::in_memory().await.expect("open");
+    let media = MediaRepository::new(&db);
+    let mut ids = Vec::new();
+    for (title, rating, votes, adult) in [
+        ("Rated, seen", 82, 90_000, false),
+        ("Rated, seen more", 80, 200_000, false),
+        ("Rated, unseen", 85, 900, false),
+        ("Seen, not rated highly", 60, 500_000, false),
+        ("Adult", 90, 100_000, true),
+    ] {
+        let mut item = NewMediaItem::film(title, 1990);
+        item.rating = Some(rating);
+        item.rating_votes = Some(votes);
+        item.is_adult = adult;
+        ids.push(media.insert(&item).await.unwrap());
+    }
+    let mut series = NewMediaItem::film("A series", 1990);
+    series.kind = Some(MediaKind::Series);
+    series.rating = Some(95);
+    series.rating_votes = Some(300_000);
+    media.insert(&series).await.unwrap();
+    assert_eq!(
+        media.acclaimed(75, 5_000, 10).await.unwrap(),
+        vec![ids[1], ids[0]],
+        "films only, not adult, most voted first"
+    );
+    assert_eq!(media.acclaimed(75, 5_000, 1).await.unwrap(), vec![ids[1]]);
+}
+
+#[tokio::test]
+async fn region_repository_surface() {
+    // Phase 18 (ADR-0055, migration 0033): what Wikidata said of each title's countries and
+    // movements, and which titles were asked.
+    use sinephile_persistence::repositories::{RegionCounts, RegionRepository, Regions};
+    let db = Db::in_memory().await.expect("open");
+    let media = MediaRepository::new(&db);
+    let mut f = Vec::new();
+    for (k, votes) in [(0, 500_000), (1, 90_000), (2, 400), (3, 50_000)] {
+        let mut item = NewMediaItem::film(format!("Film {k}"), 2000 + k);
+        item.rating_votes = Some(votes);
+        let id = media.insert(&item).await.unwrap();
+        media
+            .add_external_id(id, IdSource::Imdb, &format!("tt000000{k}"), 1.0)
+            .await
+            .unwrap();
+        f.push(id);
+    }
+    let repo = RegionRepository::new(&db);
+
+    // awaiting: most voted first, from a floor of votes
+    assert_eq!(
+        repo.awaiting(10_000, 10).await.unwrap(),
+        vec![
+            (f[0], "tt0000000".to_string()),
+            (f[1], "tt0000001".to_string()),
+            (f[3], "tt0000003".to_string())
+        ]
+    );
+    // awaiting_met: only what a profile has met, whatever its votes
+    let me = ProfileRepository::new(&db)
+        .create("me", true)
+        .await
+        .unwrap();
+    assert!(repo.awaiting_met(10).await.unwrap().is_empty());
+    ProfileRepository::new(&db)
+        .rate(me, f[2], Some(4))
+        .await
+        .unwrap();
+    assert_eq!(
+        repo.awaiting_met(10).await.unwrap(),
+        vec![(f[2], "tt0000002".to_string())]
+    );
+
+    // record: an answer replaces what was known; an empty answer still counts as asked
+    repo.record(&[
+        Regions {
+            media_item_id: f[0],
+            countries: vec!["Iran".into(), "France".into(), " ".into()],
+            movements: vec!["Iranian New Wave".into()],
+        },
+        Regions {
+            media_item_id: f[2],
+            ..Default::default()
+        },
+    ])
+    .await
+    .unwrap();
+    repo.record(&[Regions {
+        media_item_id: f[0],
+        countries: vec!["Iran".into()],
+        movements: vec!["Iranian New Wave".into()],
+    }])
+    .await
+    .unwrap();
+    assert_eq!(
+        repo.awaiting(10_000, 10).await.unwrap(),
+        vec![
+            (f[1], "tt0000001".to_string()),
+            (f[3], "tt0000003".to_string())
+        ]
+    );
+    assert!(repo.awaiting_met(10).await.unwrap().is_empty());
+    let facts = media.facts(&[f[0]]).await.unwrap();
+    assert_eq!(facts[0].countries, vec!["Iran".to_string()]);
+
+    // unasked: which of these Wikidata has not been asked about
+    assert_eq!(
+        repo.unasked(&[f[0], f[1], f[2]]).await.unwrap(),
+        [f[1]].into_iter().collect()
+    );
+
+    // counts
+    let RegionCounts {
+        asked,
+        with_country,
+        with_movement,
+        last_asked,
+    } = repo.counts().await.unwrap();
+    assert_eq!((asked, with_country, with_movement), (2, 1, 1));
+    assert!(last_asked.is_some());
 }
 
 #[tokio::test]

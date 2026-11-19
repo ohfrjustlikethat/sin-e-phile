@@ -1,5 +1,5 @@
 {
-  "spec_version": "4.7.1",
+  "spec_version": "4.8.0",
   "project": "sin-e-phile",
   "last_updated": "2026-11-19",
   "sessions_completed": 21,
@@ -2899,6 +2899,11 @@
       "id": "0054",
       "title": "Current on every launch: the catalogue, what it means, and what to recommend",
       "date": "2026-11-18"
+    },
+    {
+      "id": "0055",
+      "title": "Countries and movements from Wikidata, for the discovery engine",
+      "date": "2026-11-19"
     }
   ],
   "environment": {

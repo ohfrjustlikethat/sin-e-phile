@@ -31,6 +31,7 @@ pub mod neighbours;
 pub mod normalise;
 pub mod now;
 pub mod refresh;
+pub mod regions;
 pub mod repair;
 pub mod search_index;
 pub mod tsv;
