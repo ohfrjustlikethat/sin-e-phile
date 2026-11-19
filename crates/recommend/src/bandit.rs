@@ -194,15 +194,18 @@ impl Prior {
 }
 
 /// The prior the app uses (docs/eval-results.md, 18.2, B17), by the rule fixed there before it
-/// ran. The means: each arm's held-out likes per card and novelty on 2,000 tuning users, each
-/// over the best discovery arm's, summed and halved (stretch 0.0302 and 4.69 bits, bridge
-/// 0.0303 and 5.49, blind spot 0.0108 and 4.15, canon 0.0497 and 3.64, deep cut 0.0018 and 11.35).
-/// The weight: chosen on the same users from {0, 2, 4, 8, 16} (Recall@N against popularity
-/// +38.8%, +44.1%, +43.6%, +43.0%, +44.0%; novelty over the taste rail 1.95, 1.79, 1.63, 1.50,
-/// 1.37 bits): the best relevance with at least 1.2 bits, 2.
+/// ran, re-run after the real window changed the stretch and bridge arms (8ab7abe). The means:
+/// each arm's held-out likes per card and novelty on 2,000 tuning users, each over the best
+/// discovery arm's, summed and halved (stretch 0.0281 and 4.73 bits, bridge 0.0302 and 5.60,
+/// blind spot 0.0109 and 4.15, canon 0.0494 and 3.65, deep cut 0.0018 and 11.35). The weight:
+/// chosen on the same users from {0, 2, 4, 8, 16} (Recall@N against popularity +38.8%,
+/// +43.3%, +43.0%, +43.3%, +44.1%; novelty over the taste rail 1.98, 1.86, 1.74, 1.55, 1.40
+/// bits). The rule's choice, 16, failed E2 in the simulation the rule required (blind spots
+/// starved: shown on 2.5% of a refusing viewer's days, against 10%), so the next by the rule's
+/// own order that keeps E1 and E2: 2 (tied with 8 on Recall@N; a tie to the smaller).
 pub const PRIOR: Prior = Prior {
     weight: 2.0,
-    means: [0.5104, 0.5467, 0.2915, 0.6604, 0.5181],
+    means: [0.4928, 0.5524, 0.2931, 0.6608, 0.5182],
 };
 
 /// How far the profile's outcomes move discovery's share from where the budget puts it: a

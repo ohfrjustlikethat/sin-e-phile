@@ -22,7 +22,7 @@ UI responsiveness under load, and the feel of the discovery rails.
 | Pause overlay, scrub thumbnails, next-episode flow | 11 |
 | Review queue ergonomics — 20 ambiguous items in under a minute | 12 |
 | Onboarding with fresh eyes, on an actual non-technical person | 14 |
-| Discovery rails: are the recommendations any good? | 17 |
+| Discovery rails: are the recommendations any good? (Phase 18 E5, below) | 17, 18 |
 | Tier 0 experience on genuinely constrained hardware | 21 |
 
 ## Standing checks, every UI phase
@@ -63,3 +63,21 @@ over HTTP for the stream (`python -m http.server --bind 127.0.0.1`). Delete
 
 **Last run: 2026-11-07, Phase 11 close.** All boxes, all three tiers. Screenshots in
 `docs/evidence/phase-11/`; the numbers are in `PROJECT_STATE.json` under Phase 11 E5.
+
+## Discovery on your own taste (Phase 18, E5: "the real acceptance test")
+
+The author, on their own profile in the installed release, after at least ten films rated or finished (a blind spot is
+said only after ten, and a country only once Wikidata has been asked about everything met: the hourly check does it).
+
+- [ ] Home shows "Where your taste points", and at least two discovery rails (a stretch, a bridge, the canon, deep cuts,
+      or a blind spot), each card saying why. Write down any label that reads as false.
+- [ ] **At least three films you had not heard of and want to watch**, from any discovery rail, a mood shelf or
+      Surprise me. Name them, and the rail each came from. (E5 is met by these three, in your words.)
+- [ ] X on a card (or a right click) offers Not for me, Not right now, Already seen; the card becomes an Undo, and the
+      title is gone from Home next time. Undo brings it back.
+- [ ] Comfort to Adventure (Settings, your taste): at Adventure Home has more discovery rails; at Comfort, fewer.
+- [ ] Surprise me (the button, or RT on the pad) opens a film's page; "Under 90 minutes" keeps it short.
+- [ ] Today's two mood shelves read as their moods.
+
+**Not yet run.** Asked of the author in the Phase 19 batch.
+
