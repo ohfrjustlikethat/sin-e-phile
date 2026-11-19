@@ -326,6 +326,41 @@ fn round_robin(lists: Vec<Vec<(i64, Label)>>, k: usize) -> Vec<Discovery> {
     out
 }
 
+/// How much the matrix's part counts against closeness in [`relevance`]: half, as in Phase
+/// 17's ranker (`rank::WEIGHTS`).
+const LOVED_WEIGHT: f32 = 0.5;
+
+/// How likely the profile is to like a title, as Phase 17's ranker weighs it: its closeness
+/// to the nearest mode (cosine, to 0..1) and, at [`LOVED_WEIGHT`], how strongly the titles
+/// it loved point to it, over the most any of `titles` has (`most_loved`). The labels say
+/// why a title is in an arm; this says which of an arm's titles come first.
+///
+/// WHY (docs/eval-results.md, 18.2): ordered by closeness, rating or region alone, the
+/// discovery picks found a held-out favourite once in a hundred cards, a fifth as often as
+/// the most popular titles, and Home's relevance fell to 16% above popularity's.
+fn relevance(t: &Title, most_loved: f32) -> f32 {
+    let near = if t.near.is_empty() {
+        0.0
+    } else {
+        (nearest_mode(t) + 1.0) / 2.0
+    };
+    let loved: f32 = t.loved_with.iter().map(|(_, s)| s).sum();
+    let loved = if most_loved > 0.0 {
+        loved / most_loved
+    } else {
+        0.0
+    };
+    near + LOVED_WEIGHT * loved
+}
+
+/// The most any of `titles` is pointed to by what the profile loved.
+fn most_loved(titles: &[Title]) -> f32 {
+    titles
+        .iter()
+        .map(|t| t.loved_with.iter().map(|(_, s)| s).sum::<f32>())
+        .fold(0.0, f32::max)
+}
+
 /// Sort best first by `score`, ties to the lower id, so the same input picks the same.
 fn by_score(mut scored: Vec<(f32, i64, Label)>) -> Vec<(i64, Label)> {
     scored.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
@@ -356,9 +391,10 @@ fn outside(title: &Title, taste: &Taste, unknown: &HashSet<Axis>) -> Vec<Region>
     }
 }
 
-/// **Stretch**: close to a mode and outside it on exactly one axis. Best first by closeness,
-/// the modes in turn.
+/// **Stretch**: close to a mode and outside it on exactly one axis. Most relevant first
+/// ([`relevance`]), the modes in turn.
 pub fn stretch(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discovery> {
+    let most = most_loved(titles);
     let lists = (0..profile.modes.len())
         .map(|m| {
             let taste = &profile.modes[m];
@@ -366,9 +402,10 @@ pub fn stretch(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discovery> 
                 titles
                     .iter()
                     .filter_map(|t| {
-                        let depth = t.inside(profile, m)?;
+                        t.inside(profile, m)?;
                         let region = outside(t, taste, &profile.unknown).into_iter().next()?;
-                        Some((depth, t.id, Label::Stretch { mode: m, region }))
+                        let score = relevance(t, most);
+                        Some((score, t.id, Label::Stretch { mode: m, region }))
                     })
                     .collect(),
             )
@@ -377,9 +414,10 @@ pub fn stretch(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discovery> 
     round_robin(lists, k)
 }
 
-/// **Bridge**: close to two modes at once, by the nearer of the two (a title deep in one mode
-/// and at the edge of the other is a step, not a bridge). The pairs in turn.
+/// **Bridge**: close to two modes at once, most relevant first ([`relevance`]). The pairs in
+/// turn, those with most to offer first.
 pub fn bridge(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discovery> {
+    let most = most_loved(titles);
     let n = profile.modes.len();
     let mut lists = Vec::new();
     for a in 0..n {
@@ -388,8 +426,9 @@ pub fn bridge(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discovery> {
                 titles
                     .iter()
                     .filter_map(|t| {
-                        let depth = t.inside(profile, a)?.min(t.inside(profile, b)?);
-                        Some((depth, t.id, Label::Between { a, b }))
+                        t.inside(profile, a)?;
+                        t.inside(profile, b)?;
+                        Some((relevance(t, most), t.id, Label::Between { a, b }))
                     })
                     .collect(),
             ));
@@ -408,12 +447,13 @@ fn nearest_mode(title: &Title) -> f32 {
 /// **Blind spot**: one region the profile has met nothing from, and up to `k` of its acclaimed
 /// titles, nearest the profile's taste first. Only one region: the rail is named after it.
 /// The region chosen has at least [`BLIND_ENOUGH`] titles when any has, and of those the one
-/// whose best five come nearest the taste; a movement or a country before a decade or a genre
-/// at equal closeness, since it says more.
+/// whose best five are most relevant ([`relevance`]); a movement or a country before a decade
+/// or a genre at equal relevance, since it says more.
 pub fn blind_spot(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discovery> {
     if profile.met_titles < BLIND_MIN_MET {
         return Vec::new();
     }
+    let most = most_loved(titles);
     let mut by_region: HashMap<Region, Vec<&Title>> = HashMap::new();
     for t in titles {
         if !t.rated_at_least(BLIND_RATING) || t.votes < BLIND_VOTES {
@@ -435,11 +475,11 @@ pub fn blind_spot(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discover
         .into_iter()
         .map(|(r, mut ts)| {
             ts.sort_by(|a, b| {
-                nearest_mode(b)
-                    .total_cmp(&nearest_mode(a))
+                relevance(b, most)
+                    .total_cmp(&relevance(a, most))
                     .then(a.id.cmp(&b.id))
             });
-            let best: Vec<f32> = ts.iter().take(5).map(|t| nearest_mode(t)).collect();
+            let best: Vec<f32> = ts.iter().take(5).map(|t| relevance(t, most)).collect();
             let mean = best.iter().sum::<f32>() / best.len().max(1) as f32;
             (r, ts, mean)
         })
@@ -466,8 +506,10 @@ pub fn blind_spot(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discover
         .collect()
 }
 
-/// **Canon**: acclaimed and widely seen, close to a mode. Best rated first, the modes in turn.
+/// **Canon**: acclaimed and widely seen, close to a mode. Most relevant first, the modes in
+/// turn.
 pub fn canon(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discovery> {
+    let most = most_loved(titles);
     let lists = (0..profile.modes.len())
         .map(|m| {
             by_score(
@@ -475,11 +517,7 @@ pub fn canon(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discovery> {
                     .iter()
                     .filter(|t| t.rated_at_least(CANON_RATING) && t.votes >= CANON_VOTES)
                     .filter(|t| t.close_to(profile, m))
-                    .map(|t| {
-                        let score =
-                            t.rating.unwrap_or(0) as f32 + t.inside(profile, m).unwrap_or(0.0);
-                        (score, t.id, Label::Canon { mode: m })
-                    })
+                    .map(|t| (relevance(t, most), t.id, Label::Canon { mode: m }))
                     .collect(),
             )
         })
@@ -490,16 +528,21 @@ pub fn canon(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discovery> {
 /// **Deep cut**: highly rated and little seen. Loved by people who loved what the profile
 /// loved first (the stronger claim), then close to a mode; the modes in turn.
 pub fn deep_cut(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discovery> {
+    let most = most_loved(titles);
     let cuts: Vec<&Title> = titles.iter().filter(|t| deep(t)).collect();
     let loved = by_score(
         cuts.iter()
             .filter_map(|t| {
-                let (from, score) = t
+                let (from, _) = t
                     .loved_with
                     .iter()
                     .copied()
                     .max_by(|a, b| a.1.total_cmp(&b.1).then(b.0.cmp(&a.0)))?;
-                Some((score, t.id, Label::DeepCutLoved { loved: from }))
+                Some((
+                    relevance(t, most),
+                    t.id,
+                    Label::DeepCutLoved { loved: from },
+                ))
             })
             .collect(),
     );
@@ -508,9 +551,8 @@ pub fn deep_cut(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discovery>
         lists.push(by_score(
             cuts.iter()
                 .filter_map(|t| {
-                    let depth = t.inside(profile, m)?;
-                    let score = t.rating.unwrap_or(0) as f32 / 100.0 + depth;
-                    Some((score, t.id, Label::DeepCutNear { mode: m }))
+                    t.inside(profile, m)?;
+                    Some((relevance(t, most), t.id, Label::DeepCutNear { mode: m }))
                 })
                 .collect(),
         ));
@@ -526,9 +568,29 @@ pub fn all(
     k: usize,
     taken: &HashSet<i64>,
 ) -> Vec<(Arm, Vec<Discovery>)> {
+    let plan: Vec<(Arm, usize)> = Arm::ALL
+        .into_iter()
+        .filter(|a| *a != Arm::Familiar)
+        .map(|a| (a, k))
+        .collect();
+    choose(titles, profile, &plan, taken)
+}
+
+/// Each arm of `plan` its number of picks, in the plan's order (the bandit's: the arm most
+/// likely the best chooses first), no title in two arms nor in `taken`. The familiar is not
+/// chosen here (Phase 17's ranker is); an arm in the plan twice chooses once.
+pub fn choose(
+    titles: &[Title],
+    profile: &Profile,
+    plan: &[(Arm, usize)],
+    taken: &HashSet<i64>,
+) -> Vec<(Arm, Vec<Discovery>)> {
     let mut used: HashSet<i64> = taken.clone();
-    let mut out = Vec::new();
-    for arm in Arm::ALL {
+    let mut out: Vec<(Arm, Vec<Discovery>)> = Vec::new();
+    for &(arm, k) in plan {
+        if arm == Arm::Familiar || k == 0 || out.iter().any(|(a, _)| *a == arm) {
+            continue;
+        }
         let free: Vec<Title> = titles
             .iter()
             .filter(|t| !used.contains(&t.id))
@@ -698,6 +760,34 @@ mod tests {
             assert!(
                 picked.get(&arm).copied().unwrap_or(0) > 50,
                 "{arm:?}: {picked:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_plan_is_followed_in_its_order_and_its_numbers() {
+        for seed in 1..=50 {
+            let (titles, profile) = world(seed);
+            let plan = [
+                (Arm::DeepCut, 4),
+                (Arm::Familiar, 9),
+                (Arm::Canon, 7),
+                (Arm::DeepCut, 3),
+            ];
+            let picks = choose(&titles, &profile, &plan, &HashSet::new());
+            let arms: Vec<Arm> = picks.iter().map(|(a, _)| *a).collect();
+            assert_eq!(arms, vec![Arm::DeepCut, Arm::Canon], "seed {seed}");
+            assert!(
+                picks[0].1.len() <= 4 && picks[1].1.len() <= 7,
+                "seed {seed}"
+            );
+            // The first arm chooses first: exactly what it would choose alone; the second
+            // chooses from what is left, none twice.
+            assert_eq!(picks[0].1, deep_cut(&titles, &profile, 4), "seed {seed}");
+            let deep: HashSet<i64> = picks[0].1.iter().map(|d| d.id).collect();
+            assert!(
+                picks[1].1.iter().all(|d| !deep.contains(&d.id)),
+                "seed {seed}"
             );
         }
     }

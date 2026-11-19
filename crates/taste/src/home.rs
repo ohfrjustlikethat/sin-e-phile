@@ -327,7 +327,9 @@ pub async fn rails(
                 .copied()
                 .collect();
             let loved = crate::hybrid::loved_with(db, &weighed, &met).await?;
-            let gathered = crate::discover::gather(db, &mut **s, modes, &met, &loved).await?;
+            let mut cache = crate::discover::Cache::default();
+            let gathered =
+                crate::discover::gather(db, &mut **s, modes, &met, &loved, &mut cache).await?;
             let rails = crate::discover::rails(&gathered, want, &taken);
             let named = crate::discover::named(&rails, &gathered.profile);
             let names: HashMap<i64, String> = media

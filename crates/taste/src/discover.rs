@@ -69,6 +69,32 @@ pub struct Gathered {
     pub titles: Vec<Title>,
 }
 
+/// What gathering reads that does not depend on the profile, kept between calls. A Home
+/// keeps one for one build; the evaluation keeps one across thousands of users, whose pools
+/// overlap. (Facts change at most hourly, when countries are asked.)
+#[derive(Default)]
+pub struct Cache {
+    facts: HashMap<i64, Facts>,
+    acclaimed: Option<Vec<i64>>,
+}
+
+impl Cache {
+    /// Read the facts of whichever of `ids` are not kept yet.
+    async fn read(&mut self, media: &MediaRepository<'_>, ids: &[i64]) -> Result<(), DbError> {
+        let mut missing: Vec<i64> = ids
+            .iter()
+            .copied()
+            .filter(|id| !self.facts.contains_key(id))
+            .collect();
+        missing.sort_unstable();
+        missing.dedup();
+        for f in media.facts(&missing).await? {
+            self.facts.insert(f.id, f);
+        }
+        Ok(())
+    }
+}
+
 /// Gather for a profile: `modes` and `met` from its taste model, `loved_with` Phase 17's
 /// neighbours of what it loved (`hybrid::loved_with`).
 pub async fn gather(
@@ -77,6 +103,7 @@ pub async fn gather(
     modes: &[Mode],
     met: &HashSet<i64>,
     loved_with: &HashMap<i64, Vec<(i64, f32)>>,
+    cache: &mut Cache,
 ) -> Result<Gathered, DbError> {
     let media = MediaRepository::new(db);
 
@@ -93,12 +120,8 @@ pub async fn gather(
         .collect();
     met_titles.sort_unstable();
     met_titles.dedup();
-    let met_facts: HashMap<i64, Facts> = media
-        .facts(&met_titles)
-        .await?
-        .into_iter()
-        .map(|f| (f.id, f))
-        .collect();
+    cache.read(&media, &met_titles).await?;
+    let met_facts = &cache.facts;
     let regions_of = |id: &i64| -> Vec<Region> {
         met_facts
             .get(id)
@@ -147,13 +170,20 @@ pub async fn gather(
     }
 
     // The acclaimed, and what people who loved the same loved.
-    let acclaimed = media
-        .acclaimed(
-            strategy::BLIND_RATING.min(strategy::CANON_RATING),
-            strategy::BLIND_VOTES.min(strategy::CANON_VOTES),
-            ACCLAIMED,
-        )
-        .await?;
+    let acclaimed = match &cache.acclaimed {
+        Some(ids) => ids.clone(),
+        None => {
+            let ids = media
+                .acclaimed(
+                    strategy::BLIND_RATING.min(strategy::CANON_RATING),
+                    strategy::BLIND_VOTES.min(strategy::CANON_VOTES),
+                    ACCLAIMED,
+                )
+                .await?;
+            cache.acclaimed = Some(ids.clone());
+            ids
+        }
+    };
     let mut loved: Vec<i64> = loved_with.keys().copied().collect();
     loved.sort_unstable();
     for id in acclaimed.into_iter().chain(loved) {
@@ -162,10 +192,10 @@ pub async fn gather(
         }
     }
 
-    let titles = media
-        .facts(&pool)
-        .await?
-        .into_iter()
+    cache.read(&media, &pool).await?;
+    let titles = pool
+        .iter()
+        .filter_map(|id| cache.facts.get(id))
         .map(|f| {
             let near = semantic
                 .vector(f.id)
@@ -174,7 +204,7 @@ pub async fn gather(
                 .map(|v| modes.iter().map(|m| dot(&m.direction, &v)).collect())
                 .unwrap_or_default();
             let with = loved_with.get(&f.id).cloned().unwrap_or_default();
-            title_of(&f, near, with)
+            title_of(f, near, with)
         })
         .collect();
     Ok(Gathered { profile, titles })
@@ -194,7 +224,22 @@ pub const MIN_PICKS: usize = 5;
 /// Every discovery arm's rail of up to `k`, none repeating a title in `taken` or another
 /// rail, in [`Arm::ALL`]'s order; an arm with fewer than [`MIN_PICKS`] is left out.
 pub fn rails(gathered: &Gathered, k: usize, taken: &HashSet<i64>) -> Vec<DiscoveryRail> {
-    strategy::all(&gathered.titles, &gathered.profile, k, taken)
+    let plan: Vec<(Arm, usize)> = Arm::ALL
+        .into_iter()
+        .filter(|a| *a != Arm::Familiar)
+        .map(|a| (a, k))
+        .collect();
+    planned(gathered, &plan, taken)
+}
+
+/// The rails of a plan (the bandit's: `bandit::allocate`), in its order, each arm its number
+/// of picks; an arm with fewer than [`MIN_PICKS`] is left out.
+pub fn planned(
+    gathered: &Gathered,
+    plan: &[(Arm, usize)],
+    taken: &HashSet<i64>,
+) -> Vec<DiscoveryRail> {
+    strategy::choose(&gathered.titles, &gathered.profile, plan, taken)
         .into_iter()
         .filter(|(_, picks)| picks.len() >= MIN_PICKS)
         .map(|(arm, picks)| DiscoveryRail {

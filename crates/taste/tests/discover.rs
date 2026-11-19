@@ -168,9 +168,16 @@ async fn world() -> World {
 #[tokio::test]
 async fn every_label_holds_and_an_episode_counts_as_its_series() {
     let mut w = world().await;
-    let gathered = discover::gather(&w.db, &mut w.space, &w.modes, &w.met, &HashMap::new())
-        .await
-        .expect("gather");
+    let gathered = discover::gather(
+        &w.db,
+        &mut w.space,
+        &w.modes,
+        &w.met,
+        &HashMap::new(),
+        &mut Default::default(),
+    )
+    .await
+    .expect("gather");
     // An episode counts as its series: the profile met a western.
     assert!(gathered
         .profile
@@ -219,9 +226,16 @@ async fn every_label_holds_and_an_episode_counts_as_its_series() {
 #[tokio::test]
 async fn a_country_is_claimed_only_once_everything_met_was_asked() {
     let mut w = world().await;
-    let gathered = discover::gather(&w.db, &mut w.space, &w.modes, &w.met, &HashMap::new())
-        .await
-        .unwrap();
+    let gathered = discover::gather(
+        &w.db,
+        &mut w.space,
+        &w.modes,
+        &w.met,
+        &HashMap::new(),
+        &mut Default::default(),
+    )
+    .await
+    .unwrap();
     assert!(gathered.profile.unknown.contains(&Axis::Country));
 
     // Wikidata answers for the Iranian film and for everything the profile met, the series
@@ -240,9 +254,16 @@ async fn a_country_is_claimed_only_once_everything_met_was_asked() {
         });
     }
     regions.record(&answers).await.unwrap();
-    let gathered = discover::gather(&w.db, &mut w.space, &w.modes, &w.met, &HashMap::new())
-        .await
-        .unwrap();
+    let gathered = discover::gather(
+        &w.db,
+        &mut w.space,
+        &w.modes,
+        &w.met,
+        &HashMap::new(),
+        &mut Default::default(),
+    )
+    .await
+    .unwrap();
     assert!(
         gathered.profile.unknown.contains(&Axis::Country),
         "the episode was asked, its series was not: still unknown"
@@ -255,9 +276,16 @@ async fn a_country_is_claimed_only_once_everything_met_was_asked() {
         }])
         .await
         .unwrap();
-    let gathered = discover::gather(&w.db, &mut w.space, &w.modes, &w.met, &HashMap::new())
-        .await
-        .unwrap();
+    let gathered = discover::gather(
+        &w.db,
+        &mut w.space,
+        &w.modes,
+        &w.met,
+        &HashMap::new(),
+        &mut Default::default(),
+    )
+    .await
+    .unwrap();
     assert!(gathered.profile.unknown.is_empty());
     // Now "from Iran" may be said of the Iranian film: a stretch from the second taste.
     let rails = discover::rails(&gathered, 20, &HashSet::new());

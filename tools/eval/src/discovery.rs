@@ -21,9 +21,7 @@
 
 use std::collections::HashMap;
 
-use sinephile_recommend::bandit::{
-    self, Beliefs, Context, Guards, Outcome, Rng, Trial, GUARDS,
-};
+use sinephile_recommend::bandit::{self, Beliefs, Context, Guards, Outcome, Rng, Trial, GUARDS};
 use sinephile_recommend::strategy::Arm;
 
 use crate::error::EvalError;
@@ -39,7 +37,10 @@ const ACTS_PER_DAY: usize = 3;
 const VIEWERS: u64 = 1_000;
 
 fn discovery_arms() -> Vec<Arm> {
-    Arm::ALL.into_iter().filter(|a| *a != Arm::Familiar).collect()
+    Arm::ALL
+        .into_iter()
+        .filter(|a| *a != Arm::Familiar)
+        .collect()
 }
 
 /// One simulated viewer: their chance of finishing a card from each arm, before and after
@@ -187,7 +188,10 @@ pub fn simulate(no_floor: bool, frozen: bool) -> Result<bool, EvalError> {
     let n = VIEWERS as f64;
     let (old_before, old_after, new_before, new_after) =
         (old_before / n, old_after / n, new_before / n, new_after / n);
-    println!("E1: the favourite discovery arm changes on day {}", SWITCH + 1);
+    println!(
+        "E1: the favourite discovery arm changes on day {}",
+        SWITCH + 1
+    );
     println!(
         "  old favourite's share of discovery: days 41-60 {:.1}%, days 101-120 {:.1}% ({:+.1} points)",
         old_before * 100.0,
@@ -214,9 +218,8 @@ pub fn simulate(no_floor: bool, frozen: bool) -> Result<bool, EvalError> {
             );
         }
     }
-    let e1 = new_after - new_before >= 0.15
-        && old_before - old_after >= 0.15
-        && rose as f64 / n >= 0.80;
+    let e1 =
+        new_after - new_before >= 0.15 && old_before - old_after >= 0.15 && rose as f64 / n >= 0.80;
 
     // A viewer who warms to discovery: the share discovery gets follows.
     let mut warm = (0.0, 0.0);
@@ -286,7 +289,9 @@ pub fn simulate(no_floor: bool, frozen: bool) -> Result<bool, EvalError> {
         }
     }
     mean_share /= n * DAYS as f64;
-    println!("\nE2: a viewer who only ever takes the familiar (Comfort, every discovery card refused)");
+    println!(
+        "\nE2: a viewer who only ever takes the familiar (Comfort, every discovery card refused)"
+    );
     println!(
         "  discovery's share of the slots: least on any day {:.1}%, mean {:.1}%",
         least_share * 100.0,
@@ -300,7 +305,299 @@ pub fn simulate(no_floor: bool, frozen: bool) -> Result<bool, EvalError> {
     let e2 = least_share >= 0.20 - 1e-9 && days_without_rail == 0 && least_arm_days >= 0.10;
 
     let said = |ok: bool| if ok { "met" } else { "NOT met" };
-    println!("\n  E1, the distribution follows a change of reward: {}", said(e1));
+    println!(
+        "\n  E1, the distribution follows a change of reward: {}",
+        said(e1)
+    );
     println!("  E2, the exploration floor holds: {}", said(e2));
     Ok(e1 && e2)
+}
+
+/// Self-information of a title, `-log2(p)`, `p` the share of build users who liked it;
+/// `None` for a title none liked (left out of every mean, docs/eval-results.md).
+fn novelty(id: i64, liked_by: &HashMap<i64, u32>, build_users: usize) -> Option<f64> {
+    let n = *liked_by.get(&id)?;
+    (n > 0).then(|| -(n as f64 / build_users as f64).log2())
+}
+
+/// Running mean of novelty, and how many titles had none.
+#[derive(Default, Clone, Copy)]
+struct Novel {
+    sum: f64,
+    counted: usize,
+    unliked: usize,
+}
+
+impl Novel {
+    fn add(&mut self, v: Option<f64>) {
+        match v {
+            Some(v) => {
+                self.sum += v;
+                self.counted += 1;
+            }
+            None => self.unliked += 1,
+        }
+    }
+    fn mean(&self) -> f64 {
+        self.sum / self.counted.max(1) as f64
+    }
+    fn unliked_share(&self) -> f64 {
+        self.unliked as f64 / (self.counted + self.unliked).max(1) as f64
+    }
+}
+
+/// E4 (and E3 on real users): Home as a new profile sees it, on MovieLens test users the
+/// matrix never learned from. The taste rail is Phase 17's (the app's ranker on the app's
+/// candidates); the discovery rails are the bandit's first allocation (no outcomes yet, the
+/// budget at 0.5, 60 slots, the taste rail at most 20), each arm choosing in the plan's
+/// order. Novelty of the discovery picks against the taste rail's; Recall@N of everything
+/// shown against popularity's top N; and every discovery label checked with
+/// `strategy::holds`.
+pub async fn novelty_run(
+    data_dir: &std::path::Path,
+    limit: Option<usize>,
+) -> Result<bool, EvalError> {
+    use sinephile_recommend::rank;
+    use sinephile_recommend::split::Part;
+    use sinephile_recommend::strategy;
+    use sinephile_taste::{discover, hybrid};
+    use std::collections::HashSet;
+    use std::time::Instant;
+
+    println!("discovery: Home as a new profile sees it, MovieLens test users\n");
+    let db = sinephile_persistence::Db::open_in(data_dir).await?;
+    let (mut engine, _) = crate::search::engine(data_dir)?;
+    let semantic = engine
+        .semantic_mut()
+        .ok_or_else(|| EvalError::Missing("the meaning index and model are needed".into()))?;
+    let j = crate::recommend::judging(data_dir, &db, Part::Test, limit).await?;
+    println!(
+        "  {} build users liked {} catalogue titles; judged on {} users",
+        j.build_users,
+        j.liked_by.len(),
+        j.users.len()
+    );
+
+    let mut cache = discover::Cache::default();
+    let (mut taste_n, mut disc_n) = (Novel::default(), Novel::default());
+    let mut per_arm: HashMap<Arm, Novel> = HashMap::new();
+    let mut picks_per_arm: HashMap<Arm, usize> = HashMap::new();
+    let mut rails_per_arm: HashMap<Arm, usize> = HashMap::new();
+    let (mut recall_all, mut recall_pop, mut recall_taste) = (0.0, 0.0, 0.0);
+    // Diagnostics: hits per card shown, by where it came from; and Phase 17's ranker asked
+    // for as many as Home shows, the ceiling a relevance-only Home would reach.
+    let (mut hits_taste, mut cards_taste, mut hits_disc, mut cards_disc) =
+        (0usize, 0usize, 0usize, 0usize);
+    let (mut hits_pop, mut cards_pop) = (0usize, 0usize);
+    let mut recall_ranker_n = 0.0;
+    let mut shown_total = 0usize;
+    let mut labels = 0usize;
+    let mut false_labels = 0usize;
+    let mut gather_ms: Vec<f64> = Vec::new();
+    let started = Instant::now();
+    let recall = |top: &[i64], held: &HashSet<i64>, k: usize| {
+        let hits = top.iter().filter(|i| held.contains(i)).count();
+        hits as f64 / k.min(held.len()).max(1) as f64
+    };
+    for (user, shown, held) in &j.users {
+        let met: HashSet<i64> = shown.iter().copied().collect();
+        let held: HashSet<i64> = held.iter().copied().collect();
+        let liked: Vec<(i64, f64)> = shown.iter().map(|id| (*id, 1.0)).collect();
+        let with_vectors: Vec<(i64, Vec<f32>, f64)> = shown
+            .iter()
+            .filter_map(|id| {
+                let v = semantic.index.vector(*id)?;
+                Some((*id, v.iter().map(|x| f32::from(*x)).collect(), 1.0))
+            })
+            .collect();
+        let modes = sinephile_taste::modes::modes(&with_vectors);
+        let mut loved: HashMap<i64, Vec<(i64, f32)>> = HashMap::new();
+        for from in hybrid::strongest(&liked) {
+            let Ok(from32) = u32::try_from(from) else {
+                continue;
+            };
+            for &(to, score) in j.matrix.neighbours(from32) {
+                let to = i64::from(to);
+                if !met.contains(&to) {
+                    loved.entry(to).or_default().push((from, score));
+                }
+            }
+        }
+        let axes =
+            sinephile_taste::axes::axes(&db, &liked, &sinephile_taste::Statements::default())
+                .await?;
+        let (made, _) = hybrid::made_alike(&db, &liked, &met).await?;
+        let candidates = hybrid::candidates(
+            &db,
+            semantic,
+            &modes,
+            &met,
+            &loved,
+            &made,
+            &axes,
+            &HashSet::new(),
+        )
+        .await?;
+        let shares: Vec<f32> = modes.iter().map(|m| m.weight as f32).collect();
+        let taste: Vec<i64> = rank::rank(
+            &candidates,
+            &rank::WEIGHTS,
+            &rank::CAPS,
+            rank::DIVERSITY,
+            &shares,
+            TASTE_RAIL,
+        )
+        .into_iter()
+        .map(|p| p.id)
+        .collect();
+
+        let t = Instant::now();
+        let gathered = discover::gather(&db, semantic, &modes, &met, &loved, &mut cache).await?;
+        gather_ms.push(t.elapsed().as_secs_f64() * 1000.0);
+        let plan = bandit::allocate(
+            &Beliefs::default(),
+            Context::Evening,
+            0.5,
+            TOTAL,
+            LEAST,
+            &mut Rng::new(u64::from(*user)),
+        );
+        let familiar = plan[0].1.min(TASTE_RAIL).min(taste.len());
+        let mut taken: HashSet<i64> = met.clone();
+        taken.extend(taste[..familiar].iter().copied());
+        let rails = discover::planned(&gathered, &plan, &taken);
+        let by_id: HashMap<i64, &strategy::Title> =
+            gathered.titles.iter().map(|t| (t.id, t)).collect();
+
+        for id in &taste {
+            taste_n.add(novelty(*id, &j.liked_by, j.build_users));
+        }
+        let mut everything: Vec<i64> = taste[..familiar].to_vec();
+        for rail in &rails {
+            *rails_per_arm.entry(rail.arm).or_default() += 1;
+            for d in &rail.picks {
+                let v = novelty(d.id, &j.liked_by, j.build_users);
+                disc_n.add(v);
+                per_arm.entry(rail.arm).or_default().add(v);
+                *picks_per_arm.entry(rail.arm).or_default() += 1;
+                labels += 1;
+                if !by_id
+                    .get(&d.id)
+                    .is_some_and(|t| strategy::holds(&d.label, t, &gathered.profile))
+                {
+                    false_labels += 1;
+                }
+                everything.push(d.id);
+            }
+        }
+        let n = everything.len();
+        shown_total += n;
+        recall_all += recall(&everything, &held, n);
+        recall_taste += recall(&taste, &held, TASTE_RAIL);
+        let pop: Vec<i64> = j
+            .popular
+            .iter()
+            .filter(|i| !met.contains(i))
+            .take(n)
+            .copied()
+            .collect();
+        recall_pop += recall(&pop, &held, n);
+        hits_taste += everything[..familiar]
+            .iter()
+            .filter(|i| held.contains(i))
+            .count();
+        cards_taste += familiar;
+        hits_disc += everything[familiar..]
+            .iter()
+            .filter(|i| held.contains(i))
+            .count();
+        cards_disc += n - familiar;
+        hits_pop += pop.iter().filter(|i| held.contains(i)).count();
+        cards_pop += pop.len();
+        let ranked_n: Vec<i64> = rank::rank(
+            &candidates,
+            &rank::WEIGHTS,
+            &rank::CAPS,
+            rank::DIVERSITY,
+            &shares,
+            n,
+        )
+        .into_iter()
+        .map(|p| p.id)
+        .collect();
+        recall_ranker_n += recall(&ranked_n, &held, n);
+    }
+    let users = j.users.len().max(1) as f64;
+    gather_ms.sort_by(f64::total_cmp);
+    let pct = |v: &[f64], p: f64| {
+        v.get(((v.len() as f64 - 1.0) * p) as usize)
+            .copied()
+            .unwrap_or(0.0)
+    };
+    println!(
+        "  {} users in {:.0} s; gathering one user's discovery pool p50 {:.0} ms, p95 {:.0} ms",
+        j.users.len(),
+        started.elapsed().as_secs_f64(),
+        pct(&gather_ms, 0.5),
+        pct(&gather_ms, 0.95)
+    );
+    println!(
+        "  shown per user: {:.1} (the taste rail's share and the discovery rails)\n",
+        shown_total as f64 / users
+    );
+    println!(
+        "  novelty, taste rail (20 a user): {:.2} bits ({:.1}% of picks unliked by any build user, left out)",
+        taste_n.mean(),
+        taste_n.unliked_share() * 100.0
+    );
+    println!(
+        "  novelty, discovery rails:        {:.2} bits ({:.1}% left out)",
+        disc_n.mean(),
+        disc_n.unliked_share() * 100.0
+    );
+    for arm in Arm::ALL {
+        if let Some(v) = per_arm.get(&arm) {
+            println!(
+                "    {:>10}: {:.2} bits, {} picks in {} rails ({:.1}% left out)",
+                arm.key(),
+                v.mean(),
+                picks_per_arm.get(&arm).copied().unwrap_or(0),
+                rails_per_arm.get(&arm).copied().unwrap_or(0),
+                v.unliked_share() * 100.0
+            );
+        }
+    }
+    let (all, pop, taste_r) = (recall_all / users, recall_pop / users, recall_taste / users);
+    println!(
+        "\n  Recall@N of everything shown {all:.4}, popularity's top N {pop:.4} ({:+.1}%)",
+        (all / pop - 1.0) * 100.0
+    );
+    println!("  (the taste rail alone, Recall@20: {taste_r:.4})");
+    println!(
+        "  (Phase 17's ranker asked for N: Recall@N {:.4}, {:+.1}% against popularity)",
+        recall_ranker_n / users,
+        (recall_ranker_n / users / pop - 1.0) * 100.0
+    );
+    let rate = |h: usize, c: usize| h as f64 / c.max(1) as f64;
+    println!(
+        "  (held-out likes per card: taste rail {:.4}, discovery {:.4}, popularity {:.4})",
+        rate(hits_taste, cards_taste),
+        rate(hits_disc, cards_disc),
+        rate(hits_pop, cards_pop)
+    );
+    println!("  discovery labels checked: {labels}, false: {false_labels}");
+
+    let lift_bits = disc_n.mean() - taste_n.mean();
+    let e4 = lift_bits >= 1.0 && all / pop - 1.0 > 0.40;
+    let e3 = false_labels == 0 && labels > 0;
+    let said = |ok: bool| if ok { "met" } else { "NOT met" };
+    println!(
+        "\n  E4, discovery {lift_bits:+.2} bits over the taste rail (at least 1) with relevance held: {}",
+        said(e4)
+    );
+    println!(
+        "  E3, every discovery label true of its title: {}",
+        said(e3)
+    );
+    Ok(e4 && e3)
 }

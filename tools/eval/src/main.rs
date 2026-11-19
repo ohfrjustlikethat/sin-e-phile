@@ -183,6 +183,14 @@ async fn main() {
             args.iter().any(|a| a == "--no-floor"),
             args.iter().any(|a| a == "--frozen"),
         ),
+        "discovery" => {
+            let limit = args
+                .iter()
+                .position(|a| a == "--limit")
+                .and_then(|i| args.get(i + 1))
+                .and_then(|n| n.parse().ok());
+            discovery::novelty_run(Path::new(&data_dir), limit).await
+        }
         "modes" => modes::run(Path::new(&data_dir), args.iter().any(|a| a == "--prove")).await,
         "import" => {
             let from = args
