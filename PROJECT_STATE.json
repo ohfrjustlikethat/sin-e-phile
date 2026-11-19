@@ -1,7 +1,7 @@
 {
   "spec_version": "4.7.1",
   "project": "sin-e-phile",
-  "last_updated": "2026-11-18",
+  "last_updated": "2026-11-19",
   "sessions_completed": 21,
   "current_phase": {
     "number": 18,
@@ -15,7 +15,7 @@
       {
         "id": "18.1",
         "text": "The strategy arms (crates/recommend/src/strategy.rs, new): safe-familiar, adjacent-stretch (one axis away from a taste mode), cross-mode bridge (between two of the profile's modes), blind-spot (a well-regarded region the profile never touched: a country, a decade, a movement), canon-gap (acclaimed work the taste predicts and the profile has not seen), deep-cut (highly rated obscurity near a mode); each yields candidates from Phase 17's pools and the meaning index with an honest label ('Because you loved Stalker', 'Your blind spot: Iranian New Wave'), tested so every label is true (E3).",
-        "status": "not_started",
+        "status": "in_progress",
         "commit": null
       },
       {
@@ -2083,7 +2083,7 @@
         {
           "id": "18.1",
           "text": "The strategy arms (crates/recommend/src/strategy.rs, new): safe-familiar, adjacent-stretch (one axis away from a taste mode), cross-mode bridge (between two of the profile's modes), blind-spot (a well-regarded region the profile never touched: a country, a decade, a movement), canon-gap (acclaimed work the taste predicts and the profile has not seen), deep-cut (highly rated obscurity near a mode); each yields candidates from Phase 17's pools and the meaning index with an honest label ('Because you loved Stalker', 'Your blind spot: Iranian New Wave'), tested so every label is true (E3).",
-          "status": "not_started",
+          "status": "in_progress",
           "commit": null
         },
         {
@@ -2589,15 +2589,8 @@
       ]
     }
   ],
-  "next_action": "Phase 18, 18.1: create crates/recommend/src/strategy.rs with the six arms as candidate generators over crates/taste/src/hybrid.rs's pools and the meaning index (safe-familiar = Phase 17's rail; adjacent-stretch = one axis from a mode; cross-mode bridge = the midpoint direction of two modes; blind-spot = a well-voted country or decade the profile has no titles from; canon-gap = top-rated titles near a mode the profile has not met; deep-cut = high rating, low votes, near a mode), each pick carrying a label that names only what is true; a property test that every label is true (E3). Plan first in docs/phases/phase-18-discovery-engine.md.",
-  "blockers": [
-    {
-      "id": "B16",
-      "raised": "2026-11-17",
-      "needs_user": false,
-      "description": "CI run 43916502166 failed on ProfilePicker.test.tsx (a digit typed right after a wrong PIN was swallowed on a slower runner). Fixed in the next commit (one state update); cleared when CI is green again."
-    }
-  ],
+  "next_action": "Phase 18, 18.1: write crates/recommend/src/strategy.rs (the six arms over described titles, Label as data, holds() re-deriving each claim, a generated-profile test that every label holds); then crates/taste/src/discover.rs gathering each arm's pool; then ADR-0055's Wikidata country (P495) and movement (P135) launch step. Plan in docs/phases/phase-18-discovery-engine.md.",
+  "blockers": [],
   "decisions_pending": [
     {
       "id": "P1",

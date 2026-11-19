@@ -10,7 +10,10 @@
 //!   within caps per director, franchise and year; a truthful reason for every pick.
 //! - [`split`]: which MovieLens users build the matrix, which tune it, and which judge it,
 //!   so a number in `docs/eval-results.md` is never measured on the people it learned from.
+//! - [`strategy`]: Phase 18's discovery arms (stretch, bridge, blind spot, canon, deep cut),
+//!   each pick with a label that says what is true of it.
 
 pub mod cf;
 pub mod rank;
 pub mod split;
+pub mod strategy;

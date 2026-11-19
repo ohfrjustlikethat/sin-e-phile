@@ -44,5 +44,47 @@ Multi-armed and contextual bandits; the exploration/exploitation trade-off; Thom
 
 <!-- subtask log: appended during the phase -->
 
+## Plan (2026-11-19, ADR-0040)
+
+**What the data allows, checked first** (a copy of the development catalogue): 652,952 films rated, 57,013 with 1,000
+votes or more, 329 rated 8.0+ with 100,000 votes, 4,986 rated 7.5+ with 1,000 to 10,000 votes. **No title has a country
+or an original language**: the IMDb datasets carry neither. A blind spot by country or movement ("Your blind spot:
+Iranian New Wave") therefore needs a source, and the app already asks Wikidata at launch (ADR-0054's article mapping).
+Decided (ADR-0055): the same launch asks Wikidata for country of origin (P495, as ISO 3166 codes into the existing
+`media_items.countries`) and film movement (P135, English labels, a new table), most-voted first, 500 ids a query at
+WDQS's one query in three seconds: about six minutes for every film with 1,000 votes, spread over launches.
+
+**18.1, the arms** (`crates/recommend/src/strategy.rs`, pure, std only; gathering in `crates/taste/src/discover.rs`):
+- A title as the arms see it: its closeness to each taste mode, rating, votes, year, length, genres, countries,
+  movements, and the loved titles that point to it. The profile: its modes (members name them), and every region
+  (decade, genre, country, movement) of what it has met, with counts.
+- "Close to a mode" is defined by rank, not by a cosine guessed once: within the mode's 300 nearest titles in the meaning
+  index (`close`), "within reach" within its 2,000 nearest (`reach`). The gatherer reads both cosines from the index.
+- **safe-familiar**: Phase 17's rail, its reasons unchanged. **adjacent-stretch**: close to a mode and outside that
+  mode on exactly one axis (decade, genre, country), "Like Stalker, but from the 1990s". **cross-mode bridge**: within
+  reach of two modes at once, from the midpoint of their directions, "Between Stalker and Spirited Away".
+  **blind-spot**: a decade, genre, country or movement with nothing met, its acclaimed titles (7.5+, 5,000 votes)
+  nearest the taste, "You've never watched anything from the 1950s". **canon-gap**: 7.8+ with 50,000 votes, within
+  reach of a mode, "Acclaimed, and close to Stalker". **deep-cut**: 7.5+ with at most 15,000 votes, close to a mode or
+  loved by people who loved one of its members, "Loved by people who loved Stalker, seen by almost no one".
+- A label is data (`Label`), words are made from it, and `holds(label, title, profile)` re-derives the claim from the
+  facts. E3's test: on generated profiles and catalogues, every pick of every arm holds; and each arm's label seen to
+  fail when a fact is changed under it.
+
+**18.2, the bandit**: Thompson sampling, a Beta posterior per arm per profile, context the Comfort to Adventure budget;
+an exploration floor (every discovery arm at least 1 in 20 slots on average, discovery at least a quarter of the
+slots) and a cap (no arm above 40%). `eval discovery`: simulated users drawn from MovieLens test users, whose reward
+patterns switch half way (E1), and one who rewards only safe-familiar (E2).
+
+**E4's target, fixed before anything is measured.** Novelty is mean self-information, `-log2(p)`, `p` a title's share
+of MovieLens build users who liked it (the usual form of "mean inverse popularity"; a title liked by half the users
+scores 1 bit, by one in a thousand about 10). Target: the discovery rails' mean novelty is **at least 1 bit above
+Phase 17's taste rail** on the same test users (titles on average half as widely liked, or less), **while relevance
+holds**: Recall@20 of the slots Home shows (taste rail plus discovery) stays more than 40% above popularity, Phase 17's
+E1 bar.
+
+**18.3** dismissals (not for me, not right now, already seen) and the per-profile budget; one item per Home.
+**18.4** Surprise me, mood shelves, I42, and search-by-meaning quality (Phase 5 E3, E4). **18.5** the case study, E5.
+
 ## Work log
 
