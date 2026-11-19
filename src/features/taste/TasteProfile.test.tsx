@@ -34,9 +34,12 @@ const commands = {
   ),
   profiles: vi.fn(() => ok([])),
   activeProfile: vi.fn(() => ok(null)),
+  // Phase 18: Comfort to Adventure.
+  discoveryBudget: vi.fn(() => ok(0.5 as number | null)),
+  setDiscoveryBudget: vi.fn((_v: number | null) => ok(null)),
 };
 vi.mock("@/lib/ipc", () => ({ commands }));
-const { TasteProfile, shareWords } = await import("./TasteProfile");
+const { TasteProfile, shareWords, adventureWord } = await import("./TasteProfile");
 
 describe("Your taste (Phase 15)", () => {
   it("says each mode, its share and the leanings, and keeps corrections", async () => {
@@ -76,5 +79,22 @@ describe("Your taste (Phase 15)", () => {
     );
     expect(await screen.findByText("Not enough to go on yet")).toBeInTheDocument();
     expect(shareWords(0.004)).toBe("under 1% of your taste");
+  });
+
+  it("Comfort to Adventure is saved as it is moved, and said in place (Phase 18)", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <TasteProfile />
+      </QueryClientProvider>,
+    );
+    const slider = await screen.findByRole("slider", { name: "Comfort to Adventure" });
+    expect(slider).toHaveValue("50");
+    expect(screen.getByText("Balanced")).toBeInTheDocument();
+    fireEvent.change(slider, { target: { value: "85" } });
+    expect(screen.getByText("Adventure")).toBeInTheDocument();
+    await waitFor(() => expect(commands.setDiscoveryBudget).toHaveBeenCalledWith(0.85));
+    expect(await screen.findByText("Saved: Home follows")).toBeInTheDocument();
+    expect([adventureWord(0), adventureWord(0.5), adventureWord(1)]).toEqual(["Comfort", "Balanced", "Adventure"]);
   });
 });

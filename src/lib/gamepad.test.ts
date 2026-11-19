@@ -67,6 +67,8 @@ describe("gamepad decisions", () => {
     expect(navAction(BUTTON.A)).toEqual({ kind: "activate" });
     expect(navAction(BUTTON.RB)).toEqual({ kind: "tab", next: true });
     expect(navAction(BUTTON.Y)).toEqual({ kind: "search" });
+    // Phase 18: X is "options for what has focus" (a recommended card's "not for me").
+    expect(navAction(BUTTON.X)).toEqual({ kind: "options" });
   });
 
   it("repeats a held direction only after a delay", () => {

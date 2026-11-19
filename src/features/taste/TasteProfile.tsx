@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, EmptyState } from "@/design-system";
+import { Button, EmptyState, Slider } from "@/design-system";
 import { commands, type TasteModeView, type TastePick } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
 import { ChoiceRow, type Choice } from "@/features/detail/ChoiceRow";
@@ -103,6 +103,8 @@ export function TasteProfile() {
 
       {modes.length > 0 && <HomePreview />}
 
+      {profile.isSuccess && <Adventure />}
+
       {profile.isSuccess && (
         <section aria-label="What you said" className="mt-14 border-t border-line-subtle pt-8">
           <p className="max-w-[60ch] text-[14px] text-ink-muted">
@@ -116,6 +118,60 @@ export function TasteProfile() {
         </section>
       )}
     </article>
+  );
+}
+
+/** The budget's word: where the slider sits. */
+export function adventureWord(v: number): string {
+  return v < 0.34 ? "Comfort" : v < 0.67 ? "Balanced" : "Adventure";
+}
+
+/**
+ * Comfort to Adventure (Phase 18): how much of Home the discovery rails start with. What the
+ * profile finishes and abandons moves it from there; this is where it starts.
+ */
+function Adventure() {
+  const client = useQueryClient();
+  const saved = useQuery({ queryKey: ["discovery-budget"], queryFn: () => ok(commands.discoveryBudget()) });
+  const [value, setValue] = useState<number | null>(null);
+  const [said, setSaid] = useState<string | null>(null);
+  const shown = value ?? saved.data ?? 0.5;
+  const timer = useRef<number | undefined>(undefined);
+  const save = useMutation({
+    mutationFn: (v: number) => ok(commands.setDiscoveryBudget(v)),
+    onSuccess: () => {
+      setSaid("Saved: Home follows");
+      void client.invalidateQueries({ queryKey: ["discovery-budget"] });
+      void client.invalidateQueries({ queryKey: ["home"] });
+    },
+    onError: (e) => setSaid(`Not saved: ${e.message}`),
+  });
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  return (
+    <section aria-label="Comfort or adventure" className="mt-14 border-t border-line-subtle pt-8">
+      <h2 className="label mb-2">Comfort or adventure</h2>
+      <p className="max-w-[60ch] text-[14px] text-ink-muted">
+        Comfort keeps Home close to what you love. Adventure gives more of it to stretches, blind spots and deep
+        cuts. Whichever you choose, what you finish pushes it further and what you abandon eases it back.
+      </p>
+      <div className="mt-4 max-w-[420px]">
+        <Slider
+          label="Comfort to Adventure"
+          value={Math.round(shown * 100)}
+          display={adventureWord(shown)}
+          onChange={(n) => {
+            const v = n / 100;
+            setValue(v);
+            setSaid(null);
+            window.clearTimeout(timer.current);
+            timer.current = window.setTimeout(() => save.mutate(v), 300);
+          }}
+        />
+        <p role="status" className="min-h-[18px] font-ui text-[12.5px] text-ink-muted">
+          {said}
+        </p>
+      </div>
+    </section>
   );
 }
 
@@ -183,7 +239,7 @@ function Examples({ films }: { films: TastePick[] }) {
 
 /** Home's taste rail as it stands, so a correction shows what it changed (Phase 16). */
 function HomePreview() {
-  const home = useQuery({ queryKey: ["home"], queryFn: () => ok(commands.home()) });
+  const home = useQuery({ queryKey: ["home"], queryFn: () => ok(commands.home(new Date().getHours())) });
   const rail = home.data?.find((r) => r.key === "taste");
   if (!rail || rail.items.length === 0) return null;
   return (

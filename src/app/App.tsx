@@ -175,6 +175,13 @@ export function App() {
             case "settings":
               useUi.getState().setSettingsOpen(true);
               break;
+            case "options":
+              // What the keyboard's context-menu key does, sent to whatever has focus: a
+              // recommended card opens "not for me" (Phase 18); anything else ignores it.
+              document.activeElement?.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "ContextMenu", bubbles: true, cancelable: true }),
+              );
+              break;
           }
         },
         tilt: (rx, ry) => {

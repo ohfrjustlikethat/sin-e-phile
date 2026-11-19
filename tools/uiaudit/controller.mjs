@@ -757,6 +757,26 @@ try {
   const seen = await layoutProblems();
   await evalJs(`document.getElementById("too-wide").remove()`);
   check(seen.length > 0, `the layout check sees a 3000 px paragraph (${seen.join("; ")})`);
+  // Phase 18: "not for me" on a recommended card, by pad alone: X opens it, A says it, A on Undo
+  // takes it back, and focus is on the card again.
+  await evalJs(`(() => { const t = document.querySelector('section[aria-label="For you"] [data-focus-tile]');
+    t.scrollIntoView({ block: "nearest", inline: "nearest" }); t.focus(); })()`);
+  await press(B.X);
+  const menu = await waitFor(
+    () => evalJs(`!!document.querySelector('[role="dialog"][aria-label$="not interested?"]')`),
+    "the not-for-me menu", 15).catch(() => false);
+  check(menu && (await evalJs(`document.activeElement?.textContent === "Not for me"`)),
+    "X on a recommended card opens its menu, with focus on Not for me");
+  await press(B.A);
+  const undone = await waitFor(() => evalJs(`document.activeElement?.textContent === "Undo"`), "the card's undo", 15)
+    .catch(() => false);
+  const said = await calls("dismiss");
+  check(undone && said.length === 1 && said[0].kind === "not_for_me",
+    `A on Not for me is said, and the card stands as an Undo (${JSON.stringify(said)})`);
+  await press(B.A);
+  const back = await waitFor(() => evalJs(`!!document.activeElement?.closest('section[aria-label="For you"]')
+      && document.activeElement?.hasAttribute("data-focus-tile")`), "the card back", 15).catch(() => false);
+  check(back && (await calls("undismiss")).length === 1, "A on Undo takes it back, focus on the card again");
 
   await press(B.Y);
   const kb = await waitFor(() => evalJs(`!!document.querySelector('[aria-label="On-screen keyboard"]')`), "the keyboard", 20);

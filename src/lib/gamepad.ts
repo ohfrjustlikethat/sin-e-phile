@@ -29,7 +29,9 @@ export type NavAction =
   | { kind: "back" }
   | { kind: "tab"; next: boolean }
   | { kind: "search" }
-  | { kind: "settings" };
+  | { kind: "settings" }
+  /** X: options for whatever has focus, as the keyboard's context-menu key (Phase 18: "not for me"). */
+  | { kind: "options" };
 
 /** One frame of a pad: which buttons are down, and the sticks. */
 export interface PadFrame {
@@ -164,6 +166,8 @@ export function navAction(button: number): NavAction | null {
       return { kind: "tab", next: true };
     case BUTTON.Y:
       return { kind: "search" };
+    case BUTTON.X:
+      return { kind: "options" };
     case BUTTON.MENU:
       return { kind: "settings" };
     default:

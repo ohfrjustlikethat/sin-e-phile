@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/design-system";
+import { useScreenHints, type Hint } from "@/design-system/focus/FocusLayer";
 import { commands } from "@/lib/ipc";
 import { onEvent } from "@/lib/events";
 import { SetupCard } from "./SetupCard";
@@ -22,6 +23,15 @@ async function ok<T>(p: Promise<{ status: "ok"; data: T } | { status: "error"; e
 
 export const HOME = ["home"];
 
+/** Home's pad hints: X on a recommended card says "not for me" (Phase 18). */
+const HINTS: Hint[] = [
+  ["A", "Select"],
+  ["B", "Back"],
+  ["X", "Not for me…"],
+  ["Y", "Search"],
+  ["Menu", "Settings"],
+];
+
 const WHY: Record<string, string> = {
   continue: "Where you left off",
   new_episodes: "New in the shows you follow",
@@ -40,7 +50,9 @@ const WHY: Record<string, string> = {
 };
 
 export function HomeScreen() {
-  const home = useQuery({ queryKey: HOME, queryFn: () => ok(commands.home()) });
+  // The hour: the part of the day the discovery engine learns and chooses in (Phase 18).
+  const home = useQuery({ queryKey: HOME, queryFn: () => ok(commands.home(new Date().getHours())) });
+  useScreenHints(HINTS);
   // New titles from the catalogue, and anything new in the library, show at once.
   const client = useQueryClient();
   useEffect(() => {

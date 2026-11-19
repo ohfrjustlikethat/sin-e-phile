@@ -382,7 +382,11 @@ export const commands = {
 	tasteProfile: () => typedError<TasteProfileView, string>(__TAURI_INVOKE("taste_profile")),
 	/**  Correct one mode of the profile's taste: "more", "less", "not_me", or `None` to undo. */
 	correctTaste: (anchor: number, correction: string | null) => typedError<null, string>(__TAURI_INVOKE("correct_taste", { anchor, correction })),
-	home: () => typedError<RailView[], string>(__TAURI_INVOKE("home")),
+	/**
+	 *  Home's rails. `hour` is the viewer's local hour (0 to 23): the part of the day the
+	 *  discovery engine learns and chooses in (Phase 18).
+	 */
+	home: (hour: number | null) => typedError<RailView[], string>(__TAURI_INVOKE("home", { hour })),
 	/**  The watchlist page (Appendix F, I39): what this profile saved, newest first. */
 	watchlist: () => typedError<HomeCard[], string>(__TAURI_INVOKE("watchlist")),
 	/**
@@ -437,6 +441,16 @@ export const commands = {
 	/**  Whether the first-run wizard has been finished or skipped. */
 	onboardingDone: () => typedError<boolean, string>(__TAURI_INVOKE("onboarding_done")),
 	finishOnboarding: () => typedError<null, string>(__TAURI_INVOKE("finish_onboarding")),
+	/**
+	 *  "Not for me", "not right now" or "already seen" on a recommended card, said at `hour`
+	 *  (local, 0 to 23). Home leaves the title out from now on (`sinephile_taste::discover`).
+	 */
+	dismiss: (id: number, kind: Dismissal, hour: number | null) => typedError<null, string>(__TAURI_INVOKE("dismiss", { id, kind, hour })),
+	/**  Take a dismissal back: the card's undo. */
+	undismiss: (id: number) => typedError<null, string>(__TAURI_INVOKE("undismiss", { id })),
+	/**  This profile's Comfort to Adventure setting, 0 to 1. */
+	discoveryBudget: () => typedError<number | null, string>(__TAURI_INVOKE("discovery_budget")),
+	setDiscoveryBudget: (value: number | null) => typedError<null, string>(__TAURI_INVOKE("set_discovery_budget", { value })),
 };
 
 /* Types */
@@ -650,6 +664,9 @@ export type CutoutRect = {
 	height: number | null,
 	radius: number | null,
 };
+
+/**  What a viewer says of a recommended card (Phase 18). */
+export type Dismissal = "not_for_me" | "not_right_now" | "already_seen";
 
 /**  One download as the Downloads page lists it, with its live rate. */
 export type DownloadRow = {
