@@ -466,6 +466,24 @@ impl<'a> MediaRepository<'a> {
             .collect())
     }
 
+    /// How many IMDb votes each of `ids` has, those with any: how widely seen, for search by
+    /// meaning's popularity prior (Phase 18). One query per 500.
+    pub async fn votes_of(&self, ids: &[i64]) -> Result<HashMap<i64, i64>, DbError> {
+        let mut out = HashMap::with_capacity(ids.len());
+        for chunk in ids.chunks(500) {
+            let sql = format!(
+                "SELECT id, rating_votes FROM media_items WHERE rating_votes IS NOT NULL AND id IN ({})",
+                vec!["?"; chunk.len()].join(",")
+            );
+            let mut q = sqlx::query_as::<_, (i64, i64)>(&sql);
+            for id in chunk {
+                q = q.bind(id);
+            }
+            out.extend(q.fetch_all(self.db.pool()).await?);
+        }
+        Ok(out)
+    }
+
     /// A title's genres, by name (Phase 15's taste axes).
     /// [`Facts`] for each of `ids` the catalogue holds, in no particular order: a rail's
     /// thousand candidates in four queries per 500 rather than four per title.

@@ -2485,6 +2485,18 @@ async fn media_acclaimed_surface() {
         "films only, not adult, most voted first"
     );
     assert_eq!(media.acclaimed(75, 5_000, 1).await.unwrap(), vec![ids[1]]);
+
+    // votes_of: each title's votes, those with any
+    let mut unvoted = NewMediaItem::film("No votes", 2001);
+    unvoted.rating_votes = None;
+    let unvoted = media.insert(&unvoted).await.unwrap();
+    let votes = media
+        .votes_of(&[ids[0], ids[2], unvoted, 999_999])
+        .await
+        .unwrap();
+    assert_eq!(votes.len(), 2);
+    assert_eq!((votes[&ids[0]], votes[&ids[2]]), (90_000, 900));
+    assert!(media.votes_of(&[]).await.unwrap().is_empty());
 }
 
 #[tokio::test]

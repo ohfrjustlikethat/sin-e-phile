@@ -161,6 +161,50 @@ pub const GUARDS: Guards = Guards {
     arm_cap: ARM_CAP,
 };
 
+/// A population prior over the discovery arms (blocker B17): what a profile with no outcomes
+/// yet is expected to find in each, as `weight` pseudo-trials at each arm's `mean`. Used only in
+/// the draws that share discovery's slots between its arms ([`allocate_within`]): discovery's
+/// share of Home is the budget's and the profile's, not the population's.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Prior {
+    pub weight: f64,
+    /// Stretch, bridge, blind spot, canon, deep cut: [`Arm::ALL`]'s order without the familiar.
+    pub means: [f64; 5],
+}
+
+impl Prior {
+    /// None at all: every arm flat.
+    pub const NONE: Prior = Prior {
+        weight: 0.0,
+        means: [0.5; 5],
+    };
+
+    /// The same means at another weight (the evaluation's sweep).
+    pub fn weighed(self, weight: f64) -> Prior {
+        Prior { weight, ..self }
+    }
+
+    fn mean(&self, arm: Arm) -> f64 {
+        let at = Arm::ALL
+            .into_iter()
+            .filter(|a| *a != Arm::Familiar)
+            .position(|a| a == arm);
+        at.map_or(0.5, |i| self.means[i])
+    }
+}
+
+/// The prior the app uses (docs/eval-results.md, 18.2, B17), by the rule fixed there before it
+/// ran. The means: each arm's held-out likes per card and novelty on 2,000 tuning users, each
+/// over the best discovery arm's, summed and halved (stretch 0.0302 and 4.69 bits, bridge
+/// 0.0303 and 5.49, blind spot 0.0108 and 4.15, canon 0.0497 and 3.64, deep cut 0.0018 and 11.35).
+/// The weight: chosen on the same users from {0, 2, 4, 8, 16} (Recall@N against popularity
+/// +38.8%, +44.1%, +43.6%, +43.0%, +44.0%; novelty over the taste rail 1.95, 1.79, 1.63, 1.50,
+/// 1.37 bits): the best relevance with at least 1.2 bits, 2.
+pub const PRIOR: Prior = Prior {
+    weight: 2.0,
+    means: [0.5104, 0.5467, 0.2915, 0.6604, 0.5181],
+};
+
 /// How far the profile's outcomes move discovery's share from where the budget puts it: a
 /// difference of 0.5 between the discovery arms' mean chance and the familiar's moves it 0.3.
 pub const ADAPT: f64 = 0.6;
@@ -340,10 +384,11 @@ pub fn allocate(
     least: usize,
     rng: &mut Rng,
 ) -> Vec<(Arm, usize)> {
-    allocate_within(beliefs, context, budget, total, least, &GUARDS, rng)
+    allocate_within(beliefs, context, budget, total, least, &GUARDS, &PRIOR, rng)
 }
 
-/// [`allocate`] within other guards.
+/// [`allocate`] within other guards and another prior.
+#[allow(clippy::too_many_arguments)]
 pub fn allocate_within(
     beliefs: &Beliefs,
     context: Context,
@@ -351,6 +396,7 @@ pub fn allocate_within(
     total: usize,
     least: usize,
     guards: &Guards,
+    prior: &Prior,
     rng: &mut Rng,
 ) -> Vec<(Arm, usize)> {
     let share = discovery_share_within(beliefs, context, budget, guards);
@@ -359,7 +405,14 @@ pub fn allocate_within(
         .into_iter()
         .filter(|a| *a != Arm::Familiar)
         .collect();
-    let beliefs_now: Vec<(f64, f64)> = arms.iter().map(|a| beliefs.belief(*a, context)).collect();
+    let beliefs_now: Vec<(f64, f64)> = arms
+        .iter()
+        .map(|a| {
+            let (alpha, beta) = beliefs.belief(*a, context);
+            let m = prior.mean(*a);
+            (alpha + prior.weight * m, beta + prior.weight * (1.0 - m))
+        })
+        .collect();
     let mut wins = vec![1usize; arms.len()];
     for _ in 0..DRAWS {
         let best = beliefs_now
@@ -529,6 +582,53 @@ mod tests {
         let eased = discovery_share(&Beliefs::from_trials(&timid), Context::Evening, 0.5);
         assert!(pushed > start + 0.05, "{pushed}");
         assert!(eased < start - 0.05, "{eased}");
+    }
+
+    #[test]
+    fn a_prior_leans_a_new_profile_and_outcomes_outweigh_it() {
+        // Canon favoured, deep cuts not; a new profile follows the prior, and a profile that
+        // has finished thirty deep cuts and refused thirty canon picks follows itself.
+        let prior = Prior {
+            weight: 8.0,
+            means: [0.5, 0.5, 0.5, 0.9, 0.1],
+        };
+        let share = |b: &Beliefs, arm: Arm| {
+            let mut rng = Rng::new(5);
+            let mut n = 0;
+            for _ in 0..200 {
+                let plan = allocate_within(b, Context::Day, 0.5, 60, 6, &GUARDS, &prior, &mut rng);
+                n += plan.iter().find(|(a, _)| *a == arm).map_or(0, |(_, k)| *k);
+            }
+            n
+        };
+        let fresh = Beliefs::default();
+        assert!(share(&fresh, Arm::Canon) > 3 * share(&fresh, Arm::DeepCut).max(1));
+        let mut t = trials(Arm::DeepCut, Outcome::Completed, 30, Context::Day);
+        t.extend(trials(Arm::Canon, Outcome::NotForMe, 30, Context::Day));
+        let lived = Beliefs::from_trials(&t);
+        assert!(share(&lived, Arm::DeepCut) > share(&lived, Arm::Canon));
+        // And it never touches discovery's share of Home.
+        let flat = allocate_within(
+            &fresh,
+            Context::Day,
+            0.5,
+            60,
+            6,
+            &GUARDS,
+            &Prior::NONE,
+            &mut Rng::new(1),
+        );
+        let leaned = allocate_within(
+            &fresh,
+            Context::Day,
+            0.5,
+            60,
+            6,
+            &GUARDS,
+            &prior,
+            &mut Rng::new(1),
+        );
+        assert_eq!(flat[0].1, leaned[0].1);
     }
 
     #[test]

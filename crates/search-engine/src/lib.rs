@@ -30,7 +30,7 @@
 pub mod card;
 pub mod query;
 
-use sinephile_persistence::repositories::{Hit, MatchReason, SearchRepository};
+use sinephile_persistence::repositories::{Hit, MatchReason, MediaRepository, SearchRepository};
 use sinephile_persistence::{Db, DbError};
 use sinephile_vector_index::VectorIndex;
 
@@ -60,6 +60,17 @@ pub const RRF_K: f64 = 60.0;
 /// larger `LIMIT` on a query that is already indexed.
 const CANDIDATES: i64 = 50;
 
+/// How much how widely seen a title is counts beside its closeness in meaning (Phase 18,
+/// 18.4): `cosine + POPULARITY_PRIOR * ln(1 + votes) / ln(1 + most votes among them)`, over
+/// the [`PRIOR_POOL`] nearest, the best [`CANDIDATES`] going on to fusion. Plot-first
+/// documents (v3) let hundreds of thousands of obscure plots outrank the films a person
+/// means; votes say which are meant. Chosen on `fixtures/search/meaning-tuning.tsv` by the
+/// rule in docs/eval-results.md; 0 is exactly the search before it.
+pub const POPULARITY_PRIOR: f64 = 0.0;
+
+/// The nearest titles the popularity prior chooses its candidates from.
+const PRIOR_POOL: i64 = 200;
+
 /// Run the fuzzy tier only when everything above found fewer than this.
 const FUZZY_THRESHOLD: usize = 2;
 
@@ -82,18 +93,29 @@ pub struct Semantic {
 
 pub struct Engine {
     semantic: Option<Semantic>,
+    popularity: f64,
 }
 
 impl Engine {
     /// Keyword-only. The Tier 0 floor, and what runs before an artefact is downloaded.
     pub fn keyword_only() -> Self {
-        Self { semantic: None }
+        Self {
+            semantic: None,
+            popularity: POPULARITY_PRIOR,
+        }
     }
 
     pub fn hybrid(semantic: Semantic) -> Self {
         Self {
             semantic: Some(semantic),
+            popularity: POPULARITY_PRIOR,
         }
+    }
+
+    /// Another weight for the popularity prior: the evaluation's sweep
+    /// (`eval search --tune-meaning`).
+    pub fn set_popularity_prior(&mut self, weight: f64) {
+        self.popularity = weight.max(0.0);
     }
 
     /// Whether the vector half is available — 5.8's UI needs to say so honestly rather
@@ -203,10 +225,39 @@ impl Engine {
                 // the per-vector scale the quantiser applies, so this is exact rather
                 // than approximate — see `crates/vector-index`.
                 let quantised = sinephile_embedding::quantise::quantise(&vector);
-                let neighbours = semantic
-                    .index
-                    .search(&quantised.values, CANDIDATES as usize)?;
-                let ids: Vec<i64> = neighbours.iter().map(|n| n.media_item_id).collect();
+                let ids: Vec<i64> = if self.popularity > 0.0 {
+                    let neighbours = semantic
+                        .index
+                        .search(&quantised.values, PRIOR_POOL as usize)?;
+                    let ids: Vec<i64> = neighbours.iter().map(|n| n.media_item_id).collect();
+                    let votes = MediaRepository::new(db).votes_of(&ids).await?;
+                    let top = votes.values().copied().max().unwrap_or(0);
+                    let scale = ((top + 1) as f64).ln().max(1e-9);
+                    let mut scored: Vec<(f64, i64)> = neighbours
+                        .iter()
+                        .map(|n| {
+                            let seen = votes.get(&n.media_item_id).copied().unwrap_or(0);
+                            let prior = ((seen.max(0) + 1) as f64).ln() / scale;
+                            (
+                                f64::from(1.0 - n.distance) + self.popularity * prior,
+                                n.media_item_id,
+                            )
+                        })
+                        .collect();
+                    scored.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
+                    scored
+                        .into_iter()
+                        .take(CANDIDATES as usize)
+                        .map(|(_, id)| id)
+                        .collect()
+                } else {
+                    semantic
+                        .index
+                        .search(&quantised.values, CANDIDATES as usize)?
+                        .iter()
+                        .map(|n| n.media_item_id)
+                        .collect()
+                };
 
                 // The index knows ids; the catalogue knows what they are. One batch
                 // lookup, then put them back in the index's order — `describe` does not

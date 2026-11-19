@@ -78,6 +78,7 @@ fn live(viewer: &Viewer, seed: u64, guards: &Guards, learn: bool) -> Vec<Vec<(Ar
             TOTAL,
             LEAST,
             guards,
+            &bandit::PRIOR,
             &mut rng,
         );
         let chances = if day < SWITCH {
@@ -356,6 +357,8 @@ impl Novel {
 pub async fn novelty_run(
     data_dir: &std::path::Path,
     limit: Option<usize>,
+    tune: bool,
+    prior: bandit::Prior,
 ) -> Result<bool, EvalError> {
     use sinephile_recommend::rank;
     use sinephile_recommend::split::Part;
@@ -364,13 +367,19 @@ pub async fn novelty_run(
     use std::collections::HashSet;
     use std::time::Instant;
 
-    println!("discovery: Home as a new profile sees it, MovieLens test users\n");
+    println!(
+        "discovery: Home as a new profile sees it, MovieLens {} users; prior {:.1} pseudo-trials at {:?}\n",
+        if tune { "tuning" } else { "test" },
+        prior.weight,
+        prior.means
+    );
     let db = sinephile_persistence::Db::open_in(data_dir).await?;
     let (mut engine, _) = crate::search::engine(data_dir)?;
     let semantic = engine
         .semantic_mut()
         .ok_or_else(|| EvalError::Missing("the meaning index and model are needed".into()))?;
-    let j = crate::recommend::judging(data_dir, &db, Part::Test, limit).await?;
+    let part = if tune { Part::Tune } else { Part::Test };
+    let j = crate::recommend::judging(data_dir, &db, part, limit).await?;
     println!(
         "  {} build users liked {} catalogue titles; judged on {} users",
         j.build_users,
@@ -455,12 +464,14 @@ pub async fn novelty_run(
         let t = Instant::now();
         let gathered = discover::gather(&db, semantic, &modes, &met, &loved, &mut cache).await?;
         gather_ms.push(t.elapsed().as_secs_f64() * 1000.0);
-        let plan = bandit::allocate(
+        let plan = bandit::allocate_within(
             &Beliefs::default(),
             Context::Evening,
             0.5,
             TOTAL,
             LEAST,
+            &GUARDS,
+            &prior,
             &mut Rng::new(u64::from(*user)),
         );
         // The familiar's whole share, as Home shows it: the taste rail, and what is past its

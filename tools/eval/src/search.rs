@@ -137,6 +137,48 @@ pub async fn one(data_dir: &Path, query: &str) -> Result<bool, EvalError> {
 }
 
 pub async fn run(data_dir: &Path, report: bool) -> Result<bool, EvalError> {
+    run_with(data_dir, report, None).await
+}
+
+/// 18.4: search by meaning's popularity prior at each of `weights`, on the TUNING set
+/// (`fixtures/search/meaning-tuning.tsv`), never on E3's: meaning nDCG@10 for each, the rule
+/// in docs/eval-results.md choosing.
+pub async fn tune_meaning(data_dir: &Path, weights: &[f64]) -> Result<bool, EvalError> {
+    let db = Db::open_in(data_dir).await?;
+    let (mut engine, hybrid) = engine(data_dir)?;
+    if !hybrid {
+        println!("search --tune-meaning: needs the meaning index and model");
+        return Ok(false);
+    }
+    println!("search --tune-meaning: the popularity prior on the tuning set\n");
+    for &weight in weights {
+        engine.set_popularity_prior(weight);
+        let outcomes = crate::relevance::run_on(
+            Path::new("fixtures/search/meaning-tuning.tsv"),
+            &mut engine,
+            &db,
+        )
+        .await?;
+        let meaning: Vec<&crate::relevance::Outcome> =
+            outcomes.iter().filter(|o| o.kind == "meaning").collect();
+        let mean = meaning.iter().map(|o| o.ndcg).sum::<f64>() / meaning.len().max(1) as f64;
+        println!(
+            "  prior {weight:.2}: meaning nDCG@10 {mean:.4} over {} queries",
+            meaning.len()
+        );
+        for o in &meaning {
+            println!("      {:.4}  {}", o.ndcg, o.query);
+        }
+    }
+    Ok(true)
+}
+
+/// [`run`] with the popularity prior at `prior` instead of the app's (`--prior`).
+pub async fn run_with(
+    data_dir: &Path,
+    report: bool,
+    prior: Option<f64>,
+) -> Result<bool, EvalError> {
     let fixture = Path::new("fixtures/search/exact-titles.tsv");
     let cases = load(fixture)?;
     let db = Db::open_in(data_dir).await?;
@@ -149,6 +191,10 @@ pub async fn run(data_dir: &Path, report: bool) -> Result<bool, EvalError> {
     // the harness's convenience, it is the Tier 0 path (SPEC.md 8, ADR-0014) and it
     // deserves to be measured too. The banner says which one ran.
     let (mut engine, hybrid) = engine(data_dir)?;
+    if let Some(weight) = prior {
+        engine.set_popularity_prior(weight);
+        println!("  (popularity prior {weight:.2} for this run)");
+    }
 
     let mut outcomes = Vec::with_capacity(cases.len());
     for case in cases {

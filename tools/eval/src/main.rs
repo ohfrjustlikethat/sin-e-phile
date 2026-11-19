@@ -49,7 +49,19 @@ async fn main() {
             .and_then(|i| args.get(i + 1))
         {
             Some(query) => search::one(Path::new(&data_dir), query).await,
-            None => search::run(Path::new(&data_dir), report).await,
+            // 18.4: `--tune-meaning` sweeps the popularity prior on the tuning set;
+            // `--prior W` runs E1 to E3 with it at W.
+            None if args.iter().any(|a| a == "--tune-meaning") => {
+                search::tune_meaning(Path::new(&data_dir), &[0.0, 0.05, 0.1, 0.2, 0.4]).await
+            }
+            None => {
+                let prior = args
+                    .iter()
+                    .position(|a| a == "--prior")
+                    .and_then(|i| args.get(i + 1))
+                    .and_then(|n| n.parse::<f64>().ok());
+                search::run_with(Path::new(&data_dir), report, prior).await
+            }
         },
         "vector" if args.iter().any(|a| a == "--memory") => vector::memory(Path::new(&data_dir)),
         "vector" => vector::run(Path::new(&data_dir), report, prove, expansion).await,
@@ -189,7 +201,25 @@ async fn main() {
                 .position(|a| a == "--limit")
                 .and_then(|i| args.get(i + 1))
                 .and_then(|n| n.parse().ok());
-            discovery::novelty_run(Path::new(&data_dir), limit).await
+            // `--tune`: the tuning users (B17's prior is chosen on them); `--prior-weight K`: the
+            // app's prior means at another weight (0 for none).
+            let weight = args
+                .iter()
+                .position(|a| a == "--prior-weight")
+                .and_then(|i| args.get(i + 1))
+                .and_then(|n| n.parse::<f64>().ok());
+            let prior = match weight {
+                Some(0.0) => sinephile_recommend::bandit::Prior::NONE,
+                Some(w) => sinephile_recommend::bandit::PRIOR.weighed(w),
+                None => sinephile_recommend::bandit::PRIOR,
+            };
+            discovery::novelty_run(
+                Path::new(&data_dir),
+                limit,
+                args.iter().any(|a| a == "--tune"),
+                prior,
+            )
+            .await
         }
         "modes" => modes::run(Path::new(&data_dir), args.iter().any(|a| a == "--prove")).await,
         "import" => {
