@@ -12,7 +12,7 @@
 
 **Phase 18 — Discovery Engine** (`in_progress`, branch `phase/18-discovery-engine`)
 
-2 of 6 exit criteria met with evidence.
+3 of 6 exit criteria met with evidence.
 
 > Builds on Phase 17's recommender: its candidate pools, calibration and reasons are what the arms draw from. Receives Phase 5 E3 and E4 (search by meaning, carried on at Phase 17's close).
 
@@ -30,7 +30,8 @@
       - *Evidence:* eval discovery --simulate on fcc4110 (1,000 simulated viewers, 120 days, favourite arm changes day 61): new favourite's share of discovery 12.8% -> 47.8% (+35.0 points, bar +15), old 49.0% -> 28.0% (-21.0, bar -15), rose for 98.9% of viewers (bar 80%). Seen to fail with --frozen (+0.1 points, NOT met). First run on 7bc4ef3 missed the bar (+12.0/-6.0) and is recorded in docs/eval-results.md 18.2.
 - [x] **E2** The exploration floor holds: even a maximally-conservative simulated user still receives genuine discovery.
       - *Evidence:* eval discovery --simulate on fcc4110: 1,000 maximally conservative viewers (Comfort, every discovery card 'not for me') for 120 days: discovery's least share on any day 20.0% (bar 20%), 0 of 120,000 days without a discovery rail, every discovery arm shown on at least 23.3% of each viewer's days (bar 10%). Seen to fail with --no-floor (0.0% on every day, NOT met). docs/eval-results.md 18.2.
-- [ ] **E3** Rail labels accurately describe why each item is there.
+- [x] **E3** Rail labels accurately describe why each item is there.
+      - *Evidence:* strategy::tests::every_label_of_every_arm_holds_on_generated_profiles (300 generated profiles, every pick's Label re-derived by strategy::holds; seen to fail with arms taking titles 0.1 short of close and with the blind spot ignoring met regions, 6784097); sinephile-taste tests/discover.rs every_label_holds_and_an_episode_counts_as_its_series; strategy::tests::a_blind_spot_rail_holds_one_region (a rail named for a region holds only it); and on real users: `eval discovery` on a1dd9a9 over 15,640 MovieLens test users checked 461,488 discovery labels with strategy::holds, none false (docs/eval-results.md, 18.2).
 - [ ] **E4** Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.
 - [ ] **E5** The author tests it on their own taste and finds at least three films they hadn't heard of and want to watch. This is the real acceptance test.
 - [ ] **E6** Case study written — this is the flagship one.
@@ -39,7 +40,7 @@
 
 ## What's next
 
-Phase 18: record the full `eval discovery` run (all MovieLens test users, on the scratch copy with regions asked) in docs/eval-results.md and E3/E4 evidence; then a real-window look with `eval recommend --rail 2` on a copy holding a probe profile; then 18.4: Surprise me (a command picking one film from the plan's arms, playable first, I42's length limit) and mood shelves from the meaning index (crates/taste), with search-by-meaning quality (Phase 5 E3 nDCG@10 0.0472, E4's two named queries) worked first.
+Phase 18, E4 (NOT met: +28.8% Recall@N over popularity against the +40% bar, novelty +1.93 bits): add hits-per-card by arm to tools/eval/src/discovery.rs, then try the matrix's weight in strategy::relevance (LOVED_WEIGHT), judged on `eval discovery --limit 2000` and once more on all test users; three distinct approaches then choose (ADR-0040). In the tree, uncommitted: home::Ask (I42's length limit) and crates/taste/src/surprise.rs (not yet in lib.rs): register it, test it, add the surprise_me IPC command, the Home button and RT on the pad.
 
 ---
 
@@ -73,7 +74,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 15 | Taste Model | B | 5, 14 | 2 | 4/5 |
 | [x] | 16 | Ready to Watch | B | 15 | 3–4 | 9/9 |
 | [x] | 17 | Recommendation Engine | B | 15, 16 | 2–3 | 6/7 |
-| [~] | 18 | Discovery Engine 🏁 | B | 17 | 2 | 2/6 |
+| [~] | 18 | Discovery Engine 🏁 | B | 17 | 2 | 3/6 |
 | [ ] | 19 | Browsing Surfaces | B | 18 | 4–5 | 0/13 |
 | [ ] | 20 | Watchlist and External Sync | C | 19 | 1–2 | 0/5 |
 | [ ] | 21 | Windows Platform Integration | C | 12, 19 | 2–3 | 0/5 |

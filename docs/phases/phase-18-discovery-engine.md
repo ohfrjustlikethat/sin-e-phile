@@ -17,7 +17,7 @@ The thing that makes this app worth using: recommendations that are *surprising 
 
 - [x] **E1** The bandit demonstrably shifts its strategy distribution in simulation when reward patterns change.
 - [x] **E2** The exploration floor holds: even a maximally-conservative simulated user still receives genuine discovery.
-- [ ] **E3** Rail labels accurately describe why each item is there.
+- [x] **E3** Rail labels accurately describe why each item is there.
 - [ ] **E4** Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.
 - [ ] **E5** The author tests it on their own taste and finds at least three films they hadn't heard of and want to watch. This is the real acceptance test.
 - [ ] **E6** Case study written — this is the flagship one.

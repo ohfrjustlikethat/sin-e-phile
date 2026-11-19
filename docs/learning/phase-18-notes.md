@@ -36,7 +36,8 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
   none. So country claims wait until every title the profile met has had its country asked.
 - **Relevance within an arm**: the arm says why a title may be shown; Phase 17's relevance says which of those first.
   Ordered by closeness alone, discovery picks found a held-out favourite once in a hundred cards and Home's relevance
-  fell to 16% above popularity's; ordered by relevance, 42% with novelty still 1.7 bits above the taste rail's.
+  fell to 16% above popularity's (100 users); ordered by relevance, 29% over all 15,640 test users, with novelty 1.9
+  bits above the taste rail's. (The first 100 users said 42%: a small sample flatters.)
 - **Novelty is measured in bits**: `-log2` of the share of people who liked a title. One bit more is half as widely
   liked; the discovery rails' picks are on average about three times less widely liked than the taste rail's.
 
@@ -93,5 +94,5 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
    bandit do without it, and why is that a failure rather than "giving people what they want"?
 4. Why may the app say "You've never watched anything from Iran" only once every title the profile met has had its
    country asked, when a decade can be claimed at once?
-5. Ordering each arm's picks by relevance cost 1.9 bits of novelty and gained 26 points of relevance. What does a bit
-   of novelty mean, and why was the trade worth it?
+5. On 100 users relevance ordering looked like it cleared E4's bar (+42%); on 15,640 it did not (+28.8%). Why does a
+   small sample mislead here, and what does a bit of novelty mean?

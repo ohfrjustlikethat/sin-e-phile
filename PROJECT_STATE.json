@@ -59,8 +59,8 @@
       {
         "id": "E3",
         "text": "Rail labels accurately describe why each item is there.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "strategy::tests::every_label_of_every_arm_holds_on_generated_profiles (300 generated profiles, every pick's Label re-derived by strategy::holds; seen to fail with arms taking titles 0.1 short of close and with the blind spot ignoring met regions, 6784097); sinephile-taste tests/discover.rs every_label_holds_and_an_episode_counts_as_its_series; strategy::tests::a_blind_spot_rail_holds_one_region (a rail named for a region holds only it); and on real users: `eval discovery` on a1dd9a9 over 15,640 MovieLens test users checked 461,488 discovery labels with strategy::holds, none false (docs/eval-results.md, 18.2)."
       },
       {
         "id": "E4",
@@ -2057,8 +2057,8 @@
         {
           "id": "E3",
           "text": "Rail labels accurately describe why each item is there.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "strategy::tests::every_label_of_every_arm_holds_on_generated_profiles (300 generated profiles, every pick's Label re-derived by strategy::holds; seen to fail with arms taking titles 0.1 short of close and with the blind spot ignoring met regions, 6784097); sinephile-taste tests/discover.rs every_label_holds_and_an_episode_counts_as_its_series; strategy::tests::a_blind_spot_rail_holds_one_region (a rail named for a region holds only it); and on real users: `eval discovery` on a1dd9a9 over 15,640 MovieLens test users checked 461,488 discovery labels with strategy::holds, none false (docs/eval-results.md, 18.2)."
         },
         {
           "id": "E4",
@@ -2589,7 +2589,7 @@
       ]
     }
   ],
-  "next_action": "Phase 18: record the full `eval discovery` run (all MovieLens test users, on the scratch copy with regions asked) in docs/eval-results.md and E3/E4 evidence; then a real-window look with `eval recommend --rail 2` on a copy holding a probe profile; then 18.4: Surprise me (a command picking one film from the plan's arms, playable first, I42's length limit) and mood shelves from the meaning index (crates/taste), with search-by-meaning quality (Phase 5 E3 nDCG@10 0.0472, E4's two named queries) worked first.",
+  "next_action": "Phase 18, E4 (NOT met: +28.8% Recall@N over popularity against the +40% bar, novelty +1.93 bits): add hits-per-card by arm to tools/eval/src/discovery.rs, then try the matrix's weight in strategy::relevance (LOVED_WEIGHT), judged on `eval discovery --limit 2000` and once more on all test users; three distinct approaches then choose (ADR-0040). In the tree, uncommitted: home::Ask (I42's length limit) and crates/taste/src/surprise.rs (not yet in lib.rs): register it, test it, add the surprise_me IPC command, the Home button and RT on the pad.",
   "blockers": [],
   "decisions_pending": [
     {

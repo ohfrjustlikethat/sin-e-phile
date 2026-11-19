@@ -3451,3 +3451,34 @@ cap; the cap raised to half of discovery, since with a rail's minimum per arm 40
 
 **E1 met. E2 met.** Each seen to fail: `--frozen` (beliefs never updated) gives +0.1 and +0.2 points and 50.0% rose, E1
 NOT met; `--no-floor` (floor 0) gives discovery 0.0% on all 120,000 days, E2 NOT met.
+
+### 18.2: E4 and E3 on the MovieLens test users (2026-11-19)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- discovery` on a1dd9a9 (each arm's picks ordered by Phase 17's
+relevance), on a copy of the development data with every title of 1,000 votes asked of Wikidata (ADR-0055); 15,640 test
+users, 1,973 s, Tier 2 dev machine. Home as a new profile sees it: no outcomes, budget 0.5, 60 slots, the taste rail at
+most 20; 49.5 cards shown a user.
+
+**A trial on the first 100 users first** (each arm by closeness, rating or region): novelty +3.58 bits, Recall@N +16.0%
+over popularity; discovery picks found a held-out like 0.0097 times a card against popularity's 0.0539 and the taste
+rail's 0.1340. Phase 17's ranker asked for the same N reached +53.4%, so the bar is reachable. Ordered by relevance, the
+same 100 users gave +1.72 bits and **+42.0%**: a sample of 100 flattered it, as the full run shows.
+
+| Measure | Value | Bar |
+|---|---|---|
+| novelty, taste rail (20 a user) | 3.74 bits (1.5% of picks liked by no build user, left out) | |
+| novelty, discovery rails | **5.67 bits** (5.0% left out) | |
+| E4: discovery over the taste rail | **+1.93 bits** | at least +1: met |
+| E4: Recall@N of everything shown, against popularity's top N | **0.3091 against 0.2400: +28.8%** | more than +40%: **NOT met** |
+| (the taste rail alone, Recall@20) | 0.2639 (Phase 17 recorded 0.2639: no regression) | |
+| (Phase 17's ranker asked for N, the ceiling) | 0.3553, +48.0% | |
+| (held-out likes per card: taste rail / discovery / popularity) | 0.1326 / 0.0299 / 0.0597 | |
+| E3: discovery labels checked with `strategy::holds` | **461,488, none false** | none false: met |
+
+Per arm: stretch 4.64 bits, bridge 5.42, blind spot 4.15, canon 3.57, deep cut 11.37 (16.7% liked by no build user);
+each arm had about 8,500 rails (blind spot 7,821). Gathering a user's discovery pool: p50 24 ms, p95 43 ms.
+
+**E4 is not met.** To reach +40% the discovery picks need about 35% more held-out likes a card (0.030 to 0.040) with
+at least a bit of novelty kept; they have 0.93 bits to spare. Next: hits per card by arm, then the matrix's weight in
+the arms' relevance, judged on 2,000 users and then once more on all of them.
+
