@@ -55,9 +55,12 @@ async fn now_showing(db: &Db, profile: i64) -> Result<Vec<i64>, DbError> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rail {
-    /// "continue" | "new_episodes" | "library" | "new" | "taste" | "watchlist" | "loved"
+    /// "continue" | "new_episodes" | "library" | "new" | "rising" | "taste" | a discovery
+    /// arm's key ("stretch", "bridge", "blind_spot", "canon", "deep_cut") | "watchlist" |
+    /// "loved"
     pub key: &'static str,
-    pub title: &'static str,
+    /// A blind spot's names its region ("Your blind spot: Iranian New Wave"), so not fixed.
+    pub title: String,
     pub items: Vec<i64>,
     /// A line for an item beyond its own facts: "S2 E5" for a series with a new episode.
     pub notes: HashMap<i64, String>,
@@ -247,9 +250,25 @@ pub async fn rails(
             .collect()
     };
 
+    // Rising now (ADR-0054 step 6): what gained the most ratings at the catalogue's last
+    // refresh, kept by the refresh itself; the profile's own titles left out.
+    let mut rising_notes = HashMap::new();
+    let rising: Vec<i64> = media
+        .kept_rising()
+        .await?
+        .into_iter()
+        .filter(|(id, _)| !seen.contains(id))
+        .map(|(id, gained)| {
+            rising_notes.insert(id, format!("+{} ratings", thousands(gained)));
+            id
+        })
+        .collect();
+
     // Where the profile's taste points (Phase 17): the hybrid ranker over meaning, people who
     // loved the same, and popularity, with the profile's axes; each pick says why.
     let mut taste_notes: HashMap<i64, String> = HashMap::new();
+    // And the discovery rails (Phase 18): each arm's picks, none in another rail.
+    let mut discovery: Vec<(crate::discover::DiscoveryRail, HashMap<i64, String>)> = Vec::new();
     // Mutably: the meaning index is held across database awaits, which a shared reference
     // could only do if it were Sync; it is Send.
     let taste = match &mut model {
@@ -295,27 +314,55 @@ pub async fn rails(
             for p in &picks {
                 taste_notes.insert(p.id, crate::hybrid::note(p, modes, &titles, &makers));
             }
-            picks.into_iter().map(|p| p.id).collect()
+            let picked: Vec<i64> = picks.into_iter().map(|p| p.id).collect();
+
+            // Never the same title in two rails: everything Home shows above or beside them.
+            let taken: HashSet<i64> = met
+                .iter()
+                .chain(&picked)
+                .chain(&saved)
+                .chain(&library)
+                .chain(&new_episodes)
+                .chain(rising.iter().take(PER_RAIL))
+                .copied()
+                .collect();
+            let loved = crate::hybrid::loved_with(db, &weighed, &met).await?;
+            let gathered = crate::discover::gather(db, &mut **s, modes, &met, &loved).await?;
+            let rails = crate::discover::rails(&gathered, want, &taken);
+            let named = crate::discover::named(&rails, &gathered.profile);
+            let names: HashMap<i64, String> = media
+                .facts(&named)
+                .await?
+                .into_iter()
+                .map(|f| (f.id, f.title))
+                .collect();
+            let by_id: HashMap<i64, &sinephile_recommend::strategy::Title> =
+                gathered.titles.iter().map(|t| (t.id, t)).collect();
+            for rail in rails {
+                let notes = rail
+                    .picks
+                    .iter()
+                    .map(|d| {
+                        let facts = by_id.get(&d.id).copied();
+                        let words = crate::discover::note(d, &gathered.profile, &names, facts);
+                        (d.id, words)
+                    })
+                    .collect();
+                discovery.push((rail, notes));
+            }
+            picked
         }
         None => Vec::new(),
     };
-    // Rising now (ADR-0054 step 6): what gained the most ratings at the catalogue's last
-    // refresh, kept by the refresh itself; the profile's own titles left out.
-    let mut rising_notes = HashMap::new();
-    let rising: Vec<i64> = media
-        .kept_rising()
-        .await?
-        .into_iter()
-        .filter(|(id, _)| !seen.contains(id))
-        .map(|(id, gained)| {
-            rising_notes.insert(id, format!("+{} ratings", thousands(gained)));
-            id
-        })
-        .collect();
 
     let shown: HashSet<i64> = seen
         .iter()
         .chain(taste.iter())
+        .chain(
+            discovery
+                .iter()
+                .flat_map(|(r, _)| r.picks.iter().map(|d| &d.id)),
+        )
         .chain(saved.iter())
         .chain(new_releases.iter().take(PER_RAIL))
         .copied()
@@ -328,25 +375,49 @@ pub async fn rails(
         .collect();
 
     let mut out = Vec::new();
-    for (key, title, ids) in [
-        ("continue", "Continue watching", started),
-        ("new_episodes", "New episodes of your shows", new_episodes),
-        ("library", "Your library", library),
-        ("new", "New releases", new_releases),
-        ("rising", "Rising now", rising),
-        ("taste", "Where your taste points", taste),
-        ("watchlist", "On your watchlist", saved),
-        ("loved", "Widely loved", loved),
-    ] {
+    // Each rail: its key, its name, its titles, and the notes its cards may carry.
+    type Listed<'a> = (
+        &'static str,
+        String,
+        Vec<i64>,
+        Option<&'a HashMap<i64, String>>,
+    );
+    let mut lists: Vec<Listed> = vec![
+        (
+            "continue",
+            "Continue watching".into(),
+            started,
+            Some(&continue_notes),
+        ),
+        (
+            "new_episodes",
+            "New episodes of your shows".into(),
+            new_episodes,
+            Some(&episode_notes),
+        ),
+        ("library", "Your library".into(), library, None),
+        ("new", "New releases".into(), new_releases, None),
+        ("rising", "Rising now".into(), rising, Some(&rising_notes)),
+        (
+            "taste",
+            "Where your taste points".into(),
+            taste,
+            Some(&taste_notes),
+        ),
+    ];
+    for (rail, notes) in &discovery {
+        lists.push((
+            rail.arm.key(),
+            rail.title.clone(),
+            rail.picks.iter().map(|d| d.id).collect(),
+            Some(notes),
+        ));
+    }
+    lists.push(("watchlist", "On your watchlist".into(), saved, None));
+    lists.push(("loved", "Widely loved".into(), loved, None));
+    for (key, title, ids, from) in lists {
         let items: Vec<i64> = suits(ids).await?.into_iter().take(PER_RAIL).collect();
         if !items.is_empty() {
-            let from = match key {
-                "new_episodes" => Some(&episode_notes),
-                "continue" => Some(&continue_notes),
-                "taste" => Some(&taste_notes),
-                "rising" => Some(&rising_notes),
-                _ => None,
-            };
             let notes = from.map_or_else(HashMap::new, |from| {
                 items
                     .iter()

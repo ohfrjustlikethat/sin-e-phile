@@ -53,7 +53,7 @@ pub async fn catalogue_rails(
         if !items.is_empty() {
             out.push(Rail {
                 key,
-                title,
+                title: title.into(),
                 items,
                 notes: Default::default(),
                 progress: Default::default(),

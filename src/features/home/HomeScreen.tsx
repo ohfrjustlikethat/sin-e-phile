@@ -29,6 +29,12 @@ const WHY: Record<string, string> = {
   new: "Out this year, by your taste",
   rising: "Gaining the most ratings since the last update",
   taste: "From what you liked and what you said you love",
+  // Phase 18's discovery rails: each card says why it is there.
+  stretch: "Close to one of your tastes, one step outside it",
+  bridge: "Close to two of your tastes at once",
+  blind_spot: "Acclaimed, from somewhere you have never been",
+  canon: "Rated 7.8 or more by 50,000 people, close to your taste",
+  deep_cut: "Rated 7.5 or more by at most 15,000 people",
   watchlist: "What you saved",
   loved: "The films most people have seen and rated",
 };

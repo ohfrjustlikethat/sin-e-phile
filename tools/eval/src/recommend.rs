@@ -741,5 +741,25 @@ pub async fn rail(data_dir: &Path, profile: i64) -> Result<bool, EvalError> {
     println!(
         "\nreasons: {loved} loved by people who loved, {close} close in meaning, {widely} widely loved"
     );
+    // Phase 18: each discovery rail Home built, every card's note beside it.
+    for arm in sinephile_recommend::strategy::Arm::ALL {
+        let Some(r) = rails.iter().find(|r| r.key == arm.key()) else {
+            continue;
+        };
+        let facts: HashMap<i64, (String, Option<i64>)> =
+            sinephile_persistence::repositories::MediaRepository::new(&db)
+                .facts(&r.items)
+                .await?
+                .into_iter()
+                .map(|f| (f.id, (f.title, f.year)))
+                .collect();
+        println!("\n{} ({}): \"{}\"", arm.key(), r.items.len(), r.title);
+        for (n, id) in r.items.iter().enumerate() {
+            let (title, year) = facts.get(id).cloned().unwrap_or_default();
+            let year = year.map_or(String::new(), |y| format!(" ({y})"));
+            let note = r.notes.get(id).map_or("", String::as_str);
+            println!("  {:>2}. {title}{year}: {note}", n + 1);
+        }
+    }
     Ok(!taste.items.is_empty())
 }

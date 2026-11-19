@@ -77,7 +77,7 @@ pub enum Region {
     Decade(i64),
     /// IMDb's genre, as the catalogue stores it ("Western").
     Genre(String),
-    /// ISO 3166-1 alpha-2 ("IR").
+    /// As Wikidata names it ("Iran", "Soviet Union").
     Country(String),
     /// A film movement, as Wikidata names it ("Iranian New Wave").
     Movement(String),
@@ -131,7 +131,7 @@ pub struct Title {
     pub votes: i64,
     pub year: Option<i64>,
     pub genres: Vec<String>,
-    /// ISO 3166-1 alpha-2.
+    /// As Wikidata names them; empty until asked (ADR-0055).
     pub countries: Vec<String>,
     pub movements: Vec<String>,
     /// The profile's loved titles whose stored neighbours include this one, with the
@@ -204,6 +204,9 @@ pub struct Profile {
     /// How many titles it has met: a profile of three has a blind spot everywhere, which is
     /// not worth saying.
     pub met_titles: usize,
+    /// Axes on which something it met is not known yet (a country Wikidata has not been asked
+    /// about): nothing is claimed on them, since "never" might be false.
+    pub unknown: HashSet<Axis>,
 }
 
 /// Why an arm chose a title. Each is a claim [`holds`] can check against the facts.
@@ -256,13 +259,16 @@ pub const BLIND_RATING: i64 = 75;
 pub const BLIND_VOTES: i64 = 5_000;
 /// A profile needs this many titles met before a region it has not met is a blind spot.
 pub const BLIND_MIN_MET: usize = 10;
+/// A blind spot with fewer acclaimed titles than this is chosen only when none has more.
+pub const BLIND_ENOUGH: usize = 5;
 
 /// Is `label` true of `title` for `profile`? Re-derived from the facts, independently of how
 /// the arms choose: E3's check.
 pub fn holds(label: &Label, title: &Title, profile: &Profile) -> bool {
     match label {
         Label::Stretch { mode, region } => {
-            title.close_to(profile, *mode)
+            !profile.unknown.contains(&region.axis())
+                && title.close_to(profile, *mode)
                 && title.regions().contains(region)
                 && profile
                     .modes
@@ -274,6 +280,7 @@ pub fn holds(label: &Label, title: &Title, profile: &Profile) -> bool {
         }
         Label::BlindSpot(region) => {
             profile.met_titles >= BLIND_MIN_MET
+                && !profile.unknown.contains(&region.axis())
                 && !profile.met.contains(region)
                 && title.regions().contains(region)
                 && title.rated_at_least(BLIND_RATING)
@@ -325,14 +332,18 @@ fn by_score(mut scored: Vec<(f32, i64, Label)>) -> Vec<(i64, Label)> {
     scored.into_iter().map(|(_, id, l)| (id, l)).collect()
 }
 
-/// The axis values of `region`'s kind that `title` has and `taste` does not.
-fn outside(title: &Title, taste: &Taste) -> Vec<Region> {
+/// The regions `title` has and `taste` does not, when they are all on one axis: one step
+/// away. Empty when it differs on none, or on two or more.
+fn outside(title: &Title, taste: &Taste, unknown: &HashSet<Axis>) -> Vec<Region> {
     let regions = title.regions();
     let mut axes: HashMap<Axis, Vec<Region>> = HashMap::new();
     for r in regions {
-        // Only an axis the mode says something about: a mode with no countries known says
-        // nothing about a title's country.
-        if taste.regions.iter().any(|t| t.axis() == r.axis()) && !taste.regions.contains(&r) {
+        // Only an axis the mode says something about, and the profile is known on: a mode
+        // with no countries known says nothing about a title's country.
+        if !unknown.contains(&r.axis())
+            && taste.regions.iter().any(|t| t.axis() == r.axis())
+            && !taste.regions.contains(&r)
+        {
             axes.entry(r.axis()).or_default().push(r);
         }
     }
@@ -356,7 +367,7 @@ pub fn stretch(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discovery> 
                     .iter()
                     .filter_map(|t| {
                         let depth = t.inside(profile, m)?;
-                        let region = outside(t, taste).into_iter().next()?;
+                        let region = outside(t, taste, &profile.unknown).into_iter().next()?;
                         Some((depth, t.id, Label::Stretch { mode: m, region }))
                     })
                     .collect(),
@@ -394,10 +405,11 @@ fn nearest_mode(title: &Title) -> f32 {
     title.near.iter().copied().fold(-1.0, f32::max)
 }
 
-/// **Blind spot**: one region the profile has met nothing from, and its acclaimed titles
-/// nearest the profile's taste. The region chosen is the one whose best few titles come
-/// nearest; a movement or a country before a decade or a genre at equal closeness, since
-/// it says more. `k` titles from it, or from the next when it has fewer.
+/// **Blind spot**: one region the profile has met nothing from, and up to `k` of its acclaimed
+/// titles, nearest the profile's taste first. Only one region: the rail is named after it.
+/// The region chosen has at least [`BLIND_ENOUGH`] titles when any has, and of those the one
+/// whose best five come nearest the taste; a movement or a country before a decade or a genre
+/// at equal closeness, since it says more.
 pub fn blind_spot(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discovery> {
     if profile.met_titles < BLIND_MIN_MET {
         return Vec::new();
@@ -408,7 +420,7 @@ pub fn blind_spot(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discover
             continue;
         }
         for r in t.regions() {
-            if !profile.met.contains(&r) {
+            if !profile.met.contains(&r) && !profile.unknown.contains(&r.axis()) {
                 by_region.entry(r).or_default().push(t);
             }
         }
@@ -432,27 +444,26 @@ pub fn blind_spot(titles: &[Title], profile: &Profile, k: usize) -> Vec<Discover
             (r, ts, mean)
         })
         .collect();
+    // A region with enough to fill a short rail first: the rail is named after its region,
+    // so it holds one region only.
+    let enough = |ts: &Vec<&Title>| ts.len() >= BLIND_ENOUGH.min(k);
     regions.sort_by(|a, b| {
-        b.2.total_cmp(&a.2)
+        enough(&b.1)
+            .cmp(&enough(&a.1))
+            .then(b.2.total_cmp(&a.2))
             .then(specific(&b.0).cmp(&specific(&a.0)))
             .then(a.0.cmp(&b.0))
     });
-    let mut out = Vec::new();
-    let mut taken = HashSet::new();
-    for (region, ts, _) in regions {
-        for t in ts {
-            if out.len() >= k {
-                return out;
-            }
-            if taken.insert(t.id) {
-                out.push(Discovery {
-                    id: t.id,
-                    label: Label::BlindSpot(region.clone()),
-                });
-            }
-        }
-    }
-    out
+    let Some((region, ts, _)) = regions.into_iter().next() else {
+        return Vec::new();
+    };
+    ts.into_iter()
+        .take(k)
+        .map(|t| Discovery {
+            id: t.id,
+            label: Label::BlindSpot(region.clone()),
+        })
+        .collect()
 }
 
 /// **Canon**: acclaimed and widely seen, close to a mode. Best rated first, the modes in turn.
@@ -627,6 +638,9 @@ mod tests {
         for t in met {
             p.met.extend(t.regions());
         }
+        if rng.chance(0.3) {
+            p.unknown.insert(Axis::Country);
+        }
         for m in 0..modes {
             let members: Vec<&Title> = met.iter().skip(m).step_by(modes.max(1)).collect();
             p.modes.push(Taste {
@@ -735,7 +749,41 @@ mod tests {
                 .chain([Region::Decade(2000), Region::Genre("Animation".into())])
                 .collect(),
             met_titles: 30,
+            unknown: HashSet::new(),
         }
+    }
+
+    #[test]
+    fn nothing_is_claimed_on_an_axis_not_yet_known() {
+        // A film the profile met was never asked of Wikidata: it may be Iranian, so "you have
+        // never watched anything from Iran" may be false, and is not said.
+        let mut p = drama_1970s();
+        let iranian = Title {
+            id: 17,
+            near: vec![0.8, 0.2],
+            rating: Some(80),
+            votes: 9_000,
+            year: Some(1975),
+            genres: vec!["Drama".into()],
+            countries: vec!["Iran".into()],
+            ..Default::default()
+        };
+        let label = Label::BlindSpot(Region::Country("Iran".into()));
+        assert!(holds(&label, &iranian, &p));
+        assert_eq!(
+            blind_spot(std::slice::from_ref(&iranian), &p, 5)[0].label,
+            label
+        );
+        let stretch_label = Label::Stretch {
+            mode: 0,
+            region: Region::Country("Iran".into()),
+        };
+        assert!(holds(&stretch_label, &iranian, &p));
+        p.unknown.insert(Axis::Country);
+        assert!(!holds(&label, &iranian, &p), "seen to fail");
+        assert!(!holds(&stretch_label, &iranian, &p), "seen to fail");
+        assert!(blind_spot(std::slice::from_ref(&iranian), &p, 5).is_empty());
+        assert!(stretch(&[iranian], &p, 5).is_empty());
     }
 
     #[test]
@@ -823,6 +871,35 @@ mod tests {
         // Nor with too little history to say.
         let thin = Profile { met_titles: 3, ..p };
         assert!(blind_spot(&[western], &thin, 5).is_empty());
+    }
+
+    #[test]
+    fn a_blind_spot_rail_holds_one_region() {
+        // Named after its region, so a second region's titles would make the name false.
+        let p = drama_1970s();
+        let acclaimed = |id, year, genre: &str, near| Title {
+            id,
+            near: vec![near, 0.0],
+            rating: Some(80),
+            votes: 9_000,
+            year: Some(year),
+            genres: vec![genre.into()],
+            ..Default::default()
+        };
+        let mut titles: Vec<Title> = (0..6)
+            .map(|i| acclaimed(100 + i, 1950 + i, "Drama", 0.3))
+            .collect();
+        // Two westerns nearer the taste than any 1950s drama, but too few to fill a rail.
+        titles.push(acclaimed(200, 1975, "Western", 0.9));
+        titles.push(acclaimed(201, 1976, "Western", 0.9));
+        let picks = blind_spot(&titles, &p, 20);
+        assert_eq!(picks.len(), 6);
+        assert!(
+            picks
+                .iter()
+                .all(|d| d.label == Label::BlindSpot(Region::Decade(1950))),
+            "{picks:?}"
+        );
     }
 
     #[test]

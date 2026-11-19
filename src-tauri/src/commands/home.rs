@@ -73,7 +73,7 @@ pub async fn home(state: State<'_, AppState>) -> Result<Vec<RailView>, String> {
         }
         out.push(RailView {
             key: r.key.into(),
-            title: r.title.into(),
+            title: r.title,
             items,
         });
     }
@@ -153,7 +153,7 @@ pub async fn catalogue_rails(
     for r in rails {
         out.push(RailView {
             key: r.key.into(),
-            title: r.title.into(),
+            title: r.title,
             items: home_cards(&db, &r.items).await?,
         });
     }

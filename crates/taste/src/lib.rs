@@ -10,6 +10,7 @@
 pub mod axes;
 pub mod continuing;
 pub mod describe;
+pub mod discover;
 pub mod home;
 pub mod hybrid;
 pub mod model;
