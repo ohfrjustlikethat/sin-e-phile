@@ -3678,3 +3678,19 @@ Every harness on the copy of the development data (`SINEPHILE_DATA_DIR=<copy> ta
 
 No quality metric regressed; search's p95 rose by 2.9 ms, inside its 80 ms budget, the measured cost of the prior.
 
+### 18.5, B18: popularity in the arms' order, the rule fixed before any run (2026-11-20)
+
+E4 stands at +39.9% on the test users (bar more than 40%). The arms order their picks by Phase 17's relevance (closeness
+to a taste, half the matrix's part); a held-out favourite leans towards the widely seen, and search by meaning gained
+most from exactly that term. So: `relevance + w * ln(1 + votes) / ln(1 + the most votes among the titles)` in
+`strategy::relevance`, the same form as search's prior.
+
+1. `w` from {0, 0.1, 0.2, 0.4}, each measured on the first 2,000 TUNING users (`eval discovery --tune --limit 2000`), the
+   bandit's prior as shipped (0e06e59).
+2. **Chosen**: the best Recall@N against popularity whose novelty is at least 1.2 bits over the taste rail; a tie to the
+   smaller `w`.
+3. **Then** `eval discovery --simulate` (E1, E2) must still hold; if the chosen `w` breaks either, the next by the same
+   order that keeps both is taken (said here, before running, this time).
+4. **Judged** once on all test users (E4). If it is not met, E4 is carried to Phase 19, whose Home overhaul decides which
+   rails Home shows and how many cards, with its measured state.
+
