@@ -1,6 +1,5 @@
 import { Rail } from "@/design-system";
-import { TitleCard } from "./TitleCard";
-import { RecommendedCard } from "./RecommendedCard";
+import { MenuCard } from "./MenuCard";
 import type { HomeCard, RailView } from "@/lib/ipc";
 import { useUi } from "@/lib/store";
 
@@ -43,7 +42,16 @@ export function TitleRail({ rail, lead, why }: { rail: RailView; lead: boolean; 
             },
             onOpen: () => openDetail(c.id),
           };
-          return recommended ? <RecommendedCard title={c.title} {...card} /> : <TitleCard {...card} />;
+          // Every card has its menu: rating, and Continue watching's removal or a recommendation's answers.
+          return (
+            <MenuCard
+              title={c.title}
+              isShow={c.is_show}
+              dismissible={recommended}
+              continuing={rail.key === "continue"}
+              {...card}
+            />
+          );
         }}
       />
     </section>

@@ -546,12 +546,15 @@ async fn profile_repository_surface() {
     // create — including the demote-the-incumbent path
     let first = repo.create("First", true).await.expect("create");
 
-    // rate / rating (Phase 11) — replace, clear, refuse out of range
+    // rate / rating (Phase 11; half stars, ADR-0056) — replace, clear, refuse out of range
     assert_eq!(repo.rating(first, film).await.expect("rating"), None);
-    repo.rate(first, film, Some(4)).await.expect("rate");
-    repo.rate(first, film, Some(5)).await.expect("rate again");
-    assert_eq!(repo.rating(first, film).await.unwrap(), Some(5));
-    assert!(repo.rate(first, film, Some(6)).await.is_err());
+    repo.rate(first, film, Some(8)).await.expect("rate");
+    repo.rate(first, film, Some(9))
+        .await
+        .expect("rate again, four and a half");
+    assert_eq!(repo.rating(first, film).await.unwrap(), Some(9));
+    assert!(repo.rate(first, film, Some(11)).await.is_err());
+    assert!(repo.rate(first, film, Some(0)).await.is_err());
     repo.rate(first, film, None).await.expect("clear");
     assert_eq!(repo.rating(first, film).await.unwrap(), None);
     let second = repo
@@ -673,12 +676,93 @@ async fn profile_repository_surface() {
     discovery.undismiss(first, film).await.unwrap();
     assert_eq!(repo.signal_fingerprint(first).await.unwrap(), f0);
 
-    // ratings — every rating with its date
+    // ratings — every rating with its date, in stars
     repo.rate(first, film, Some(3)).await.unwrap();
     let rated = repo.ratings(first).await.expect("ratings");
-    assert_eq!((rated.len(), rated[0].0, rated[0].1), (1, film, 3));
+    assert_eq!((rated.len(), rated[0].0, rated[0].1), (1, film, 1.5));
     assert!(rated[0].2.len() >= 10, "dated");
     repo.rate(first, film, None).await.unwrap();
+
+    // rate_season / season_ratings / rating_of / rated_count (ADR-0056) — a show is rated
+    // season by season, and every reader sees it as their average, replacing a rating of
+    // the show as a whole
+    let mut show = NewMediaItem::film("Twin Peaks", 1990);
+    show.kind = Some(MediaKind::Series);
+    let show = media.insert(&show).await.expect("series");
+    repo.rate(first, show, Some(6)).await.unwrap();
+    assert_eq!(
+        repo.rating_of(first, show).await.expect("rating_of"),
+        Some(6.0)
+    );
+    let before_seasons = repo.signal_fingerprint(first).await.unwrap();
+    repo.rate_season(first, show, 1, Some(10))
+        .await
+        .expect("rate_season");
+    repo.rate_season(first, show, 2, Some(6)).await.unwrap();
+    repo.rate_season(first, show, 2, Some(7))
+        .await
+        .expect("rate_season again");
+    assert!(repo.rate_season(first, show, 3, Some(11)).await.is_err());
+    assert_eq!(
+        repo.season_ratings(first, show)
+            .await
+            .expect("season_ratings"),
+        vec![(1, 10), (2, 7)]
+    );
+    assert_eq!(repo.rating_of(first, show).await.unwrap(), Some(8.5));
+    assert_eq!(repo.ratings(first).await.unwrap()[0].1, 4.25);
+    assert_ne!(
+        repo.signal_fingerprint(first).await.unwrap(),
+        before_seasons,
+        "a season's rating moves it"
+    );
+    assert_eq!(repo.rated_count(first).await.expect("rated_count"), 1);
+    assert_eq!(
+        repo.liked(first).await.unwrap(),
+        vec![(show, 0.7 + 0.5 * 0.15)],
+        "the show is liked by its seasons' average"
+    );
+    repo.rate_season(first, show, 1, None)
+        .await
+        .expect("clear a season");
+    repo.rate_season(first, show, 2, None).await.unwrap();
+    assert_eq!(
+        repo.rating_of(first, show).await.unwrap(),
+        Some(6.0),
+        "with no season rated, the show's own rating again"
+    );
+    repo.rate(first, show, None).await.unwrap();
+    assert_eq!(repo.rated_count(first).await.unwrap(), 0);
+
+    // skip_rating / to_rate (ADR-0056's rate-a-batch screen) — well-known films, most voted
+    // first, never one rated or skipped
+    let mut known = NewMediaItem::film("Seven Samurai", 1954);
+    known.rating_votes = Some(400_000);
+    let known = media.insert(&known).await.unwrap();
+    let mut better_known = NewMediaItem::film("Rashomon", 1950);
+    better_known.rating_votes = Some(500_000);
+    let better_known = media.insert(&better_known).await.unwrap();
+    assert_eq!(
+        repo.to_rate(first, 100_000, 0, 10).await.expect("to_rate"),
+        vec![better_known, known]
+    );
+    assert_eq!(
+        repo.to_rate(first, 100_000, 1, 10).await.unwrap(),
+        vec![known]
+    );
+    repo.skip_rating(first, better_known)
+        .await
+        .expect("skip_rating");
+    repo.skip_rating(first, better_known)
+        .await
+        .expect("skip_rating twice");
+    repo.rate(first, known, Some(8)).await.unwrap();
+    assert!(repo
+        .to_rate(first, 100_000, 0, 10)
+        .await
+        .unwrap()
+        .is_empty());
+    repo.rate(first, known, None).await.unwrap();
 
     // record_signal / signals — one per title and kind within a minute; the kind is checked
     repo.record_signal(first, film, "detail")
@@ -698,8 +782,8 @@ async fn profile_repository_surface() {
         .insert(&NewMediaItem::film("Early Summer", 1951))
         .await
         .expect("film");
-    repo.rate(second, other, Some(5)).await.unwrap();
-    repo.rate(second, third, Some(2)).await.unwrap();
+    repo.rate(second, other, Some(10)).await.unwrap();
+    repo.rate(second, third, Some(4)).await.unwrap();
     repo.record_watch(second, third, 6_000, true).await.unwrap();
     let liked = repo.liked(second).await.expect("liked");
     assert_eq!(
@@ -735,6 +819,30 @@ async fn profile_repository_surface() {
         .await
         .expect("position miss")
         .is_none());
+
+    // hide_from_continue / hidden_from_continue (ADR-0056) — hidden until played again
+    repo.hide_from_continue(second, film)
+        .await
+        .expect("hide_from_continue");
+    repo.hide_from_continue(second, film)
+        .await
+        .expect("hide_from_continue twice");
+    assert_eq!(
+        repo.hidden_from_continue(second)
+            .await
+            .expect("hidden_from_continue"),
+        vec![film]
+    );
+    assert!(repo.hidden_from_continue(first).await.unwrap().is_empty());
+    sqlx::query("UPDATE continue_hidden SET hidden_at = datetime('now', '-1 minute')")
+        .execute(db.pool())
+        .await
+        .unwrap();
+    repo.save_position(second, &position).await.unwrap();
+    assert!(
+        repo.hidden_from_continue(second).await.unwrap().is_empty(),
+        "played again: back"
+    );
 
     // continue_watching — exercises the completion-threshold arithmetic
     assert_eq!(

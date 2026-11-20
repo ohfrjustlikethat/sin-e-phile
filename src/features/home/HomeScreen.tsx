@@ -1,12 +1,12 @@
 import { useEffect } from "react";
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Skeleton } from "@/design-system";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Skeleton } from "@/design-system";
 import { useScreenHints, type Hint } from "@/design-system/focus/FocusLayer";
 import { commands } from "@/lib/ipc";
 import { onEvent } from "@/lib/events";
 import { SetupCard } from "./SetupCard";
+import { RateCard } from "@/features/ratings/RateCard";
 import { TitleRail } from "./TitleRail";
-import { LENGTHS, surpriseMe, useLength } from "./surprise";
 
 /**
  * Home, first version (SPEC.md Phase 14; Phase 18 overhauls it). Continue watching, where
@@ -38,7 +38,6 @@ const HINTS: Hint[] = [
 const MOOD = "A mood, found by what films are about rather than their genre";
 
 const WHY: Record<string, string> = {
-  continue: "Where you left off",
   new_episodes: "New in the shows you follow",
   library: "On this PC, newest first",
   new: "Out this year, by your taste",
@@ -57,14 +56,9 @@ const WHY: Record<string, string> = {
 
 export function HomeScreen() {
   // The hour: the part of the day the discovery engine learns and chooses in (Phase 18).
-  // "I have 90 minutes" (I42): the recommendation rails hold only what fits.
-  const maxMinutes = useLength((s) => s.maxMinutes);
-  const setMaxMinutes = useLength((s) => s.setMaxMinutes);
   const home = useQuery({
-    queryKey: [...HOME, maxMinutes],
-    queryFn: () => ok(commands.home(new Date().getHours(), maxMinutes)),
-    // A new length keeps the rails on screen while the shorter ones come.
-    placeholderData: keepPreviousData,
+    queryKey: HOME,
+    queryFn: () => ok(commands.home(new Date().getHours())),
   });
   useScreenHints(HINTS);
   // New titles from the catalogue, and anything new in the library, show at once.
@@ -94,33 +88,7 @@ export function HomeScreen() {
   return (
     <div className="flex flex-col gap-12 pt-10 pb-24">
       <SetupCard />
-      {/* Surprise me (ADR-0043) and how long you have (I42), on the rails' own grid: the index
-          column, then the content, so its left edge is the rails' (seen in the release build). */}
-      <div className="grid" style={{ gridTemplateColumns: "var(--index-col) 1fr" }}>
-        <div className="border-r border-line-subtle" />
-        <div className="flex min-w-0 flex-wrap items-center gap-6 pl-8 pr-14">
-        <Button variant="secondary" size="sm" onClick={() => void surpriseMe()}>
-          Surprise me
-        </Button>
-        <div role="radiogroup" aria-label="How long you have" className="flex items-center gap-4">
-          {LENGTHS.map((l) => (
-            <button
-              key={l.label}
-              type="button"
-              role="radio"
-              aria-checked={maxMinutes === l.minutes}
-              onClick={() => setMaxMinutes(l.minutes)}
-              className={[
-                "font-ui text-[13px] underline-offset-4",
-                maxMinutes === l.minutes ? "text-ink underline" : "text-ink-muted hover:text-ink",
-              ].join(" ")}
-            >
-              {l.label}
-            </button>
-          ))}
-        </div>
-        </div>
-      </div>
+      <RateCard />
       {home.data.map((r, i) => (
         <TitleRail key={r.key} rail={r} lead={i === 0} why={WHY[r.key] ?? (r.key.startsWith("mood_") ? MOOD : "")} />
       ))}

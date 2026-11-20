@@ -52,3 +52,17 @@ the top bar; and the "the episode each show is on" line gone.
   stars.
 - The card menu becomes every title card's, not only recommended ones'.
 - I42 leaves Appendix F as removed by the author, not as done or carried.
+
+## Decisions taken in building it (not the author's; recorded so they can be changed)
+
+- **Weights**: whole stars weigh what they did (5: 1.6, 4: 1.0, 3: 0.2, 2: −0.6, 1: −1.0); halves lie between; half a
+  star −1.2; strongly held from 4.5. **Liked** from four stars (as MovieLens' `cf::LIKED`); 3.5 weighs 0.6 but is not a
+  like. Measured on the taste harness: 40.63% → 40.71%, lift over popularity 1.14x → 1.17x (docs/eval-results.md 18.6).
+- **One view** (`title_ratings`) is what every reader reads; a show rated as a whole before seasons existed keeps that
+  rating until a season is rated.
+- **Imports** keep half stars exactly (out of ten is halves).
+- **The end card** stays films-only (as built); an episode's season is rated on the show's page.
+- **Rate films** asks films with at least 100,000 IMDb votes, most voted first; "Haven't seen it" is remembered and is
+  no taste signal.
+- **The card menu** of a show offers "Rate seasons…", which opens its page: a card is too small for a season list.
+- **Saving waits 350 ms** for the stars to settle, so stepping by key or pad is one save.

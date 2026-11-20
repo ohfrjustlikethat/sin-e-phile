@@ -113,9 +113,13 @@ async fn a_letterboxd_export_is_recorded_and_a_second_import_adds_nothing() {
 
     // Thief is 1980 on Letterboxd and 1981 here: one year either side, and only one.
     assert!(profiles.finished(me, thief).await.unwrap());
-    // ratings.csv's rating beats the diary's; 3.5 rounds up to 4.
-    assert_eq!(profiles.rating(me, heat).await.unwrap(), Some(5));
-    assert_eq!(profiles.rating(me, tiger).await.unwrap(), Some(4));
+    // ratings.csv's rating beats the diary's; half stars are kept exactly (ADR-0056).
+    assert_eq!(profiles.rating(me, heat).await.unwrap(), Some(10));
+    assert_eq!(
+        profiles.rating(me, tiger).await.unwrap(),
+        Some(7),
+        "3.5 stays 3.5"
+    );
     assert_eq!(profiles.watchlist(me).await.unwrap(), vec![manhunter]);
     assert!(
         !profiles.finished(me, collateral).await.unwrap(),

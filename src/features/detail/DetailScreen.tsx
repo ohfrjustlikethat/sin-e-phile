@@ -16,6 +16,7 @@ import { DOWNLOADS, useDownloads } from "@/features/downloads/useDownloads";
 import { WATCHLIST } from "@/features/watchlist/WatchlistScreen";
 import { HOME } from "@/features/home/HomeScreen";
 import { useArtworkOn } from "@/features/home/TitleCard";
+import { ContinueRemoval, RateRow, ShowAverage } from "@/features/ratings/TitleRating";
 
 /**
  * The minimal detail page — SPEC.md Phase 8: title, synopsis, cast, and a Play button
@@ -210,11 +211,22 @@ export function DetailScreen() {
       <div className="relative flex items-start gap-14 px-16 pt-6 pb-24">
       <div className="min-w-0 max-w-[1100px] flex-1">
       <h1 className="font-serif text-[64px] leading-[0.98] tracking-[-0.015em] text-ink">{d.title}</h1>
-      {byline && <p className="label mt-5">{byline}</p>}
+      {(byline || isSeries) && (
+        <p className="label mt-5 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {byline}
+          {/* A show's own rating is its rated seasons' average (ADR-0056). */}
+          {isSeries && <ShowAverage id={d.id} />}
+        </p>
+      )}
+      {/* A film's stars, on their own line under the title and year (ADR-0056). */}
+      {!isSeries && <RateRow id={d.id} />}
 
       {isSeries ? (
         <>
           <UpNext id={d.id} show={d.title} />
+          <div className="mt-3">
+            <ContinueRemoval id={d.id} />
+          </div>
           <div className="mt-8 flex">
             <WatchlistAction id={d.id} />
           </div>
@@ -247,6 +259,7 @@ export function DetailScreen() {
               Start over
             </button>
           ) : null}
+          <ContinueRemoval id={d.id} />
         </div>
         {plan.phase === "ready" && plan.plan.why && (
           <p className="mt-1 text-[13px] text-ink-faint" aria-label="Why this source">

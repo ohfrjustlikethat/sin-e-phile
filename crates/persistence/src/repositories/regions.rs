@@ -42,7 +42,7 @@ impl<'a> RegionRepository<'a> {
     pub async fn awaiting_met(&self, limit: i64) -> Result<Vec<(i64, String)>, DbError> {
         Ok(sqlx::query_as(&format!(
             "WITH touched(id) AS (
-                 SELECT media_item_id FROM ratings
+                 SELECT media_item_id FROM title_ratings
                  UNION SELECT media_item_id FROM watch_events
                  UNION SELECT media_item_id FROM playback_positions
                  UNION SELECT media_item_id FROM watchlist_items

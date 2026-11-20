@@ -434,8 +434,9 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
       act(() => events.on["player-state"]?.({ payload: { ...STATE, position: 1440, ended: true } }));
       expect(await screen.findByRole("dialog", { name: "Finished" })).toHaveTextContent("Nosferatu");
       expect(commands.playerClose).toHaveBeenCalled();
-      fireEvent.click(screen.getByRole("radio", { name: "4 out of 5" }));
-      expect(commands.rateTitle).toHaveBeenCalledWith(1, 4);
+      // Half stars (ADR-0056): three and a half, saved once the stars settle.
+      fireEvent.change(screen.getByRole("slider", { name: "Your rating" }), { target: { value: "7" } });
+      await waitFor(() => expect(commands.rateTitle).toHaveBeenCalledWith(1, 7));
     });
   });
 

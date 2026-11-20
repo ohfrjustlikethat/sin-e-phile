@@ -2,9 +2,10 @@
 //! Tarkovsky and slasher films is not well described by their midpoint.
 //!
 //! 1. **Signals, weighted and decayed** ([`weigh`]): a completed viewing 1.0, a rewatch 1.5,
-//!    a rating by its stars, a watchlist entry 0.4; an abandon early is a negative, later
-//!    barely one. Each fades with age (half-life 180 days; 720 for five stars and rewatches,
-//!    the strongly held), so the model follows a person who changes.
+//!    a rating by its stars (half stars, [`rating_weight`]), a watchlist entry 0.4; an abandon
+//!    early is a negative, later barely one. A rating adds to what watching said (ADR-0056:
+//!    both count). Each fades with age (half-life 180 days; 720 for four and a half stars and
+//!    up, and rewatches, the strongly held), so the model follows a person who changes.
 //! 2. **Clustered** ([`modes`]): k-means over the liked titles' vectors (cosine), k from 3
 //!    to 8 chosen by silhouette; each mode has a direction, a weight and a recency.
 //! 3. **Recommended across modes** ([`interleave_by_weight`]): each mode's nearest, taken in
@@ -14,7 +15,8 @@ use std::collections::HashMap;
 
 /// How long a signal takes to count half (days).
 pub const HALF_LIFE: f64 = 180.0;
-/// For five stars and rewatches: held strongly, so they fade four times slower.
+/// For four and a half stars and up, and rewatches: held strongly, so they fade four times
+/// slower.
 pub const HALF_LIFE_STRONG: f64 = 720.0;
 
 /// One thing a profile did with a title.
@@ -27,8 +29,8 @@ pub enum Signal {
         at: f64,
         runtime: Option<f64>,
     },
-    /// Rated 1 to 5.
-    Rated(i64),
+    /// Rated 0.5 to 5 stars, in halves (ADR-0056); a show, its rated seasons' average.
+    Rated(f64),
     Watchlisted,
     /// "Not for me" on a recommendation (Phase 18): as an abandon in the first minutes.
     NotForMe,
@@ -44,16 +46,34 @@ pub fn abandon_weight(at: f64, runtime: Option<f64>) -> f64 {
     -0.6 + 0.5 * share
 }
 
+/// What a rating says, by its stars: the whole stars weigh what they always have (five 1.6,
+/// four 1.0, three 0.2, two −0.6, one −1.0), half stars lie on the line between, and half a
+/// star is −1.2. Three and a half is 0.6: liked, less than four.
+pub fn rating_weight(stars: f64) -> f64 {
+    const AT: [(f64, f64); 6] = [
+        (0.5, -1.2),
+        (1.0, -1.0),
+        (2.0, -0.6),
+        (3.0, 0.2),
+        (4.0, 1.0),
+        (5.0, 1.6),
+    ];
+    let stars = stars.clamp(0.5, 5.0);
+    for pair in AT.windows(2) {
+        let ((a, wa), (b, wb)) = (pair[0], pair[1]);
+        if stars <= b {
+            return wa + (wb - wa) * (stars - a) / (b - a);
+        }
+    }
+    1.6
+}
+
 /// A signal's weight before decay, and whether it is strongly held.
 pub fn base(signal: &Signal) -> (f64, bool) {
     match signal {
         Signal::Completed => (1.0, false),
         Signal::Abandoned { at, runtime } => (abandon_weight(*at, *runtime), false),
-        Signal::Rated(5) => (1.6, true),
-        Signal::Rated(4) => (1.0, false),
-        Signal::Rated(3) => (0.2, false),
-        Signal::Rated(2) => (-0.6, false),
-        Signal::Rated(_) => (-1.0, false),
+        Signal::Rated(stars) => (rating_weight(*stars), *stars >= 4.5),
         Signal::Watchlisted => (0.4, false),
         Signal::NotForMe => (abandon_weight(0.0, None), false),
         Signal::AlreadySeen => (0.0, false),
@@ -302,10 +322,34 @@ mod tests {
     }
 
     #[test]
+    fn half_stars_lie_between_the_whole_ones_and_whole_ones_are_unchanged() {
+        for (stars, w) in [(5.0, 1.6), (4.0, 1.0), (3.0, 0.2), (2.0, -0.6), (1.0, -1.0)] {
+            assert!((rating_weight(stars) - w).abs() < 1e-12, "{stars}");
+        }
+        assert!((rating_weight(4.5) - 1.3).abs() < 1e-12);
+        assert!((rating_weight(3.5) - 0.6).abs() < 1e-12);
+        assert!((rating_weight(2.5) - -0.2).abs() < 1e-12);
+        assert!((rating_weight(0.5) - -1.2).abs() < 1e-12);
+        // Rising all the way: more stars always say more.
+        let w: Vec<f64> = (1..=10)
+            .map(|h| rating_weight(f64::from(h) / 2.0))
+            .collect();
+        assert!(w.windows(2).all(|p| p[0] < p[1]), "{w:?}");
+        assert!(
+            base(&Signal::Rated(4.5)).1,
+            "four and a half is strongly held"
+        );
+        assert!(!base(&Signal::Rated(4.0)).1);
+        // A show's average of its seasons sits between them.
+        let avg = rating_weight(4.25);
+        assert!(avg > rating_weight(4.0) && avg < rating_weight(4.5));
+    }
+
+    #[test]
     fn signals_fade_with_age_and_strong_ones_fade_slower() {
         let w = weigh(&[
-            (1, Signal::Rated(4), 180.0),
-            (2, Signal::Rated(5), 180.0),
+            (1, Signal::Rated(4.0), 180.0),
+            (2, Signal::Rated(5.0), 180.0),
             (3, Signal::Completed, 0.0),
         ]);
         let get = |id| w.iter().find(|(i, _)| *i == id).unwrap().1;

@@ -155,6 +155,11 @@ const FAKE = `(() => {
     finish_onboarding: () => { window.__onboarded = true; return null; },
     update_profile: () => null,
     rate_title: () => null,
+    // ADR-0056: ratings for any title; this profile has rated enough that Home does not ask.
+    title_rating: () => null,
+    rated_count: () => 12,
+    show_ratings: () => ({ seasons: [], average: null }),
+    in_continue_watching: () => false,
     taste_round: () => Array.from({ length: 12 }, (_, i) => ({ id: 100 + i, title: "Film " + (i + 1),
       year: 1930 + i * 8, made_by: "A Director" })),
     taste_input: () => ({ statements: { pace: null, ambiguity: null, era: null, subtitles: null, runtime: null, form: null }, love: null }),
@@ -616,7 +621,7 @@ try {
   await waitFor(() => evalJs(`document.body.textContent.includes("Film 1")`), "the title cards", 25);
   await steerToButton("Film 1A Director · 1930");
   await press(B.A);
-  check((await calls("rate_title")).some((a) => a.id === 100 && a.stars === 4), "A on a title card picks it (liked, four stars)");
+  check((await calls("rate_title")).some((a) => a.id === 100 && a.halves === 8), "A on a title card picks it (liked, four stars: eight halves)");
   await shoot("00b-title-cards");
   await steerToButton("Continue");
   await press(B.A);
@@ -759,16 +764,26 @@ try {
   const seen = await layoutProblems();
   await evalJs(`document.getElementById("too-wide").remove()`);
   check(seen.length > 0, `the layout check sees a 3000 px paragraph (${seen.join("; ")})`);
-  // Phase 18: "not for me" on a recommended card, by pad alone: X opens it, A says it, A on Undo
-  // takes it back, and focus is on the card again.
+  // Phase 18 and ADR-0056: a recommended card's menu, by pad alone. X opens it on its stars; Right
+  // twice rates it one star; Down reaches "not for me", A says it, A on Undo takes it back, and focus
+  // is on the card again.
   await evalJs(`(() => { const t = document.querySelector('section[aria-label="For you"] [data-focus-tile]');
     t.scrollIntoView({ block: "nearest", inline: "nearest" }); t.focus(); })()`);
   await press(B.X);
   const menu = await waitFor(
-    () => evalJs(`!!document.querySelector('[role="dialog"][aria-label$="not interested?"]')`),
-    "the not-for-me menu", 15).catch(() => false);
-  check(menu && (await evalJs(`document.activeElement?.textContent === "Not for me"`)),
-    "X on a recommended card opens its menu, with focus on Not for me");
+    () => evalJs(`!!document.querySelector('[role="dialog"][aria-label$=": options"]')`),
+    "the card's menu", 15).catch(() => false);
+  check(menu && (await evalJs(`document.activeElement?.getAttribute("aria-label") === "Your rating"`)),
+    "X on a recommended card opens its menu, with focus on its stars");
+  await press(B.RIGHT);
+  await press(B.RIGHT);
+  // Whichever "For you" card has focus by now (300 to 323; earlier steps moved along the rail).
+  const rated = await waitFor(async () => (await calls("rate_title")).some((a) => a.id >= 300 && a.id < 324 && a.halves === 2),
+    "the card's rating", 15).catch(() => false);
+  check(rated && (await evalJs(`document.activeElement?.getAttribute("aria-valuetext") === "1 star"`)),
+    `Right twice on the stars rates it one star, saved once they settle (${JSON.stringify(await calls("rate_title"))})`);
+  await press(B.DOWN);
+  check(await evalJs(`document.activeElement?.textContent === "Not for me"`), "Down from the stars reaches Not for me");
   await press(B.A);
   const undone = await waitFor(() => evalJs(`document.activeElement?.textContent === "Undo"`), "the card's undo", 15)
     .catch(() => false);

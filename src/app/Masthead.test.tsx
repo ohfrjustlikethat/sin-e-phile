@@ -5,7 +5,10 @@ import { useUi } from "@/lib/store";
 
 const ok = <T,>(data: T) => Promise.resolve({ status: "ok" as const, data });
 const row = (state: string) => ({ speed: 0, peers: 0, download: { id: state.length, state } });
-const commands = { downloads: vi.fn(() => ok<unknown[]>([])) };
+const commands = {
+  downloads: vi.fn(() => ok<unknown[]>([])),
+  surpriseMe: vi.fn((_hour: number | null) => ok({ id: 7, note: null, on_this_pc: false })),
+};
 vi.mock("@/lib/ipc", () => ({ commands }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(() => Promise.resolve(() => undefined)) }));
 const { Masthead } = await import("@/app/Masthead");
@@ -38,6 +41,17 @@ describe("Masthead", () => {
     expect(button).toHaveAttribute("aria-pressed", "true");
     const nav = screen.getByRole("navigation", { name: "Primary" });
     expect(within(nav).queryByRole("button", { current: "page" })).toBeNull();
+  });
+
+  it("has Surprise me as a word just left of Search, opening a film (ADR-0056)", async () => {
+    render(<Masthead />);
+    const surprise = screen.getByRole("button", { name: "Surprise me" });
+    const search = screen.getByRole("button", { name: /Search/ });
+    expect(surprise.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(surprise.nextElementSibling).toBe(search);
+    fireEvent.click(surprise);
+    await vi.waitFor(() => expect(useUi.getState().detail).toBe(7));
+    expect(commands.surpriseMe).toHaveBeenCalledWith(expect.any(Number));
   });
 
   it("shows every destination as a word, in §3.1's order", () => {

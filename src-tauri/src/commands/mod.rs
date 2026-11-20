@@ -15,6 +15,7 @@ pub mod overlay;
 pub mod playback;
 pub mod player;
 pub mod profiles;
+pub mod ratings;
 pub mod search;
 pub mod series;
 pub mod sources;

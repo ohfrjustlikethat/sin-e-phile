@@ -19,8 +19,14 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
   finishing what discovery chose pushes it up, abandoning it eases it down.
 - **Not for me, not right now, already seen** on every recommended card: X on a pad, the context-menu key, a right
   click. Each feeds the bandit, the first is also a taste signal, and every rail leaves the title out.
-- **Surprise me** (a Home button, RT on a pad): one film from what Home recommends now, on this PC first, opened on its
-  page; and **"I have 90 minutes"**, length chips that narrow Home and Surprise me.
+- **Surprise me** (a word in the masthead left of Search, RT on a pad): one film from what Home recommends now, on this
+  PC first, opened on its page. ("I have 90 minutes" was built, then removed by the author: ADR-0056.)
+- **Ratings for any title** (ADR-0056, the author's answers): half stars, 0.5 to 5; a show rated season by season, its
+  average shown; from the title page, every card's menu, the end card and a **Rate films** screen of well-known films.
+  Stars and watching both feed the taste model.
+- **Remove from Continue watching**: hidden, its place kept, back once played again.
+- **A cancelled download that restarted itself**, fixed: the queue's once-a-second pass and the viewer's actions now
+  take turns.
 - **Mood shelves**: six moods as sentences searched by meaning ("Slow and beautiful", "Tense, under 100 minutes"), two
   a day, each shelf leaning to the profile's own tastes.
 - **A population prior** for the bandit (blocker B17): what a profile with no history is likely to find in each arm,
@@ -46,6 +52,13 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
   bits above the taste rail's. (The first 100 users said 42%: a small sample flatters.)
 - **Novelty is measured in bits**: `-log2` of the share of people who liked a title. One bit more is half as widely
   liked; the discovery rails' picks are on average about three times less widely liked than the taste rail's.
+
+- **Ratings are what recommendations stand on** (the author's words). Half stars keep a 3.5 distinct from a 4: on the
+  taste harness the model then beats popularity by more (1.17x against 1.14x), on a stricter set of favourites.
+- **One view, every reader**: a show's rating is its seasons' average everywhere because there is one place that says
+  so (`title_ratings`), not five copies of the rule.
+- **A race needs a turn, not a retry**: the download queue worked from what it read a second ago, so a cancel in that
+  second was undone. Making the two take turns removes the window; a test that holds the pass open shows it.
 
 ## 3. New concepts
 
@@ -99,7 +112,22 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
 - **A pad button as a keyboard key**: X sends the context-menu key to whatever has focus — `src/app/App.tsx`
   (`case "options"`).
 - **Capture-phase listeners at the window**, to answer a synthetic Escape before the app's Back does —
-  `src/features/home/RecommendedCard.tsx`.
+  `src/features/home/MenuCard.tsx`.
+- **An async mutex as a turn** (`tokio::sync::Mutex<()>`: holding it is the turn, nothing is inside) —
+  `crates/downloads/src/manager.rs:86`, taken at `:168`.
+- **Reproducing a race deterministically**: a fake that stalls inside the pass until told to go (`tokio::sync::Notify`)
+  — `crates/downloads/tests/cancel.rs`.
+- **A SQL view** as the single reader of a rule (a title's rating, or its seasons' average) —
+  `crates/persistence/migrations/0035_half_stars.up.sql:32`.
+- **Rebuilding a SQLite table** to change a CHECK (create, copy, drop, rename) — `0035_half_stars.up.sql:5`.
+- **Piecewise-linear interpolation** between known weights — `crates/taste/src/modes.rs:52` (`rating_weight`).
+- **"Back once played again" as a comparison of times**, not a flag to clear — `profiles.rs:424`
+  (`hidden_from_continue`).
+- **A native control under a drawing**: a transparent range input over five stars gives keys, pad and screen readers a
+  slider for free — `src/design-system/primitives/StarRating.tsx:45`.
+- **Optimistic updates and in-flight loads**: set the new value, and cancel the load without reverting, or it puts the
+  old value back — `src/features/ratings/useRating.ts:53`.
+- **Saving once the input settles** (debounce: a timer replaced by each change) — `useRating.ts` (`settle`).
 
 ## 4. Five questions
 
@@ -113,3 +141,7 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
    country asked, when a decade can be claimed at once?
 5. On 100 users relevance ordering looked like it cleared E4's bar (+42%); on 15,640 it did not (+28.8%). Why does a
    small sample mislead here, and what does a bit of novelty mean?
+
+(Added with ADR-0056, for the next gate: why does cancelling a download need the queue to wait its turn, when the
+cancel already marks the row cancelled? And why is a show's rating a view over its seasons rather than a number stored
+when a season is rated?)

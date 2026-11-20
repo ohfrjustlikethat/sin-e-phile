@@ -2726,3 +2726,29 @@ companion, never the published graph. **Spec amendments:** A44 (4.7.1), recorded
   one; and a stray second instance of a launch script muddies a log (stop by PID, launch one).
 - **Resume**: `next_action`. Waiting on the author: E5 with the new installer.
 
+## 2026-11-21 — Phase 18, 18.6: the author's fix list (ADR-0056)
+
+- **What the author found**: asked to rate ten films for E5, there was no way to rate a film except after watching it.
+  They asked for Letterboxd-style ratings that feed the taste model ("on that lies the recommendation algorithm"), a way
+  to remove anything from Continue watching, Surprise me beside the tabs, the line under Continue watching gone, and a
+  download that sometimes would not cancel fixed. Asked eleven specific questions; every answer is in ADR-0056 and
+  SPEC A46 (spec 4.9.0), and in memory.
+- **Built**: half stars everywhere (migration 0035 doubles what was rated; `title_ratings` the one reader); seasons rated
+  on a show's page with "your average"; every card's menu rates (a show's sends to its page); the end card's stars;
+  Rate films (well-known films, one after another) from Home's card under ten ratings and from Your taste; Continue
+  watching's removal (card menu, × for the mouse, the title page; back once played again); Surprise me in the masthead,
+  I42 removed end to end; the lines under Continue watching removed.
+- **The download that would not cancel**: a real race. The queue's once-a-second pass read the queue, a cancel landed
+  while it ran, the pass saw the torrent gone from its backend and added it again, running. `tests/cancel.rs` holds the
+  pass open with a stalling fake and reproduced it (Active, added twice); user actions now take turns with the pass.
+  Direct downloads' delete and quick pause/resume were suspected too and tested: sound, kept as guards.
+- **Measured**: the taste harness with half stars kept 40.71% (40.63% before), lift over popularity 1.17x (1.14x), on a
+  stricter set of favourites (a 3.5 is no longer rounded up into "liked"). Recorded in docs/eval-results.md 18.6.
+- **Found by a test**: rating a film before its saved rating had loaded was put back by the load, and cancelling the
+  load reverted it again; the hooks now cancel without reverting.
+- **Decisions** (mine, in ADR-0056's last section): the weights between whole stars, liked from four, strongly held from
+  4.5, imports one to one, a show's card menu sending to its page, Rate films' 100,000-vote floor, the 350 ms settle.
+  **Spec amendments**: A46 (4.9.0), the author's own answers.
+- **Lesson**: a feature that asks the author to do something (rate ten films) has to be checked in the release build for
+  whether they can; the acceptance test was written before the way to pass it existed.
+

@@ -12,6 +12,11 @@ use sinephile_persistence::{Db, NewMediaItem};
 struct Seen {
     watchlist: Vec<i64>,
     rating: Option<i64>,
+    /// ADR-0056: a show's seasons (here rated on the film's id: the table keys by profile),
+    /// what is hidden from Continue watching, and how many titles are rated.
+    seasons: Vec<(i64, i64)>,
+    hidden: Vec<i64>,
+    rated: i64,
     position: Option<i64>,
     continue_watching: usize,
     finished: bool,
@@ -26,6 +31,9 @@ async fn seen(db: &Db, profile: i64, film: i64) -> Seen {
     Seen {
         watchlist: p.watchlist(profile).await.unwrap(),
         rating: p.rating(profile, film).await.unwrap(),
+        seasons: p.season_ratings(profile, film).await.unwrap(),
+        hidden: p.hidden_from_continue(profile).await.unwrap(),
+        rated: p.rated_count(profile).await.unwrap(),
         position: p
             .position(profile, film)
             .await
@@ -64,7 +72,9 @@ async fn nothing_one_profile_does_is_visible_to_another() {
 
     // Everything personal, done as A.
     profiles.add_to_watchlist(a, film, None).await.unwrap();
-    profiles.rate(a, film, Some(5)).await.unwrap();
+    profiles.rate(a, film, Some(10)).await.unwrap();
+    profiles.rate_season(a, film, 1, Some(7)).await.unwrap();
+    profiles.skip_rating(a, other).await.unwrap();
     profiles
         .save_position(
             a,
@@ -99,9 +109,14 @@ async fn nothing_one_profile_does_is_visible_to_another() {
         .unwrap();
     creds.set_pin(a, "1357").await.unwrap();
 
+    profiles.hide_from_continue(a, film).await.unwrap();
+
     let after_a = seen(&db, a, film).await;
     assert_eq!(after_a.watchlist, vec![film]);
-    assert_eq!(after_a.rating, Some(5));
+    assert_eq!(after_a.rating, Some(10));
+    assert_eq!(after_a.seasons, vec![(1, 7)]);
+    assert_eq!(after_a.hidden, vec![film]);
+    assert_eq!(after_a.rated, 1);
     assert!(after_a.finished && after_a.setting.as_deref() == Some("ja"));
     assert!(!after_a.pin_opens_with_wrong_code);
 
@@ -113,6 +128,9 @@ async fn nothing_one_profile_does_is_visible_to_another() {
         Seen {
             watchlist: vec![],
             rating: None,
+            seasons: vec![],
+            hidden: vec![],
+            rated: 0,
             position: None,
             continue_watching: 0,
             finished: false,
@@ -146,7 +164,10 @@ async fn deleting_a_profile_takes_all_of_its_own_and_nothing_else() {
         .unwrap();
     for p in [a, b] {
         profiles.add_to_watchlist(p, film, None).await.unwrap();
-        profiles.rate(p, film, Some(4)).await.unwrap();
+        profiles.rate(p, film, Some(8)).await.unwrap();
+        profiles.rate_season(p, film, 2, Some(6)).await.unwrap();
+        profiles.hide_from_continue(p, film).await.unwrap();
+        profiles.skip_rating(p, film).await.unwrap();
         profiles.record_watch(p, film, 100, false).await.unwrap();
         creds.set(p, "playback.audio", "en").await.unwrap();
         creds.set_pin(p, "2468").await.unwrap();
@@ -167,6 +188,9 @@ async fn deleting_a_profile_takes_all_of_its_own_and_nothing_else() {
     for sql in [
         "SELECT COUNT(*) FROM watchlist_items WHERE profile_id = ?",
         "SELECT COUNT(*) FROM ratings WHERE profile_id = ?",
+        "SELECT COUNT(*) FROM season_ratings WHERE profile_id = ?",
+        "SELECT COUNT(*) FROM continue_hidden WHERE profile_id = ?",
+        "SELECT COUNT(*) FROM rate_skipped WHERE profile_id = ?",
         "SELECT COUNT(*) FROM watch_events WHERE profile_id = ?",
         "SELECT COUNT(*) FROM profile_settings WHERE profile_id = ?",
         "SELECT COUNT(*) FROM playback_positions WHERE profile_id = ?",

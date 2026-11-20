@@ -205,7 +205,7 @@ async fn a_title_gained_at_a_launch_is_recommended_on_that_launch_with_a_true_re
     let profiles = ProfileRepository::new(&db);
     let me = profiles.ensure_default().await.expect("profile");
     for id in [stalker, solaris] {
-        profiles.rate(me, id, Some(5)).await.expect("rate");
+        profiles.rate(me, id, Some(10)).await.expect("rate");
     }
 
     // The launch: the catalogue's refresh gains a film, credited as the credits step would.

@@ -30,6 +30,7 @@ interface Where {
   downloadsOpen: boolean;
   reviewOpen: boolean;
   tasteOpen: boolean;
+  rateOpen?: boolean;
 }
 
 type TitleOf = (id: number) => string | undefined;
@@ -43,6 +44,8 @@ function tabPage(s: Where, titleOf: TitleOf): string {
 /** The page a step back lands on, by name; `null` when there is nowhere to go back to. */
 export function backLabel(s: Where, titleOf: TitleOf): string | null {
   const trail = s.trails[s.tab];
+  // Rating films goes back to the page it was opened over: Your taste, or Home.
+  if (s.rateOpen) return hereLabel({ ...s, rateOpen: false }, titleOf);
   if (s.reviewOpen || s.tasteOpen) return "Settings";
   // The page showing under Settings or Downloads: a title, or the tab itself.
   if (s.settingsOpen || s.downloadsOpen) return tabPage(s, titleOf);
@@ -54,6 +57,7 @@ export function backLabel(s: Where, titleOf: TitleOf): string | null {
 
 /** The page showing now, by name: where a screen opened over it (Who's watching?) goes back to. */
 export function hereLabel(s: Where, titleOf: TitleOf): string {
+  if (s.rateOpen) return "Rate films";
   if (s.settingsOpen && s.reviewOpen) return "Check your library";
   if (s.settingsOpen && s.tasteOpen) return "Your taste";
   if (s.settingsOpen) return "Settings";
@@ -78,6 +82,7 @@ function useWhere(): Where {
       downloadsOpen: s.downloadsOpen,
       reviewOpen: s.reviewOpen,
       tasteOpen: s.tasteOpen,
+      rateOpen: s.rateOpen,
     })),
   );
 }

@@ -5,7 +5,7 @@ import { useUi } from "@/lib/store";
 import type { HomeCard } from "@/lib/ipc";
 
 const ok = <T,>(data: T) => Promise.resolve({ status: "ok" as const, data });
-const card = (id: number, title: string, year: number) => ({ id, title, year, made_by: null, runtime_minutes: null, note: null, progress: null });
+const card = (id: number, title: string, year: number) => ({ id, title, year, made_by: null, runtime_minutes: null, note: null, progress: null, is_show: false });
 
 const commands = {
   libraryTitles: vi.fn((shows: boolean) =>

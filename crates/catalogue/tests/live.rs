@@ -48,7 +48,7 @@ async fn what_a_profile_loved_gets_live_neighbours_scored_beside_movielens() {
     let profiles = ProfileRepository::new(&db);
     let me = profiles.ensure_default().await.expect("profile");
     for id in [anime, film] {
-        profiles.rate(me, id, Some(5)).await.expect("rate");
+        profiles.rate(me, id, Some(10)).await.expect("rate");
     }
     // A MovieLens matrix to be scored beside: its first neighbours average 0.35.
     let neighbours = NeighbourRepository::new(&db);

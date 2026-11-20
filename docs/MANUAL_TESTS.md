@@ -68,15 +68,22 @@ over HTTP for the stream (`python -m http.server --bind 127.0.0.1`). Delete
 
 The author, on their own profile in the installed release, after at least ten films rated or finished (a blind spot is
 said only after ten, and a country only once Wikidata has been asked about everything met: the hourly check does it).
+**To rate ten quickly** (ADR-0056): Home's "Rate films" card while under ten, or Settings → your taste → Rate more
+films; or the stars under any film's title, or X / right click on any card.
 
 - [ ] Home shows "Where your taste points", and at least two discovery rails (a stretch, a bridge, the canon, deep cuts,
       or a blind spot), each card saying why. Write down any label that reads as false.
 - [ ] **At least three films you had not heard of and want to watch**, from any discovery rail, a mood shelf or
       Surprise me. Name them, and the rail each came from. (E5 is met by these three, in your words.)
-- [ ] X on a card (or a right click) offers Not for me, Not right now, Already seen; the card becomes an Undo, and the
-      title is gone from Home next time. Undo brings it back.
+- [ ] X on a card (or a right click) rates it (stars; a show's "Rate seasons…"), and on a recommendation offers Not for
+      me, Not right now, Already seen; the card becomes an Undo, and the title is gone from Home next time. Undo brings
+      it back.
+- [ ] Ratings (ADR-0056): a film's stars under its title, half stars by mouse, arrows or the pad; a show's season header
+      has its stars and the show says "your average"; the end card's stars; Rate films asks one film after another.
+- [ ] Continue watching: the × on a card (mouse), X → Remove, or the title page's link takes it out; playing it again
+      brings it back. No line under the row's name.
 - [ ] Comfort to Adventure (Settings, your taste): at Adventure Home has more discovery rails; at Comfort, fewer.
-- [ ] Surprise me (the button, or RT on the pad) opens a film's page; "Under 90 minutes" keeps it short.
+- [ ] Surprise me (the word left of Search, or RT on the pad) opens a film's page.
 - [ ] Today's two mood shelves read as their moods.
 
 **Not yet run.** Asked of the author in the Phase 19 batch.

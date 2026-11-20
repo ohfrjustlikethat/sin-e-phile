@@ -8,6 +8,7 @@ import { shortPlace } from "@/features/player/place";
 import { airsLine } from "./airing";
 import { ChoiceRow } from "./ChoiceRow";
 import { SeriesMarks } from "./Watched";
+import { SeasonHeader } from "@/features/ratings/TitleRating";
 
 /**
  * A series' seasons and episodes — SPEC.md Phase 11.
@@ -156,6 +157,15 @@ export function SeriesSection({ id }: { id: number }) {
       )}
       {seasons.length === 0 && !series.isPending && (
         <p className="text-sm text-ink-muted">The catalogue lists no episodes for this series yet.</p>
+      )}
+      {/* The season's own header, with its stars (ADR-0056: a show is rated season by season). */}
+      {chosen !== null && seasons.length > 0 && (
+        <SeasonHeader
+          series={id}
+          season={chosen}
+          name={seasonLabel(chosen)}
+          episodes={episodes.data?.length ?? 0}
+        />
       )}
       <ol className="flex flex-col">
         {(episodes.data ?? []).map((e) => (

@@ -147,9 +147,10 @@ pub(crate) fn zip_texts(path: &Path) -> Result<HashMap<String, String>, ImportEr
     Ok(out)
 }
 
-/// The app's 1-5 stars for a rating out of 10: halves round up (a Letterboxd 3.5 is 4).
-pub fn stars(out_of_ten: f64) -> Option<i64> {
-    (out_of_ten > 0.0).then(|| ((out_of_ten / 2.0).ceil() as i64).clamp(1, 5))
+/// The app's half stars (ADR-0056: 1 to 10 halves, 0.5 to 5 stars) for a rating out of 10:
+/// one to one, so a Letterboxd 3.5 stays 3.5 and an IMDb 7 is three and a half stars.
+pub fn halves(out_of_ten: f64) -> Option<i64> {
+    (out_of_ten > 0.0).then(|| (out_of_ten.round() as i64).clamp(1, 10))
 }
 
 /// A title the import could not place, and why, for the user to read.
@@ -325,8 +326,8 @@ pub async fn import(
             }
         };
         s.matched += 1;
-        if let Some(stars) = e.rating.and_then(stars) {
-            profiles.rate(profile, id, Some(stars)).await?;
+        if let Some(halves) = e.rating.and_then(halves) {
+            profiles.rate(profile, id, Some(halves)).await?;
             s.ratings += 1;
         }
         if !e.watches.is_empty() {
@@ -416,11 +417,12 @@ mod tests {
     }
 
     #[test]
-    fn ratings_become_stars_with_halves_rounding_up() {
-        assert_eq!(stars(10.0), Some(5));
-        assert_eq!(stars(7.0), Some(4), "a Letterboxd 3.5");
-        assert_eq!(stars(6.0), Some(3));
-        assert_eq!(stars(1.0), Some(1), "a half star is still one");
-        assert_eq!(stars(0.0), None, "unrated");
+    fn ratings_out_of_ten_are_half_stars_exactly() {
+        assert_eq!(halves(10.0), Some(10));
+        assert_eq!(halves(7.0), Some(7), "a Letterboxd 3.5 stays 3.5");
+        assert_eq!(halves(6.0), Some(6));
+        assert_eq!(halves(1.0), Some(1), "half a star");
+        assert_eq!(halves(0.0), None, "unrated");
+        assert_eq!(halves(12.0), Some(10), "never more than five stars");
     }
 }

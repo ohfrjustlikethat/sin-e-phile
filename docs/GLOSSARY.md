@@ -326,3 +326,7 @@ nothing more; its search plugins, feeds and tracker lists are never read.
 **Blind spot** *(Phase 18)* — A decade, genre, country or film movement a profile has met nothing from; claimed only when every title it met is known on that axis.
 
 **Self-information** *(Phase 18)* — Novelty in bits, -log2 of the share of people who liked a title: one more bit is half as widely liked.
+
+**Halves** *(ADR-0056)* — How a rating is stored: 1 to 10, half a star each, so 7 is three and a half stars.
+
+**title_ratings** *(ADR-0056)* — The one view every reader of ratings reads: a title's own rating, or a show's seasons' average.

@@ -157,6 +157,12 @@ pub async fn continuing(db: &Db, profile: i64, limit: usize) -> Result<Vec<Conti
         .recent_positions(profile, READ)
         .await?;
     let episodes = EpisodeRepository::new(db);
+    // Removed by the viewer (ADR-0056), until played again.
+    let hidden: HashSet<i64> = ProfileRepository::new(db)
+        .hidden_from_continue(profile)
+        .await?
+        .into_iter()
+        .collect();
     let mut cards = HashSet::new();
     let mut out = Vec::new();
     for p in positions {
@@ -165,7 +171,7 @@ pub async fn continuing(db: &Db, profile: i64, limit: usize) -> Result<Vec<Conti
         }
         let placement = episodes.placement(p.media_item_id).await?;
         let card = placement.map_or(p.media_item_id, |(series, _, _)| series);
-        if !cards.insert(card) {
+        if !cards.insert(card) || hidden.contains(&card) {
             continue;
         }
         if let Some(c) = resolve(db, &p, placement).await? {

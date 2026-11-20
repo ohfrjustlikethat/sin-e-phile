@@ -19,7 +19,7 @@ const commands = {
   subtitleSettings: vi.fn(() => ok({ has_key: false })),
   torrentSettings: vi.fn(() => ok({ bind_interface: null as string | null })),
   // Phase 18: Surprise me.
-  surpriseMe: vi.fn((_hour: number | null, _max: number | null) =>
+  surpriseMe: vi.fn((_hour: number | null) =>
     ok({ id: 7, note: "Like Stalker, but from the 1920s", on_this_pc: false } as {
       id: number;
       note: string | null;
@@ -50,7 +50,7 @@ describe("Home, first version (Phase 14)", () => {
     // No director known: the byline says the year alone, never " · 1927" or "Uncatalogued".
     expect(within(loved).getByText("1927")).toBeInTheDocument();
     expect(screen.queryByText("Uncatalogued")).toBeNull();
-    fireEvent.click(within(screen.getByRole("region", { name: "Continue watching" })).getByRole("button", { name: /Heat/ }));
+    fireEvent.click(within(screen.getByRole("region", { name: "Continue watching" })).getByRole("button", { name: /^Heat/ }));
     expect(useUi.getState().detail).toBe(1);
   });
 
@@ -94,17 +94,11 @@ describe("Home, first version (Phase 14)", () => {
     expect(screen.queryByRole("region", { name: "Finish setting up" })).toBeNull();
   });
 
-  it("Surprise me opens a film, within the length chosen (Phase 18, I42)", async () => {
-    useUi.setState({ detail: null });
+  it("Home has no length choice and no Surprise me row: both left Home (ADR-0056)", async () => {
     renderHome();
     await screen.findByRole("region", { name: "Widely loved" });
-    const lengths = screen.getByRole("radiogroup", { name: "How long you have" });
-    expect(within(lengths).getByRole("radio", { name: "Any length" })).toHaveAttribute("aria-checked", "true");
-    fireEvent.click(within(lengths).getByRole("radio", { name: "Under 90 minutes" }));
-    await waitFor(() => expect(commands.home).toHaveBeenLastCalledWith(expect.any(Number), 90));
-    fireEvent.click(screen.getByRole("button", { name: "Surprise me" }));
-    await waitFor(() => expect(useUi.getState().detail).toBe(7));
-    expect(commands.surpriseMe).toHaveBeenLastCalledWith(expect.any(Number), 90);
-    fireEvent.click(within(lengths).getByRole("radio", { name: "Any length" }));
+    expect(screen.queryByRole("radiogroup", { name: "How long you have" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Surprise me" })).toBeNull();
+    expect(commands.home).toHaveBeenLastCalledWith(expect.any(Number));
   });
 });

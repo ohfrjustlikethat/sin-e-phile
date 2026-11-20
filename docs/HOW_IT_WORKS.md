@@ -288,10 +288,14 @@ against the facts before it says it. A **bandit** (Thompson sampling) learns whi
 gives them more of Home, within a **floor**: even someone who refuses every discovery card still gets a fifth of
 Home's recommendations from them, because a filter bubble is an optimisation failure, not an inevitability. A
 Comfort to Adventure setting says where to start, and "not for me", "not right now" and "already seen" on any
-recommended card teach it. **Surprise me** (a button, or RT on a controller) opens one film Home would recommend,
-ready to play; **mood shelves** ("Slow and beautiful", "Tense, under 100 minutes") are found by what films are
-about, not their genre; and "I have 90 minutes" narrows all of it. How it all fits: `docs/specs/discovery.md`, and
-the story of building it: `docs/case-studies/discovery.md`.
+recommended card teach it. **Surprise me** (beside Search, or RT on a controller) opens one film Home would
+recommend, ready to play; and **mood shelves** ("Slow and beautiful", "Tense, under 100 minutes") are found by what
+films are about, not their genre. How it all fits: `docs/specs/discovery.md`, and the story of building it:
+`docs/case-studies/discovery.md`.
+
+**Your ratings** are what all of it stands on. Any title can be rated in half stars, as on Letterboxd: from its page,
+from any card's menu, after a film ends, or many in a row on the Rate films screen. A show is rated season by season,
+and counts as the average of its rated seasons. A rating adds to what watching already said. How: `docs/specs/ratings.md`.
 
 **The analogy:** a friend who knows your taste well enough to predict what you will
 like, but who is also willing to say "I know this is not your usual thing, but trust

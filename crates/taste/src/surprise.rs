@@ -3,8 +3,7 @@
 //!
 //! The film is one Home would recommend now ([`crate::home::rails_at`], the same plan): from
 //! the taste rail and the discovery rails, or, for a profile with no taste yet, from new
-//! releases and the widely loved. Films only, and within the length limit when one is asked
-//! (I42). What is on this PC comes first, since it plays at once. Of the first [`FROM`] that
+//! releases and the widely loved. Films only. What is on this PC comes first, since it plays at once. Of the first [`FROM`] that
 //! qualify, one at random: asking again gives another.
 
 use std::collections::HashSet;

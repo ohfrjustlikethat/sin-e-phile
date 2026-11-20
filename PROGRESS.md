@@ -16,13 +16,14 @@
 
 > Builds on Phase 17's recommender: its candidate pools, calibration and reasons are what the arms draw from. Receives Phase 5 E3 and E4 (search by meaning, carried on at Phase 17's close).
 
-### Subtasks — 4/5 complete
+### Subtasks — 4/6 complete
 
 - [x] **18.1** The strategy arms (crates/recommend/src/strategy.rs, new): safe-familiar, adjacent-stretch (one axis away from a taste mode), cross-mode bridge (between two of the profile's modes), blind-spot (a well-regarded region the profile never touched: a country, a decade, a movement), canon-gap (acclaimed work the taste predicts and the profile has not seen), deep-cut (highly rated obscurity near a mode); each yields candidates from Phase 17's pools and the meaning index with an honest label ('Because you loved Stalker', 'Your blind spot: Iranian New Wave'), tested so every label is true (E3). · `c362b80`
 - [x] **18.2** The contextual bandit (Thompson sampling) over the arms, rewarded by outcomes (played, completed, abandoned early, watchlisted, dismissed), with an exploration floor and no arm dominating; a simulation harness (`eval discovery`) with simulated users whose reward patterns change (E1), a maximally conservative user who still gets discovery (E2), and the novelty metric, mean inverse popularity, against its target with relevance held (E4). · `193e4d4`
 - [x] **18.3** The exploration budget and dismissals: a Comfort to Adventure setting per profile adapted by the bandit; 'not for me', 'not right now', 'already seen' on every recommended card (pad-reachable) feeding back; never the same item in two rails. · `d7b5afa`
 - [x] **18.4** Surprise me (one button and a pad shortcut: a film the viewer will probably like, from their taste and their sources, opened ready to play) and mood shelves from the semantic index offered to Home's rails, with I42 ('I have 90 minutes'). Search-by-meaning quality, carried from Phase 5 (E3 nDCG@10 0.0472, E4 the two named queries), is worked here, where mood shelves depend on it. · `890a469`
 - [ ] **18.5** The flagship case study (E6), the author's acceptance test on their own taste (E5, asked in the author batch), docs/specs, learning note, README and HOW_IT_WORKS, regression against every recorded number, close.
+- [~] **18.6** The author's fix list of 2026-11-20 (ADR-0056, spec 4.9.0): half-star ratings for any title (shows by season, the average shown; stars and watching both count) from the title page, every card's menu, the end card and a rate-a-batch screen; remove from Continue watching; Surprise me in the masthead and I42's length choice removed; the line under Continue watching removed; a cancelled download that restarted itself (the queue's race).
 
 ### Exit criteria
 
@@ -41,7 +42,7 @@
 
 ## What's next
 
-Phase 18: waiting on the author for E5 (docs/MANUAL_TESTS.md, 'Discovery on your own taste', with the installer built from the phase branch, target/release/bundle/nsis/sin-e-phile_0.1.0_x64-setup.exe). Meanwhile finish 18.5: the case study's numbers (docs/case-studies/discovery.md: E4 +40.0%, 1.71 bits), the README row, then /closephase once E5 is answered, carrying Phase 5 E3/E4 a third time (0.3276; grief not defensible) and flagging that to the author.
+Phase 18, 18.6: finish and ship the author's fix list (ADR-0056): run the pre-push checklist, commit, push; `npm run release` and launch the release build on a fresh copy of the author's data (migration 35 doubles their ratings) to check rating a film, a season, a card, the rate-a-batch screen and Continue watching's removal in the real window; then tell the author the installer is ready for E5 (docs/MANUAL_TESTS.md, 'Discovery on your own taste'). Then 18.5: close once E5 is answered, carrying Phase 5 E3/E4 a third time, flagged to the author.
 
 ---
 

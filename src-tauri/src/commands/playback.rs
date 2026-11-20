@@ -429,38 +429,6 @@ pub async fn save_position(
         .map_err(|e| e.to_string())
 }
 
-/// The viewer's 1–5 rating, from the end card (Phase 11, ADR-0043). `None` clears it.
-#[tauri::command]
-#[specta::specta]
-pub async fn rate_title(
-    state: State<'_, AppState>,
-    id: i32,
-    stars: Option<i32>,
-) -> Result<(), String> {
-    let db = state.db().ok_or("the library is still opening")?;
-    let profiles = ProfileRepository::new(&db);
-    let profile = state.profile().await?;
-    profiles
-        .rate(profile, i64::from(id), stars.map(i64::from))
-        .await
-        .map_err(|e| e.to_string())?;
-    crate::commands::home::refresh_model(&state, profile);
-    Ok(())
-}
-
-#[tauri::command]
-#[specta::specta]
-pub async fn title_rating(state: State<'_, AppState>, id: i32) -> Result<Option<i32>, String> {
-    let db = state.db().ok_or("the library is still opening")?;
-    let profiles = ProfileRepository::new(&db);
-    let profile = state.profile().await?;
-    Ok(profiles
-        .rating(profile, i64::from(id))
-        .await
-        .map_err(|e| e.to_string())?
-        .map(|s| s as i32))
-}
-
 /// The player left a title (Phase 15): seconds actually played, where it stopped, its
 /// length. Recorded as a viewing, completed or abandoned at its point; a skim is not.
 #[tauri::command]

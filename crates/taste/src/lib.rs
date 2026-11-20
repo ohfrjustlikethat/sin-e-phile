@@ -16,6 +16,7 @@ pub mod hybrid;
 pub mod model;
 pub mod modes;
 pub mod mood;
+pub mod rate;
 pub mod rounds;
 pub mod shelf;
 pub mod signals;

@@ -76,13 +76,12 @@ read from viewings (an episode counting for its series), the watchlist, ratings 
 signals (the first weighs as an early abandon); "not right now" for 14 days. X on a pad, the context-menu key or a
 right click opens them on a recommended card; the card stands as an Undo, and a toast says what follows.
 
-## 7. Surprise me and "I have 90 minutes" (`crates/taste/src/surprise.rs`, I42)
+## 7. Surprise me (`crates/taste/src/surprise.rs`)
 
 One film from what Home would recommend now (the taste rails and the discovery rails; for a profile with no taste yet,
 new releases and the widely loved), films only, what is on this PC first, at random among the best five, opened on its
-page. The Home button, and RT on a pad from anywhere while browsing. Home's length chips (any, under 90 minutes, under
-2 hours) narrow the recommendation rails and Surprise me; a title with no known length is left out under a limit, and
-what the profile started, saved or keeps on this PC is never cut.
+page. A word in the masthead just left of Search, and RT on a pad from anywhere while browsing (ADR-0056). A length
+choice ("I have 90 minutes", I42) was built and then removed by the author.
 
 ## 8. Mood shelves (`crates/taste/src/mood.rs`)
 

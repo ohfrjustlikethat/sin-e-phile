@@ -3726,3 +3726,23 @@ no more than 1.4004. That is inside the difference two samples of users make, an
 comfort. The test users have now judged three versions of the arms (193e4d4 +40.4%, 0e06e59 +39.9%, b2842d4 +40.0%), each
 change chosen first on the tuning users by a rule written before it ran.
 
+### 18.6: half stars in the taste model (ADR-0056), the taste harness before and after (2026-11-21)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- taste`: the same three MovieLens users (3, 12, 72), five folds,
+500 slots. Each user's own half-star ratings go in as a Letterboxd export through `sinephile_imports`, so the whole path
+is measured: import, storage, the taste model's weights, liked titles.
+
+| | Whole stars (3.5 rounded up to 4; b2842d4) | Half stars kept (ADR-0056) |
+|---|---|---|
+| liked, users 3 / 12 / 72 | 498 / 411 / 407 | 355 / 321 / 407 |
+| held-out favourites, modes alone | 12.83% | 11.58% |
+| **modes with the popularity prior (as shipped)** | **40.63%** | **40.71%** |
+| the 500 most popular (the bar) | 35.64% | 34.73% |
+| lift over popularity | 1.14x | **1.17x** |
+| E2 (Phase 14, reflected in the taste model) | met | met |
+
+What changed is what counts as a favourite: a 3.5 is no longer rounded up into "liked" (it weighs 0.6 in the model, between
+three stars' 0.2 and four's 1.0), so the held-out set is stricter and popularity finds less of it. On that stricter set
+the model finds slightly more than before and its margin over popularity widens (+5.98 points against +4.99). Whole-star
+ratings weigh exactly what they did (`modes::rating_weight`, tested), so nothing already rated moved.
+

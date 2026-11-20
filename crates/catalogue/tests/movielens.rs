@@ -204,15 +204,25 @@ async fn ratings_are_counted_without_being_stored() {
     .fetch_all(db.pool())
     .await
     .expect("tables");
-    // The one rating table is the viewer's own (migration 0020, Phase 11): a profile's
-    // 1-5 stars, keyed by profile. Nothing shaped like MovieLens's (user, film, score)
-    // rows exists to store 25 million of them in.
-    assert_eq!(tables, ["ratings"], "only the viewer's own ratings");
-    let columns: Vec<String> = sqlx::query_scalar("SELECT name FROM pragma_table_info('ratings')")
-        .fetch_all(db.pool())
-        .await
-        .expect("columns");
-    assert!(columns.contains(&"profile_id".to_string()), "{columns:?}");
+    // The rating tables are the viewer's own (migration 0020, Phase 11; 0035, ADR-0056): a
+    // profile's half stars for a title, and for a show's seasons, keyed by profile. Nothing
+    // shaped like MovieLens's (user, film, score) rows exists to store 25 million of them in.
+    assert_eq!(
+        tables,
+        ["ratings", "season_ratings"],
+        "only the viewer's own ratings"
+    );
+    for table in &tables {
+        let columns: Vec<String> =
+            sqlx::query_scalar(&format!("SELECT name FROM pragma_table_info('{table}')"))
+                .fetch_all(db.pool())
+                .await
+                .expect("columns");
+        assert!(
+            columns.contains(&"profile_id".to_string()),
+            "{table}: {columns:?}"
+        );
+    }
 }
 
 #[tokio::test]

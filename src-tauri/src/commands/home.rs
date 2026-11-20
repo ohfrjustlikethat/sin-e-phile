@@ -28,6 +28,8 @@ pub struct HomeCard {
     pub note: Option<String>,
     /// How far into it, 0 to 1: Continue watching's bar (Phase 16).
     pub progress: Option<f64>,
+    /// A show, rated season by season (ADR-0056); anything else is rated as a whole.
+    pub is_show: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -38,19 +40,11 @@ pub struct RailView {
 }
 
 /// Home's rails. `hour` is the viewer's local hour (0 to 23): the part of the day the
-/// discovery engine learns and chooses in (Phase 18). `max_minutes`: "I have 90 minutes"
-/// (I42), the recommendation rails holding only what runs no longer.
+/// discovery engine learns and chooses in (Phase 18).
 #[tauri::command]
 #[specta::specta]
-pub async fn home(
-    state: State<'_, AppState>,
-    hour: Option<u32>,
-    max_minutes: Option<u32>,
-) -> Result<Vec<RailView>, String> {
-    let ask = sinephile_taste::home::Ask {
-        hour,
-        max_minutes: max_minutes.map(i64::from),
-    };
+pub async fn home(state: State<'_, AppState>, hour: Option<u32>) -> Result<Vec<RailView>, String> {
+    let ask = sinephile_taste::home::Ask { hour };
     let db = state.db().ok_or("the library is still opening")?;
     let me = state.profile().await?;
     let kids = crate::commands::profiles::kids(&state).await;
@@ -105,14 +99,13 @@ pub struct SurpriseView {
     pub on_this_pc: bool,
 }
 
-/// Surprise me: one film this profile will probably like, from what Home recommends now,
-/// within `max_minutes` when given (I42). `None` when there is nothing to choose from.
+/// Surprise me: one film this profile will probably like, from what Home recommends now.
+/// `None` when there is nothing to choose from.
 #[tauri::command]
 #[specta::specta]
 pub async fn surprise_me(
     state: State<'_, AppState>,
     hour: Option<u32>,
-    max_minutes: Option<u32>,
 ) -> Result<Option<SurpriseView>, String> {
     let db = state.db().ok_or("the library is still opening")?;
     let me = state.profile().await?;
@@ -121,10 +114,7 @@ pub async fn surprise_me(
         .get(me, "taste.love")
         .await
         .map_err(|e| e.to_string())?;
-    let ask = sinephile_taste::home::Ask {
-        hour,
-        max_minutes: max_minutes.map(i64::from),
-    };
+    let ask = sinephile_taste::home::Ask { hour };
     // A new draw at each press.
     let seed = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -238,7 +228,10 @@ pub async fn set_discovery_budget(state: State<'_, AppState>, value: f64) -> Res
 
 /// What a card shows for each title, in the order given; a title the catalogue no longer
 /// holds is left out.
-async fn home_cards(db: &sinephile_persistence::Db, ids: &[i64]) -> Result<Vec<HomeCard>, String> {
+pub(crate) async fn home_cards(
+    db: &sinephile_persistence::Db,
+    ids: &[i64],
+) -> Result<Vec<HomeCard>, String> {
     let mut cards = sinephile_search_engine::card::cards(db, ids)
         .await
         .map_err(|e| e.to_string())?;
@@ -257,6 +250,11 @@ async fn home_cards(db: &sinephile_persistence::Db, ids: &[i64]) -> Result<Vec<H
             runtime_minutes: m.runtime_minutes.map(|r| r as i32),
             note: None,
             progress: None,
+            is_show: matches!(
+                m.kind,
+                sinephile_persistence::MediaKind::Series
+                    | sinephile_persistence::MediaKind::AnimeSeries
+            ),
         });
     }
     Ok(out)

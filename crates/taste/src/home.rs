@@ -121,12 +121,9 @@ pub struct Ask {
     /// The viewer's local hour, 0 to 23: the part of the day the discovery engine's bandit
     /// learns and chooses in. `None` is taken as the evening.
     pub hour: Option<u32>,
-    /// "I have 90 minutes" (I42): the recommendation rails hold only titles known to run no
-    /// longer. What the profile started, saved or keeps on this PC is never cut.
-    pub max_minutes: Option<i64>,
 }
 
-/// Home's rails at an unknown hour, any length: [`rails_at`] with nothing asked.
+/// Home's rails at an unknown hour: [`rails_at`] with nothing asked.
 pub async fn rails(
     db: &Db,
     semantic: Option<&mut Semantic>,
@@ -149,8 +146,8 @@ pub async fn rails_at(
     ask: Ask,
 ) -> Result<Vec<Rail>, DbError> {
     let hour = ask.hour;
-    // A length limit leaves out much of what is chosen, so more is chosen.
-    let more = if kids { 6 } else { 1 } * if ask.max_minutes.is_some() { 3 } else { 1 };
+    // A kids profile leaves out much of what is chosen, so more is chosen.
+    let more = if kids { 6 } else { 1 };
     let profiles = ProfileRepository::new(db);
     let media = MediaRepository::new(db);
     let suits = |ids: Vec<i64>| async move {
@@ -392,7 +389,7 @@ pub async fn rails_at(
             let mut facts = crate::discover::Cache::default();
             let gathered =
                 crate::discover::gather(db, &mut **s, modes, &met, &loved, &mut facts).await?;
-            // A kids profile, or a length limit, asks each arm for more: what does not suit
+            // A kids profile asks each arm for more: what does not suit
             // children, or runs longer, is left out below.
             let asked: Vec<(Arm, usize)> = plan.iter().map(|(arm, n)| (*arm, n * more)).collect();
             let rails = crate::discover::planned(&gathered, &asked, &taken);
@@ -521,38 +518,11 @@ pub async fn rails_at(
     }
     lists.push(("watchlist", "On your watchlist".into(), saved, None));
     lists.push(("loved", "Widely loved".into(), loved, None));
-    // "I have 90 minutes": only what is known to run no longer, in the recommendation rails.
-    let cut = |key: &str| !matches!(key, "continue" | "new_episodes" | "library" | "watchlist");
-    let too_long: HashSet<i64> = match ask.max_minutes {
-        Some(max) => {
-            let ids: Vec<i64> = lists
-                .iter()
-                .filter(|(key, ..)| cut(key))
-                .flat_map(|(_, _, ids, _)| ids.iter().copied())
-                .collect();
-            let fits: HashSet<i64> = media
-                .facts(&ids)
-                .await?
-                .into_iter()
-                .filter(|f| f.runtime_minutes.is_some_and(|m| m <= max))
-                .map(|f| f.id)
-                .collect();
-            ids.into_iter().filter(|id| !fits.contains(id)).collect()
-        }
-        None => HashSet::new(),
-    };
     let mut recorded: Vec<(i64, &'static str)> = Vec::new();
     // What the taste rail shows, which its second rail continues after.
     let mut in_taste: HashSet<i64> = HashSet::new();
     for (key, title, ids, from) in lists {
         let limit = limits.get(key).copied().unwrap_or(PER_RAIL);
-        let ids: Vec<i64> = if cut(key) {
-            ids.into_iter()
-                .filter(|id| !too_long.contains(id))
-                .collect()
-        } else {
-            ids
-        };
         let ids: Vec<i64> = if key == "taste_more" {
             ids.into_iter()
                 .filter(|id| !in_taste.contains(id))

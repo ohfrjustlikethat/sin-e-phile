@@ -56,7 +56,7 @@ chose pushes it further, abandoning it eases it back. Every recommended card tak
 early abandon), and to every rail (never shown again; "not right now" for a fortnight).
 
 **And the rest of 18.4:** Surprise me (a button, RT on a pad: one film from what Home recommends now, what is on this PC
-first, opened ready to play), "I have 90 minutes" (length chips that narrow Home and Surprise me), and mood shelves
+first, opened ready to play; a length choice was built too, and removed by the author), and mood shelves
 ("Slow and beautiful", "Tense, under 100 minutes": sentences searched by meaning, two a day).
 
 ## How it was judged

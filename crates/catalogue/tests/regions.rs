@@ -32,7 +32,7 @@ async fn what_profiles_met_is_asked_first_and_every_answer_is_kept() {
         .await
         .unwrap();
     ProfileRepository::new(&db)
-        .rate(me, obscure, Some(5))
+        .rate(me, obscure, Some(10))
         .await
         .unwrap();
 

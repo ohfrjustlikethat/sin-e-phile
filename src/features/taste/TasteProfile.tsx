@@ -69,6 +69,12 @@ export function TasteProfile() {
       <p className="mt-5 max-w-[60ch] text-[15px] text-ink-muted">
         What your recommendations are made of. Not you? Say so, and Home follows.
       </p>
+      {/* Ratings are what recommendations stand on (ADR-0056): rate many, one after another. */}
+      <div className="mt-6">
+        <Button variant="secondary" size="sm" onClick={() => useUi.getState().setRateOpen(true)}>
+          Rate more films
+        </Button>
+      </div>
 
       {profile.isError && <p className="mt-10 text-sm text-danger">{profile.error.message}</p>}
       {profile.isSuccess && modes.length === 0 && axes.length === 0 && (
@@ -239,7 +245,7 @@ function Examples({ films }: { films: TastePick[] }) {
 
 /** Home's taste rail as it stands, so a correction shows what it changed (Phase 16). */
 function HomePreview() {
-  const home = useQuery({ queryKey: ["home"], queryFn: () => ok(commands.home(new Date().getHours(), null)) });
+  const home = useQuery({ queryKey: ["home"], queryFn: () => ok(commands.home(new Date().getHours())) });
   const rail = home.data?.find((r) => r.key === "taste");
   if (!rail || rail.items.length === 0) return null;
   return (

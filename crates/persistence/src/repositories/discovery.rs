@@ -16,8 +16,9 @@ pub struct Happened {
     /// The part of the day it was shown in, or for a dismissal, the part it was said in.
     pub context: String,
     /// `"completed"`, `"played"`, `"abandoned"` (stopped within the first fifth),
-    /// `"watchlisted"`, `"not_for_me"`, `"not_right_now"` or `"already_seen"`. A rating counts
-    /// as `"completed"` from four stars, `"not_for_me"` at two or fewer, `"played"` at three.
+    /// `"watchlisted"`, `"not_for_me"`, `"not_right_now"` or `"already_seen"`. A rating (a show's
+    /// by its seasons' average) counts as `"completed"` from four stars, `"not_for_me"` at two or
+    /// fewer, `"played"` between.
     pub event: String,
     /// When, as stored.
     pub at: String,
@@ -86,12 +87,12 @@ impl<'a> DiscoveryRepository<'a> {
              WHERE s.profile_id = ?1
              UNION ALL
              SELECT s.media_item_id, s.arm, s.context,
-                    CASE WHEN r.stars >= 4 THEN 'completed'
-                         WHEN r.stars <= 2 THEN 'not_for_me'
+                    CASE WHEN r.halves >= 8 THEN 'completed'
+                         WHEN r.halves <= 4 THEN 'not_for_me'
                          ELSE 'played' END,
                     r.rated_at
              FROM discovery_shown s
-             JOIN ratings r ON r.profile_id = s.profile_id
+             JOIN title_ratings r ON r.profile_id = s.profile_id
               AND r.media_item_id = s.media_item_id
               AND datetime(r.rated_at) >= datetime(s.first_shown)
              WHERE s.profile_id = ?1
