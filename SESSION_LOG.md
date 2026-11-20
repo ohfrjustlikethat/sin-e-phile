@@ -2708,3 +2708,21 @@ companion, never the published graph. **Spec amendments:** A44 (4.7.1), recorded
 - **Resume**: `next_action` (B18 first). Waiting on the author: E5 (MANUAL_TESTS, "Discovery on your own taste"), and
   Phase 5 E3/E4's third carry at Phase 18's close.
 
+## 2026-11-20 (later) — Phase 18: an installer for E5, a slow Wikidata, E4 met by a hair
+
+- **The installer for the author's test**: the one on disk dated from before Phase 17. `npm run release` from the phase
+  branch (b2842d4's arms; c2dcfbb onwards), then the release build on a fresh copy of the author's data (migration 29
+  to 34, their profile of three ratings): Home, Surprise me, the length chips, the taste rails, canon, deep cuts and a
+  mood shelf, no errors; second launch clean. Found there and fixed: Surprise me's row was off the rails' grid; and on a
+  slow WDQS day (39 s a query of 200, 2 s a query of 100 an hour later) every regions run timed out at the transport's
+  30 s, so queries are now 100 titles allowed WDQS's 60 s, 6,000 a run, and a stop is a warning in the release log
+  (ADR-0055 amended in place; not a spec change). The author's own titles were all asked first, as designed.
+- **E4 met at +40.0%** (b2842d4: popularity 0.1 in the arms' order, chosen on tuning users by a rule written first), by
+  under 0.05 point, said so; novelty +1.71 bits; E3 467,741 labels true. B18 closed. The test users have judged three
+  versions; each change was chosen without them.
+- **Decisions**: the per-request wait on the transport; Wikidata batches and rate; the arms' popularity weight by rule.
+  **Spec amendments**: none.
+- **Lesson**: a step that talks to a public service needs a slow day in its tests of the real window, not only its fast
+  one; and a stray second instance of a launch script muddies a log (stop by PID, launch one).
+- **Resume**: `next_action`. Waiting on the author: E5 with the new installer.
+
