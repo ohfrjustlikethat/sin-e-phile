@@ -65,8 +65,8 @@
       {
         "id": "E4",
         "text": "Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.",
-        "met": false,
-        "evidence": "NOT MET 2026-11-20 on the shipped arms: `eval discovery` on 0e06e59, all 15,640 MovieLens test users: discovery 1.89 bits more novel than the taste rail (bar 1) but Recall@N of everything shown 0.3626 against popularity's top N 0.2593, +39.9% (bar more than 40%). On the arms before the real window's fixes it measured +40.4% (193e4d4); the fixes (honest labels, a floor of votes) cost half a point and stay. docs/eval-results.md 18.2 to 18.5."
+        "met": true,
+        "evidence": "`eval discovery` on b2842d4 (the arms after the real window's fixes, popularity in the arms' order at 0.1 and the bandit's prior at 2, both chosen on tuning users by rules fixed before they ran), all 15,640 MovieLens test users: discovery 1.71 bits more novel than the taste rail (bar 1); Recall@N of everything shown 0.3630 against popularity's top N 0.2593, +40.0% (bar more than 40%): met by under 0.05 point (the unrounded ratio above 1.40, at most 1.4004), inside sampling noise and said so. The test users have judged three versions (+40.4%, +39.9%, +40.0%). Seen to fail: the same harness gave +28.8% before the prior. docs/eval-results.md 18.2 to 18.5."
       },
       {
         "id": "E5",
@@ -2063,8 +2063,8 @@
         {
           "id": "E4",
           "text": "Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.",
-          "met": false,
-          "evidence": "NOT MET 2026-11-20 on the shipped arms: `eval discovery` on 0e06e59, all 15,640 MovieLens test users: discovery 1.89 bits more novel than the taste rail (bar 1) but Recall@N of everything shown 0.3626 against popularity's top N 0.2593, +39.9% (bar more than 40%). On the arms before the real window's fixes it measured +40.4% (193e4d4); the fixes (honest labels, a floor of votes) cost half a point and stay. docs/eval-results.md 18.2 to 18.5."
+          "met": true,
+          "evidence": "`eval discovery` on b2842d4 (the arms after the real window's fixes, popularity in the arms' order at 0.1 and the bandit's prior at 2, both chosen on tuning users by rules fixed before they ran), all 15,640 MovieLens test users: discovery 1.71 bits more novel than the taste rail (bar 1); Recall@N of everything shown 0.3630 against popularity's top N 0.2593, +40.0% (bar more than 40%): met by under 0.05 point (the unrounded ratio above 1.40, at most 1.4004), inside sampling noise and said so. The test users have judged three versions (+40.4%, +39.9%, +40.0%). Seen to fail: the same harness gave +28.8% before the prior. docs/eval-results.md 18.2 to 18.5."
         },
         {
           "id": "E5",
@@ -2589,15 +2589,8 @@
       ]
     }
   ],
-  "next_action": "Phase 18: B18 first (read it): pick one change on tuning users (`eval discovery --tune --limit 2000`), then judge once on all test users. Then 18.5's rest: README (search row 0.3276; a discovery line), the case study's final numbers (docs/case-studies/discovery.md), the regression check's numbers in docs/eval-results.md, and the author batch: E5 (docs/MANUAL_TESTS.md, 'Discovery on your own taste') and Phase 5 E3/E4's third carry.",
-  "blockers": [
-    {
-      "id": "B18",
-      "raised": "2026-11-20",
-      "needs_user": false,
-      "description": "Phase 18 E4 short by 0.1 point after the real window's fixes (+39.9% against more than 40%; novelty met at +1.89 bits). The test users have judged two versions; the next change is chosen on the first 2,000 TUNING users (about 3.5 points above the test users on every setting so far, so it needs about +44% there) and judged on the test users once. Candidates, cheapest first: the bridge and stretch arms ordered with the search prior's popularity term as well as relevance; deep cuts loved by people who loved the profile's titles before those only close in meaning. If that fails: carry E4 to Phase 19, whose Home overhaul decides which rails Home shows and how many cards, which is what this measure is of."
-    }
-  ],
+  "next_action": "Phase 18: waiting on the author for E5 (docs/MANUAL_TESTS.md, 'Discovery on your own taste', with the installer built from the phase branch, target/release/bundle/nsis/sin-e-phile_0.1.0_x64-setup.exe). Meanwhile finish 18.5: the case study's numbers (docs/case-studies/discovery.md: E4 +40.0%, 1.71 bits), the README row, then /closephase once E5 is answered, carrying Phase 5 E3/E4 a third time (0.3276; grief not defensible) and flagging that to the author.",
+  "blockers": [],
   "decisions_pending": [
     {
       "id": "P1",

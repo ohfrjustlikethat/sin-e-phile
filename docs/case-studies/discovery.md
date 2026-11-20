@@ -74,9 +74,10 @@ Every bar was written into `docs/eval-results.md` before the run it judges, so a
 - **E4, novelty with relevance held.** On 15,640 MovieLens test users, Home as a new profile sees it. Novelty is
   self-information, `-log2` of the share of people who liked a title: one bit more is half as widely liked. Relevance is
   Recall@N of everything Home shows (taste and discovery together, about 60 cards) against popularity's top N. The bar:
-  discovery at least one bit more novel than the taste rail, and Home more than 40% above popularity. **Not met, by
-  0.1 point:** discovery is 1.89 bits more novel than the taste rail (about 3.7 times less widely liked), and Home is
-  **39.9%** above popularity (0.3626 against 0.2593), with the taste rail itself unchanged at Phase 17's 0.2639.
+  discovery at least one bit more novel than the taste rail, and Home more than 40% above popularity. **Met, by the
+  narrowest margin:** discovery is 1.71 bits more novel than the taste rail (about 3.3 times less widely liked), and Home
+  is **40.0%** above popularity (0.3630 against 0.2593; above 40% unrounded, by under 0.05 point, which is inside the
+  noise between two samples of users), with the taste rail itself unchanged at Phase 17's 0.2639.
 
 ## What went wrong, and what it taught
 
@@ -125,7 +126,9 @@ The stretch and bridge arms had changed, so the prior's rule was run again from 
 a weight of 16, and the simulation the rule itself required showed 16 starving blind spots (2.5% of a refusing viewer's
 days, against E2's 10%): a prior strong enough to win on relevance had stopped exploring. The next weight by the rule's
 own order, 2, keeps E1 and E2; that departure is recorded, not hidden. Judged once on the test users with the honest
-arms: **+39.9%**. The fixes stay; the 0.1 point is the next session's work, chosen on the tuning users and judged once.
+arms: **+39.9%**. The fixes stayed. One more change, chosen on the tuning users by a rule written first (a little
+popularity in each arm's order, 0.1, the form search uses), and judged once: **+40.0%**, met by under 0.05 point. The
+test users judged three versions in all; each change was chosen without them.
 
 ## The side effect on search
 

@@ -12,7 +12,7 @@
 
 **Phase 18 — Discovery Engine** (`in_progress`, branch `phase/18-discovery-engine`)
 
-3 of 6 exit criteria met with evidence.
+4 of 6 exit criteria met with evidence.
 
 > Builds on Phase 17's recommender: its candidate pools, calibration and reasons are what the arms draw from. Receives Phase 5 E3 and E4 (search by meaning, carried on at Phase 17's close).
 
@@ -32,8 +32,8 @@
       - *Evidence:* eval discovery --simulate on fcc4110: 1,000 maximally conservative viewers (Comfort, every discovery card 'not for me') for 120 days: discovery's least share on any day 20.0% (bar 20%), 0 of 120,000 days without a discovery rail, every discovery arm shown on at least 23.3% of each viewer's days (bar 10%). Seen to fail with --no-floor (0.0% on every day, NOT met). docs/eval-results.md 18.2.
 - [x] **E3** Rail labels accurately describe why each item is there.
       - *Evidence:* strategy::tests::every_label_of_every_arm_holds_on_generated_profiles (300 generated profiles, every pick's Label re-derived by strategy::holds; seen to fail with arms taking titles 0.1 short of close and with the blind spot ignoring met regions, 6784097); sinephile-taste tests/discover.rs every_label_holds_and_an_episode_counts_as_its_series; strategy::tests::a_blind_spot_rail_holds_one_region (a rail named for a region holds only it); and on real users: `eval discovery` on a1dd9a9 over 15,640 MovieLens test users checked 461,488 discovery labels (467,741 on 0e06e59) with strategy::holds, none false (docs/eval-results.md, 18.2).
-- [ ] **E4** Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.
-      - *Evidence:* NOT MET 2026-11-20 on the shipped arms: `eval discovery` on 0e06e59, all 15,640 MovieLens test users: discovery 1.89 bits more novel than the taste rail (bar 1) but Recall@N of everything shown 0.3626 against popularity's top N 0.2593, +39.9% (bar more than 40%). On the arms before the real window's fixes it measured +40.4% (193e4d4); the fixes (honest labels, a floor of votes) cost half a point and stay. docs/eval-results.md 18.2 to 18.5.
+- [x] **E4** Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.
+      - *Evidence:* `eval discovery` on b2842d4 (the arms after the real window's fixes, popularity in the arms' order at 0.1 and the bandit's prior at 2, both chosen on tuning users by rules fixed before they ran), all 15,640 MovieLens test users: discovery 1.71 bits more novel than the taste rail (bar 1); Recall@N of everything shown 0.3630 against popularity's top N 0.2593, +40.0% (bar more than 40%): met by under 0.05 point (the unrounded ratio above 1.40, at most 1.4004), inside sampling noise and said so. The test users have judged three versions (+40.4%, +39.9%, +40.0%). Seen to fail: the same harness gave +28.8% before the prior. docs/eval-results.md 18.2 to 18.5.
 - [ ] **E5** The author tests it on their own taste and finds at least three films they hadn't heard of and want to watch. This is the real acceptance test.
 - [ ] **E6** Case study written — this is the flagship one.
 
@@ -41,13 +41,13 @@
 
 ## What's next
 
-Phase 18: B18 first (read it): pick one change on tuning users (`eval discovery --tune --limit 2000`), then judge once on all test users. Then 18.5's rest: README (search row 0.3276; a discovery line), the case study's final numbers (docs/case-studies/discovery.md), the regression check's numbers in docs/eval-results.md, and the author batch: E5 (docs/MANUAL_TESTS.md, 'Discovery on your own taste') and Phase 5 E3/E4's third carry.
+Phase 18: waiting on the author for E5 (docs/MANUAL_TESTS.md, 'Discovery on your own taste', with the installer built from the phase branch, target/release/bundle/nsis/sin-e-phile_0.1.0_x64-setup.exe). Meanwhile finish 18.5: the case study's numbers (docs/case-studies/discovery.md: E4 +40.0%, 1.71 bits), the README row, then /closephase once E5 is answered, carrying Phase 5 E3/E4 a third time (0.3276; grief not defensible) and flagging that to the author.
 
 ---
 
 ## Blockers
 
-- **B18** Phase 18 E4 short by 0.1 point after the real window's fixes (+39.9% against more than 40%; novelty met at +1.89 bits). The test users have judged two versions; the next change is chosen on the first 2,000 TUNING users (about 3.5 points above the test users on every setting so far, so it needs about +44% there) and judged on the test users once. Candidates, cheapest first: the bridge and stretch arms ordered with the search prior's popularity term as well as relevance; deep cuts loved by people who loved the profile's titles before those only close in meaning. If that fails: carry E4 to Phase 19, whose Home overhaul decides which rails Home shows and how many cards, which is what this measure is of.
+None.
 
 ---
 
@@ -75,7 +75,7 @@ Tiers are the legitimate stopping points from `SPEC.md` Appendix E. **Tier B is 
 | [x] | 15 | Taste Model | B | 5, 14 | 2 | 4/5 |
 | [x] | 16 | Ready to Watch | B | 15 | 3–4 | 9/9 |
 | [x] | 17 | Recommendation Engine | B | 15, 16 | 2–3 | 6/7 |
-| [~] | 18 | Discovery Engine 🏁 | B | 17 | 2 | 3/6 |
+| [~] | 18 | Discovery Engine 🏁 | B | 17 | 2 | 4/6 |
 | [ ] | 19 | Browsing Surfaces | B | 18 | 4–5 | 0/13 |
 | [ ] | 20 | Watchlist and External Sync | C | 19 | 1–2 | 0/5 |
 | [ ] | 21 | Windows Platform Integration | C | 12, 19 | 2–3 | 0/5 |

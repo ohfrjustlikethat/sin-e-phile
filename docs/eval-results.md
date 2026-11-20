@@ -3694,3 +3694,35 @@ most from exactly that term. So: `relevance + w * ln(1 + votes) / ln(1 + the mos
 4. **Judged** once on all test users (E4). If it is not met, E4 is carried to Phase 19, whose Home overhaul decides which
    rails Home shows and how many cards, with its measured state.
 
+### 18.5, B18: popularity in the arms' order, measured on tuning users (2026-11-20)
+
+`eval discovery --tune --limit 2000`, the prior as shipped (weight 2), each weight a rebuild of `RELEVANCE_POPULARITY`:
+
+| w | Recall@N against popularity | novelty over the taste rail |
+|---|---|---|
+| 0 (as shipped, 0e06e59) | +43.3% (0.3684) | 1.86 bits |
+| **0.1** | **+43.6% (0.3692)** | **1.68 bits** |
+| 0.2 | +43.6% (0.3691) | 1.59 bits |
+| 0.4 | +43.6% (0.3691) | 1.50 bits |
+
+**Chosen: 0.1** (b2842d4). A small gain, 0.3 point on these users, most of it from bridges and stretches leaning to the
+widely seen. `eval discovery --simulate` unchanged (E1 98.8% rose, E2 every arm on 16.7% of days): the simulation does not
+see the arms' order.
+
+### 18.5: E4 judged once with popularity in the arms' order: met, by the narrowest margin (2026-11-20)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- discovery` on b2842d4, 15,640 test users, 1,944 s.
+
+| Measure | Value | Bar |
+|---|---|---|
+| novelty, taste rail / discovery rails | 3.74 / 5.45 bits | |
+| E4: discovery over the taste rail | **+1.71 bits** | at least +1: met |
+| E4: Recall@N of everything shown against popularity's top N | **0.3630 against 0.2593: +40.0%** | more than +40%: **met** |
+| (the taste rail alone, Recall@20) | 0.2639 (unchanged) | |
+| E3: discovery labels checked | **467,741, none false** | met |
+
+**Met by under 0.05 point**: the harness judges the unrounded ratio above 1.40, and the printed four decimals bound it at
+no more than 1.4004. That is inside the difference two samples of users make, and is stated so rather than rounded into
+comfort. The test users have now judged three versions of the arms (193e4d4 +40.4%, 0e06e59 +39.9%, b2842d4 +40.0%), each
+change chosen first on the tuning users by a rule written before it ran.
+
