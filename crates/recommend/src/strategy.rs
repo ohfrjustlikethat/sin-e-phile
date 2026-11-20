@@ -337,27 +337,49 @@ const LOVED_WEIGHT: f32 = 0.5;
 /// WHY (docs/eval-results.md, 18.2): ordered by closeness, rating or region alone, the
 /// discovery picks found a held-out favourite once in a hundred cards, a fifth as often as
 /// the most popular titles, and Home's relevance fell to 16% above popularity's.
-fn relevance(t: &Title, most_loved: f32) -> f32 {
+fn relevance(t: &Title, most: Most) -> f32 {
     let near = if t.near.is_empty() {
         0.0
     } else {
         (nearest_mode(t) + 1.0) / 2.0
     };
     let loved: f32 = t.loved_with.iter().map(|(_, s)| s).sum();
-    let loved = if most_loved > 0.0 {
-        loved / most_loved
+    let loved = if most.loved > 0.0 {
+        loved / most.loved
     } else {
         0.0
     };
-    near + LOVED_WEIGHT * loved
+    let seen = ((t.votes.max(0) + 1) as f32).ln() / most.votes;
+    near + LOVED_WEIGHT * loved + RELEVANCE_POPULARITY * seen
 }
 
-/// The most any of `titles` is pointed to by what the profile loved.
-fn most_loved(titles: &[Title]) -> f32 {
-    titles
-        .iter()
-        .map(|t| t.loved_with.iter().map(|(_, s)| s).sum::<f32>())
-        .fold(0.0, f32::max)
+/// How much how widely seen a title is counts in [`relevance`], as `ln(1 + votes)` over the
+/// most among the titles (blocker B18, chosen on tuning users by the rule in
+/// docs/eval-results.md, 18.5): Recall@N +43.3%, +43.6%, +43.6%, +43.6% against popularity at
+/// 0, 0.1, 0.2, 0.4, novelty 1.86, 1.68, 1.59, 1.50 bits; the best relevance with 1.2 bits, 0.1.
+pub const RELEVANCE_POPULARITY: f32 = 0.1;
+
+/// What [`relevance`] scales by, over the titles an arm chooses from.
+#[derive(Debug, Clone, Copy)]
+struct Most {
+    /// The most any title is pointed to by what the profile loved.
+    loved: f32,
+    /// `ln(1 + the most votes any title has)`.
+    votes: f32,
+}
+
+fn most_loved(titles: &[Title]) -> Most {
+    Most {
+        loved: titles
+            .iter()
+            .map(|t| t.loved_with.iter().map(|(_, s)| s).sum::<f32>())
+            .fold(0.0, f32::max),
+        votes: titles
+            .iter()
+            .map(|t| ((t.votes.max(0) + 1) as f32).ln())
+            .fold(0.0, f32::max)
+            .max(1e-6),
+    }
 }
 
 /// Sort best first by `score`, ties to the lower id, so the same input picks the same.
