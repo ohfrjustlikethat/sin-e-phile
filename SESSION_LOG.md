@@ -2751,4 +2751,9 @@ companion, never the published graph. **Spec amendments:** A44 (4.7.1), recorded
   **Spec amendments**: A46 (4.9.0), the author's own answers.
 - **Lesson**: a feature that asks the author to do something (rate ten films) has to be checked in the release build for
   whether they can; the acceptance test was written before the way to pass it existed.
+- **The installer** (2026-11-21 01:52, a1816c7) on a fresh copy of the author's data: migration 35 doubled their three
+  ratings, Home shows Surprise me by Search, the Rate films card ("3 of 10 rated") and no line under Continue watching;
+  no errors logged. An attempt to click into the real window landed in the author's VS Code instead (Windows would not
+  raise the app over their editor): nothing changed, the process was stopped, and in-window checks stay screenshots
+  only. The Rate films screen and the stars are covered by tests and the pad audit, not yet seen in the real window.
 

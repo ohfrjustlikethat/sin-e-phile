@@ -45,8 +45,8 @@
       {
         "id": "18.6",
         "text": "The author's fix list of 2026-11-20 (ADR-0056, spec 4.9.0): half-star ratings for any title (shows by season, the average shown; stars and watching both count) from the title page, every card's menu, the end card and a rate-a-batch screen; remove from Continue watching; Surprise me in the masthead and I42's length choice removed; the line under Continue watching removed; a cancelled download that restarted itself (the queue's race).",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "a1816c7"
       }
     ],
     "exit_criteria": [
@@ -2119,8 +2119,8 @@
         {
           "id": "18.6",
           "text": "The author's fix list of 2026-11-20 (ADR-0056, spec 4.9.0): half-star ratings for any title (shows by season, the average shown; stars and watching both count) from the title page, every card's menu, the end card and a rate-a-batch screen; remove from Continue watching; Surprise me in the masthead and I42's length choice removed; the line under Continue watching removed; a cancelled download that restarted itself (the queue's race).",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "a1816c7"
         }
       ]
     },
@@ -2601,7 +2601,7 @@
       ]
     }
   ],
-  "next_action": "Phase 18, 18.6: finish and ship the author's fix list (ADR-0056): run the pre-push checklist, commit, push; `npm run release` and launch the release build on a fresh copy of the author's data (migration 35 doubles their ratings) to check rating a film, a season, a card, the rate-a-batch screen and Continue watching's removal in the real window; then tell the author the installer is ready for E5 (docs/MANUAL_TESTS.md, 'Discovery on your own taste'). Then 18.5: close once E5 is answered, carrying Phase 5 E3/E4 a third time, flagged to the author.",
+  "next_action": "Phase 18: waiting on the author for E5 with the installer built 2026-11-21 01:52 from a1816c7 (target/release/bundle/nsis/sin-e-phile_0.1.0_x64-setup.exe; checked on a copy of their data: migration 35 turned their three ratings into 8 halves, Home shows Surprise me by Search and the Rate films card at 3 of 10). docs/MANUAL_TESTS.md, 'Discovery on your own taste', now includes the rating and Continue watching checks; the Rate films screen and the stars were not seen in the real window (no synthetic clicks), only in tests and the pad audit. Once E5 is answered: /closephase 18, carrying Phase 5 E3/E4 a third time (0.3276; grief not defensible), flagged to the author.",
   "blockers": [],
   "decisions_pending": [
     {
