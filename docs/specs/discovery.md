@@ -39,8 +39,9 @@ ten titles met.
 ## 3. Countries and movements (ADR-0055)
 
 `crates/catalogue/src/regions.rs`, hourly beside the live neighbours: Wikidata's P495 (country of origin) and P135
-(movement), English labels, by IMDb id, 200 a query, 12,000 titles a run (measured on the development copy: 69,124
-titles in 2,150 s, about 6 s a query with WDQS's own time, so a run is about six minutes). Met titles
+(movement), English labels, by IMDb id, 100 a query allowed WDQS's 60 s, 6,000 titles a run (measured on the
+development copy: 69,124 titles in 2,150 s at 200 a query one day; 39 s a query of 200 the next, past the transport's
+30 s, which is why the batch halved and the wait doubled). Met titles
 first, then films and series with 1,000 votes, most voted first. `title_regions` holds the answers and `regions_asked`
 every title asked. `ingest regions` runs it to the end on a data folder.
 

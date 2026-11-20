@@ -104,9 +104,13 @@ fn ids_query(imdb_ids: &[String]) -> Option<String> {
     ))
 }
 
-/// The most IMDb ids one [`Wikipedia::regions_for`] asks about. Two optional joins a title
-/// answer in a few seconds for 200, and the query stays a GET of a few kilobytes.
-pub const REGIONS_PER_REQUEST: usize = 200;
+/// The most IMDb ids one [`Wikipedia::regions_for`] asks about. 200 answered in about 6 s on
+/// one day and timed out at 30 s on another (2026-11-20, 39 s a query): 100 keeps a slow day's
+/// query well inside [`REGIONS_WAIT`].
+pub const REGIONS_PER_REQUEST: usize = 100;
+
+/// How long a regions query may take: WDQS's own limit, not the transport's 30 s.
+pub const REGIONS_WAIT: std::time::Duration = std::time::Duration::from_secs(60);
 
 /// The SPARQL asking where each of `imdb_ids` comes from (P495, country of origin) and which
 /// film movement it belongs to (P135), each by its English label (Phase 18, ADR-0055); `None`
@@ -257,7 +261,8 @@ impl<'a> Wikipedia<'a> {
         let url = format!("{WDQS_ENDPOINT}?query={}", encode(&query));
         let request = Request::get(url)
             .header("accept", "application/sparql-results+json")
-            .header("user-agent", USER_AGENT);
+            .header("user-agent", USER_AGENT)
+            .wait(REGIONS_WAIT);
         let response = self.execute(WDQS_HOST, request).await?;
         parse_regions(&response.body)
     }
@@ -711,6 +716,10 @@ mod tests {
         );
         assert!(!query.contains("DELETE"), "{query}");
         assert_eq!(regions_query(&[]), None);
+        assert_eq!(
+            Request::get("x").wait(REGIONS_WAIT).timeout,
+            Some(REGIONS_WAIT)
+        );
     }
 
     #[test]

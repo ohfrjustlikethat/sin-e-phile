@@ -26,10 +26,11 @@ WDQS, by IMDb id (property P345), under ADR-0033's rate limit and identifying us
 belongs to (P135)**, by IMDb id, each as its English label.
 
 - **What is asked, in order**: every title some profile has met and that was never asked (an episode as its series),
-  whatever its votes, then films and series with at least 1,000 votes, most voted first. 12,000 titles a run, 200 ids a
-  query. Measured on a copy of the development catalogue: every eligible title, 69,124, in 2,150 s (about 6 s a query
+  whatever its votes, then films and series with at least 1,000 votes, most voted first. 6,000 titles a run, 100 ids a
+  query, each allowed WDQS's own 60 s (amended 2026-11-20: 200 a query timed out at the transport's 30 s on a slow day,
+  39 s a query, in the release build's first launches). Measured on a copy of the development catalogue: every eligible title, 69,124, in 2,150 s (about 6 s a query
   with WDQS's own time), 64,560 with a country (93%) and 404 with a movement; so a run is about six minutes of an hour's
-  background, and the first six hours the app is open ask everything.
+  background, and the first dozen hours the app is open ask everything (at the amended rate).
 - **Stored** in a new table (migration 0033, `title_regions`: title, axis, name), with `regions_asked` recording every
   title asked, answered or not, so a title Wikidata does not know is not asked again each hour.
 - **English names, not ISO codes.** The Soviet Union, West Germany, Czechoslovakia and Yugoslavia have no ISO 3166-1

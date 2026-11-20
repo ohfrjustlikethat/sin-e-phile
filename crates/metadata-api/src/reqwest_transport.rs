@@ -73,6 +73,9 @@ impl Transport for HttpTransport {
             if let Some(body) = request.body {
                 builder = builder.body(body);
             }
+            if let Some(timeout) = request.timeout {
+                builder = builder.timeout(timeout);
+            }
 
             let response = builder.send().await.map_err(|error| {
                 if error.is_timeout() {

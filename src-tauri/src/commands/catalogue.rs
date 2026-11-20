@@ -285,7 +285,7 @@ async fn live_neighbours(app: &AppHandle) {
 }
 
 /// Countries and movements from Wikidata (Phase 18, ADR-0055, `sinephile_catalogue::regions`):
-/// what profiles met, then the most voted, 12,000 titles an hour until every one is asked.
+/// what profiles met, then the most voted, 6,000 titles an hour until every one is asked.
 async fn regions(app: &AppHandle) {
     let state = app.state::<AppState>();
     let Some(db) = state.db() else { return };

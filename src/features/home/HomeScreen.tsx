@@ -94,8 +94,11 @@ export function HomeScreen() {
   return (
     <div className="flex flex-col gap-12 pt-10 pb-24">
       <SetupCard />
-      {/* Surprise me (ADR-0043) and how long you have (I42). */}
-      <div className="flex flex-wrap items-center gap-6 px-16">
+      {/* Surprise me (ADR-0043) and how long you have (I42), on the rails' own grid: the index
+          column, then the content, so its left edge is the rails' (seen in the release build). */}
+      <div className="grid" style={{ gridTemplateColumns: "var(--index-col) 1fr" }}>
+        <div className="border-r border-line-subtle" />
+        <div className="flex min-w-0 flex-wrap items-center gap-6 pl-8 pr-14">
         <Button variant="secondary" size="sm" onClick={() => void surpriseMe()}>
           Surprise me
         </Button>
@@ -115,6 +118,7 @@ export function HomeScreen() {
               {l.label}
             </button>
           ))}
+        </div>
         </div>
       </div>
       {home.data.map((r, i) => (

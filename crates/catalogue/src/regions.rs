@@ -12,9 +12,10 @@
 //!    the acclaimed and widely seen are what the arms choose from. About 57,000 films in the
 //!    development catalogue.
 //!
-//! [`PER_RUN`] titles a run, [`REGIONS_PER_REQUEST`] a query: about six minutes of the hourly
-//! check's background (measured: 69,124 titles in 2,150 s on the development copy), so every
-//! title with 1,000 votes is asked within the first six hours the app is open. A title Wikidata does not
+//! [`PER_RUN`] titles a run, [`REGIONS_PER_REQUEST`] a query, each allowed WDQS's own 60 s: a
+//! few minutes of the hourly check's background (measured: 69,124 titles in 2,150 s on the
+//! development copy one day, 39 s a query of 200 the next), so every title with 1,000 votes
+//! is asked within the app's first dozen open hours, what profiles met in the first. A title Wikidata does not
 //! know, or says nothing of, is recorded as asked with nothing, and not asked again.
 
 use std::collections::HashMap;
@@ -27,8 +28,8 @@ use sinephile_persistence::Db;
 
 use crate::job::JobError;
 
-/// Titles asked per run.
-pub const PER_RUN: usize = 12_000;
+/// Titles asked per run: 60 queries, a few minutes even on a slow day.
+pub const PER_RUN: usize = 6_000;
 
 /// The fewest votes a title needs to be asked about unless a profile has met it.
 pub const MIN_VOTES: i64 = 1_000;
@@ -77,7 +78,8 @@ pub async fn ask(db: &Db, wiki: &Wikipedia<'_>, limit: usize) -> Result<Report, 
         let placed = match wiki.regions_for(&imdb_ids).await {
             Ok(placed) => placed,
             Err(error) => {
-                tracing::info!(%error, "regions: Wikidata stopped answering; the next run resumes");
+                // A warning, so a release log (warnings only from this crate) says why a run stopped.
+                tracing::warn!(%error, "regions: Wikidata stopped answering; the next run resumes");
                 report.finished = false;
                 break;
             }
