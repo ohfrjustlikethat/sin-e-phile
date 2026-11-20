@@ -1,5 +1,5 @@
 {
-  "spec_version": "4.8.0",
+  "spec_version": "4.9.0",
   "project": "sin-e-phile",
   "last_updated": "2026-11-19",
   "sessions_completed": 21,
@@ -2904,6 +2904,11 @@
       "id": "0055",
       "title": "Countries and movements from Wikidata, for the discovery engine",
       "date": "2026-11-19"
+    },
+    {
+      "id": "0056",
+      "title": "Ratings for any title, and the author's interface answers of 2026-11-20",
+      "date": "2026-11-20"
     }
   ],
   "environment": {

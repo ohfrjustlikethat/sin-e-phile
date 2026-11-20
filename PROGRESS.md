@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 4.8.0** · 21 session(s) completed · last updated 2026-11-19
+**Spec version 4.9.0** · 21 session(s) completed · last updated 2026-11-19
 
 ---
 

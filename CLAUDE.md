@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **4.8.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **4.9.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -316,6 +316,11 @@ unasked. Every other optional download stays behind a button with its size (ADR-
 neither. The hourly check asks P495 and P135 by IMDb id (met titles first, then 1,000+
 votes), stored as English names in `title_regions`. No label says "never" of a country or
 movement until every title the profile met was asked (`strategy::Profile::unknown`).
+
+**Ratings are half stars, and shows are rated by season** (ADR-0056, the author's answers): 0.5–5 like Letterboxd,
+no reviews; a show shows the average of its rated seasons; stars and watching both count in the taste model; rate from
+the title page, any card's menu, the end card and a rate-a-batch screen. Continue watching removal hides a title and
+keeps its place. Surprise me is a text button left of Search; I42's length choice was removed by the author.
 
 **TMDB is optional, and no key ever ships** (ADR-0013, ADR-0027). The app is fully
 functional on the offline IMDb + MovieLens catalogue with no key. Each user supplies
