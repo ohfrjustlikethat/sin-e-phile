@@ -127,6 +127,7 @@ fn engine_err(e: anyhow::Error) -> TorrentError {
 }
 
 /// What to add.
+#[derive(Clone)]
 pub enum Source {
     /// A `magnet:` link.
     Magnet(String),
@@ -261,6 +262,53 @@ impl Engine {
     /// Add a torrent and wait until it is live. A magnet whose metadata does not arrive
     /// within `dead_swarm_after` is a dead swarm, said plainly.
     pub async fn add(&self, source: Source, opts: AddOptions) -> Result<String, TorrentError> {
+        let (id, already) = self.add_once(source.clone(), opts.clone()).await?;
+        // Held already, but its files deleted behind its back (a download cleared before
+        // 2026-11-21 left its torrent in the session): it would count every piece as had and
+        // serve files that are gone. Dropped, and added again from nothing.
+        if already && self.drop_if_files_gone(&id).await? {
+            return Ok(self.add_once(source, opts).await?.0);
+        }
+        Ok(id)
+    }
+
+    /// Whether a torrent the engine holds has lost its files: something of it was fetched,
+    /// and not one of its files is on disk any more. Such a torrent is taken out of the
+    /// session (its record of pieces with it) and `true` is returned; a torrent with its
+    /// files, or with nothing fetched yet, is left as it is.
+    pub async fn drop_if_files_gone(&self, id: &str) -> Result<bool, TorrentError> {
+        let h = self.handle(id)?;
+        if h.stats().progress_bytes == 0 {
+            return Ok(false);
+        }
+        let Ok(files) = self.files(id) else {
+            return Ok(false);
+        };
+        let folder = h.output_folder();
+        let on_disk = files
+            .iter()
+            .filter(|f| f.len > 0)
+            .any(|f| folder.join(&f.path).exists());
+        if on_disk {
+            return Ok(false);
+        }
+        tracing::info!(
+            id,
+            "a held torrent's files are gone; dropped from the session"
+        );
+        self.session
+            .delete(librqbit::api::TorrentIdOrHash::Id(h.id()), false)
+            .await
+            .map_err(engine_err)?;
+        Ok(true)
+    }
+
+    /// One add: the torrent's id, and whether the session held it already.
+    async fn add_once(
+        &self,
+        source: Source,
+        opts: AddOptions,
+    ) -> Result<(String, bool), TorrentError> {
         let trackers = match &source {
             Source::InfoHash { trackers, .. } if !trackers.is_empty() => Some(trackers.clone()),
             _ => None,
@@ -300,8 +348,9 @@ impl Engine {
             .await
             .map_err(|_| TorrentError::DeadSwarm(deadline.as_secs()))?
             .map_err(|e| TorrentError::BadInput(format!("{e:#}")))?;
-        let handle = match added {
-            AddTorrentResponse::Added(_, h) | AddTorrentResponse::AlreadyManaged(_, h) => h,
+        let (handle, already) = match added {
+            AddTorrentResponse::Added(_, h) => (h, false),
+            AddTorrentResponse::AlreadyManaged(_, h) => (h, true),
             AddTorrentResponse::ListOnly(_) => {
                 return Err(TorrentError::Engine("list-only".into()))
             }
@@ -309,7 +358,7 @@ impl Engine {
         if !opts.paused {
             handle.wait_until_initialized().await.map_err(engine_err)?;
         }
-        Ok(handle.info_hash().as_string())
+        Ok((handle.info_hash().as_string(), already))
     }
 
     fn handle(&self, id: &str) -> Result<Handle, TorrentError> {

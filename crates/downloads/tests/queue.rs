@@ -147,7 +147,7 @@ async fn a_finished_download_files_itself_into_the_library_already_matched() {
             .unwrap(),
     );
     let downloads = work.path().join("Downloads");
-    let m = manager(&db, engine, vec![s.peer], downloads.clone());
+    let m = manager(&db, engine.clone(), vec![s.peer], downloads.clone());
 
     let id = DownloadRepository::new(&db)
         .add(&NewDownload {
@@ -176,6 +176,22 @@ async fn a_finished_download_files_itself_into_the_library_already_matched() {
         .unwrap()
         .iter()
         .any(|f| f.path == file));
+
+    // Deleted from Downloads (the author, 2026-11-21): the file, the library's record, the
+    // row, and the torrent in its backend, which would otherwise serve the same torrent to
+    // Streams from files that are gone.
+    let hash = d.backend_id.clone().expect("the torrent's id");
+    assert!(engine.has(&hash));
+    m.clear(id).await.unwrap();
+    assert!(!engine.has(&hash), "the torrent is out of the engine");
+    assert!(!Path::new(&file).exists(), "the file is gone");
+    assert!(library.file_by_path(&file).await.unwrap().is_none());
+    assert!(library.files_for_item(heat).await.unwrap().is_empty());
+    assert!(DownloadRepository::new(&db)
+        .get(id)
+        .await
+        .unwrap()
+        .is_none());
 }
 
 /// A season pack: three episodes, each exactly four pieces (so no piece holds bytes of

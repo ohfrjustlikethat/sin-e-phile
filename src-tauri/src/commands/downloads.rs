@@ -743,8 +743,11 @@ pub async fn download_clear(
     state: State<'_, AppState>,
     id: i32,
 ) -> Result<(), String> {
-    let db = state.db().ok_or("the library is still opening")?;
-    storage::clear(&db, i64::from(id), &downloads_dir())
+    // Through the manager: the torrent leaves its backend before its files go (2026-11-21).
+    let _ = state.db().ok_or("the library is still opening")?;
+    manager(&app)
+        .await?
+        .clear(i64::from(id))
         .await
         .map_err(|e| e.to_string())?;
     let _ = app.emit("library-changed", 0);

@@ -41,6 +41,49 @@ async fn a_leecher_gets_every_byte_and_finds_the_feature() {
     }
 }
 
+/// The author, 2026-11-21: after a finished download was deleted, playing the same torrent
+/// from Streams tried to play the deleted files. The session still held the torrent and
+/// counted every piece as had. A held torrent whose files are all gone is dropped and fetched
+/// again; one whose files are there is left alone.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_held_torrent_whose_files_were_deleted_is_fetched_again() {
+    use sinephile_torrent::{AddOptions, Source};
+    let s = swarm(LAYOUT, None).await;
+    let dir = temp();
+    let (leech, id) = s.leecher(dir.path(), SeedingPolicy::KeepSeeding).await;
+    wait_finished(&leech, &id, Duration::from_secs(60)).await;
+    assert!(
+        !leech.drop_if_files_gone(&id).await.unwrap(),
+        "its files are there: kept"
+    );
+    assert!(leech.has(&id));
+
+    // Deleted behind the engine's back, as clearing a download used to.
+    let main = leech.main_file(&id, Wanted::default()).unwrap();
+    let file = leech.file_path(&id, &main).unwrap();
+    let folder = file.parent().unwrap().to_path_buf();
+    for (rel, _) in LAYOUT {
+        let _ = std::fs::remove_file(folder.join(rel));
+    }
+    assert!(!file.exists());
+
+    // Asked for again: fetched from nothing, not "finished" over files that are gone.
+    let again = leech
+        .add(
+            Source::File(s.torrent.clone()),
+            AddOptions {
+                initial_peers: vec![s.peer],
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(again, id);
+    wait_finished(&leech, &id, Duration::from_secs(60)).await;
+    let on_disk = std::fs::read(&file).expect("the file is back");
+    assert!(on_disk == s.bytes("Test.Film.1922.mkv"), "and whole");
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn seeding_stops_at_completion_by_default() {
     let s = swarm(LAYOUT, None).await;

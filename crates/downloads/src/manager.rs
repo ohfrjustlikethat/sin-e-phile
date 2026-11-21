@@ -383,6 +383,24 @@ impl Manager {
         Ok(())
     }
 
+    /// Delete a finished download (Downloads, Kept on this PC): out of its backend first, then
+    /// its files, its library record and its row. A finished torrent stays in its backend to
+    /// seed or wait; left there with its files deleted, it counted every piece as had, and
+    /// playing the same torrent from Streams served files that were gone (the author,
+    /// 2026-11-21).
+    pub async fn clear(&self, id: i64) -> Result<(), ManagerError> {
+        let _turn = self.turn.lock().await;
+        if let Some(d) = DownloadRepository::new(&self.db).get(id).await? {
+            if let (Some(b), Some(bid)) = (self.backend(&d.backend), d.backend_id.as_deref()) {
+                if b.holds(bid).await {
+                    b.remove(bid, false).await?;
+                }
+            }
+        }
+        self.forget(id);
+        crate::storage::clear(&self.db, id, &self.dir).await
+    }
+
     /// Stop it for good, and delete what was fetched unless told to keep it. Marked cancelled
     /// first, so nothing starts it again even if its backend refuses to let go; a backend
     /// that cannot delete the files is asked once more to stop it, keeping them, and the
