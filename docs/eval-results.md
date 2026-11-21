@@ -3791,7 +3791,9 @@ Nothing regressed. The full workspace suite: 960 passed; the front end: 294.
 | Scratch copies of data in Temp | 40 GB | 2 MB |
 | **Free on C:** | about 157 GB (not measured: 681 GB measured once the streams were gone, less their 524) | **1,028 GB** |
 
-The author's Downloads (11 GB) were not touched. `tools/doctor` now warns when `target/` passes 60 GB: seen to fail at
+After the new profiles, everything built again (the workspace's tests, the debug app, the release installer, the
+evaluation tool): **`target/` 18 GB** (`du -sh target`, 2026-11-21 22:41), against 295 GB before. The author's Downloads
+(11 GB) were not touched. `tools/doctor` now warns when `target/` passes 60 GB: seen to fail at
 295 GB before the clean, 0.0 GB after.
 
 ### Streaming fetches only the watched file (`cargo test -p sinephile-torrent --test swarm`)

@@ -15,8 +15,8 @@
       {
         "id": "19.0",
         "text": "The author's request before the phase (ADR-0057, spec 4.10.0): 524 GB of streams deleted and the session cleared of them; streaming fetches only the watched file; a 20 GB stream cache, least recently watched out first (Downloads page setting); target/ cleaned (325 GiB) and kept small by Cargo profiles with a doctor warning; scratch copies deleted (C: 1,028 GB free); a search that is a person's name shows their films (zendaya, timothee chalamet, christopher nolan).",
-        "status": "in_progress",
-        "commit": null
+        "status": "complete",
+        "commit": "c82b81b"
       },
       {
         "id": "19.1",
@@ -2289,8 +2289,8 @@
         {
           "id": "19.0",
           "text": "The author's request before the phase (ADR-0057, spec 4.10.0): 524 GB of streams deleted and the session cleared of them; streaming fetches only the watched file; a 20 GB stream cache, least recently watched out first (Downloads page setting); target/ cleaned (325 GiB) and kept small by Cargo profiles with a doctor warning; scratch copies deleted (C: 1,028 GB free); a search that is a person's name shows their films (zendaya, timothee chalamet, christopher nolan).",
-          "status": "in_progress",
-          "commit": null
+          "status": "complete",
+          "commit": "c82b81b"
         },
         {
           "id": "19.1",
