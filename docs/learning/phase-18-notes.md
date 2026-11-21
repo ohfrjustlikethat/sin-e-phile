@@ -128,6 +128,13 @@ Four sections only (ADR-0016 A4): what we built, why, new concepts, the five que
 - **Optimistic updates and in-flight loads**: set the new value, and cancel the load without reverting, or it puts the
   old value back — `src/features/ratings/useRating.ts:53`.
 - **Saving once the input settles** (debounce: a timer replaced by each change) — `useRating.ts` (`settle`).
+- **State outside the database that can go stale**: a torrent session's record of pieces outlived the files it described
+  — `crates/torrent/src/engine.rs:263` (`add`) and `:274` (`drop_if_files_gone`); `crates/downloads/src/manager.rs`
+  (`clear`, out of the backend before the files go).
+- **Memoising with a validity key** (the profile's signal fingerprint, the part of the day, an age): reuse a result only
+  while what it was built from is unchanged — `crates/taste/src/home.rs` (`recent`).
+- **A scrolling popup**: a max height and `overflow-y: auto`, or a long list leaves the window —
+  `src/features/player/PlayerScreen.tsx` (`TrackMenu`).
 
 ## 4. Five questions
 

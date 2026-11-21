@@ -2757,3 +2757,27 @@ companion, never the published graph. **Spec amendments:** A44 (4.7.1), recorded
   raise the app over their editor): nothing changed, the process was stopped, and in-window checks stay screenshots
   only. The Rate films screen and the stars are covered by tests and the pad audit, not yet seen in the real window.
 
+## 2026-11-21 (later) — Phase 18 closed: the author's E5, three fixes, the retrospective
+
+- **E5**: the author ran it on their own profile with the new installer: "E5 seems okay". Recorded in their words; they
+  named no films.
+- **Three things they found, fixed with a test seen to fail first**: a long subtitle list ran off the window (the bar's
+  track menu had no height; 0d33fe9). A deleted download played from its old files (its torrent stayed in librqbit's
+  session counting every piece as had; Delete now takes the torrent out first, and a held torrent whose files are all
+  gone is dropped and fetched again, which also repairs what earlier deletes left behind; 4f0e1c8). Surprise me was
+  slow (each press built all of Home, 377 ms warm, 3.7 s cold, behind the search engine's lock; now it picks from the
+  rails Home last built while they are current, 1.5 to 1.8 ms; 525bb0a; `eval surprise`).
+- **Closed**: E1 to E6 met with evidence; Phase 5 E3 (0.3276) and E4 (half) carried a third time, to Phase 19, with an
+  untried approach (negation-aware queries) as its first subtask, flagged to the author. Regression check clean.
+- **Decisions**: the stale-torrent rule (something fetched, no file on disk) and its place in `add` and play; Surprise
+  me's 15-minute memo and what invalidates it; the carry. **Spec amendments**: none since A46.
+
+### Phase 18 retrospective
+
+- **What worked**: bars written before runs, tuning users kept apart from test users, and per-arm diagnostics; the
+  bandit's simulation proved E1 and E2 cheaply; one view for every reader of ratings.
+- **What did not**: E4 was judged three times on the test users as the arms changed (each change chosen without them,
+  but the margin is inside sampling noise); E5 was written before the app could rate a film; Surprise me shipped without
+  a timing.
+- **Next time**: time every user-facing action against a budget when it is built; walk the acceptance test through the
+  release build before asking the author to; look at the real window before tuning a metric on it.

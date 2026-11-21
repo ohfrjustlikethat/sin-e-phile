@@ -19,8 +19,8 @@ The thing that makes this app worth using: recommendations that are *surprising 
 - [x] **E2** The exploration floor holds: even a maximally-conservative simulated user still receives genuine discovery.
 - [x] **E3** Rail labels accurately describe why each item is there.
 - [x] **E4** Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.
-- [ ] **E5** The author tests it on their own taste and finds at least three films they hadn't heard of and want to watch. This is the real acceptance test.
-- [ ] **E6** Case study written — this is the flagship one.
+- [x] **E5** The author tests it on their own taste and finds at least three films they hadn't heard of and want to watch. This is the real acceptance test.
+- [x] **E6** Case study written — this is the flagship one.
 
 ## Subtasks
 
@@ -28,8 +28,9 @@ The thing that makes this app worth using: recommendations that are *surprising 
 - [x] **18.2** The contextual bandit (Thompson sampling) over the arms, rewarded by outcomes (played, completed, abandoned early, watchlisted, dismissed), with an exploration floor and no arm dominating; a simulation harness (`eval discovery`) with simulated users whose reward patterns change (E1), a maximally conservative user who still gets discovery (E2), and the novelty metric, mean inverse popularity, against its target with relevance held (E4).
 - [x] **18.3** The exploration budget and dismissals: a Comfort to Adventure setting per profile adapted by the bandit; 'not for me', 'not right now', 'already seen' on every recommended card (pad-reachable) feeding back; never the same item in two rails.
 - [x] **18.4** Surprise me (one button and a pad shortcut: a film the viewer will probably like, from their taste and their sources, opened ready to play) and mood shelves from the semantic index offered to Home's rails, with I42 ('I have 90 minutes'). Search-by-meaning quality, carried from Phase 5 (E3 nDCG@10 0.0472, E4 the two named queries), is worked here, where mood shelves depend on it.
-- [ ] **18.5** The flagship case study (E6), the author's acceptance test on their own taste (E5, asked in the author batch), docs/specs, learning note, README and HOW_IT_WORKS, regression against every recorded number, close.
+- [x] **18.5** The flagship case study (E6), the author's acceptance test on their own taste (E5, asked in the author batch), docs/specs, learning note, README and HOW_IT_WORKS, regression against every recorded number, close.
 - [x] **18.6** The author's fix list of 2026-11-20 (ADR-0056, spec 4.9.0): half-star ratings for any title (shows by season, the average shown; stars and watching both count) from the title page, every card's menu, the end card and a rate-a-batch screen; remove from Continue watching; Surprise me in the masthead and I42's length choice removed; the line under Continue watching removed; a cancelled download that restarted itself (the queue's race).
+- [x] **18.7** The author's E5 findings of 2026-11-21: a long subtitle list that ran off the window (0d33fe9); a deleted download whose torrent stayed in the engine and was played from gone files (4f0e1c8); Surprise me rebuilding all of Home per press, 377 ms to 1.7 ms (525bb0a).
 
 ## Improvements assigned (SPEC.md Appendix F)
 
@@ -106,3 +107,5 @@ E1 bar.
 - **18.2** The contextual bandit (Thompson sampling) over the arms, rewarded by outcomes (played, completed · `193e4d4`
 - **18.4** Surprise me (one button and a pad shortcut: a film the viewer will probably like, from their tas · `890a469`
 - **18.6** The author's fix list of 2026-11-20 (ADR-0056, spec 4.9.0): half-star ratings for any title (sho · `a1816c7`
+- **18.5** The flagship case study (E6), the author's acceptance test on their own taste (E5, asked in the  · `b1d59eb`
+- **18.7** The author's E5 findings of 2026-11-21: a long subtitle list that ran off the window (0d33fe9);  · `525bb0a`

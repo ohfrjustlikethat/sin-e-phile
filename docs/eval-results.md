@@ -3764,3 +3764,16 @@ it last built for each profile, and a press picks from them while nothing they s
 the part of the day, "what you love", 15 minutes), without the engine. The first run, over budget, is the check seen to
 fail.
 
+### Regression check before merging Phase 18 (rule 13), 2026-11-21
+
+What 18.6 and 18.7 touched that earlier harnesses measure, run again on the scratch data on 525bb0a's code:
+
+| Harness | Recorded | Now |
+|---|---|---|
+| `eval update` (Phase 15 E5: a watch to an updated model, under 2 s) | 125.7 to 133.2 ms | 113.2 to 120.9 ms; every watch in its model; E5 met |
+| `eval import` (Phase 14 E2: 600 films, tuned set) | 598 right (99.67%), 0 wrong, 2 asked | 598 right (99.67%), 0 wrong, 2 asked; 349 ratings recorded (half stars kept) |
+| `eval taste` (Phase 14 E2 / 15) | 40.63%, 1.14x popularity | 40.71%, 1.17x (18.6) |
+| `eval discovery` (Phase 18 E3, E4) | as judged on b2842d4 | unchanged code paths since |
+| Search (Phase 5 E1, E2, E3) | as recorded in 18.4 | no search code changed since |
+
+Nothing regressed. The full workspace suite: 960 passed; the front end: 294.

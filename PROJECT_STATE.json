@@ -39,14 +39,20 @@
       {
         "id": "18.5",
         "text": "The flagship case study (E6), the author's acceptance test on their own taste (E5, asked in the author batch), docs/specs, learning note, README and HOW_IT_WORKS, regression against every recorded number, close.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "b1d59eb"
       },
       {
         "id": "18.6",
         "text": "The author's fix list of 2026-11-20 (ADR-0056, spec 4.9.0): half-star ratings for any title (shows by season, the average shown; stars and watching both count) from the title page, every card's menu, the end card and a rate-a-batch screen; remove from Continue watching; Surprise me in the masthead and I42's length choice removed; the line under Continue watching removed; a cancelled download that restarted itself (the queue's race).",
         "status": "complete",
         "commit": "a1816c7"
+      },
+      {
+        "id": "18.7",
+        "text": "The author's E5 findings of 2026-11-21: a long subtitle list that ran off the window (0d33fe9); a deleted download whose torrent stayed in the engine and was played from gone files (4f0e1c8); Surprise me rebuilding all of Home per press, 377 ms to 1.7 ms (525bb0a).",
+        "status": "complete",
+        "commit": "525bb0a"
       }
     ],
     "exit_criteria": [
@@ -77,14 +83,14 @@
       {
         "id": "E5",
         "text": "The author tests it on their own taste and finds at least three films they hadn't heard of and want to watch. This is the real acceptance test.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "manual: the author ran it on their own profile in the installed release (installer of 2026-11-21 from a1816c7, after rating films with the half stars built for it, ADR-0056) and said \"E5 seems okay\" (2026-11-21). They named no films; the three the criterion asks for are their judgment, not a list recorded here. docs/case-studies/discovery.md, E5."
       },
       {
         "id": "E6",
         "text": "Case study written — this is the flagship one.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "docs/case-studies/discovery.md (the flagship case study: the problem, the five arms and the bandit, how each criterion was judged with bars fixed first, what the author's test found, what went wrong, the side effect on search, what would be done differently); every number in docs/eval-results.md, Phase 18."
       }
     ]
   },
@@ -750,16 +756,16 @@
           "text": "nDCG@10 > 0.75 on the semantic query set.",
           "met": false,
           "evidence": "MEASURED 2026-11-20 in Phase 18 (18.4) with search by meaning's popularity prior at 0.4, chosen on a separate tuning set (fixtures/search/meaning-tuning.tsv, 0.0215 to 0.4213): `eval search --report` on 890a469 -> meaning nDCG@10 0.3276 over 8 queries (from 0.0472), filter 1.0000, known-item MRR 1.0000 (both first); E2 43/43; E1 p95 24.2 ms. Still below 0.75. History: docs/eval-results.md (Session 19, Phase 17 regression check, 18.4); docs/case-study/search.md.",
-          "carried_to_phase": 18,
-          "carried_reason": "Phase 17 built the recommender on the meaning index and gave titles without meaning a vector (ADR-0054), but it does not change how a query is embedded or ranked, so the number did not move. Phase 18's mood shelves are queries over the same semantic index; retrieval quality is their precondition, so the work moves there."
+          "carried_to_phase": 19,
+          "carried_reason": "Third carry, flagged to the author. Phase 18 took meaning search from 0.0472 to 0.3276 with a popularity prior (18.4); what is left is query understanding, not ranking: a query that says what it is NOT ('...that aren't depressing') is embedded as one meaning, so the negated idea pulls results toward it. The next approach, untried: split a negated clause, embed it apart, and push down results close to it, chosen on the tuning set first. It is Phase 19's first subtask: Search is one of the browsing surfaces that phase brings to standard."
         },
         {
           "id": "E4",
           "text": "\"films about grief that aren't depressing\" and \"like Wong Kar-wai but Korean\" both return defensible results — documented with screenshots in the case study.",
           "met": false,
           "evidence": "HALF MET 2026-11-20 (Phase 18, 18.4, popularity prior 0.4, 890a469): 'like Wong Kar-wai but Korean' now gives Chungking Express, In the Mood for Love, Memories of Murder, 2046, Thirst, 3-Iron (nDCG 0.2385): defensible. 'films about grief that aren't depressing' gives Hereafter, Antichrist, The Queen, Cries & Whispers, 1984 (nDCG 0.0000): the negation is missed. docs/eval-results.md 18.4; earlier screenshots docs/case-study/shots/01-grief.png, 02-wong-kar-wai.png.",
-          "carried_to_phase": 18,
-          "carried_reason": "The same retrieval quality as E3; it moves with E3 to Phase 18, whose mood shelves are built from semantic queries."
+          "carried_to_phase": 19,
+          "carried_reason": "With E3, third carry, flagged to the author: 'like Wong Kar-wai but Korean' is defensible since 18.4; 'films about grief that aren't depressing' fails on the negation, which is E3's next approach. Phase 19's first subtask."
         },
         {
           "id": "E5",
@@ -2075,14 +2081,14 @@
         {
           "id": "E5",
           "text": "The author tests it on their own taste and finds at least three films they hadn't heard of and want to watch. This is the real acceptance test.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "manual: the author ran it on their own profile in the installed release (installer of 2026-11-21 from a1816c7, after rating films with the half stars built for it, ADR-0056) and said \"E5 seems okay\" (2026-11-21). They named no films; the three the criterion asks for are their judgment, not a list recorded here. docs/case-studies/discovery.md, E5."
         },
         {
           "id": "E6",
           "text": "Case study written — this is the flagship one.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "docs/case-studies/discovery.md (the flagship case study: the problem, the five arms and the bandit, how each criterion was judged with bars fixed first, what the author's test found, what went wrong, the side effect on search, what would be done differently); every number in docs/eval-results.md, Phase 18."
         }
       ],
       "subtasks": [
@@ -2113,14 +2119,20 @@
         {
           "id": "18.5",
           "text": "The flagship case study (E6), the author's acceptance test on their own taste (E5, asked in the author batch), docs/specs, learning note, README and HOW_IT_WORKS, regression against every recorded number, close.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "b1d59eb"
         },
         {
           "id": "18.6",
           "text": "The author's fix list of 2026-11-20 (ADR-0056, spec 4.9.0): half-star ratings for any title (shows by season, the average shown; stars and watching both count) from the title page, every card's menu, the end card and a rate-a-batch screen; remove from Continue watching; Surprise me in the masthead and I42's length choice removed; the line under Continue watching removed; a cancelled download that restarted itself (the queue's race).",
           "status": "complete",
           "commit": "a1816c7"
+        },
+        {
+          "id": "18.7",
+          "text": "The author's E5 findings of 2026-11-21: a long subtitle list that ran off the window (0d33fe9); a deleted download whose torrent stayed in the engine and was played from gone files (4f0e1c8); Surprise me rebuilding all of Home per press, 377 ms to 1.7 ms (525bb0a).",
+          "status": "complete",
+          "commit": "525bb0a"
         }
       ]
     },
