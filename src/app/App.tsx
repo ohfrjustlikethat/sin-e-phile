@@ -11,6 +11,7 @@ import { PadPicker, closePadPicker, openPadPicker } from "@/app/PadPicker";
 import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { ReviewScreen } from "@/features/library/ReviewScreen";
 import { DownloadsScreen } from "@/features/downloads/DownloadsScreen";
+import { RateScreen } from "@/features/ratings/RateScreen";
 import { TasteProfile } from "@/features/taste/TasteProfile";
 import { DownloadNotices } from "@/features/downloads/DownloadNotices";
 import { ToastStack } from "@/design-system";
@@ -34,6 +35,7 @@ import { setWindowFullscreen } from "@/lib/fullscreen";
 import { useScrollMemory } from "@/lib/scrollMemory";
 import { BackBar, usePageName } from "./BackBar";
 import { handleBack } from "./backKey";
+import { surpriseMe } from "@/features/home/surprise";
 
 /** Full screen for the whole app window (ADR-0042: View, or picking the pad up), from any window state. */
 async function fullscreen(on?: boolean) {
@@ -68,6 +70,7 @@ export function App() {
   const reviewOpen = useUi((s) => s.reviewOpen);
   const tasteOpen = useUi((s) => s.tasteOpen);
   const downloadsOpen = useUi((s) => s.downloadsOpen);
+  const rateOpen = useUi((s) => s.rateOpen);
   const pickerOpen = useUi((s) => s.pickerOpen);
   const setPickerOpen = useUi((s) => s.setPickerOpen);
   const { profiles, loading: profilesLoading } = useProfiles();
@@ -105,7 +108,9 @@ export function App() {
   blocking.current = Boolean(onboarding) || palette;
   // One scroll area holds every page; each page's position is kept and put back (Phase 16).
   const pageKey = useUi((s) =>
-    s.reviewOpen
+    s.rateOpen
+      ? "rate"
+      : s.reviewOpen
       ? "review"
       : s.tasteOpen
         ? "taste"
@@ -174,6 +179,16 @@ export function App() {
               break;
             case "settings":
               useUi.getState().setSettingsOpen(true);
+              break;
+            case "surprise":
+              void surpriseMe();
+              break;
+            case "options":
+              // What the keyboard's context-menu key does, sent to whatever has focus: a
+              // recommended card opens "not for me" (Phase 18); anything else ignores it.
+              document.activeElement?.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "ContextMenu", bubbles: true, cancelable: true }),
+              );
               break;
           }
         },
@@ -294,7 +309,9 @@ export function App() {
           <div id="panel-slot" className="pointer-events-none absolute inset-x-0 top-14 bottom-0 z-40" />
           <main ref={mainRef} className="min-h-0 min-w-0 flex-1 overflow-auto">
             <BackBar />
-            {settingsOpen && reviewOpen ? (
+            {rateOpen ? (
+              <RateScreen />
+            ) : settingsOpen && reviewOpen ? (
               <ReviewScreen />
             ) : settingsOpen && tasteOpen ? (
               <TasteProfile />

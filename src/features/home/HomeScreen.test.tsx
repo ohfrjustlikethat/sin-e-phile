@@ -18,6 +18,14 @@ const commands = {
   ),
   subtitleSettings: vi.fn(() => ok({ has_key: false })),
   torrentSettings: vi.fn(() => ok({ bind_interface: null as string | null })),
+  // Phase 18: Surprise me.
+  surpriseMe: vi.fn((_hour: number | null) =>
+    ok({ id: 7, note: "Like Stalker, but from the 1920s", on_this_pc: false } as {
+      id: number;
+      note: string | null;
+      on_this_pc: boolean;
+    } | null),
+  ),
 };
 vi.mock("@/lib/ipc", () => ({ commands }));
 // jsdom has no layout: the rail measures nothing, and renders its first cards.
@@ -42,7 +50,7 @@ describe("Home, first version (Phase 14)", () => {
     // No director known: the byline says the year alone, never " · 1927" or "Uncatalogued".
     expect(within(loved).getByText("1927")).toBeInTheDocument();
     expect(screen.queryByText("Uncatalogued")).toBeNull();
-    fireEvent.click(within(screen.getByRole("region", { name: "Continue watching" })).getByRole("button", { name: /Heat/ }));
+    fireEvent.click(within(screen.getByRole("region", { name: "Continue watching" })).getByRole("button", { name: /^Heat/ }));
     expect(useUi.getState().detail).toBe(1);
   });
 
@@ -84,5 +92,13 @@ describe("Home, first version (Phase 14)", () => {
     const card = await screen.findByRole("region", { name: "Finish setting up" });
     fireEvent.click(within(card).getByRole("button", { name: "Hide" }));
     expect(screen.queryByRole("region", { name: "Finish setting up" })).toBeNull();
+  });
+
+  it("Home has no length choice and no Surprise me row: both left Home (ADR-0056)", async () => {
+    renderHome();
+    await screen.findByRole("region", { name: "Widely loved" });
+    expect(screen.queryByRole("radiogroup", { name: "How long you have" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Surprise me" })).toBeNull();
+    expect(commands.home).toHaveBeenLastCalledWith(expect.any(Number));
   });
 });

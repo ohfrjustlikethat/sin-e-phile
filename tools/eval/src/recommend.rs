@@ -384,7 +384,6 @@ pub async fn whole(
 ) -> Result<bool, EvalError> {
     let caps = caps.unwrap_or(rank::CAPS);
     use sinephile_taste::hybrid;
-    let path = data_dir.join("datasets").join("ml-25m.zip");
     let judge = if tune || check {
         Part::Tune
     } else {
@@ -403,64 +402,14 @@ pub async fn whole(
     let semantic = engine
         .semantic_mut()
         .ok_or_else(|| missing("the meaning index and model are needed"))?;
-    let titles = movielens::by_movielens_id(&db).await.map_err(missing)?;
-
-    // The ratings, onto catalogue titles: the build users' likes make the matrix.
-    let mut building: Vec<Rating> = Vec::new();
-    let mut judged: HashMap<u32, Judged> = HashMap::new();
-    movielens::ratings(&path, |user, movie, stars| {
-        if stars < cf::LIKED {
-            return;
-        }
-        let Some(item) = titles.get(&movie).and_then(|&id| u32::try_from(id).ok()) else {
-            return;
-        };
-        match split::part(user) {
-            Part::Build => building.push(Rating { user, item, stars }),
-            p if p == judge => {
-                let j = judged.entry(user).or_insert_with(|| Judged {
-                    shown: Vec::new(),
-                    held: Vec::new(),
-                });
-                if split::held_out(user, movie) {
-                    j.held.push(item);
-                } else {
-                    j.shown.push(item);
-                }
-            }
-            _ => {}
-        }
-    })
-    .map_err(missing)?;
-    let likes = Likes::from_ratings(building, cf::MIN_LIKES);
-    let threads = std::thread::available_parallelism().map_or(4, |n| n.get());
-    let matrix = cf::build(&likes, cf::CHOSEN, TOP, threads);
-    let popular: Vec<i64> = likes
-        .popularity()
-        .into_iter()
-        .map(|(id, _)| i64::from(id))
-        .collect();
-    let in_matrix: HashSet<i64> = popular.iter().copied().collect();
-
-    // The same users the matrix-only number was judged on: enough shown, something held out
-    // that the matrix holds. In id order, so `--limit` takes the same users every run.
-    let mut users: Vec<(u32, Vec<i64>, Vec<i64>)> = judged
-        .into_iter()
-        .filter_map(|(user, j)| {
-            let held: Vec<i64> = j
-                .held
-                .into_iter()
-                .map(i64::from)
-                .filter(|i| in_matrix.contains(i))
-                .collect();
-            let shown: Vec<i64> = j.shown.into_iter().map(i64::from).collect();
-            (shown.len() >= MIN_SHOWN && !held.is_empty()).then_some((user, shown, held))
-        })
-        .collect();
-    users.sort_by_key(|(u, _, _)| *u);
-    if let Some(n) = limit {
-        users.truncate(n);
-    }
+    let Judging {
+        likes,
+        matrix,
+        popular,
+        in_matrix,
+        users,
+        ..
+    } = judging(data_dir, &db, judge, limit).await?;
     println!(
         "  matrix from {} build users' likes over {} titles; judged on {} users",
         likes.people(),
@@ -692,6 +641,105 @@ pub async fn whole(
     Ok(e1 && e2 && e3)
 }
 
+/// MovieLens onto the catalogue, split as Phase 17 judges it (and Phase 18 after it).
+pub(crate) struct Judging {
+    /// The build users' likes, items liked by at least `cf::MIN_LIKES` of them.
+    pub likes: Likes,
+    pub matrix: Matrix,
+    /// The matrix's titles, most liked first: popularity's list.
+    pub popular: Vec<i64>,
+    pub in_matrix: HashSet<i64>,
+    /// The judged users, in id order: (user, shown likes, held-out likes the matrix holds).
+    pub users: Vec<(u32, Vec<i64>, Vec<i64>)>,
+    /// How many build users liked each title, with no minimum: novelty's counts.
+    pub liked_by: HashMap<i64, u32>,
+    /// Build users who liked anything in the catalogue.
+    pub build_users: usize,
+}
+
+/// The ratings, onto catalogue titles: the build users' likes make the matrix; the users of
+/// part `judge` with at least `MIN_SHOWN` shown likes and a held-out like the matrix holds are
+/// judged, the first `limit` of them by id.
+pub(crate) async fn judging(
+    data_dir: &Path,
+    db: &sinephile_persistence::Db,
+    judge: Part,
+    limit: Option<usize>,
+) -> Result<Judging, EvalError> {
+    let path = data_dir.join("datasets").join("ml-25m.zip");
+    let titles = movielens::by_movielens_id(db).await.map_err(missing)?;
+    let mut building: Vec<Rating> = Vec::new();
+    let mut judged: HashMap<u32, Judged> = HashMap::new();
+    let mut liked_by: HashMap<i64, u32> = HashMap::new();
+    let mut builders: HashSet<u32> = HashSet::new();
+    movielens::ratings(&path, |user, movie, stars| {
+        if stars < cf::LIKED {
+            return;
+        }
+        let Some(item) = titles.get(&movie).and_then(|&id| u32::try_from(id).ok()) else {
+            return;
+        };
+        match split::part(user) {
+            Part::Build => {
+                building.push(Rating { user, item, stars });
+                *liked_by.entry(i64::from(item)).or_default() += 1;
+                builders.insert(user);
+            }
+            p if p == judge => {
+                let j = judged.entry(user).or_insert_with(|| Judged {
+                    shown: Vec::new(),
+                    held: Vec::new(),
+                });
+                if split::held_out(user, movie) {
+                    j.held.push(item);
+                } else {
+                    j.shown.push(item);
+                }
+            }
+            _ => {}
+        }
+    })
+    .map_err(missing)?;
+    let likes = Likes::from_ratings(building, cf::MIN_LIKES);
+    let threads = std::thread::available_parallelism().map_or(4, |n| n.get());
+    let matrix = cf::build(&likes, cf::CHOSEN, TOP, threads);
+    let popular: Vec<i64> = likes
+        .popularity()
+        .into_iter()
+        .map(|(id, _)| i64::from(id))
+        .collect();
+    let in_matrix: HashSet<i64> = popular.iter().copied().collect();
+
+    // The same users the matrix-only number was judged on: enough shown, something held out
+    // that the matrix holds. In id order, so `--limit` takes the same users every run.
+    let mut users: Vec<(u32, Vec<i64>, Vec<i64>)> = judged
+        .into_iter()
+        .filter_map(|(user, j)| {
+            let held: Vec<i64> = j
+                .held
+                .into_iter()
+                .map(i64::from)
+                .filter(|i| in_matrix.contains(i))
+                .collect();
+            let shown: Vec<i64> = j.shown.into_iter().map(i64::from).collect();
+            (shown.len() >= MIN_SHOWN && !held.is_empty()).then_some((user, shown, held))
+        })
+        .collect();
+    users.sort_by_key(|(u, _, _)| *u);
+    if let Some(n) = limit {
+        users.truncate(n);
+    }
+    Ok(Judging {
+        likes,
+        matrix,
+        popular,
+        in_matrix,
+        users,
+        liked_by,
+        build_users: builders.len(),
+    })
+}
+
 /// One profile's "Where your taste points" as Home builds it, each card's reason beside it,
 /// and how the reasons divide: what 17.3's look at the real window reads in full (the window
 /// shows eight), and what the case study quotes. Run it on a copy (`SINEPHILE_DATA_DIR`):
@@ -741,5 +789,31 @@ pub async fn rail(data_dir: &Path, profile: i64) -> Result<bool, EvalError> {
     println!(
         "\nreasons: {loved} loved by people who loved, {close} close in meaning, {widely} widely loved"
     );
+    // Phase 18: each discovery rail, the second taste rail and the mood shelves Home built,
+    // every card's note beside it.
+    let shown: Vec<&sinephile_taste::home::Rail> = rails
+        .iter()
+        .filter(|r| {
+            r.key == "taste_more"
+                || r.key.starts_with("mood_")
+                || sinephile_recommend::strategy::Arm::from_key(r.key).is_some()
+        })
+        .collect();
+    for r in shown {
+        let facts: HashMap<i64, (String, Option<i64>)> =
+            sinephile_persistence::repositories::MediaRepository::new(&db)
+                .facts(&r.items)
+                .await?
+                .into_iter()
+                .map(|f| (f.id, (f.title, f.year)))
+                .collect();
+        println!("\n{} ({}): \"{}\"", r.key, r.items.len(), r.title);
+        for (n, id) in r.items.iter().enumerate() {
+            let (title, year) = facts.get(id).cloned().unwrap_or_default();
+            let year = year.map_or(String::new(), |y| format!(" ({y})"));
+            let note = r.notes.get(id).map_or("", String::as_str);
+            println!("  {:>2}. {title}{year}: {note}", n + 1);
+        }
+    }
     Ok(!taste.items.is_empty())
 }

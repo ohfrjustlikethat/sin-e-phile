@@ -264,28 +264,32 @@ impl<'a> ProfileRepository<'a> {
         rows.into_iter().map(map_profile).collect()
     }
 
-    /// Append to the watch log. Never updates: the log is the record.
-    /// The profile's 1–5 rating of a title; rating again replaces it, `None` clears it.
+    /// The profile's rating of a title in half stars (ADR-0056): `halves` 1 to 10 is 0.5 to 5
+    /// stars. Rating again replaces it, `None` clears it.
     pub async fn rate(
         &self,
         profile_id: i64,
         media_item_id: i64,
-        stars: Option<i64>,
+        halves: Option<i64>,
     ) -> Result<(), DbError> {
-        match stars {
-            Some(stars) if (1..=5).contains(&stars) => {
+        match halves {
+            Some(halves) if (1..=10).contains(&halves) => {
                 sqlx::query(
-                    "INSERT INTO ratings (profile_id, media_item_id, stars) VALUES (?1, ?2, ?3)
+                    "INSERT INTO ratings (profile_id, media_item_id, halves) VALUES (?1, ?2, ?3)
                      ON CONFLICT (profile_id, media_item_id) DO UPDATE
-                       SET stars = excluded.stars, rated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')",
+                       SET halves = excluded.halves, rated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')",
                 )
                 .bind(profile_id)
                 .bind(media_item_id)
-                .bind(stars)
+                .bind(halves)
                 .execute(self.db.pool())
                 .await?;
             }
-            Some(stars) => return Err(DbError::Invalid(format!("{stars} is not 1 to 5 stars"))),
+            Some(halves) => {
+                return Err(DbError::Invalid(format!(
+                    "{halves} is not 1 to 10 half stars"
+                )))
+            }
             None => {
                 sqlx::query("DELETE FROM ratings WHERE profile_id = ?1 AND media_item_id = ?2")
                     .bind(profile_id)
@@ -297,17 +301,182 @@ impl<'a> ProfileRepository<'a> {
         Ok(())
     }
 
+    /// The title's own rating, in half stars.
     pub async fn rating(
         &self,
         profile_id: i64,
         media_item_id: i64,
     ) -> Result<Option<i64>, DbError> {
         Ok(sqlx::query_scalar(
-            "SELECT stars FROM ratings WHERE profile_id = ?1 AND media_item_id = ?2",
+            "SELECT halves FROM ratings WHERE profile_id = ?1 AND media_item_id = ?2",
         )
         .bind(profile_id)
         .bind(media_item_id)
         .fetch_optional(self.db.pool())
+        .await?)
+    }
+
+    /// One season of a show, in half stars (ADR-0056: a show is rated season by season);
+    /// rating again replaces it, `None` clears it.
+    pub async fn rate_season(
+        &self,
+        profile_id: i64,
+        series_id: i64,
+        season: i64,
+        halves: Option<i64>,
+    ) -> Result<(), DbError> {
+        match halves {
+            Some(halves) if (1..=10).contains(&halves) => {
+                sqlx::query(
+                    "INSERT INTO season_ratings (profile_id, series_id, season, halves)
+                     VALUES (?1, ?2, ?3, ?4)
+                     ON CONFLICT (profile_id, series_id, season) DO UPDATE
+                       SET halves = excluded.halves, rated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')",
+                )
+                .bind(profile_id)
+                .bind(series_id)
+                .bind(season)
+                .bind(halves)
+                .execute(self.db.pool())
+                .await?;
+            }
+            Some(halves) => {
+                return Err(DbError::Invalid(format!(
+                    "{halves} is not 1 to 10 half stars"
+                )))
+            }
+            None => {
+                sqlx::query(
+                    "DELETE FROM season_ratings WHERE profile_id = ?1 AND series_id = ?2 AND season = ?3",
+                )
+                .bind(profile_id)
+                .bind(series_id)
+                .bind(season)
+                .execute(self.db.pool())
+                .await?;
+            }
+        }
+        Ok(())
+    }
+
+    /// A show's rated seasons: (season, half stars), in season order.
+    pub async fn season_ratings(
+        &self,
+        profile_id: i64,
+        series_id: i64,
+    ) -> Result<Vec<(i64, i64)>, DbError> {
+        Ok(sqlx::query_as(
+            "SELECT season, halves FROM season_ratings
+             WHERE profile_id = ?1 AND series_id = ?2 ORDER BY season",
+        )
+        .bind(profile_id)
+        .bind(series_id)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
+    /// The rating every reader of taste uses, in half stars: the title's own, or for a show
+    /// with rated seasons, their average (the `title_ratings` view).
+    pub async fn rating_of(
+        &self,
+        profile_id: i64,
+        media_item_id: i64,
+    ) -> Result<Option<f64>, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT halves FROM title_ratings WHERE profile_id = ?1 AND media_item_id = ?2",
+        )
+        .bind(profile_id)
+        .bind(media_item_id)
+        .fetch_optional(self.db.pool())
+        .await?)
+    }
+
+    /// How many titles the profile has rated (a show with rated seasons is one).
+    pub async fn rated_count(&self, profile_id: i64) -> Result<i64, DbError> {
+        Ok(
+            sqlx::query_scalar("SELECT COUNT(*) FROM title_ratings WHERE profile_id = ?1")
+                .bind(profile_id)
+                .fetch_one(self.db.pool())
+                .await?,
+        )
+    }
+
+    /// Remove a film or a show from Continue watching (ADR-0056): hidden, its place kept,
+    /// back once it is played again.
+    pub async fn hide_from_continue(
+        &self,
+        profile_id: i64,
+        media_item_id: i64,
+    ) -> Result<(), DbError> {
+        sqlx::query(
+            "INSERT INTO continue_hidden (profile_id, media_item_id) VALUES (?1, ?2)
+             ON CONFLICT (profile_id, media_item_id) DO UPDATE SET hidden_at = datetime('now')",
+        )
+        .bind(profile_id)
+        .bind(media_item_id)
+        .execute(self.db.pool())
+        .await?;
+        Ok(())
+    }
+
+    /// What is hidden from Continue watching now: removed, and not played since (no
+    /// position of it, or of one of the show's episodes, saved after it was removed).
+    pub async fn hidden_from_continue(&self, profile_id: i64) -> Result<Vec<i64>, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT h.media_item_id FROM continue_hidden h
+             WHERE h.profile_id = ?1
+               AND NOT EXISTS (
+                   SELECT 1 FROM playback_positions p
+                   LEFT JOIN episodes e ON e.media_item_id = p.media_item_id
+                   WHERE p.profile_id = ?1
+                     AND (p.media_item_id = h.media_item_id OR e.series_id = h.media_item_id)
+                     AND datetime(p.updated_at) > datetime(h.hidden_at))
+             ORDER BY h.media_item_id",
+        )
+        .bind(profile_id)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
+    /// "Haven't seen it" on the rate-a-batch screen: not asked again.
+    pub async fn skip_rating(&self, profile_id: i64, media_item_id: i64) -> Result<(), DbError> {
+        sqlx::query(
+            "INSERT OR IGNORE INTO rate_skipped (profile_id, media_item_id) VALUES (?1, ?2)",
+        )
+        .bind(profile_id)
+        .bind(media_item_id)
+        .execute(self.db.pool())
+        .await?;
+        Ok(())
+    }
+
+    /// Well-known films to rate one after another (ADR-0056's rate-a-batch screen): the most
+    /// voted films with at least `min_votes`, that this profile has not rated, skipped,
+    /// dismissed or finished, most voted first, from `offset`.
+    pub async fn to_rate(
+        &self,
+        profile_id: i64,
+        min_votes: i64,
+        offset: i64,
+        limit: i64,
+    ) -> Result<Vec<i64>, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT m.id FROM media_items m
+             WHERE m.kind IN ('film', 'anime_film') AND m.is_adult = 0 AND m.rating_votes >= ?2
+               AND NOT EXISTS (SELECT 1 FROM ratings r
+                               WHERE r.profile_id = ?1 AND r.media_item_id = m.id)
+               AND NOT EXISTS (SELECT 1 FROM rate_skipped s
+                               WHERE s.profile_id = ?1 AND s.media_item_id = m.id)
+               AND NOT EXISTS (SELECT 1 FROM dismissals d
+                               WHERE d.profile_id = ?1 AND d.media_item_id = m.id)
+             ORDER BY m.rating_votes DESC, m.id
+             LIMIT ?4 OFFSET ?3",
+        )
+        .bind(profile_id)
+        .bind(min_votes)
+        .bind(offset)
+        .bind(limit)
+        .fetch_all(self.db.pool())
         .await?)
     }
 
@@ -355,27 +524,32 @@ impl<'a> ProfileRepository<'a> {
     }
 
     /// A cheap fingerprint of everything the taste model reads for a profile: it changes
-    /// whenever a viewing, a rating or the watchlist changes, so a cached model can be
-    /// trusted while it does not (Phase 15).
+    /// whenever a viewing, a rating, the watchlist or a dismissal (Phase 18) changes, so a
+    /// cached model can be trusted while it does not (Phase 15).
     pub async fn signal_fingerprint(&self, profile_id: i64) -> Result<String, DbError> {
         Ok(sqlx::query_scalar(
             "SELECT
                  (SELECT COUNT(*) || '/' || COALESCE(MAX(id), 0) FROM watch_events WHERE profile_id = ?1)
                  || ':' ||
-                 (SELECT COUNT(*) || '/' || COALESCE(MAX(rated_at), '') || '/' || COALESCE(SUM(stars * media_item_id), 0)
-                    FROM ratings WHERE profile_id = ?1)
+                 (SELECT COUNT(*) || '/' || COALESCE(MAX(rated_at), '') || '/' || COALESCE(SUM(halves * media_item_id), 0)
+                    FROM title_ratings WHERE profile_id = ?1)
                  || ':' ||
-                 (SELECT COUNT(*) || '/' || COALESCE(SUM(media_item_id), 0) FROM watchlist_items WHERE profile_id = ?1)",
+                 (SELECT COUNT(*) || '/' || COALESCE(SUM(media_item_id), 0) FROM watchlist_items WHERE profile_id = ?1)
+                 || ':' ||
+                 (SELECT COUNT(*) || '/' || COALESCE(MAX(at), '') || '/' || COALESCE(SUM(media_item_id * length(kind)), 0)
+                    FROM dismissals WHERE profile_id = ?1)",
         )
         .bind(profile_id)
         .fetch_one(self.db.pool())
         .await?)
     }
 
-    /// Every rating with when it was given: (title, stars, rated_at), oldest first.
-    pub async fn ratings(&self, profile_id: i64) -> Result<Vec<(i64, i64, String)>, DbError> {
+    /// Every rating with when it was given: (title, stars 0.5 to 5, rated_at), oldest first.
+    /// A show with rated seasons is one rating, their average, dated by the latest.
+    pub async fn ratings(&self, profile_id: i64) -> Result<Vec<(i64, f64, String)>, DbError> {
         Ok(sqlx::query_as(
-            "SELECT media_item_id, stars, rated_at FROM ratings WHERE profile_id = ? ORDER BY rated_at, media_item_id",
+            "SELECT media_item_id, halves / 2.0, rated_at FROM title_ratings
+             WHERE profile_id = ? ORDER BY rated_at, media_item_id",
         )
         .bind(profile_id)
         .fetch_all(self.db.pool())
@@ -648,17 +822,18 @@ impl<'a> ProfileRepository<'a> {
     }
 
     /// What this profile liked, with a weight, strongest first (Phase 14's taste seed;
-    /// Phase 15 builds the full model on the same signals): five stars 1.0, four 0.7, and
-    /// a completed watch with no rating 0.3. Three stars and below are not liking.
+    /// Phase 15 builds the full model on the same signals): five stars 1.0, four and a half
+    /// 0.85, four 0.7 (a show by its seasons' average), and a completed watch with no rating
+    /// 0.3. Three and a half stars and below are not liking, as in MovieLens (`cf::LIKED`).
     pub async fn liked(&self, profile_id: i64) -> Result<Vec<(i64, f64)>, DbError> {
         Ok(sqlx::query_as(
-            "SELECT media_item_id, CASE stars WHEN 5 THEN 1.0 ELSE 0.7 END AS weight
-             FROM ratings WHERE profile_id = ?1 AND stars >= 4
+            "SELECT media_item_id, 0.7 + (halves - 8) * 0.15 AS weight
+             FROM title_ratings WHERE profile_id = ?1 AND halves >= 8
              UNION ALL
              SELECT DISTINCT w.media_item_id, 0.3
              FROM watch_events w
              WHERE w.profile_id = ?1 AND w.completed = 1
-               AND NOT EXISTS (SELECT 1 FROM ratings r
+               AND NOT EXISTS (SELECT 1 FROM title_ratings r
                                WHERE r.profile_id = ?1 AND r.media_item_id = w.media_item_id)
              ORDER BY weight DESC, media_item_id",
         )

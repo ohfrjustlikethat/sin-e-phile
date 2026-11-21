@@ -1,7 +1,7 @@
 {
-  "spec_version": "4.7.1",
+  "spec_version": "4.9.0",
   "project": "sin-e-phile",
-  "last_updated": "2026-11-18",
+  "last_updated": "2026-11-19",
   "sessions_completed": 21,
   "current_phase": {
     "number": 18,
@@ -15,70 +15,82 @@
       {
         "id": "18.1",
         "text": "The strategy arms (crates/recommend/src/strategy.rs, new): safe-familiar, adjacent-stretch (one axis away from a taste mode), cross-mode bridge (between two of the profile's modes), blind-spot (a well-regarded region the profile never touched: a country, a decade, a movement), canon-gap (acclaimed work the taste predicts and the profile has not seen), deep-cut (highly rated obscurity near a mode); each yields candidates from Phase 17's pools and the meaning index with an honest label ('Because you loved Stalker', 'Your blind spot: Iranian New Wave'), tested so every label is true (E3).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "c362b80"
       },
       {
         "id": "18.2",
         "text": "The contextual bandit (Thompson sampling) over the arms, rewarded by outcomes (played, completed, abandoned early, watchlisted, dismissed), with an exploration floor and no arm dominating; a simulation harness (`eval discovery`) with simulated users whose reward patterns change (E1), a maximally conservative user who still gets discovery (E2), and the novelty metric, mean inverse popularity, against its target with relevance held (E4).",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "193e4d4"
       },
       {
         "id": "18.3",
         "text": "The exploration budget and dismissals: a Comfort to Adventure setting per profile adapted by the bandit; 'not for me', 'not right now', 'already seen' on every recommended card (pad-reachable) feeding back; never the same item in two rails.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "d7b5afa"
       },
       {
         "id": "18.4",
         "text": "Surprise me (one button and a pad shortcut: a film the viewer will probably like, from their taste and their sources, opened ready to play) and mood shelves from the semantic index offered to Home's rails, with I42 ('I have 90 minutes'). Search-by-meaning quality, carried from Phase 5 (E3 nDCG@10 0.0472, E4 the two named queries), is worked here, where mood shelves depend on it.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "890a469"
       },
       {
         "id": "18.5",
         "text": "The flagship case study (E6), the author's acceptance test on their own taste (E5, asked in the author batch), docs/specs, learning note, README and HOW_IT_WORKS, regression against every recorded number, close.",
-        "status": "not_started",
-        "commit": null
+        "status": "complete",
+        "commit": "b1d59eb"
+      },
+      {
+        "id": "18.6",
+        "text": "The author's fix list of 2026-11-20 (ADR-0056, spec 4.9.0): half-star ratings for any title (shows by season, the average shown; stars and watching both count) from the title page, every card's menu, the end card and a rate-a-batch screen; remove from Continue watching; Surprise me in the masthead and I42's length choice removed; the line under Continue watching removed; a cancelled download that restarted itself (the queue's race).",
+        "status": "complete",
+        "commit": "a1816c7"
+      },
+      {
+        "id": "18.7",
+        "text": "The author's E5 findings of 2026-11-21: a long subtitle list that ran off the window (0d33fe9); a deleted download whose torrent stayed in the engine and was played from gone files (4f0e1c8); Surprise me rebuilding all of Home per press, 377 ms to 1.7 ms (525bb0a).",
+        "status": "complete",
+        "commit": "525bb0a"
       }
     ],
     "exit_criteria": [
       {
         "id": "E1",
         "text": "The bandit demonstrably shifts its strategy distribution in simulation when reward patterns change.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "eval discovery --simulate on fcc4110 (1,000 simulated viewers, 120 days, favourite arm changes day 61): new favourite's share of discovery 12.8% -> 47.8% (+35.0 points, bar +15), old 49.0% -> 28.0% (-21.0, bar -15), rose for 98.9% of viewers (bar 80%). Seen to fail with --frozen (+0.1 points, NOT met). First run on 7bc4ef3 missed the bar (+12.0/-6.0) and is recorded in docs/eval-results.md 18.2."
       },
       {
         "id": "E2",
         "text": "The exploration floor holds: even a maximally-conservative simulated user still receives genuine discovery.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "eval discovery --simulate on fcc4110: 1,000 maximally conservative viewers (Comfort, every discovery card 'not for me') for 120 days: discovery's least share on any day 20.0% (bar 20%), 0 of 120,000 days without a discovery rail, every discovery arm shown on at least 23.3% of each viewer's days (bar 10%). Seen to fail with --no-floor (0.0% on every day, NOT met). docs/eval-results.md 18.2."
       },
       {
         "id": "E3",
         "text": "Rail labels accurately describe why each item is there.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "strategy::tests::every_label_of_every_arm_holds_on_generated_profiles (300 generated profiles, every pick's Label re-derived by strategy::holds; seen to fail with arms taking titles 0.1 short of close and with the blind spot ignoring met regions, 6784097); sinephile-taste tests/discover.rs every_label_holds_and_an_episode_counts_as_its_series; strategy::tests::a_blind_spot_rail_holds_one_region (a rail named for a region holds only it); and on real users: `eval discovery` on a1dd9a9 over 15,640 MovieLens test users checked 461,488 discovery labels (467,741 on 0e06e59) with strategy::holds, none false (docs/eval-results.md, 18.2)."
       },
       {
         "id": "E4",
         "text": "Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "`eval discovery` on b2842d4 (the arms after the real window's fixes, popularity in the arms' order at 0.1 and the bandit's prior at 2, both chosen on tuning users by rules fixed before they ran), all 15,640 MovieLens test users: discovery 1.71 bits more novel than the taste rail (bar 1); Recall@N of everything shown 0.3630 against popularity's top N 0.2593, +40.0% (bar more than 40%): met by under 0.05 point (the unrounded ratio above 1.40, at most 1.4004), inside sampling noise and said so. The test users have judged three versions (+40.4%, +39.9%, +40.0%). Seen to fail: the same harness gave +28.8% before the prior. docs/eval-results.md 18.2 to 18.5."
       },
       {
         "id": "E5",
         "text": "The author tests it on their own taste and finds at least three films they hadn't heard of and want to watch. This is the real acceptance test.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "manual: the author ran it on their own profile in the installed release (installer of 2026-11-21 from a1816c7, after rating films with the half stars built for it, ADR-0056) and said \"E5 seems okay\" (2026-11-21). They named no films; the three the criterion asks for are their judgment, not a list recorded here. docs/case-studies/discovery.md, E5."
       },
       {
         "id": "E6",
         "text": "Case study written — this is the flagship one.",
-        "met": false,
-        "evidence": null
+        "met": true,
+        "evidence": "docs/case-studies/discovery.md (the flagship case study: the problem, the five arms and the bandit, how each criterion was judged with bars fixed first, what the author's test found, what went wrong, the side effect on search, what would be done differently); every number in docs/eval-results.md, Phase 18."
       }
     ]
   },
@@ -743,17 +755,17 @@
           "id": "E3",
           "text": "nDCG@10 > 0.75 on the semantic query set.",
           "met": false,
-          "evidence": "MEASURED 2026-11-18 at Phase 17's close, carried again (ADR-0036): `SINEPHILE_DATA_DIR=<copy> target/release/eval.exe all` at f8d8e58 -> meaning nDCG@10 0.0472 over 8 queries (unchanged since 814fc41), filter 1.0000 over 2; two graded answers are still outside the vector index (ceiling 0.7468). History: 2026-10-25 measured 0.0472 after five distinct attempts; docs/eval-results.md Session 19 and 'Phase 17 regression check'; docs/case-study/search.md.",
-          "carried_to_phase": 18,
-          "carried_reason": "Phase 17 built the recommender on the meaning index and gave titles without meaning a vector (ADR-0054), but it does not change how a query is embedded or ranked, so the number did not move. Phase 18's mood shelves are queries over the same semantic index; retrieval quality is their precondition, so the work moves there."
+          "evidence": "MEASURED 2026-11-20 in Phase 18 (18.4) with search by meaning's popularity prior at 0.4, chosen on a separate tuning set (fixtures/search/meaning-tuning.tsv, 0.0215 to 0.4213): `eval search --report` on 890a469 -> meaning nDCG@10 0.3276 over 8 queries (from 0.0472), filter 1.0000, known-item MRR 1.0000 (both first); E2 43/43; E1 p95 24.2 ms. Still below 0.75. History: docs/eval-results.md (Session 19, Phase 17 regression check, 18.4); docs/case-study/search.md.",
+          "carried_to_phase": 19,
+          "carried_reason": "Third carry, flagged to the author. Phase 18 took meaning search from 0.0472 to 0.3276 with a popularity prior (18.4); what is left is query understanding, not ranking: a query that says what it is NOT ('...that aren't depressing') is embedded as one meaning, so the negated idea pulls results toward it. The next approach, untried: split a negated clause, embed it apart, and push down results close to it, chosen on the tuning set first. It is Phase 19's first subtask: Search is one of the browsing surfaces that phase brings to standard."
         },
         {
           "id": "E4",
           "text": "\"films about grief that aren't depressing\" and \"like Wong Kar-wai but Korean\" both return defensible results — documented with screenshots in the case study.",
           "met": false,
-          "evidence": "DOCUMENTED, NOT MET, carried again (ADR-0036): the same two queries at f8d8e58 score as in docs/case-study/search.md (grief 0.1505, Wong Kar-wai 0.0752 at 814fc41; meaning nDCG unchanged at 0.0472, docs/eval-results.md 'Phase 17 regression check'), screenshots docs/case-study/shots/01-grief.png and 02-wong-kar-wai.png.",
-          "carried_to_phase": 18,
-          "carried_reason": "The same retrieval quality as E3; it moves with E3 to Phase 18, whose mood shelves are built from semantic queries."
+          "evidence": "HALF MET 2026-11-20 (Phase 18, 18.4, popularity prior 0.4, 890a469): 'like Wong Kar-wai but Korean' now gives Chungking Express, In the Mood for Love, Memories of Murder, 2046, Thirst, 3-Iron (nDCG 0.2385): defensible. 'films about grief that aren't depressing' gives Hereafter, Antichrist, The Queen, Cries & Whispers, 1984 (nDCG 0.0000): the negation is missed. docs/eval-results.md 18.4; earlier screenshots docs/case-study/shots/01-grief.png, 02-wong-kar-wai.png.",
+          "carried_to_phase": 19,
+          "carried_reason": "With E3, third carry, flagged to the author: 'like Wong Kar-wai but Korean' is defensible since 18.4; 'films about grief that aren't depressing' fails on the negation, which is E3's next approach. Phase 19's first subtask."
         },
         {
           "id": "E5",
@@ -2045,70 +2057,82 @@
         {
           "id": "E1",
           "text": "The bandit demonstrably shifts its strategy distribution in simulation when reward patterns change.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "eval discovery --simulate on fcc4110 (1,000 simulated viewers, 120 days, favourite arm changes day 61): new favourite's share of discovery 12.8% -> 47.8% (+35.0 points, bar +15), old 49.0% -> 28.0% (-21.0, bar -15), rose for 98.9% of viewers (bar 80%). Seen to fail with --frozen (+0.1 points, NOT met). First run on 7bc4ef3 missed the bar (+12.0/-6.0) and is recorded in docs/eval-results.md 18.2."
         },
         {
           "id": "E2",
           "text": "The exploration floor holds: even a maximally-conservative simulated user still receives genuine discovery.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "eval discovery --simulate on fcc4110: 1,000 maximally conservative viewers (Comfort, every discovery card 'not for me') for 120 days: discovery's least share on any day 20.0% (bar 20%), 0 of 120,000 days without a discovery rail, every discovery arm shown on at least 23.3% of each viewer's days (bar 10%). Seen to fail with --no-floor (0.0% on every day, NOT met). docs/eval-results.md 18.2."
         },
         {
           "id": "E3",
           "text": "Rail labels accurately describe why each item is there.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "strategy::tests::every_label_of_every_arm_holds_on_generated_profiles (300 generated profiles, every pick's Label re-derived by strategy::holds; seen to fail with arms taking titles 0.1 short of close and with the blind spot ignoring met regions, 6784097); sinephile-taste tests/discover.rs every_label_holds_and_an_episode_counts_as_its_series; strategy::tests::a_blind_spot_rail_holds_one_region (a rail named for a region holds only it); and on real users: `eval discovery` on a1dd9a9 over 15,640 MovieLens test users checked 461,488 discovery labels (467,741 on 0e06e59) with strategy::holds, none false (docs/eval-results.md, 18.2)."
         },
         {
           "id": "E4",
           "text": "Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "`eval discovery` on b2842d4 (the arms after the real window's fixes, popularity in the arms' order at 0.1 and the bandit's prior at 2, both chosen on tuning users by rules fixed before they ran), all 15,640 MovieLens test users: discovery 1.71 bits more novel than the taste rail (bar 1); Recall@N of everything shown 0.3630 against popularity's top N 0.2593, +40.0% (bar more than 40%): met by under 0.05 point (the unrounded ratio above 1.40, at most 1.4004), inside sampling noise and said so. The test users have judged three versions (+40.4%, +39.9%, +40.0%). Seen to fail: the same harness gave +28.8% before the prior. docs/eval-results.md 18.2 to 18.5."
         },
         {
           "id": "E5",
           "text": "The author tests it on their own taste and finds at least three films they hadn't heard of and want to watch. This is the real acceptance test.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "manual: the author ran it on their own profile in the installed release (installer of 2026-11-21 from a1816c7, after rating films with the half stars built for it, ADR-0056) and said \"E5 seems okay\" (2026-11-21). They named no films; the three the criterion asks for are their judgment, not a list recorded here. docs/case-studies/discovery.md, E5."
         },
         {
           "id": "E6",
           "text": "Case study written — this is the flagship one.",
-          "met": false,
-          "evidence": null
+          "met": true,
+          "evidence": "docs/case-studies/discovery.md (the flagship case study: the problem, the five arms and the bandit, how each criterion was judged with bars fixed first, what the author's test found, what went wrong, the side effect on search, what would be done differently); every number in docs/eval-results.md, Phase 18."
         }
       ],
       "subtasks": [
         {
           "id": "18.1",
           "text": "The strategy arms (crates/recommend/src/strategy.rs, new): safe-familiar, adjacent-stretch (one axis away from a taste mode), cross-mode bridge (between two of the profile's modes), blind-spot (a well-regarded region the profile never touched: a country, a decade, a movement), canon-gap (acclaimed work the taste predicts and the profile has not seen), deep-cut (highly rated obscurity near a mode); each yields candidates from Phase 17's pools and the meaning index with an honest label ('Because you loved Stalker', 'Your blind spot: Iranian New Wave'), tested so every label is true (E3).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "c362b80"
         },
         {
           "id": "18.2",
           "text": "The contextual bandit (Thompson sampling) over the arms, rewarded by outcomes (played, completed, abandoned early, watchlisted, dismissed), with an exploration floor and no arm dominating; a simulation harness (`eval discovery`) with simulated users whose reward patterns change (E1), a maximally conservative user who still gets discovery (E2), and the novelty metric, mean inverse popularity, against its target with relevance held (E4).",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "193e4d4"
         },
         {
           "id": "18.3",
           "text": "The exploration budget and dismissals: a Comfort to Adventure setting per profile adapted by the bandit; 'not for me', 'not right now', 'already seen' on every recommended card (pad-reachable) feeding back; never the same item in two rails.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "d7b5afa"
         },
         {
           "id": "18.4",
           "text": "Surprise me (one button and a pad shortcut: a film the viewer will probably like, from their taste and their sources, opened ready to play) and mood shelves from the semantic index offered to Home's rails, with I42 ('I have 90 minutes'). Search-by-meaning quality, carried from Phase 5 (E3 nDCG@10 0.0472, E4 the two named queries), is worked here, where mood shelves depend on it.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "890a469"
         },
         {
           "id": "18.5",
           "text": "The flagship case study (E6), the author's acceptance test on their own taste (E5, asked in the author batch), docs/specs, learning note, README and HOW_IT_WORKS, regression against every recorded number, close.",
-          "status": "not_started",
-          "commit": null
+          "status": "complete",
+          "commit": "b1d59eb"
+        },
+        {
+          "id": "18.6",
+          "text": "The author's fix list of 2026-11-20 (ADR-0056, spec 4.9.0): half-star ratings for any title (shows by season, the average shown; stars and watching both count) from the title page, every card's menu, the end card and a rate-a-batch screen; remove from Continue watching; Surprise me in the masthead and I42's length choice removed; the line under Continue watching removed; a cancelled download that restarted itself (the queue's race).",
+          "status": "complete",
+          "commit": "a1816c7"
+        },
+        {
+          "id": "18.7",
+          "text": "The author's E5 findings of 2026-11-21: a long subtitle list that ran off the window (0d33fe9); a deleted download whose torrent stayed in the engine and was played from gone files (4f0e1c8); Surprise me rebuilding all of Home per press, 377 ms to 1.7 ms (525bb0a).",
+          "status": "complete",
+          "commit": "525bb0a"
         }
       ]
     },
@@ -2589,15 +2613,8 @@
       ]
     }
   ],
-  "next_action": "Phase 18, 18.1: create crates/recommend/src/strategy.rs with the six arms as candidate generators over crates/taste/src/hybrid.rs's pools and the meaning index (safe-familiar = Phase 17's rail; adjacent-stretch = one axis from a mode; cross-mode bridge = the midpoint direction of two modes; blind-spot = a well-voted country or decade the profile has no titles from; canon-gap = top-rated titles near a mode the profile has not met; deep-cut = high rating, low votes, near a mode), each pick carrying a label that names only what is true; a property test that every label is true (E3). Plan first in docs/phases/phase-18-discovery-engine.md.",
-  "blockers": [
-    {
-      "id": "B16",
-      "raised": "2026-11-17",
-      "needs_user": false,
-      "description": "CI run 43916502166 failed on ProfilePicker.test.tsx (a digit typed right after a wrong PIN was swallowed on a slower runner). Fixed in the next commit (one state update); cleared when CI is green again."
-    }
-  ],
+  "next_action": "Phase 18: waiting on the author for E5 with the installer built 2026-11-21 01:52 from a1816c7 (target/release/bundle/nsis/sin-e-phile_0.1.0_x64-setup.exe; checked on a copy of their data: migration 35 turned their three ratings into 8 halves, Home shows Surprise me by Search and the Rate films card at 3 of 10). docs/MANUAL_TESTS.md, 'Discovery on your own taste', now includes the rating and Continue watching checks; the Rate films screen and the stars were not seen in the real window (no synthetic clicks), only in tests and the pad audit. Once E5 is answered: /closephase 18, carrying Phase 5 E3/E4 a third time (0.3276; grief not defensible), flagged to the author.",
+  "blockers": [],
   "decisions_pending": [
     {
       "id": "P1",
@@ -2906,6 +2923,16 @@
       "id": "0054",
       "title": "Current on every launch: the catalogue, what it means, and what to recommend",
       "date": "2026-11-18"
+    },
+    {
+      "id": "0055",
+      "title": "Countries and movements from Wikidata, for the discovery engine",
+      "date": "2026-11-19"
+    },
+    {
+      "id": "0056",
+      "title": "Ratings for any title, and the author's interface answers of 2026-11-20",
+      "date": "2026-11-20"
     }
   ],
   "environment": {

@@ -49,7 +49,8 @@ export function TitleCards({
 
   const toggle = async (c: TastePick) => {
     const on = picked.has(c.id);
-    await ok(commands.rateTitle(c.id, on ? null : 4));
+    // "I love this" is four stars: eight halves (ADR-0056).
+    await ok(commands.rateTitle(c.id, on ? null : 8));
     const next = new Set(picked);
     if (on) next.delete(c.id);
     else next.add(c.id);

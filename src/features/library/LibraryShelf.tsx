@@ -60,7 +60,7 @@ export function LibraryShelf({ shows }: { shows: boolean }) {
           <TitleRail
             rail={{ key: "continue", title: "Continue watching", items: going.data! }}
             lead={false}
-            why={shows ? "the episode each show is on" : "where you left each film"}
+            why=""
           />
         </div>
       )}

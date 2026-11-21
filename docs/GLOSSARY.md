@@ -316,3 +316,17 @@ nothing more; its search plugins, feeds and tracker lists are never read.
 **Decay / half-life** *(Phase 15)* — An old signal counts half as much after 180 days (720 for strongly held ones).
 
 **Correction** *(Phase 15)* — More of this, less, or not me, on one taste mode; it changes that mode's weight on Home.
+
+**Discovery arm** *(Phase 18)* — One way of choosing what to show: the familiar (Phase 17's rail), a stretch, a bridge, a blind spot, the canon, a deep cut.
+
+**Thompson sampling** *(Phase 18)* — Exploring by drawing a plausible chance for each arm from its belief and giving slots by the draws: what is uncertain sometimes draws high, so it gets tried.
+
+**Exploration floor** *(Phase 18)* — The least share of Home discovery always keeps (20%), so a profile cannot be narrowed into a bubble.
+
+**Blind spot** *(Phase 18)* — A decade, genre, country or film movement a profile has met nothing from; claimed only when every title it met is known on that axis.
+
+**Self-information** *(Phase 18)* — Novelty in bits, -log2 of the share of people who liked a title: one more bit is half as widely liked.
+
+**Halves** *(ADR-0056)* — How a rating is stored: 1 to 10, half a star each, so 7 is three and a half stars.
+
+**title_ratings** *(ADR-0056)* — The one view every reader of ratings reads: a title's own rating, or a show's seasons' average.

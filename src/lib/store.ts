@@ -89,6 +89,9 @@ interface UiState {
   /** The Downloads page (Phase 13), opened from the masthead. */
   downloadsOpen: boolean;
   setDownloadsOpen: (open: boolean) => void;
+  /** Rate films one after another (ADR-0056), over the page it was opened from (Home, or Your taste). */
+  rateOpen: boolean;
+  setRateOpen: (open: boolean) => void;
   /** Who's watching? (Phase 14): `null` until launch has decided whether to ask. */
   pickerOpen: boolean | null;
   /**
@@ -142,6 +145,7 @@ export const useUi = create<UiState>()(
             downloadsOpen: false,
             reviewOpen: false,
             tasteOpen: false,
+            rateOpen: false,
             navSeq: s.navSeq + 1,
           };
         }),
@@ -154,12 +158,14 @@ export const useUi = create<UiState>()(
           downloadsOpen: false,
           reviewOpen: false,
           tasteOpen: false,
+          rateOpen: false,
           navSeq: s.navSeq + 1,
         })),
       back: () => {
         const s = get();
         const step = { navSeq: s.navSeq + 1 };
         if (s.panelBack) s.panelBack();
+        else if (s.rateOpen) set({ ...step, rateOpen: false });
         else if (s.reviewOpen) set({ ...step, reviewOpen: false });
         else if (s.tasteOpen) set({ ...step, tasteOpen: false });
         else if (s.settingsOpen) set({ ...step, settingsOpen: false });
@@ -179,13 +185,15 @@ export const useUi = create<UiState>()(
       setTasteOpen: (tasteOpen) =>
         set(tasteOpen ? { tasteOpen, settingsOpen: true, reviewOpen: false, downloadsOpen: false, detail: null } : { tasteOpen }),
       downloadsOpen: false,
+      rateOpen: false,
+      setRateOpen: (rateOpen) => set({ rateOpen }),
       pickerOpen: null,
       pickerAtLaunch: false,
       setPickerOpen: (pickerOpen, atLaunch = false) => set({ pickerOpen, pickerAtLaunch: pickerOpen && atLaunch }),
       setDownloadsOpen: (downloadsOpen) =>
         set(
           downloadsOpen
-            ? { downloadsOpen, settingsOpen: false, reviewOpen: false, tasteOpen: false, detail: null }
+            ? { downloadsOpen, settingsOpen: false, reviewOpen: false, tasteOpen: false, rateOpen: false, detail: null }
             : { downloadsOpen },
         ),
       playing: null,
@@ -196,7 +204,7 @@ export const useUi = create<UiState>()(
       setSettingsOpen: (settingsOpen) =>
         set(
           settingsOpen
-            ? { settingsOpen, reviewOpen: false, tasteOpen: false, downloadsOpen: false }
+            ? { settingsOpen, reviewOpen: false, tasteOpen: false, downloadsOpen: false, rateOpen: false }
             : { settingsOpen, reviewOpen: false, tasteOpen: false },
         ),
       play: (playing) => set({ playing }),
@@ -211,6 +219,7 @@ export const useUi = create<UiState>()(
             downloadsOpen: false,
             reviewOpen: false,
             tasteOpen: false,
+            rateOpen: false,
             navSeq: s.navSeq + 1,
           };
         }),

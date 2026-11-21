@@ -1,9 +1,11 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/design-system";
+import { useScreenHints, type Hint } from "@/design-system/focus/FocusLayer";
 import { commands } from "@/lib/ipc";
 import { onEvent } from "@/lib/events";
 import { SetupCard } from "./SetupCard";
+import { RateCard } from "@/features/ratings/RateCard";
 import { TitleRail } from "./TitleRail";
 
 /**
@@ -22,19 +24,43 @@ async function ok<T>(p: Promise<{ status: "ok"; data: T } | { status: "error"; e
 
 export const HOME = ["home"];
 
+/** Home's pad hints: X on a recommended card says "not for me" (Phase 18). */
+const HINTS: Hint[] = [
+  ["A", "Select"],
+  ["B", "Back"],
+  ["X", "Not for me…"],
+  ["RT", "Surprise me"],
+  ["Y", "Search"],
+  ["Menu", "Settings"],
+];
+
+/** A mood shelf's line (Phase 18): two moods a day, in turn. */
+const MOOD = "A mood, found by what films are about rather than their genre";
+
 const WHY: Record<string, string> = {
-  continue: "Where you left off",
   new_episodes: "New in the shows you follow",
   library: "On this PC, newest first",
   new: "Out this year, by your taste",
   rising: "Gaining the most ratings since the last update",
   taste: "From what you liked and what you said you love",
+  taste_more: "The rest of what your taste points to: the more Comfort, the longer",
+  // Phase 18's discovery rails: each card says why it is there.
+  stretch: "Close to one of your tastes, one step outside it",
+  bridge: "Close to two of your tastes at once",
+  blind_spot: "Acclaimed, from somewhere you have never been",
+  canon: "Rated 7.8 or more by 50,000 people, close to your taste",
+  deep_cut: "Rated 7.5 or more by at most 15,000 people",
   watchlist: "What you saved",
   loved: "The films most people have seen and rated",
 };
 
 export function HomeScreen() {
-  const home = useQuery({ queryKey: HOME, queryFn: () => ok(commands.home()) });
+  // The hour: the part of the day the discovery engine learns and chooses in (Phase 18).
+  const home = useQuery({
+    queryKey: HOME,
+    queryFn: () => ok(commands.home(new Date().getHours())),
+  });
+  useScreenHints(HINTS);
   // New titles from the catalogue, and anything new in the library, show at once.
   const client = useQueryClient();
   useEffect(() => {
@@ -62,8 +88,9 @@ export function HomeScreen() {
   return (
     <div className="flex flex-col gap-12 pt-10 pb-24">
       <SetupCard />
+      <RateCard />
       {home.data.map((r, i) => (
-        <TitleRail key={r.key} rail={r} lead={i === 0} why={WHY[r.key] ?? ""} />
+        <TitleRail key={r.key} rail={r} lead={i === 0} why={WHY[r.key] ?? (r.key.startsWith("mood_") ? MOOD : "")} />
       ))}
     </div>
   );

@@ -49,6 +49,12 @@ pub struct Facts {
     pub genres: Vec<String>,
     /// (person id, name), billing order.
     pub directors: Vec<(i64, String)>,
+    /// IMDb's rating times ten, 0 to 100 (Phase 18: the acclaimed and the deep cuts).
+    pub rating: Option<i64>,
+    /// The countries it comes from and the movements it belongs to, as Wikidata names them
+    /// (Phase 18, migration 0033); empty until asked, or when Wikidata does not say.
+    pub countries: Vec<String>,
+    pub movements: Vec<String>,
 }
 
 pub struct MediaRepository<'a> {
@@ -460,23 +466,50 @@ impl<'a> MediaRepository<'a> {
             .collect())
     }
 
+    /// How many IMDb votes each of `ids` has, those with any: how widely seen, for search by
+    /// meaning's popularity prior (Phase 18). One query per 500.
+    pub async fn votes_of(&self, ids: &[i64]) -> Result<HashMap<i64, i64>, DbError> {
+        let mut out = HashMap::with_capacity(ids.len());
+        for chunk in ids.chunks(500) {
+            let sql = format!(
+                "SELECT id, rating_votes FROM media_items WHERE rating_votes IS NOT NULL AND id IN ({})",
+                vec!["?"; chunk.len()].join(",")
+            );
+            let mut q = sqlx::query_as::<_, (i64, i64)>(&sql);
+            for id in chunk {
+                q = q.bind(id);
+            }
+            out.extend(q.fetch_all(self.db.pool()).await?);
+        }
+        Ok(out)
+    }
+
     /// A title's genres, by name (Phase 15's taste axes).
     /// [`Facts`] for each of `ids` the catalogue holds, in no particular order: a rail's
-    /// thousand candidates in three queries per 500 rather than three per title.
+    /// thousand candidates in four queries per 500 rather than four per title.
     pub async fn facts(&self, ids: &[i64]) -> Result<Vec<Facts>, DbError> {
         let mut out: HashMap<i64, Facts> = HashMap::with_capacity(ids.len());
         for chunk in ids.chunks(500) {
             let marks = vec!["?"; chunk.len()].join(",");
             let sql = format!(
-                "SELECT id, primary_title, release_year, runtime_minutes, rating_votes
+                "SELECT id, primary_title, release_year, runtime_minutes, rating_votes, rating
                  FROM media_items WHERE id IN ({marks})"
             );
-            let mut q =
-                sqlx::query_as::<_, (i64, String, Option<i64>, Option<i64>, Option<i64>)>(&sql);
+            type Row = (
+                i64,
+                String,
+                Option<i64>,
+                Option<i64>,
+                Option<i64>,
+                Option<i64>,
+            );
+            let mut q = sqlx::query_as::<_, Row>(&sql);
             for id in chunk {
                 q = q.bind(id);
             }
-            for (id, title, year, runtime_minutes, votes) in q.fetch_all(self.db.pool()).await? {
+            for (id, title, year, runtime_minutes, votes, rating) in
+                q.fetch_all(self.db.pool()).await?
+            {
                 out.insert(
                     id,
                     Facts {
@@ -485,9 +518,27 @@ impl<'a> MediaRepository<'a> {
                         year,
                         runtime_minutes,
                         votes,
+                        rating,
                         ..Default::default()
                     },
                 );
+            }
+            let sql = format!(
+                "SELECT media_item_id, axis, name FROM title_regions
+                 WHERE media_item_id IN ({marks}) ORDER BY axis, name"
+            );
+            let mut q = sqlx::query_as::<_, (i64, String, String)>(&sql);
+            for id in chunk {
+                q = q.bind(id);
+            }
+            for (id, axis, name) in q.fetch_all(self.db.pool()).await? {
+                if let Some(f) = out.get_mut(&id) {
+                    if axis == "country" {
+                        f.countries.push(name);
+                    } else {
+                        f.movements.push(name);
+                    }
+                }
             }
             let sql = format!(
                 "SELECT mg.media_item_id, g.name FROM media_genres mg JOIN genres g ON g.id = mg.genre_id
@@ -626,6 +677,28 @@ impl<'a> MediaRepository<'a> {
                AND is_adult = 0 AND rating_votes IS NOT NULL
              ORDER BY rating_votes DESC, id LIMIT ?",
         )
+        .bind(limit)
+        .fetch_all(self.db.pool())
+        .await?)
+    }
+
+    /// Films rated at least `min_rating` (0 to 100) by at least `min_votes`, not adult, most
+    /// voted first: the acclaimed, whom the discovery engine's blind spots and canon are drawn
+    /// from (Phase 18). About 3,600 films at 7.5 and 5,000 votes.
+    pub async fn acclaimed(
+        &self,
+        min_rating: i64,
+        min_votes: i64,
+        limit: i64,
+    ) -> Result<Vec<i64>, DbError> {
+        Ok(sqlx::query_scalar(
+            "SELECT id FROM media_items
+             WHERE rating_votes >= ? AND rating >= ? AND is_adult = 0
+               AND +kind IN ('film', 'anime_film')
+             ORDER BY rating_votes DESC, id LIMIT ?",
+        )
+        .bind(min_votes)
+        .bind(min_rating)
         .bind(limit)
         .fetch_all(self.db.pool())
         .await?)

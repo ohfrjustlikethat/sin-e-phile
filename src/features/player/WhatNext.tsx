@@ -1,5 +1,7 @@
 import { forwardRef, useEffect, useState } from "react";
-import { commands, type EpisodeView, type TitleView } from "@/lib/ipc";
+import type { EpisodeView, TitleView } from "@/lib/ipc";
+import { StarRating, starWords } from "@/design-system";
+import { useTitleRating } from "@/features/ratings/useRating";
 
 /**
  * What comes next — SPEC.md Phase 11, ADR-0043.
@@ -73,38 +75,18 @@ interface EndProps {
 }
 
 export function EndCard({ mediaItemId, title, moreLikeThis, onOpen, onLeave }: EndProps) {
-  const [stars, setStars] = useState<number | null>(null);
-  useEffect(() => {
-    void commands.titleRating(mediaItemId).then((r) => r.status === "ok" && setStars(r.data));
-  }, [mediaItemId]);
-  const rate = (n: number) => {
-    const next = stars === n ? null : n;
-    setStars(next);
-    void commands.rateTitle(mediaItemId, next);
-  };
+  // Half stars, as everywhere (ADR-0056).
+  const { halves, set } = useTitleRating(mediaItemId);
   return (
     <div className="absolute inset-0 grid place-items-center bg-black" role="dialog" aria-label="Finished">
       <div className="w-[min(620px,86%)]">
         <p className="label text-ink-faint">You watched</p>
         <h1 className="mt-2 font-serif text-[52px] leading-[1.02] text-ink">{title}</h1>
-        <div className="mt-7" role="radiogroup" aria-label="Your rating">
+        <div className="mt-7">
           <p className="label mb-2 text-ink-faint">Your rating</p>
-          <div className="flex gap-2">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                type="button"
-                role="radio"
-                aria-checked={stars === n}
-                aria-label={`${n} out of 5`}
-                onClick={() => rate(n)}
-                className={`h-10 w-10 rounded-sm border text-[17px] ${
-                  stars !== null && n <= stars ? "border-ink text-ink" : "border-line-strong text-ink-faint"
-                }`}
-              >
-                {n}
-              </button>
-            ))}
+          <div className="flex items-center gap-4">
+            <StarRating value={halves} onChange={set} />
+            <span className="label">{halves ? starWords(halves) : "Rate"}</span>
           </div>
         </div>
         {moreLikeThis.length > 0 && (

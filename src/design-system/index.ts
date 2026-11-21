@@ -19,6 +19,7 @@ export { Badge } from "./primitives/Badge";
 export type { BadgeTone } from "./primitives/Badge";
 export { ProgressBar } from "./primitives/ProgressBar";
 export { Rating } from "./primitives/Rating";
+export { StarRating, StarsShown, starWords } from "./primitives/StarRating";
 
 export { PosterCard, TypographicCard } from "./media/PosterCard";
 export type { PosterFilm, PosterSize } from "./media/PosterCard";

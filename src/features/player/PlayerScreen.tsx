@@ -937,7 +937,14 @@ function TrackMenu({
         {label}
       </button>
       {open && (
-        <ul role="menu" data-cutout aria-label={label} className="absolute right-0 bottom-9 min-w-44 rounded-md border border-line bg-raised py-1">
+        // A film with dozens of subtitle tracks ran off the top of the window, out of reach (the author, 2026-11-21):
+        // the list keeps within the picture above the bar and scrolls; the hole in the video is the box as shown.
+        <ul
+          role="menu"
+          data-cutout
+          aria-label={label}
+          className="absolute right-0 bottom-9 max-h-[60vh] min-w-44 overflow-y-auto overscroll-contain rounded-md border border-line bg-raised py-1"
+        >
           {kind === "sub" && (
             <li>
               <button type="button" role="menuitem" onClick={() => onPick(null)} className="w-full px-3 py-1.5 text-left hover:bg-surface">

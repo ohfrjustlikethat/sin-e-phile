@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { DESTINATIONS, type Destination, useUi } from "@/lib/store";
 import { inProgress } from "@/features/downloads/format";
 import { useDownloads } from "@/features/downloads/useDownloads";
+import { surpriseMe } from "@/features/home/surprise";
 import { ProfileAvatar } from "@/features/profiles/ProfileAvatar";
 import { useProfiles } from "@/features/profiles/useProfiles";
 
@@ -21,7 +22,8 @@ import { useProfiles } from "@/features/profiles/useProfiles";
  * - Empty space is the drag region, so the bar still moves the window.
  *
  * Downloads (Phase 13) is a word too, with the number in progress beside it, shown only
- * when there is one. The profile's avatar (Phase 14) opens Who's watching?.
+ * when there is one. The profile's avatar (Phase 14) opens Who's watching?. Surprise me
+ * (Phase 18) is a word just left of Search, where the author asked for it (ADR-0056).
  */
 
 export const LABELS: Record<Destination, string> = {
@@ -39,6 +41,7 @@ function inTauri(): boolean {
 
 export function Masthead() {
   const { destination, settingsOpen, setSettingsOpen, downloadsOpen, setDownloadsOpen, goTab } = useUi();
+  const rateOpen = useUi((s) => s.rateOpen);
   const searching = useUi((s) => s.tab === "search");
   const controls = useWindowControls();
   const downloads = useDownloads();
@@ -98,7 +101,7 @@ export function Masthead() {
           {DESTINATIONS.map((d) => {
             // Nothing is active while search or settings is showing: a tab claiming
             // "Films" behind a page of search results says you are somewhere you are not.
-            const active = !searching && !settingsOpen && !downloadsOpen && destination === d;
+            const active = !searching && !settingsOpen && !downloadsOpen && !rateOpen && destination === d;
             return (
               <li key={d} className="flex">
                 <button
@@ -128,6 +131,14 @@ export function Masthead() {
       <div data-tauri-drag-region className="flex-1" />
 
       <div className={`flex shrink-0 items-center pr-3 ${compact ? "gap-1.5" : "gap-2"}`}>
+        <button
+          type="button"
+          onClick={() => void surpriseMe()}
+          className={`flex h-8 items-center whitespace-nowrap ${compact ? "px-2.5" : "px-3"} text-[13px] text-ink-muted transition-colors duration-[var(--dur-standard)] hover:text-ink`}
+        >
+          Surprise me
+        </button>
+
         <button
           type="button"
           onClick={() => goTab("search")}

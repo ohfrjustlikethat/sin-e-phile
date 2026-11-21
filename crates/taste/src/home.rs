@@ -8,12 +8,16 @@
 use std::collections::{HashMap, HashSet};
 
 use sinephile_persistence::repositories::{
-    CredentialRepository, EpisodeRepository, LibraryRepository, MediaRepository, ProfileRepository,
+    CredentialRepository, DiscoveryRepository, EpisodeRepository, LibraryRepository,
+    MediaRepository, ProfileRepository,
 };
 use sinephile_persistence::{Db, DbError};
+use sinephile_recommend::bandit::Context;
+use sinephile_recommend::strategy::Arm;
 use sinephile_search_engine::Semantic;
 
-pub(crate) fn now_iso() -> String {
+/// Today, UTC, as "YYYY-MM-DD": what the taste model and the discovery engine age things by.
+pub fn now_iso() -> String {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs() as i64);
@@ -55,9 +59,12 @@ async fn now_showing(db: &Db, profile: i64) -> Result<Vec<i64>, DbError> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rail {
-    /// "continue" | "new_episodes" | "library" | "new" | "taste" | "watchlist" | "loved"
+    /// "continue" | "new_episodes" | "library" | "new" | "rising" | "taste" | a discovery
+    /// arm's key ("stretch", "bridge", "blind_spot", "canon", "deep_cut") | "watchlist" |
+    /// "loved"
     pub key: &'static str,
-    pub title: &'static str,
+    /// A blind spot's names its region ("Your blind spot: Iranian New Wave"), so not fixed.
+    pub title: String,
     pub items: Vec<i64>,
     /// A line for an item beyond its own facts: "S2 E5" for a series with a new episode.
     pub notes: HashMap<i64, String>,
@@ -108,6 +115,62 @@ pub async fn taste_rail(
         .unwrap_or_default())
 }
 
+/// Home's rails as built, and what they were built from: [`recent`] gives them back while
+/// that is still so.
+pub(crate) struct Built {
+    fingerprint: String,
+    context: Context,
+    kids: bool,
+    love: Option<String>,
+    at: std::time::Instant,
+    rails: Vec<Rail>,
+}
+
+/// How long rails stay current without a change to the profile.
+pub const RECENT: std::time::Duration = std::time::Duration::from_secs(15 * 60);
+
+/// The rails Home last built for this profile, if they are still what it would build now:
+/// nothing the taste model reads has changed (the signal fingerprint), the same part of the
+/// day, the same "what you love", and built within [`RECENT`]. Surprise me picks from these
+/// rather than building Home again (the author, 2026-11-21: "very slow"; 377 ms a press warm,
+/// 3.7 s cold, waiting on the search engine besides).
+pub async fn recent(
+    db: &Db,
+    profile: i64,
+    kids: bool,
+    love: Option<&str>,
+    cache: &crate::model::ModelCache,
+    ask: Ask,
+) -> Result<Option<Vec<Rail>>, DbError> {
+    let context = ask.hour.map_or(Context::Evening, Context::of_hour);
+    let fingerprint = ProfileRepository::new(db)
+        .signal_fingerprint(profile)
+        .await?;
+    let homes = cache
+        .homes
+        .lock()
+        .map_err(|_| DbError::Invalid("poisoned".into()))?;
+    Ok(homes
+        .get(&profile)
+        .filter(|b| {
+            b.fingerprint == fingerprint
+                && b.context == context
+                && b.kids == kids
+                && b.love.as_deref() == love
+                && b.at.elapsed() < RECENT
+        })
+        .map(|b| b.rails.clone()))
+}
+
+/// What a Home is asked for beyond the profile (Phase 18).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Ask {
+    /// The viewer's local hour, 0 to 23: the part of the day the discovery engine's bandit
+    /// learns and chooses in. `None` is taken as the evening.
+    pub hour: Option<u32>,
+}
+
+/// Home's rails at an unknown hour: [`rails_at`] with nothing asked.
 pub async fn rails(
     db: &Db,
     semantic: Option<&mut Semantic>,
@@ -116,7 +179,25 @@ pub async fn rails(
     love: Option<&str>,
     cache: &crate::model::ModelCache,
 ) -> Result<Vec<Rail>, DbError> {
+    rails_at(db, semantic, profile, kids, love, cache, Ask::default()).await
+}
+
+/// Home's rails, for what `ask` says.
+pub async fn rails_at(
+    db: &Db,
+    semantic: Option<&mut Semantic>,
+    profile: i64,
+    kids: bool,
+    love: Option<&str>,
+    cache: &crate::model::ModelCache,
+    ask: Ask,
+) -> Result<Vec<Rail>, DbError> {
+    let hour = ask.hour;
+    // A kids profile leaves out much of what is chosen, so more is chosen.
+    let more = if kids { 6 } else { 1 };
     let profiles = ProfileRepository::new(db);
+    // What these rails are built from, for `recent`.
+    let fingerprint = profiles.signal_fingerprint(profile).await?;
     let media = MediaRepository::new(db);
     let suits = |ids: Vec<i64>| async move {
         if !kids {
@@ -139,15 +220,20 @@ pub async fn rails(
         .collect();
     let liked = profiles.liked(profile).await?;
     let saved = profiles.watchlist(profile).await?;
+    let today = crate::model::day_of(&now_iso()).unwrap_or(0.0);
+    // What the discovery engine has learned of this profile, and what it dismissed: a
+    // dismissed title is never recommended, in any rail (Phase 18).
+    let (beliefs, hidden) = crate::discover::memory(db, profile, today).await?;
     let seen: HashSet<i64> = liked
         .iter()
         .map(|(id, _)| *id)
         .chain(continuing.iter().flat_map(|c| [c.card, c.plays]))
+        .chain(hidden.iter().copied())
         .collect();
+    let context = hour.map_or(Context::Evening, Context::of_hour);
 
     // The taste model (Phase 15), with the profile's corrections: built once, for the new
     // releases and the taste rail.
-    let today = crate::model::day_of(&now_iso()).unwrap_or(0.0);
     let year = (today / 365.2425 + 1970.0).floor() as i64;
     let mut model = None;
     if let Some(s) = semantic {
@@ -247,9 +333,29 @@ pub async fn rails(
             .collect()
     };
 
+    // Rising now (ADR-0054 step 6): what gained the most ratings at the catalogue's last
+    // refresh, kept by the refresh itself; the profile's own titles left out.
+    let mut rising_notes = HashMap::new();
+    let rising: Vec<i64> = media
+        .kept_rising()
+        .await?
+        .into_iter()
+        .filter(|(id, _)| !seen.contains(id))
+        .map(|(id, gained)| {
+            rising_notes.insert(id, format!("+{} ratings", thousands(gained)));
+            id
+        })
+        .collect();
+
     // Where the profile's taste points (Phase 17): the hybrid ranker over meaning, people who
     // loved the same, and popularity, with the profile's axes; each pick says why.
     let mut taste_notes: HashMap<i64, String> = HashMap::new();
+    // And the discovery rails (Phase 18): each arm's picks, none in another rail, as many as
+    // the bandit's plan gives each; the taste rail as many as the plan gives the familiar.
+    let mut discovery: Vec<(crate::discover::DiscoveryRail, HashMap<i64, String>)> = Vec::new();
+    let mut limits: HashMap<&'static str, usize> = HashMap::new();
+    // And today's mood shelves (Phase 18): found by meaning, none repeating another rail.
+    let mut moods: Vec<(crate::mood::Mood, Vec<i64>)> = Vec::new();
     // Mutably: the meaning index is held across database awaits, which a shared reference
     // could only do if it were Sync; it is Send.
     let taste = match &mut model {
@@ -272,7 +378,28 @@ pub async fn rails(
                 .into_iter()
                 .chain(library_titles.library_titles(true).await?)
                 .collect();
-            let want = PER_RAIL * if kids { 6 } else { 1 };
+            // The bandit's plan first (Phase 18): it says how many the familiar gets. The same
+            // plan all hour, so Home does not reshuffle at every refresh.
+            let seed = (profile as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15)
+                ^ ((today as u64) * 24 + u64::from(hour.unwrap_or(20)));
+            let plan = sinephile_recommend::bandit::allocate(
+                &beliefs,
+                context,
+                crate::discover::budget(db, profile).await?,
+                crate::discover::SLOTS,
+                crate::discover::LEAST,
+                &mut sinephile_recommend::bandit::Rng::new(seed),
+            );
+            // The familiar's whole share is shown: the taste rail, and past its twenty a second
+            // rail. (Showing only twenty of thirty gave discovery more of Home than the plan
+            // meant: docs/eval-results.md, 18.2.)
+            let familiar = plan.first().map_or(PER_RAIL, |(_, n)| *n);
+            limits.insert("taste", familiar.min(PER_RAIL));
+            limits.insert("taste_more", familiar.saturating_sub(PER_RAIL));
+            for (arm, n) in plan.iter().filter(|(a, _)| *a != Arm::Familiar) {
+                limits.insert(arm.key(), (*n).min(PER_RAIL));
+            }
+            let want = familiar.max(1) * more;
             let (picks, makers) =
                 crate::hybrid::rail(db, &mut **s, modes, &met, &weighed, &axes, &playable, want)
                     .await?;
@@ -295,27 +422,90 @@ pub async fn rails(
             for p in &picks {
                 taste_notes.insert(p.id, crate::hybrid::note(p, modes, &titles, &makers));
             }
-            picks.into_iter().map(|p| p.id).collect()
+            let picked: Vec<i64> = picks.into_iter().map(|p| p.id).collect();
+
+            // Never the same title in two rails: everything Home shows above or beside them.
+            let taken: HashSet<i64> = met
+                .iter()
+                .chain(&picked)
+                .chain(&saved)
+                .chain(&library)
+                .chain(&new_episodes)
+                .chain(rising.iter().take(PER_RAIL))
+                .copied()
+                .collect();
+            let loved = crate::hybrid::loved_with(db, &weighed, &met).await?;
+            let mut facts = crate::discover::Cache::default();
+            let gathered =
+                crate::discover::gather(db, &mut **s, modes, &met, &loved, &mut facts).await?;
+            // A kids profile asks each arm for more: what does not suit
+            // children, or runs longer, is left out below.
+            let asked: Vec<(Arm, usize)> = plan.iter().map(|(arm, n)| (*arm, n * more)).collect();
+            let rails = crate::discover::planned(&gathered, &asked, &taken);
+            let nearest = crate::discover::nearest_members(&mut **s, &gathered.profile, &rails);
+            let named = crate::discover::named(&rails, &gathered.profile, &nearest);
+            let names: HashMap<i64, String> = media
+                .facts(&named)
+                .await?
+                .into_iter()
+                .map(|f| (f.id, f.title))
+                .collect();
+            let by_id: HashMap<i64, &sinephile_recommend::strategy::Title> =
+                gathered.titles.iter().map(|t| (t.id, t)).collect();
+            for rail in rails {
+                let notes = rail
+                    .picks
+                    .iter()
+                    .map(|d| {
+                        let facts = by_id.get(&d.id).copied();
+                        let words =
+                            crate::discover::note(d, &gathered.profile, &names, facts, &nearest);
+                        (d.id, words)
+                    })
+                    .collect();
+                discovery.push((rail, notes));
+            }
+
+            let mut shelved: HashSet<i64> = taken.clone();
+            shelved.extend(
+                discovery
+                    .iter()
+                    .flat_map(|(r, _)| r.picks.iter().map(|d| d.id)),
+            );
+            for mood in crate::mood::today(today as i64) {
+                let Some(vector) = cache
+                    .moods
+                    .get(&mood, |text| s.embedder.embed_query(text).ok())
+                else {
+                    continue;
+                };
+                let ids = crate::mood::shelf(
+                    db,
+                    &mut **s,
+                    &mood,
+                    &vector,
+                    modes,
+                    &shelved,
+                    PER_RAIL * more,
+                )
+                .await?;
+                shelved.extend(ids.iter().copied());
+                moods.push((mood, ids));
+            }
+            picked
         }
         None => Vec::new(),
     };
-    // Rising now (ADR-0054 step 6): what gained the most ratings at the catalogue's last
-    // refresh, kept by the refresh itself; the profile's own titles left out.
-    let mut rising_notes = HashMap::new();
-    let rising: Vec<i64> = media
-        .kept_rising()
-        .await?
-        .into_iter()
-        .filter(|(id, _)| !seen.contains(id))
-        .map(|(id, gained)| {
-            rising_notes.insert(id, format!("+{} ratings", thousands(gained)));
-            id
-        })
-        .collect();
 
     let shown: HashSet<i64> = seen
         .iter()
         .chain(taste.iter())
+        .chain(
+            discovery
+                .iter()
+                .flat_map(|(r, _)| r.picks.iter().map(|d| &d.id)),
+        )
+        .chain(moods.iter().flat_map(|(_, ids)| ids.iter()))
         .chain(saved.iter())
         .chain(new_releases.iter().take(PER_RAIL))
         .copied()
@@ -328,25 +518,83 @@ pub async fn rails(
         .collect();
 
     let mut out = Vec::new();
-    for (key, title, ids) in [
-        ("continue", "Continue watching", started),
-        ("new_episodes", "New episodes of your shows", new_episodes),
-        ("library", "Your library", library),
-        ("new", "New releases", new_releases),
-        ("rising", "Rising now", rising),
-        ("taste", "Where your taste points", taste),
-        ("watchlist", "On your watchlist", saved),
-        ("loved", "Widely loved", loved),
-    ] {
-        let items: Vec<i64> = suits(ids).await?.into_iter().take(PER_RAIL).collect();
-        if !items.is_empty() {
-            let from = match key {
-                "new_episodes" => Some(&episode_notes),
-                "continue" => Some(&continue_notes),
-                "taste" => Some(&taste_notes),
-                "rising" => Some(&rising_notes),
-                _ => None,
-            };
+    // Each rail: its key, its name, its titles, and the notes its cards may carry.
+    type Listed<'a> = (
+        &'static str,
+        String,
+        Vec<i64>,
+        Option<&'a HashMap<i64, String>>,
+    );
+    let mut lists: Vec<Listed> = vec![
+        (
+            "continue",
+            "Continue watching".into(),
+            started,
+            Some(&continue_notes),
+        ),
+        (
+            "new_episodes",
+            "New episodes of your shows".into(),
+            new_episodes,
+            Some(&episode_notes),
+        ),
+        ("library", "Your library".into(), library, None),
+        ("new", "New releases".into(), new_releases, None),
+        ("rising", "Rising now".into(), rising, Some(&rising_notes)),
+        (
+            "taste",
+            "Where your taste points".into(),
+            taste.clone(),
+            Some(&taste_notes),
+        ),
+        (
+            "taste_more",
+            "More where your taste points".into(),
+            taste,
+            Some(&taste_notes),
+        ),
+    ];
+    for (rail, notes) in &discovery {
+        lists.push((
+            rail.arm.key(),
+            rail.title.clone(),
+            rail.picks.iter().map(|d| d.id).collect(),
+            Some(notes),
+        ));
+    }
+    for (mood, ids) in &moods {
+        lists.push((mood.key, mood.title.to_string(), ids.clone(), None));
+    }
+    lists.push(("watchlist", "On your watchlist".into(), saved, None));
+    lists.push(("loved", "Widely loved".into(), loved, None));
+    let mut recorded: Vec<(i64, &'static str)> = Vec::new();
+    // What the taste rail shows, which its second rail continues after.
+    let mut in_taste: HashSet<i64> = HashSet::new();
+    for (key, title, ids, from) in lists {
+        let limit = limits.get(key).copied().unwrap_or(PER_RAIL);
+        let ids: Vec<i64> = if key == "taste_more" {
+            ids.into_iter()
+                .filter(|id| !in_taste.contains(id))
+                .collect()
+        } else {
+            ids
+        };
+        let items: Vec<i64> = suits(ids).await?.into_iter().take(limit).collect();
+        if key == "taste" {
+            in_taste.extend(items.iter().copied());
+        }
+        let arm = if key == "taste" || key == "taste_more" {
+            Some(Arm::Familiar)
+        } else {
+            Arm::from_key(key)
+        };
+        // A discovery rail of two or three looks like an accident.
+        let short =
+            arm.is_some_and(|a| a != Arm::Familiar) && items.len() < crate::discover::MIN_PICKS;
+        if !items.is_empty() && !short {
+            if let Some(arm) = arm {
+                recorded.extend(items.iter().map(|id| (*id, arm.key())));
+            }
             let notes = from.map_or_else(HashMap::new, |from| {
                 items
                     .iter()
@@ -369,6 +617,23 @@ pub async fn rails(
                 progress,
             });
         }
+    }
+    // Which arm showed what, and when: what the bandit learns from (Phase 18).
+    DiscoveryRepository::new(db)
+        .record_shown(profile, &recorded, context.key())
+        .await?;
+    if let Ok(mut homes) = cache.homes.lock() {
+        homes.insert(
+            profile,
+            Built {
+                fingerprint,
+                context,
+                kids,
+                love: love.map(str::to_string),
+                at: std::time::Instant::now(),
+                rails: out.clone(),
+            },
+        );
     }
     Ok(out)
 }

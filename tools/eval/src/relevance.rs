@@ -189,7 +189,20 @@ pub async fn run(
     db: &Db,
 ) -> Result<Vec<Outcome>, EvalError> {
     let _ = data_dir;
-    let fixture = Path::new("fixtures/search/semantic-queries.tsv");
+    run_on(
+        Path::new("fixtures/search/semantic-queries.tsv"),
+        engine,
+        db,
+    )
+    .await
+}
+
+/// [`run`] on another fixture of the same format: 18.4's tuning set.
+pub async fn run_on(
+    fixture: &Path,
+    engine: &mut sinephile_search_engine::Engine,
+    db: &Db,
+) -> Result<Vec<Outcome>, EvalError> {
     let cases = load(fixture)?;
 
     let mut outcomes = Vec::with_capacity(cases.len());

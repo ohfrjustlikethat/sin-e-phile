@@ -295,7 +295,7 @@ async fn rising_now_follows_new_releases_with_what_each_gained() {
     }
     let me = ProfileRepository::new(&db).ensure_default().await.unwrap();
     ProfileRepository::new(&db)
-        .rate(me, loved, Some(5))
+        .rate(me, loved, Some(10))
         .await
         .unwrap();
     assert_eq!(media.keep_rising(2, 1_000, 200).await.unwrap(), 3);
@@ -338,4 +338,185 @@ async fn the_taste_preview_is_homes_taste_rail() {
         .map(|r| r.items.clone())
         .unwrap_or_default();
     assert_eq!(preview, taste);
+}
+
+#[tokio::test]
+async fn a_dismissed_title_leaves_every_rail_and_not_right_now_comes_back() {
+    // Phase 18: "not for me" and "already seen" for good; "not right now" for a fortnight.
+    use sinephile_persistence::repositories::DiscoveryRepository;
+    let db = Db::in_memory().await.unwrap();
+    let heat = film(&db, "Heat", 1995, 900_000, &["Crime"]).await;
+    let thief = film(&db, "Thief", 1981, 800_000, &["Crime"]).await;
+    let ronin = film(&db, "Ronin", 1998, 700_000, &["Crime"]).await;
+    let me = ProfileRepository::new(&db).ensure_default().await.unwrap();
+    let loved = |r: Vec<sinephile_taste::home::Rail>| {
+        r.into_iter()
+            .find(|r| r.key == "loved")
+            .map(|r| r.items)
+            .unwrap_or_default()
+    };
+    let models = sinephile_taste::model::ModelCache::default();
+    let home = || rails(&db, None, me, false, None, &models);
+    assert_eq!(loved(home().await.unwrap()), vec![heat, thief, ronin]);
+
+    let discovery = DiscoveryRepository::new(&db);
+    discovery
+        .dismiss(me, heat, "not_for_me", "evening")
+        .await
+        .unwrap();
+    discovery
+        .dismiss(me, thief, "not_right_now", "evening")
+        .await
+        .unwrap();
+    assert_eq!(loved(home().await.unwrap()), vec![ronin]);
+
+    // A fortnight on, "not right now" has passed; "not for me" has not.
+    sqlx::query("UPDATE dismissals SET at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-15 days')")
+        .execute(db.pool())
+        .await
+        .unwrap();
+    assert_eq!(loved(home().await.unwrap()), vec![thief, ronin]);
+    // And taken back, it is as if it was never said.
+    discovery.undismiss(me, heat).await.unwrap();
+    assert_eq!(loved(home().await.unwrap()), vec![heat, thief, ronin]);
+}
+
+#[tokio::test]
+async fn the_bandit_learns_once_per_title_from_its_strongest_outcome() {
+    use sinephile_persistence::repositories::DiscoveryRepository;
+    use sinephile_recommend::bandit::Context;
+    use sinephile_recommend::strategy::Arm;
+    let db = Db::in_memory().await.unwrap();
+    let a = film(&db, "A", 1990, 1_000, &["Drama"]).await;
+    let b = film(&db, "B", 1991, 1_000, &["Drama"]).await;
+    let profiles = ProfileRepository::new(&db);
+    let me = profiles.ensure_default().await.unwrap();
+    let discovery = DiscoveryRepository::new(&db);
+    discovery
+        .record_shown(me, &[(a, "deep_cut"), (b, "canon")], "evening")
+        .await
+        .unwrap();
+    // A: played, then finished, then rated: one success, not three.
+    profiles
+        .record_viewing(me, a, 600, false, 600)
+        .await
+        .unwrap();
+    profiles
+        .record_viewing(me, a, 6_000, true, 6_000)
+        .await
+        .unwrap();
+    profiles.rate(me, a, Some(10)).await.unwrap();
+    // B: "not for me".
+    discovery
+        .dismiss(me, b, "not_for_me", "evening")
+        .await
+        .unwrap();
+    let today = sinephile_taste::model::day_of(&sinephile_taste::home::now_iso()).unwrap();
+    let (beliefs, hidden) = sinephile_taste::discover::memory(&db, me, today)
+        .await
+        .unwrap();
+    assert_eq!(beliefs.belief(Arm::DeepCut, Context::Evening), (2.0, 1.0));
+    assert_eq!(beliefs.belief(Arm::Canon, Context::Evening), (1.0, 2.0));
+    assert_eq!(hidden, [b].into_iter().collect());
+}
+
+#[tokio::test]
+async fn surprise_me_picks_a_film_within_the_length_asked() {
+    // Phase 18 (ADR-0043) and I42: with no taste yet, from what is widely loved; films only;
+    // and "I have 90 minutes" leaves out what runs longer, or whose length is not known.
+    use sinephile_persistence::MediaKind;
+    use sinephile_taste::home::Ask;
+    use sinephile_taste::surprise::surprise;
+    let db = Db::in_memory().await.unwrap();
+    let media = MediaRepository::new(&db);
+    let mut long = NewMediaItem::film("Long", 1990);
+    long.rating_votes = Some(900_000);
+    long.runtime_minutes = Some(170);
+    let long = media.insert(&long).await.unwrap();
+    let mut short = NewMediaItem::film("Short", 1991);
+    short.rating_votes = Some(800_000);
+    short.runtime_minutes = Some(85);
+    let short = media.insert(&short).await.unwrap();
+    let mut unknown = NewMediaItem::film("Unknown length", 1992);
+    unknown.rating_votes = Some(700_000);
+    media.insert(&unknown).await.unwrap();
+    let mut show = NewMediaItem::film("A Show", 1993);
+    show.kind = Some(MediaKind::Series);
+    show.rating_votes = Some(950_000);
+    show.runtime_minutes = Some(30);
+    media.insert(&show).await.unwrap();
+    let me = ProfileRepository::new(&db).ensure_default().await.unwrap();
+    let models = sinephile_taste::model::ModelCache::default();
+
+    let mut seen = std::collections::HashSet::new();
+    for seed in 0..40 {
+        let s = surprise(&db, None, me, false, None, &models, Ask::default(), seed)
+            .await
+            .unwrap()
+            .expect("a film");
+        seen.insert(s.id);
+        assert!(!s.on_this_pc);
+    }
+    assert!(
+        seen.contains(&long) && seen.contains(&short),
+        "asking again gives another: {seen:?}"
+    );
+    assert_eq!(seen.len(), 3, "films only, never the series: {seen:?}");
+}
+
+#[tokio::test]
+async fn surprise_me_picks_from_homes_rails_while_they_are_current() {
+    // The author, 2026-11-21: Surprise me was slow, building all of Home for one film. It
+    // reuses the rails Home built last, and only while nothing they stand on has moved.
+    use sinephile_taste::home::{rails_at, recent, Ask};
+    use sinephile_taste::surprise::from_recent;
+    let db = Db::in_memory().await.unwrap();
+    let a = film(&db, "Alpha", 1990, 900_000, &["Drama"]).await;
+    let _b = film(&db, "Beta", 1991, 800_000, &["Drama"]).await;
+    let me = ProfileRepository::new(&db).ensure_default().await.unwrap();
+    let models = sinephile_taste::model::ModelCache::default();
+    let evening = Ask { hour: Some(20) };
+    assert!(
+        from_recent(&db, me, false, None, &models, evening, 1)
+            .await
+            .unwrap()
+            .is_none(),
+        "no Home built yet: Home must be built"
+    );
+    let built = rails_at(&db, None, me, false, None, &models, evening)
+        .await
+        .unwrap();
+    let again = recent(&db, me, false, None, &models, evening)
+        .await
+        .unwrap()
+        .expect("current");
+    assert_eq!(again, built);
+    assert!(from_recent(&db, me, false, None, &models, evening, 1)
+        .await
+        .unwrap()
+        .expect("from the rails")
+        .is_some());
+    // Another part of the day, another love, or a profile that has changed since: built again.
+    let morning = Ask { hour: Some(9) };
+    assert!(recent(&db, me, false, None, &models, morning)
+        .await
+        .unwrap()
+        .is_none());
+    assert!(
+        recent(&db, me, false, Some("slow cinema"), &models, evening)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    ProfileRepository::new(&db)
+        .rate(me, a, Some(10))
+        .await
+        .unwrap();
+    assert!(
+        recent(&db, me, false, None, &models, evening)
+            .await
+            .unwrap()
+            .is_none(),
+        "a rating moves what Home would show"
+    );
 }

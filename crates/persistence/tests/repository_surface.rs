@@ -408,6 +408,13 @@ async fn episode_repository_surface() {
         None,
         "not an episode"
     );
+    // series_of_many: each episode's series; what is not an episode is left out
+    let mut of = repo.series_of_many(&[s2e1, series, s1e4]).await.unwrap();
+    of.sort_unstable();
+    let mut want = vec![(s2e1, series), (s1e4, series)];
+    want.sort_unstable();
+    assert_eq!(of, want);
+    assert!(repo.series_of_many(&[]).await.unwrap().is_empty());
 
     // set_next_airing / next_airing — no episode row needed; the newest replaces
     assert_eq!(repo.next_airing(series).await.expect("next_airing"), None);
@@ -539,12 +546,15 @@ async fn profile_repository_surface() {
     // create — including the demote-the-incumbent path
     let first = repo.create("First", true).await.expect("create");
 
-    // rate / rating (Phase 11) — replace, clear, refuse out of range
+    // rate / rating (Phase 11; half stars, ADR-0056) — replace, clear, refuse out of range
     assert_eq!(repo.rating(first, film).await.expect("rating"), None);
-    repo.rate(first, film, Some(4)).await.expect("rate");
-    repo.rate(first, film, Some(5)).await.expect("rate again");
-    assert_eq!(repo.rating(first, film).await.unwrap(), Some(5));
-    assert!(repo.rate(first, film, Some(6)).await.is_err());
+    repo.rate(first, film, Some(8)).await.expect("rate");
+    repo.rate(first, film, Some(9))
+        .await
+        .expect("rate again, four and a half");
+    assert_eq!(repo.rating(first, film).await.unwrap(), Some(9));
+    assert!(repo.rate(first, film, Some(11)).await.is_err());
+    assert!(repo.rate(first, film, Some(0)).await.is_err());
     repo.rate(first, film, None).await.expect("clear");
     assert_eq!(repo.rating(first, film).await.unwrap(), None);
     let second = repo
@@ -652,13 +662,107 @@ async fn profile_repository_surface() {
         f0,
         "and clearing it puts it back"
     );
+    // A dismissal moves it too (Phase 18: "not for me" is a taste signal).
+    let discovery = sinephile_persistence::repositories::DiscoveryRepository::new(&db);
+    discovery
+        .dismiss(first, film, "not_for_me", "evening")
+        .await
+        .unwrap();
+    assert_ne!(
+        repo.signal_fingerprint(first).await.unwrap(),
+        f0,
+        "a dismissal moves it"
+    );
+    discovery.undismiss(first, film).await.unwrap();
+    assert_eq!(repo.signal_fingerprint(first).await.unwrap(), f0);
 
-    // ratings — every rating with its date
+    // ratings — every rating with its date, in stars
     repo.rate(first, film, Some(3)).await.unwrap();
     let rated = repo.ratings(first).await.expect("ratings");
-    assert_eq!((rated.len(), rated[0].0, rated[0].1), (1, film, 3));
+    assert_eq!((rated.len(), rated[0].0, rated[0].1), (1, film, 1.5));
     assert!(rated[0].2.len() >= 10, "dated");
     repo.rate(first, film, None).await.unwrap();
+
+    // rate_season / season_ratings / rating_of / rated_count (ADR-0056) — a show is rated
+    // season by season, and every reader sees it as their average, replacing a rating of
+    // the show as a whole
+    let mut show = NewMediaItem::film("Twin Peaks", 1990);
+    show.kind = Some(MediaKind::Series);
+    let show = media.insert(&show).await.expect("series");
+    repo.rate(first, show, Some(6)).await.unwrap();
+    assert_eq!(
+        repo.rating_of(first, show).await.expect("rating_of"),
+        Some(6.0)
+    );
+    let before_seasons = repo.signal_fingerprint(first).await.unwrap();
+    repo.rate_season(first, show, 1, Some(10))
+        .await
+        .expect("rate_season");
+    repo.rate_season(first, show, 2, Some(6)).await.unwrap();
+    repo.rate_season(first, show, 2, Some(7))
+        .await
+        .expect("rate_season again");
+    assert!(repo.rate_season(first, show, 3, Some(11)).await.is_err());
+    assert_eq!(
+        repo.season_ratings(first, show)
+            .await
+            .expect("season_ratings"),
+        vec![(1, 10), (2, 7)]
+    );
+    assert_eq!(repo.rating_of(first, show).await.unwrap(), Some(8.5));
+    assert_eq!(repo.ratings(first).await.unwrap()[0].1, 4.25);
+    assert_ne!(
+        repo.signal_fingerprint(first).await.unwrap(),
+        before_seasons,
+        "a season's rating moves it"
+    );
+    assert_eq!(repo.rated_count(first).await.expect("rated_count"), 1);
+    assert_eq!(
+        repo.liked(first).await.unwrap(),
+        vec![(show, 0.7 + 0.5 * 0.15)],
+        "the show is liked by its seasons' average"
+    );
+    repo.rate_season(first, show, 1, None)
+        .await
+        .expect("clear a season");
+    repo.rate_season(first, show, 2, None).await.unwrap();
+    assert_eq!(
+        repo.rating_of(first, show).await.unwrap(),
+        Some(6.0),
+        "with no season rated, the show's own rating again"
+    );
+    repo.rate(first, show, None).await.unwrap();
+    assert_eq!(repo.rated_count(first).await.unwrap(), 0);
+
+    // skip_rating / to_rate (ADR-0056's rate-a-batch screen) — well-known films, most voted
+    // first, never one rated or skipped
+    let mut known = NewMediaItem::film("Seven Samurai", 1954);
+    known.rating_votes = Some(400_000);
+    let known = media.insert(&known).await.unwrap();
+    let mut better_known = NewMediaItem::film("Rashomon", 1950);
+    better_known.rating_votes = Some(500_000);
+    let better_known = media.insert(&better_known).await.unwrap();
+    assert_eq!(
+        repo.to_rate(first, 100_000, 0, 10).await.expect("to_rate"),
+        vec![better_known, known]
+    );
+    assert_eq!(
+        repo.to_rate(first, 100_000, 1, 10).await.unwrap(),
+        vec![known]
+    );
+    repo.skip_rating(first, better_known)
+        .await
+        .expect("skip_rating");
+    repo.skip_rating(first, better_known)
+        .await
+        .expect("skip_rating twice");
+    repo.rate(first, known, Some(8)).await.unwrap();
+    assert!(repo
+        .to_rate(first, 100_000, 0, 10)
+        .await
+        .unwrap()
+        .is_empty());
+    repo.rate(first, known, None).await.unwrap();
 
     // record_signal / signals — one per title and kind within a minute; the kind is checked
     repo.record_signal(first, film, "detail")
@@ -678,8 +782,8 @@ async fn profile_repository_surface() {
         .insert(&NewMediaItem::film("Early Summer", 1951))
         .await
         .expect("film");
-    repo.rate(second, other, Some(5)).await.unwrap();
-    repo.rate(second, third, Some(2)).await.unwrap();
+    repo.rate(second, other, Some(10)).await.unwrap();
+    repo.rate(second, third, Some(4)).await.unwrap();
     repo.record_watch(second, third, 6_000, true).await.unwrap();
     let liked = repo.liked(second).await.expect("liked");
     assert_eq!(
@@ -715,6 +819,30 @@ async fn profile_repository_surface() {
         .await
         .expect("position miss")
         .is_none());
+
+    // hide_from_continue / hidden_from_continue (ADR-0056) — hidden until played again
+    repo.hide_from_continue(second, film)
+        .await
+        .expect("hide_from_continue");
+    repo.hide_from_continue(second, film)
+        .await
+        .expect("hide_from_continue twice");
+    assert_eq!(
+        repo.hidden_from_continue(second)
+            .await
+            .expect("hidden_from_continue"),
+        vec![film]
+    );
+    assert!(repo.hidden_from_continue(first).await.unwrap().is_empty());
+    sqlx::query("UPDATE continue_hidden SET hidden_at = datetime('now', '-1 minute')")
+        .execute(db.pool())
+        .await
+        .unwrap();
+    repo.save_position(second, &position).await.unwrap();
+    assert!(
+        repo.hidden_from_continue(second).await.unwrap().is_empty(),
+        "played again: back"
+    );
 
     // continue_watching — exercises the completion-threshold arithmetic
     assert_eq!(
@@ -2411,6 +2539,165 @@ async fn media_facts_surface() {
     );
     assert!(facts[1].genres.is_empty() && facts[1].directors.is_empty());
     assert!(media.facts(&[]).await.unwrap().is_empty());
+
+    // Phase 18: its rating, and the countries and movements Wikidata gave (migration 0033).
+    sqlx::query("UPDATE media_items SET rating = 83 WHERE id = ?")
+        .bind(heat)
+        .execute(db.pool())
+        .await
+        .unwrap();
+    sinephile_persistence::repositories::RegionRepository::new(&db)
+        .record(&[sinephile_persistence::repositories::Regions {
+            media_item_id: heat,
+            countries: vec!["United States".into()],
+            movements: vec!["New Hollywood".into()],
+        }])
+        .await
+        .unwrap();
+    let mut facts = media.facts(&[heat, thief]).await.unwrap();
+    facts.sort_by_key(|f| f.id);
+    assert_eq!(facts[0].rating, Some(83));
+    assert_eq!(facts[0].countries, vec!["United States".to_string()]);
+    assert_eq!(facts[0].movements, vec!["New Hollywood".to_string()]);
+    assert_eq!(facts[1].rating, None);
+    assert!(facts[1].countries.is_empty() && facts[1].movements.is_empty());
+}
+
+#[tokio::test]
+async fn media_acclaimed_surface() {
+    // Phase 18: films rated at least so high by at least so many, most voted first.
+    let db = Db::in_memory().await.expect("open");
+    let media = MediaRepository::new(&db);
+    let mut ids = Vec::new();
+    for (title, rating, votes, adult) in [
+        ("Rated, seen", 82, 90_000, false),
+        ("Rated, seen more", 80, 200_000, false),
+        ("Rated, unseen", 85, 900, false),
+        ("Seen, not rated highly", 60, 500_000, false),
+        ("Adult", 90, 100_000, true),
+    ] {
+        let mut item = NewMediaItem::film(title, 1990);
+        item.rating = Some(rating);
+        item.rating_votes = Some(votes);
+        item.is_adult = adult;
+        ids.push(media.insert(&item).await.unwrap());
+    }
+    let mut series = NewMediaItem::film("A series", 1990);
+    series.kind = Some(MediaKind::Series);
+    series.rating = Some(95);
+    series.rating_votes = Some(300_000);
+    media.insert(&series).await.unwrap();
+    assert_eq!(
+        media.acclaimed(75, 5_000, 10).await.unwrap(),
+        vec![ids[1], ids[0]],
+        "films only, not adult, most voted first"
+    );
+    assert_eq!(media.acclaimed(75, 5_000, 1).await.unwrap(), vec![ids[1]]);
+
+    // votes_of: each title's votes, those with any
+    let mut unvoted = NewMediaItem::film("No votes", 2001);
+    unvoted.rating_votes = None;
+    let unvoted = media.insert(&unvoted).await.unwrap();
+    let votes = media
+        .votes_of(&[ids[0], ids[2], unvoted, 999_999])
+        .await
+        .unwrap();
+    assert_eq!(votes.len(), 2);
+    assert_eq!((votes[&ids[0]], votes[&ids[2]]), (90_000, 900));
+    assert!(media.votes_of(&[]).await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn region_repository_surface() {
+    // Phase 18 (ADR-0055, migration 0033): what Wikidata said of each title's countries and
+    // movements, and which titles were asked.
+    use sinephile_persistence::repositories::{RegionCounts, RegionRepository, Regions};
+    let db = Db::in_memory().await.expect("open");
+    let media = MediaRepository::new(&db);
+    let mut f = Vec::new();
+    for (k, votes) in [(0, 500_000), (1, 90_000), (2, 400), (3, 50_000)] {
+        let mut item = NewMediaItem::film(format!("Film {k}"), 2000 + k);
+        item.rating_votes = Some(votes);
+        let id = media.insert(&item).await.unwrap();
+        media
+            .add_external_id(id, IdSource::Imdb, &format!("tt000000{k}"), 1.0)
+            .await
+            .unwrap();
+        f.push(id);
+    }
+    let repo = RegionRepository::new(&db);
+
+    // awaiting: most voted first, from a floor of votes
+    assert_eq!(
+        repo.awaiting(10_000, 10).await.unwrap(),
+        vec![
+            (f[0], "tt0000000".to_string()),
+            (f[1], "tt0000001".to_string()),
+            (f[3], "tt0000003".to_string())
+        ]
+    );
+    // awaiting_met: only what a profile has met, whatever its votes
+    let me = ProfileRepository::new(&db)
+        .create("me", true)
+        .await
+        .unwrap();
+    assert!(repo.awaiting_met(10).await.unwrap().is_empty());
+    ProfileRepository::new(&db)
+        .rate(me, f[2], Some(4))
+        .await
+        .unwrap();
+    assert_eq!(
+        repo.awaiting_met(10).await.unwrap(),
+        vec![(f[2], "tt0000002".to_string())]
+    );
+
+    // record: an answer replaces what was known; an empty answer still counts as asked
+    repo.record(&[
+        Regions {
+            media_item_id: f[0],
+            countries: vec!["Iran".into(), "France".into(), " ".into()],
+            movements: vec!["Iranian New Wave".into()],
+        },
+        Regions {
+            media_item_id: f[2],
+            ..Default::default()
+        },
+    ])
+    .await
+    .unwrap();
+    repo.record(&[Regions {
+        media_item_id: f[0],
+        countries: vec!["Iran".into()],
+        movements: vec!["Iranian New Wave".into()],
+    }])
+    .await
+    .unwrap();
+    assert_eq!(
+        repo.awaiting(10_000, 10).await.unwrap(),
+        vec![
+            (f[1], "tt0000001".to_string()),
+            (f[3], "tt0000003".to_string())
+        ]
+    );
+    assert!(repo.awaiting_met(10).await.unwrap().is_empty());
+    let facts = media.facts(&[f[0]]).await.unwrap();
+    assert_eq!(facts[0].countries, vec!["Iran".to_string()]);
+
+    // unasked: which of these Wikidata has not been asked about
+    assert_eq!(
+        repo.unasked(&[f[0], f[1], f[2]]).await.unwrap(),
+        [f[1]].into_iter().collect()
+    );
+
+    // counts
+    let RegionCounts {
+        asked,
+        with_country,
+        with_movement,
+        last_asked,
+    } = repo.counts().await.unwrap();
+    assert_eq!((asked, with_country, with_movement), (2, 1, 1));
+    assert!(last_asked.is_some());
 }
 
 #[tokio::test]
@@ -2881,4 +3168,115 @@ async fn core_ids_for_vectors_surface() {
     let ours = meaning.described_ids(&ids).await.unwrap();
     assert_eq!(ours.len(), 2);
     assert!(ours.contains(&ids[1]) && ours.contains(&ids[2]));
+}
+
+#[tokio::test]
+async fn discovery_repository_surface() {
+    // Phase 18 (migration 0034): which arm showed what, and what came of it.
+    use sinephile_persistence::repositories::{DiscoveryRepository, Happened};
+    let db = Db::in_memory().await.expect("open");
+    let media = MediaRepository::new(&db);
+    let mut f = Vec::new();
+    for k in 0..6 {
+        let mut item = NewMediaItem::film(format!("Film {k}"), 2000 + k);
+        item.runtime_minutes = Some(100);
+        f.push(media.insert(&item).await.unwrap());
+    }
+    let profiles = ProfileRepository::new(&db);
+    let me = profiles.create("me", true).await.unwrap();
+    let them = profiles.create("them", false).await.unwrap();
+    let repo = DiscoveryRepository::new(&db);
+
+    // Viewed before it was shown: not the arm's doing.
+    sqlx::query(
+        "INSERT INTO watch_events (profile_id, media_item_id, started_at, completed)
+         VALUES (?, ?, '2020-01-01 10:00:00', 1)",
+    )
+    .bind(me)
+    .bind(f[5])
+    .execute(db.pool())
+    .await
+    .unwrap();
+
+    // record_shown: the first arm to show a title keeps it
+    repo.record_shown(
+        me,
+        &[
+            (f[0], "deep_cut"),
+            (f[1], "canon"),
+            (f[2], "familiar"),
+            (f[3], "stretch"),
+            (f[4], "blind_spot"),
+            (f[5], "bridge"),
+        ],
+        "evening",
+    )
+    .await
+    .unwrap();
+    repo.record_shown(me, &[(f[0], "canon")], "day")
+        .await
+        .unwrap();
+
+    // What happened after: finished, stopped in the first fifth, saved, rated, dismissed.
+    profiles
+        .record_viewing(me, f[0], 6_000, true, 6_000)
+        .await
+        .unwrap();
+    profiles
+        .record_viewing(me, f[1], 600, false, 600)
+        .await
+        .unwrap();
+    profiles.add_to_watchlist(me, f[2], None).await.unwrap();
+    profiles.rate(me, f[3], Some(2)).await.unwrap();
+    // Another profile's doings are not this profile's.
+    profiles
+        .record_viewing(them, f[4], 6_000, true, 6_000)
+        .await
+        .unwrap();
+    // dismiss: the latest kept, with the part of the day it was said in
+    repo.dismiss(me, f[4], "not_for_me", "late").await.unwrap();
+    repo.dismiss(me, f[4], "not_right_now", "late")
+        .await
+        .unwrap();
+
+    // happened
+    let mut got: Vec<(i64, String, String, String)> = repo
+        .happened(me)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(
+            |Happened {
+                 media_item_id,
+                 arm,
+                 context,
+                 event,
+                 ..
+             }| (media_item_id, arm, context, event),
+        )
+        .collect();
+    got.sort();
+    let s = |x: &str| x.to_string();
+    assert_eq!(
+        got,
+        vec![
+            (f[0], s("deep_cut"), s("evening"), s("completed")),
+            (f[1], s("canon"), s("evening"), s("abandoned")),
+            (f[2], s("familiar"), s("evening"), s("watchlisted")),
+            (f[3], s("stretch"), s("evening"), s("not_for_me")),
+            (f[4], s("blind_spot"), s("late"), s("not_right_now")),
+        ]
+    );
+    assert!(repo.happened(them).await.unwrap().is_empty());
+
+    // dismissed / undismiss
+    let dismissed = repo.dismissed(me).await.unwrap();
+    assert_eq!(dismissed.len(), 1);
+    assert_eq!(
+        (dismissed[0].0, dismissed[0].1.as_str()),
+        (f[4], "not_right_now")
+    );
+    assert!(repo.undismiss(me, f[4]).await.unwrap());
+    assert!(!repo.undismiss(me, f[4]).await.unwrap());
+    assert!(repo.dismissed(me).await.unwrap().is_empty());
 }

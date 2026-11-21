@@ -37,6 +37,9 @@ pub struct Request {
     /// Refuse a response body larger than this. `None` trusts the server, which is
     /// right for a metadata API and wrong for anything a user pointed the app at.
     pub max_body_bytes: Option<usize>,
+    /// How long to wait for the whole response, when not the transport's own (30 s): a
+    /// Wikidata query may take up to WDQS's 60 s limit on a busy day (Phase 18).
+    pub timeout: Option<std::time::Duration>,
 }
 
 impl Request {
@@ -47,6 +50,7 @@ impl Request {
             body: None,
             headers: Vec::new(),
             max_body_bytes: None,
+            timeout: None,
         }
     }
 
@@ -58,6 +62,7 @@ impl Request {
             body: None,
             headers: Vec::new(),
             max_body_bytes: None,
+            timeout: None,
         }
     }
 
@@ -71,7 +76,14 @@ impl Request {
                 ("accept".into(), "application/json".into()),
             ],
             max_body_bytes: None,
+            timeout: None,
         }
+    }
+
+    /// Wait up to `timeout` for the whole response instead of the transport's own.
+    pub fn wait(mut self, timeout: std::time::Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
     }
 
     /// Cap the response body. Over the cap is [`TransportError::TooLarge`], and the

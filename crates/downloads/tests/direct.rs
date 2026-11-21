@@ -186,6 +186,68 @@ async fn a_pause_and_a_restart_carry_on_from_the_bytes_already_here() {
     assert!(Path::new(&file).exists());
 }
 
+/// Cancelled mid-download, files deleted (the author, 2026-11-20: cancelling "doesnt work
+/// sometimes"): nothing is left, nothing comes back, and a pause straight after a resume
+/// leaves one writer, not two.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_cancel_mid_download_leaves_nothing_behind() {
+    let (base, _) = server(Duration::from_millis(5));
+    for round in 0..20 {
+        let dir = TempDir::new().unwrap();
+        let d = download(10 + round, &format!("{base}/film.mp4"));
+        let b = Direct::new();
+        let id = b.add(&d, dir.path()).await.unwrap();
+        let file = dir.path().join("Nosferatu").join("film.mp4");
+        let part = part_of(&file);
+        until("some bytes", Duration::from_secs(20), || {
+            std::fs::metadata(&part)
+                .map(|m| m.len() > 0)
+                .unwrap_or(false)
+        })
+        .await;
+        b.pause(&id).await.unwrap();
+        b.resume(&id).await.unwrap();
+        b.remove(&id, true).await.unwrap();
+        assert!(!b.holds(&id).await);
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        assert!(!part.exists(), "round {round}: the .part is still there");
+        assert!(!file.exists(), "round {round}: the file is still there");
+    }
+}
+
+/// Paused and resumed again and again while it runs: one writer at a time, so the bytes
+/// still join up exactly.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn quick_pauses_and_resumes_keep_the_file_whole() {
+    let (base, _) = server(Duration::from_millis(2));
+    let dir = TempDir::new().unwrap();
+    let d = download(40, &format!("{base}/film.mp4"));
+    let b = Direct::new();
+    let id = b.add(&d, dir.path()).await.unwrap();
+    let part = part_of(&dir.path().join("Nosferatu").join("film.mp4"));
+    until("some bytes", Duration::from_secs(20), || {
+        std::fs::metadata(&part)
+            .map(|m| m.len() > 0)
+            .unwrap_or(false)
+    })
+    .await;
+    for _ in 0..40 {
+        b.pause(&id).await.unwrap();
+        b.resume(&id).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(3)).await;
+    }
+    let deadline = Instant::now() + Duration::from_secs(60);
+    while !finished(&b, &id).await {
+        assert!(Instant::now() < deadline, "not finished");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    let file = b.video_file(&id, None).await.unwrap();
+    assert!(
+        std::fs::read(&file).unwrap() == bytes(),
+        "the bytes do not join up"
+    );
+}
+
 #[tokio::test]
 async fn a_torrent_is_not_a_web_address() {
     let mut d = download(3, "infohash:abc");

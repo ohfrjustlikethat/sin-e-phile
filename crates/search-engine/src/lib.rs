@@ -30,7 +30,7 @@
 pub mod card;
 pub mod query;
 
-use sinephile_persistence::repositories::{Hit, MatchReason, SearchRepository};
+use sinephile_persistence::repositories::{Hit, MatchReason, MediaRepository, SearchRepository};
 use sinephile_persistence::{Db, DbError};
 use sinephile_vector_index::VectorIndex;
 
@@ -60,6 +60,19 @@ pub const RRF_K: f64 = 60.0;
 /// larger `LIMIT` on a query that is already indexed.
 const CANDIDATES: i64 = 50;
 
+/// How much how widely seen a title is counts beside its closeness in meaning (Phase 18,
+/// 18.4): `cosine + POPULARITY_PRIOR * ln(1 + votes) / ln(1 + most votes among them)`, over
+/// the [`PRIOR_POOL`] nearest, the best [`CANDIDATES`] going on to fusion. Plot-first
+/// documents (v3) let hundreds of thousands of obscure plots outrank the films a person
+/// means; votes say which are meant. Chosen on `fixtures/search/meaning-tuning.tsv` by the
+/// rule in docs/eval-results.md: meaning nDCG@10 there 0.0215 with none, 0.1136 at 0.05,
+/// 0.2210 at 0.1, 0.3816 at 0.2, 0.4213 at 0.4 (the grid's top, so a larger weight was not
+/// tried). 0 is exactly the search before it.
+pub const POPULARITY_PRIOR: f64 = 0.4;
+
+/// The nearest titles the popularity prior chooses its candidates from.
+const PRIOR_POOL: i64 = 200;
+
 /// Run the fuzzy tier only when everything above found fewer than this.
 const FUZZY_THRESHOLD: usize = 2;
 
@@ -82,18 +95,29 @@ pub struct Semantic {
 
 pub struct Engine {
     semantic: Option<Semantic>,
+    popularity: f64,
 }
 
 impl Engine {
     /// Keyword-only. The Tier 0 floor, and what runs before an artefact is downloaded.
     pub fn keyword_only() -> Self {
-        Self { semantic: None }
+        Self {
+            semantic: None,
+            popularity: POPULARITY_PRIOR,
+        }
     }
 
     pub fn hybrid(semantic: Semantic) -> Self {
         Self {
             semantic: Some(semantic),
+            popularity: POPULARITY_PRIOR,
         }
+    }
+
+    /// Another weight for the popularity prior: the evaluation's sweep
+    /// (`eval search --tune-meaning`).
+    pub fn set_popularity_prior(&mut self, weight: f64) {
+        self.popularity = weight.max(0.0);
     }
 
     /// Whether the vector half is available — 5.8's UI needs to say so honestly rather
@@ -203,10 +227,25 @@ impl Engine {
                 // the per-vector scale the quantiser applies, so this is exact rather
                 // than approximate — see `crates/vector-index`.
                 let quantised = sinephile_embedding::quantise::quantise(&vector);
-                let neighbours = semantic
-                    .index
-                    .search(&quantised.values, CANDIDATES as usize)?;
-                let ids: Vec<i64> = neighbours.iter().map(|n| n.media_item_id).collect();
+                let ids: Vec<i64> = if self.popularity > 0.0 {
+                    let neighbours = semantic
+                        .index
+                        .search(&quantised.values, PRIOR_POOL as usize)?;
+                    let ids: Vec<i64> = neighbours.iter().map(|n| n.media_item_id).collect();
+                    let votes = MediaRepository::new(db).votes_of(&ids).await?;
+                    let near: Vec<(i64, f32)> = neighbours
+                        .iter()
+                        .map(|n| (n.media_item_id, n.distance))
+                        .collect();
+                    with_popularity(&near, &votes, self.popularity, CANDIDATES as usize)
+                } else {
+                    semantic
+                        .index
+                        .search(&quantised.values, CANDIDATES as usize)?
+                        .iter()
+                        .map(|n| n.media_item_id)
+                        .collect()
+                };
 
                 // The index knows ids; the catalogue knows what they are. One batch
                 // lookup, then put them back in the index's order — `describe` does not
@@ -312,6 +351,34 @@ impl Engine {
     }
 }
 
+/// The `k` best of `near` (title, cosine distance) by closeness plus `weight` times how widely
+/// seen each is, `ln(1 + votes)` over the most among them; a title with no votes counts none.
+/// Ties to the lower id.
+pub fn with_popularity(
+    near: &[(i64, f32)],
+    votes: &std::collections::HashMap<i64, i64>,
+    weight: f64,
+    k: usize,
+) -> Vec<i64> {
+    let top = near
+        .iter()
+        .filter_map(|(id, _)| votes.get(id))
+        .copied()
+        .max()
+        .unwrap_or(0);
+    let scale = ((top.max(0) + 1) as f64).ln().max(1e-9);
+    let mut scored: Vec<(f64, i64)> = near
+        .iter()
+        .map(|(id, distance)| {
+            let seen = votes.get(id).copied().unwrap_or(0).max(0);
+            let prior = ((seen + 1) as f64).ln() / scale;
+            (f64::from(1.0 - distance) + weight * prior, *id)
+        })
+        .collect();
+    scored.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
+    scored.into_iter().take(k).map(|(_, id)| id).collect()
+}
+
 /// Reciprocal rank fusion of two ranked lists.
 ///
 /// `score(d) = Σ 1/(k + rank(d))` over the lists that contain `d`, ranks counted from 1.
@@ -362,6 +429,28 @@ pub fn fuse(keyword: &[Hit], semantic: &[Hit], k: f64) -> Vec<Hit> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_popularity_prior_lifts_the_widely_seen_among_the_nearly_as_near() {
+        // Three plots nearly as close to the query; the famous one rises to the top, the far
+        // one does not, and with no weight the order is closeness alone.
+        let near = [(1, 0.20f32), (2, 0.21), (3, 0.22), (4, 0.60)];
+        let votes: std::collections::HashMap<i64, i64> =
+            [(1, 900), (2, 40), (3, 2_000_000), (4, 2_000_000)].into();
+        assert_eq!(with_popularity(&near, &votes, 0.0, 4), vec![1, 2, 3, 4]);
+        let lifted = with_popularity(&near, &votes, 0.4, 4);
+        assert_eq!(lifted[0], 3, "{lifted:?}");
+        assert_eq!(
+            lifted,
+            vec![3, 1, 2, 4],
+            "the far one stays last, however famous"
+        );
+        assert_eq!(with_popularity(&near, &votes, 0.4, 2).len(), 2);
+        assert_eq!(
+            with_popularity(&near, &Default::default(), 0.4, 4),
+            vec![1, 2, 3, 4]
+        );
+    }
 
     fn hit(id: i64, why: MatchReason) -> Hit {
         Hit {

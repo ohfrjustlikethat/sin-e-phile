@@ -3398,3 +3398,382 @@ Every harness on the copy of the development data (`SINEPHILE_DATA_DIR=<copy> ta
 No metric regressed. The first `eval all` refused at the vector harness ("the index holds 119874 vectors and the
 catalogue offers ..."): A44's job had written synopses for titles inside the published file, which then counted as the
 file's own. Fixed in f8d8e58 before this run.
+
+## Phase 18 — Discovery Engine
+
+### Verdicts fixed before any run (2026-11-19)
+
+Written here before the first run of each harness, so a number cannot choose its own bar.
+
+- **E1** (`eval discovery --simulate`): 1,000 simulated viewers, 120 days, one allocation of 60 slots a day (the taste
+  rail shows at most 20 of the familiar's), three cards acted on a day (finished with the viewer's chance for its arm,
+  otherwise "not for me"). Each viewer has a favourite discovery arm (chance 0.7; other discovery arms 0.15; the
+  familiar 0.4) that changes to a different arm on day 61. **Met** when the new favourite's mean share of discovery's
+  slots over days 101-120 is at least 15 points above its share over days 41-60, the old favourite's at least 15 points
+  below, and the new favourite's share rose for at least 80% of viewers.
+- **E2** (same command): 1,000 maximally conservative viewers (Comfort; every familiar card finished with chance 0.9;
+  every discovery card "not for me") for 120 days. **Met** when on every day of every viewer discovery has at least 20%
+  of the slots and at least one rail's worth (6), and every discovery arm is shown on at least 10% of each viewer's days.
+- **E4** (`eval discovery`, MovieLens test users): novelty is mean self-information, `-log2(p)`, `p` a title's share of
+  MovieLens build users who liked it. **Met** when the discovery rails' mean novelty is at least 1 bit above Phase 17's
+  taste rail on the same users, and Recall@N of everything Home's taste and discovery rails show stays more than 40%
+  above popularity's top N (N the same).
+- **E4, made precise before its first run (2026-11-19, after E1 and E2 ran):** a title no build user liked has no share
+  (every film after ml-25m's 2019 cut-off among them), and counting it as the most novel would flatter discovery for the
+  wrong reason. Such titles are left out of both rails' means, and each rail's share left out is reported beside. Home
+  as a new profile sees it: no outcomes yet, the budget at its middle (0.5), 60 slots, the taste rail at most 20.
+
+### 18.2: the bandit in simulation, E1 and E2 (2026-11-19)
+
+`cargo run --release -p eval -- discovery --simulate` (pure simulation, no data; a few seconds, Tier 2 dev machine).
+
+**First run, on 7bc4ef3** (each discovery arm's share by one Thompson draw, over as many rails as fit at six slots
+each, no arm above 40% of discovery): **E1 NOT met.** The old favourite's share of discovery went 31.2% to 25.2% (-6.0
+points), the new favourite's 17.3% to 29.3% (+12.0); it rose for 99.6% of viewers. E2 met (least 20.0%, no day without
+a rail, every arm on at least 27.5% of days). Cause: at 25 to 30 discovery slots, five arms at a rail's minimum of six
+fill nearly all of them, so a learned preference could only decide which arm was left out.
+
+**Changed** (the bar unchanged): an arm's share follows its chance of being the best arm, how often its draw is the
+highest of 100 joint draws (probability matching); only as many rails as it takes to place discovery's slots under the
+cap; the cap raised to half of discovery, since with a rail's minimum per arm 40% kept a changed favourite second.
+
+**On fcc4110:**
+
+| Measure | Value | Bar |
+|---|---|---|
+| E1: new favourite's share of discovery, days 41-60 to 101-120 | **12.8% to 47.8% (+35.0 points)** | at least +15 |
+| E1: old favourite's share | **49.0% to 28.0% (-21.0 points)** | at least -15 |
+| E1: viewers whose new favourite's share rose | **98.9%** | at least 80% |
+| (a viewer who warms to discovery on day 61: discovery's share of all slots) | 20.4% to 46.1% | (shown, not a bar) |
+| E2: discovery's least share on any day of any viewer | **20.0%** (mean 20.0%) | at least 20% |
+| E2: days without a discovery rail | **0** of 120,000 | none |
+| E2: the least any discovery arm was shown, of one viewer's days | **23.3%** | at least 10% |
+
+**E1 met. E2 met.** Each seen to fail: `--frozen` (beliefs never updated) gives +0.1 and +0.2 points and 50.0% rose, E1
+NOT met; `--no-floor` (floor 0) gives discovery 0.0% on all 120,000 days, E2 NOT met.
+
+### 18.2: E4 and E3 on the MovieLens test users (2026-11-19)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- discovery` on a1dd9a9 (each arm's picks ordered by Phase 17's
+relevance), on a copy of the development data with every title of 1,000 votes asked of Wikidata (ADR-0055); 15,640 test
+users, 1,973 s, Tier 2 dev machine. Home as a new profile sees it: no outcomes, budget 0.5, 60 slots, the taste rail at
+most 20; 49.5 cards shown a user.
+
+**A trial on the first 100 users first** (each arm by closeness, rating or region): novelty +3.58 bits, Recall@N +16.0%
+over popularity; discovery picks found a held-out like 0.0097 times a card against popularity's 0.0539 and the taste
+rail's 0.1340. Phase 17's ranker asked for the same N reached +53.4%, so the bar is reachable. Ordered by relevance, the
+same 100 users gave +1.72 bits and **+42.0%**: a sample of 100 flattered it, as the full run shows.
+
+| Measure | Value | Bar |
+|---|---|---|
+| novelty, taste rail (20 a user) | 3.74 bits (1.5% of picks liked by no build user, left out) | |
+| novelty, discovery rails | **5.67 bits** (5.0% left out) | |
+| E4: discovery over the taste rail | **+1.93 bits** | at least +1: met |
+| E4: Recall@N of everything shown, against popularity's top N | **0.3091 against 0.2400: +28.8%** | more than +40%: **NOT met** |
+| (the taste rail alone, Recall@20) | 0.2639 (Phase 17 recorded 0.2639: no regression) | |
+| (Phase 17's ranker asked for N, the ceiling) | 0.3553, +48.0% | |
+| (held-out likes per card: taste rail / discovery / popularity) | 0.1326 / 0.0299 / 0.0597 | |
+| E3: discovery labels checked with `strategy::holds` | **461,488, none false** | none false: met |
+
+Per arm: stretch 4.64 bits, bridge 5.42, blind spot 4.15, canon 3.57, deep cut 11.37 (16.7% liked by no build user);
+each arm had about 8,500 rails (blind spot 7,821). Gathering a user's discovery pool: p50 24 ms, p95 43 ms.
+
+**E4 is not met.** To reach +40% the discovery picks need about 35% more held-out likes a card (0.030 to 0.040) with
+at least a bit of novelty kept; they have 0.93 bits to spare. Next: hits per card by arm, then the matrix's weight in
+the arms' relevance, judged on 2,000 users and then once more on all of them.
+
+### 18.2: three ways at E4's relevance, on the first 2,000 test users (2026-11-19)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- discovery --limit 2000`. The 2,000 track the whole set: on
+a1dd9a9 they give +27.6% (all 15,640: +28.8%) and +1.96 bits. Held-out likes per card by arm on a1dd9a9: canon 0.0597
+(popularity's own rate), bridge 0.0386, stretch 0.0357, blind spot 0.0116, deep cut 0.0021 (11.4 bits: a film with at
+most 15,000 IMDb votes is seldom a MovieLens favourite).
+
+| Approach | Recall@N against popularity | novelty over the taste rail |
+|---|---|---|
+| 1. each arm's picks by Phase 17's relevance (a1dd9a9; from +16.0% on 100 users) | +27.6% | +1.96 bits |
+| 2. the matrix's part weighed 1.5 in that relevance, not 0.5 (reverted) | +27.5% | +1.94 bits |
+| 3. the familiar's whole share shown (a second taste rail past twenty; 7c8377c) | **+33.2%** | **+2.02 bits** |
+
+The third is kept as a fix, not a tuning: at the middle budget the plan gave the familiar 30 slots and Home showed 20,
+so discovery had six cards in ten where the plan meant five. **E4 stays NOT met** (+33.2% against more than +40%):
+three distinct approaches, so the choice is recorded as blocker B17 in PROJECT_STATE.json (ADR-0040).
+
+### 18.2, B17 option A: the rule for a population prior, fixed before any run (2026-11-20)
+
+A new profile's bandit starts flat, so every discovery arm starts equally likely, though on the test users their
+held-out likes per card differ thirtyfold (canon 0.060, deep cut 0.002) and their novelty threefold. A prior from
+relevance alone would leave only canon and bridges, and novelty would fail; so each arm's prior weighs both.
+
+1. **Measure** on the first 2,000 TUNING users (`eval discovery --tune --limit 2000`), with no prior: each discovery arm's
+   held-out likes per card `h` and mean novelty `n`.
+2. **Value**: `v = h / max(h) + n / max(n)` over the five discovery arms, so 0 to 2; the prior's mean is `v / 2`.
+3. **Strength**: `K` pseudo-trials per arm (`alpha += K * mean`, `beta += K * (1 - mean)`), used only in the draws that
+   share discovery's slots between its arms; discovery's share of Home is unchanged. `K` from {0, 2, 4, 8, 16}.
+4. **Choose** on the same 2,000 tuning users: the largest Recall@N against popularity whose novelty is at least
+   **1.2 bits** over the taste rail (a margin over E4's 1); a tie goes to the smaller `K`.
+5. **Judge** once on all test users (E4), and run `eval discovery --simulate` again (E1, E2) with the prior in place.
+
+### 18.4: a popularity prior for search by meaning, the rule fixed before any run (2026-11-20)
+
+Phase 5's E3 (meaning nDCG@10 0.0472 against 0.75) is worked in Phase 18, where mood shelves depend on it. Its eight
+meaning queries are too few to choose a setting on and then be judged by, so a TUNING set of ten more, graded before any
+run, is `fixtures/search/meaning-tuning.tsv` (38 answers, every id checked against the catalogue's title).
+
+- **The change tried**: the meaning half retrieves its 200 nearest, scores each `cosine + lambda * ln(1 + votes) /
+  ln(1 + the most votes among them)`, and passes its best 50 to the fusion as now. Plot-first documents let 858,170
+  obscure plots outrank the films a person means (v3, 2026-10-25); votes say which are meant.
+- **Chosen** on the tuning set: `lambda` from {0, 0.05, 0.1, 0.2, 0.4}, the best meaning nDCG@10, a tie to the smaller.
+- **Judged** once on `semantic-queries.tsv` (E3 and E4's two named queries); E2 (43/43 exact titles) must hold, and
+  E1's p95 must stay inside the 80 ms budget.
+
+### 18.2, B17 option A: the prior measured and chosen on tuning users (2026-11-20)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- discovery --tune --limit 2000 --prior-weight K`, the first
+2,000 tuning users, by the rule above.
+
+**Step 1, no prior:** Recall@N +38.8% over popularity (0.3566 against 0.2569), +1.95 bits. Per arm, held-out likes per
+card and novelty: stretch 0.0302 and 4.69 bits, bridge 0.0303 and 5.49, blind spot 0.0108 and 4.15, canon 0.0497 and
+3.64, deep cut 0.0018 and 11.35. **Step 2, the means** (`v / 2`): stretch 0.5104, bridge 0.5467, blind spot 0.2915,
+canon 0.6604, deep cut 0.5181.
+
+| K (pseudo-trials) | Recall@N against popularity | novelty over the taste rail |
+|---|---|---|
+| 0 | +38.8% | 1.95 bits |
+| **2** | **+44.1%** (0.3705) | **1.79 bits** |
+| 4 | +43.6% | 1.63 bits |
+| 8 | +43.0% | 1.50 bits |
+| 16 | +44.0% (0.3703) | 1.37 bits |
+
+**Chosen: K = 2** (the best relevance with at least 1.2 bits). At K = 2 a new profile's first Home almost never has a
+blind-spot rail (one of 2,000) while canon is in nearly every one; blind spots come with outcomes, which E2's re-run
+shows. **E1 and E2 with the prior** (`eval discovery --simulate`, on 193e4d4): E1 +35.2 / -22.2 points, rose for 98.9%
+(a blind spot that becomes the favourite goes from 10.3% to 47.3% of discovery); E2 floor 20.0% every day, no day
+without a rail, every arm on at least 16.7% of days. Both met.
+
+### 18.4: the search popularity prior measured on the tuning set (2026-11-20)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- search --tune-meaning`, on `fixtures/search/meaning-tuning.tsv`
+only:
+
+| prior | meaning nDCG@10 (10 queries) |
+|---|---|
+| 0 (as before) | 0.0215 |
+| 0.05 | 0.1136 |
+| 0.1 | 0.2210 |
+| 0.2 | 0.3816 |
+| **0.4** | **0.4213** |
+
+**Chosen: 0.4**, the grid's top, so a larger weight might do better; the grid was fixed first and is not extended after
+seeing it. Per query at 0.4: samurai 0.5064, stranded astronauts 0.2021, courtroom 0.3975, mafia saga 0.7156, dinosaurs
+0.7680, simulation 0.0000, silent stunts 0.2689, Japanese animated heroine 0.5945, zombies 0.4034, boxer 0.3561.
+
+### 18.2: E4 judged once on all test users, with the prior (2026-11-20)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- discovery`, the build of 193e4d4's tree (prior weight 2; the
+banner's HEAD read 394c3ef because the commit came after the build), 15,640 test users, 2,020 s.
+
+| Measure | Value | Bar |
+|---|---|---|
+| novelty, taste rail / discovery rails | 3.74 / 5.55 bits | |
+| E4: discovery over the taste rail | **+1.81 bits** | at least +1: met |
+| E4: Recall@N of everything shown against popularity's top N | **0.3639 against 0.2593: +40.4%** | more than +40%: **met** |
+| (the taste rail alone, Recall@20) | 0.2639 (unchanged) | |
+| (Phase 17's ranker asked for N) | 0.3772, +45.5% | |
+| E3: discovery labels checked | **467,875, none false** | met |
+
+Per arm: stretch 5.05 bits and 0.0276 a card, bridge 5.81 and 0.0301, blind spot 9 rails in 15,640 users, canon 3.63 and
+0.0495, deep cut 11.33 and 0.0017. **E4 met, by 0.4 points**: a margin that thin is stated as it is, not rounded up.
+
+### 18.4: search by meaning judged once with the prior at 0.4 (2026-11-20)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- search --report` on 890a469, release build, Tier 2 dev machine,
+nothing else running:
+
+| Measure | Recorded before (Phase 17 close) | Now | Target |
+|---|---|---|---|
+| E2 exact-title top-1 | 43/43 | **43/43** | 100% |
+| E1 latency p50 / p95 / max | 6.5 / 14.5 ms | **11.6 / 24.2 / 93.0 ms** | p95 < 80 ms (Tier 0) |
+| E3 meaning nDCG@10 (8 queries) | 0.0472 | **0.3276** | > 0.75: **NOT met** |
+| E3 filter nDCG@10 | 1.0000 | **1.0000** | |
+| topical nDCG@10 (6) | 0.0629 | **0.2307** | |
+| known-item MRR (2) | 0.0000, 0 of 2 in the top 10 | **1.0000, both first** | |
+
+Per query: grief 0.0000 (was 0.1505), hometown and nephew 0.7602 (was 0), Wong Kar-wai but Korean 0.2385 (was 0.0752),
+slow science fiction about memory 0.4770 (was 0), anime loneliness 0.1894 (was 0), heist 0.1505 (was 0), mountain
+documentaries 0.5028 (was 0.1518), neorealism 0.3028 (was 0). E1 rose by about 10 ms at p95: 200 nearest instead of 50,
+and one query for their votes.
+
+**Phase 5's E4 by eye** (`eval search --query`): "like Wong Kar-wai but Korean" now gives *Chungking Express*, *In the
+Mood for Love*, *Memories of Murder*, *2046*, *The Grandmaster*, *Thirst*, *As Tears Go By*, *3-Iron*: defensible.
+"Films about grief that aren't depressing" gives *Hereafter*, *Antichrist*, *The Queen*, *Cries & Whispers*, *1984*,
+*Take Shelter*, *Talk to Her*: about grief or loss in part, but *Antichrist* and *Cries & Whispers* are the opposite of
+"not depressing", and *1984* does not belong. The negation is what the meaning model misses. **Half met.**
+
+### 18.5: the real window changed the arms, so the prior's rule was run again (2026-11-20)
+
+`eval recommend --rail 2` (a probe profile of 27 rated films on the copy) showed four things no metric had: a taste named
+by its strongest film though the pick was nearer another of its films (*Kiki's Delivery Service* "close to Tokyo
+Story"); co-productions as stretches (*Ghost in the Shell* "but from the United Kingdom"); obscure bridges (*Tokyo File
+212*); and mood shelves opening on a 1912 short. Fixed in 8ab7abe (see the case study). The stretch and bridge arms
+changed (1,000 votes; a country is a step out only when none of the film's are the taste's), so the rule above was run
+again from step 1, on the same 2,000 tuning users.
+
+**Step 1, no prior:** +38.8% (0.3565 against 0.2569), +1.98 bits. Per arm: stretch 0.0281 and 4.73 bits, bridge 0.0302
+and 5.60, blind spot 0.0109 and 4.15, canon 0.0494 and 3.65, deep cut 0.0018 and 11.35. **Means:** stretch 0.4928, bridge
+0.5524, blind spot 0.2931, canon 0.6608, deep cut 0.5182.
+
+| K | Recall@N against popularity | novelty over the taste rail |
+|---|---|---|
+| 0 | +38.8% | 1.98 bits |
+| 2 | +43.3% (0.3684) | 1.86 bits |
+| 4 | +43.0% (0.3679) | 1.74 bits |
+| 8 | +43.3% (0.3684) | 1.55 bits |
+| 16 | **+44.1% (0.3705)** | 1.40 bits |
+
+**The rule chose 16, and 16 failed E2** in the simulation step 5 requires (`eval discovery --simulate`): blind spots, with
+the lowest prior mean, were shown on only 2.5% of a refusing viewer's days against E2's 10% (E1 held: +29.6 / -18.3,
+94.7%). The rule did not say what then. A weight that breaks an exit criterion cannot ship, so **the next by the rule's
+own order that keeps E1 and E2 was taken: 2** (tied with 8 on Recall@N; a tie to the smaller), and this departure is
+recorded here rather than the rule rewritten. **E1 and E2 at 2** (0e06e59): E1 +35.1 / -22.1 points, rose for 98.8%;
+E2 floor 20.0% every day, no day without a rail, every arm on at least 16.7% of days. Both met.
+
+### 18.5: E4 judged on all test users with the fixed arms and the re-chosen prior: NOT met (2026-11-20)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- discovery` on 0e06e59 (the arms after the real window, prior
+weight 2), 15,640 test users, 1,934 s.
+
+| Measure | Value | Bar |
+|---|---|---|
+| novelty, taste rail / discovery rails | 3.74 / 5.63 bits | |
+| E4: discovery over the taste rail | **+1.89 bits** | at least +1: met |
+| E4: Recall@N of everything shown against popularity's top N | **0.3626 against 0.2593: +39.9%** | more than +40%: **NOT met** |
+| (the taste rail alone, Recall@20) | 0.2639 (unchanged) | |
+| E3: discovery labels checked | **467,741, none false** | met |
+
+Per arm: stretch 5.08 bits and 0.0248 a card (5,861 rails, down from 7,454: the co-production rule and the floor of
+votes), bridge 5.91 and 0.0301, blind spot 13 rails, canon 3.63 and 0.0494, deep cut 11.33 and 0.0017.
+
+**E4 is NOT met, by 0.1 point.** The +40.4% recorded above was measured on the arms before the real window's fixes; the
+fixes made the labels honest and cost half a point of relevance, and they stay. The test users have now judged two
+versions; a third version will be chosen on the tuning users (whose numbers run about 3.5 points above the test users'
+on every setting so far) and judged on the test users once.
+
+### Phase 18 regression check (2026-11-20)
+
+Every harness on the copy of the development data (`SINEPHILE_DATA_DIR=<copy> target/release/eval.exe all`, then
+`vector --report`), on 0e06e59's tree, release build, Tier 2 dev machine:
+
+| Metric | Recorded before (Phase 17 close) | Now |
+|---|---|---|
+| Search E2 exact-title top-1 | 43/43 | **43/43** |
+| Search E1 p50 / p95, warm | 6.5 / 14.5 ms | **7.6 / 17.4 ms** (max 70.2; the popularity prior's 200 nearest and their votes) |
+| Search E3 meaning nDCG@10 | 0.0472 | **0.3276** |
+| Search E3 filter nDCG@10 | 1.0000 | **1.0000** |
+| HNSW recall@10 (published graph) | 0.9760 | **0.9760**, index p95 1.38 ms |
+| Subtitles aligned / false accepts | 80/80, 0/10 | **80/80, 0/10** |
+| Identification E1 top-1, tuning / held out | 99.05% / 100% | **99.05% / 100.00%** |
+| Identification E2 false-confident at 0.75 | 0.39% / 0.00% | **0.39% / 0.00%** |
+| Recommender, the taste rail's Recall@20 on test users | 0.2639 | **0.2639** (`eval discovery`, above) |
+
+No quality metric regressed; search's p95 rose by 2.9 ms, inside its 80 ms budget, the measured cost of the prior.
+
+### 18.5, B18: popularity in the arms' order, the rule fixed before any run (2026-11-20)
+
+E4 stands at +39.9% on the test users (bar more than 40%). The arms order their picks by Phase 17's relevance (closeness
+to a taste, half the matrix's part); a held-out favourite leans towards the widely seen, and search by meaning gained
+most from exactly that term. So: `relevance + w * ln(1 + votes) / ln(1 + the most votes among the titles)` in
+`strategy::relevance`, the same form as search's prior.
+
+1. `w` from {0, 0.1, 0.2, 0.4}, each measured on the first 2,000 TUNING users (`eval discovery --tune --limit 2000`), the
+   bandit's prior as shipped (0e06e59).
+2. **Chosen**: the best Recall@N against popularity whose novelty is at least 1.2 bits over the taste rail; a tie to the
+   smaller `w`.
+3. **Then** `eval discovery --simulate` (E1, E2) must still hold; if the chosen `w` breaks either, the next by the same
+   order that keeps both is taken (said here, before running, this time).
+4. **Judged** once on all test users (E4). If it is not met, E4 is carried to Phase 19, whose Home overhaul decides which
+   rails Home shows and how many cards, with its measured state.
+
+### 18.5, B18: popularity in the arms' order, measured on tuning users (2026-11-20)
+
+`eval discovery --tune --limit 2000`, the prior as shipped (weight 2), each weight a rebuild of `RELEVANCE_POPULARITY`:
+
+| w | Recall@N against popularity | novelty over the taste rail |
+|---|---|---|
+| 0 (as shipped, 0e06e59) | +43.3% (0.3684) | 1.86 bits |
+| **0.1** | **+43.6% (0.3692)** | **1.68 bits** |
+| 0.2 | +43.6% (0.3691) | 1.59 bits |
+| 0.4 | +43.6% (0.3691) | 1.50 bits |
+
+**Chosen: 0.1** (b2842d4). A small gain, 0.3 point on these users, most of it from bridges and stretches leaning to the
+widely seen. `eval discovery --simulate` unchanged (E1 98.8% rose, E2 every arm on 16.7% of days): the simulation does not
+see the arms' order.
+
+### 18.5: E4 judged once with popularity in the arms' order: met, by the narrowest margin (2026-11-20)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- discovery` on b2842d4, 15,640 test users, 1,944 s.
+
+| Measure | Value | Bar |
+|---|---|---|
+| novelty, taste rail / discovery rails | 3.74 / 5.45 bits | |
+| E4: discovery over the taste rail | **+1.71 bits** | at least +1: met |
+| E4: Recall@N of everything shown against popularity's top N | **0.3630 against 0.2593: +40.0%** | more than +40%: **met** |
+| (the taste rail alone, Recall@20) | 0.2639 (unchanged) | |
+| E3: discovery labels checked | **467,741, none false** | met |
+
+**Met by under 0.05 point**: the harness judges the unrounded ratio above 1.40, and the printed four decimals bound it at
+no more than 1.4004. That is inside the difference two samples of users make, and is stated so rather than rounded into
+comfort. The test users have now judged three versions of the arms (193e4d4 +40.4%, 0e06e59 +39.9%, b2842d4 +40.0%), each
+change chosen first on the tuning users by a rule written before it ran.
+
+### 18.6: half stars in the taste model (ADR-0056), the taste harness before and after (2026-11-21)
+
+`SINEPHILE_DATA_DIR=<copy> cargo run --release -p eval -- taste`: the same three MovieLens users (3, 12, 72), five folds,
+500 slots. Each user's own half-star ratings go in as a Letterboxd export through `sinephile_imports`, so the whole path
+is measured: import, storage, the taste model's weights, liked titles.
+
+| | Whole stars (3.5 rounded up to 4; b2842d4) | Half stars kept (ADR-0056) |
+|---|---|---|
+| liked, users 3 / 12 / 72 | 498 / 411 / 407 | 355 / 321 / 407 |
+| held-out favourites, modes alone | 12.83% | 11.58% |
+| **modes with the popularity prior (as shipped)** | **40.63%** | **40.71%** |
+| the 500 most popular (the bar) | 35.64% | 34.73% |
+| lift over popularity | 1.14x | **1.17x** |
+| E2 (Phase 14, reflected in the taste model) | met | met |
+
+What changed is what counts as a favourite: a 3.5 is no longer rounded up into "liked" (it weighs 0.6 in the model, between
+three stars' 0.2 and four's 1.0), so the held-out set is stricter and popularity finds less of it. On that stricter set
+the model finds slightly more than before and its margin over popularity widens (+5.98 points against +4.99). Whole-star
+ratings weigh exactly what they did (`modes::rating_weight`, tested), so nothing already rated moved.
+
+### 18.7: Surprise me's speed (the author, 2026-11-21: "very slow")
+
+`SINEPHILE_DATA_DIR=<a copy of the author's data> cargo run --release -p eval -- surprise`: their own profile, the
+catalogue's vector half, the evening. Budget: a press under 300 ms.
+
+| | Before (a1816c7) | After (Home's rails reused while current) |
+|---|---|---|
+| Home's rails, first build of the run | 3,677 ms | 325 ms (the files already in the OS cache) |
+| Home's rails, warm | 402 ms | 315 ms |
+| **Surprise me, a press** | **373 to 377 ms: over budget** | **1.5 to 1.8 ms** |
+| a press before Home was ever built | (as a press) | 342 ms (builds Home) |
+
+Before, each press built all of Home (taste model, discovery pools, mood shelves) to choose one film, holding the search
+engine's lock, so in the app it also waited behind any search or the launch's background work. Now Home keeps the rails
+it last built for each profile, and a press picks from them while nothing they stand on has moved (the taste fingerprint,
+the part of the day, "what you love", 15 minutes), without the engine. The first run, over budget, is the check seen to
+fail.
+
+### Regression check before merging Phase 18 (rule 13), 2026-11-21
+
+What 18.6 and 18.7 touched that earlier harnesses measure, run again on the scratch data on 525bb0a's code:
+
+| Harness | Recorded | Now |
+|---|---|---|
+| `eval update` (Phase 15 E5: a watch to an updated model, under 2 s) | 125.7 to 133.2 ms | 113.2 to 120.9 ms; every watch in its model; E5 met |
+| `eval import` (Phase 14 E2: 600 films, tuned set) | 598 right (99.67%), 0 wrong, 2 asked | 598 right (99.67%), 0 wrong, 2 asked; 349 ratings recorded (half stars kept) |
+| `eval taste` (Phase 14 E2 / 15) | 40.63%, 1.14x popularity | 40.71%, 1.17x (18.6) |
+| `eval discovery` (Phase 18 E3, E4) | as judged on b2842d4 | unchanged code paths since |
+| Search (Phase 5 E1, E2, E3) | as recorded in 18.4 | no search code changed since |
+
+Nothing regressed. The full workspace suite: 960 passed; the front end: 294.

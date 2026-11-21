@@ -151,3 +151,49 @@ async fn an_older_half_watched_episode_is_behind_the_latest() {
     assert_eq!(c.len(), 1, "{c:?}");
     assert_eq!((c[0].card, c[0].plays), (s, e[2]));
 }
+
+#[tokio::test]
+async fn a_removed_title_leaves_continue_watching_until_it_is_played_again() {
+    // ADR-0056, the author: remove anything from Continue watching; its place is kept, and
+    // it comes back once played again (for a show, any of its episodes).
+    let db = Db::in_memory().await.unwrap();
+    let me = ProfileRepository::new(&db).ensure_default().await.unwrap();
+    let film = item(&db, "Heat", MediaKind::Film).await;
+    let (series, eps) = show(&db, "Twin Peaks", &["Pilot", "Traces to Nowhere"]).await;
+    watched(&db, me, film, 1_200, 10_200, 30).await;
+    watched(&db, me, eps[0], 600, 2_800, 20).await;
+    let cards = |db: Db| async move {
+        continuing(&db, me, 20)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|c| c.card)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(cards(db.clone()).await, vec![series, film]);
+
+    let profiles = ProfileRepository::new(&db);
+    profiles.hide_from_continue(me, film).await.unwrap();
+    profiles.hide_from_continue(me, series).await.unwrap();
+    assert!(cards(db.clone()).await.is_empty(), "both removed");
+    let place = profiles
+        .position(me, film)
+        .await
+        .unwrap()
+        .expect("the place is kept");
+    assert_eq!(place.position_seconds, 1_200);
+    assert!(
+        for_series(&db, me, series).await.unwrap().is_some(),
+        "the show's page still resumes where it was"
+    );
+
+    // Played again: the show by its next episode, the film by itself.
+    sqlx::query("UPDATE continue_hidden SET hidden_at = datetime('now', '-5 minutes')")
+        .execute(db.pool())
+        .await
+        .unwrap();
+    watched(&db, me, eps[1], 60, 2_800, 1).await;
+    assert_eq!(cards(db.clone()).await, vec![series], "the show is back");
+    watched(&db, me, film, 1_500, 10_200, 0).await;
+    assert_eq!(cards(db.clone()).await, vec![film, series], "and the film");
+}

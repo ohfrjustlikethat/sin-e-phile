@@ -79,6 +79,11 @@ pub struct Manager {
     live: Mutex<HashMap<i64, Progress>>,
     /// Downloads whose one wanted file the backend has applied (`Backend::keep_only`).
     kept: Mutex<std::collections::HashSet<i64>>,
+    /// One change to the queue at a time. A tick works from what it read at its start, so
+    /// a cancel or pause landing mid-pass was undone by it: a cancelled download added
+    /// again and set running (the author, 2026-11-20; `tests/cancel.rs`). The viewer's
+    /// actions wait for the pass in flight, about a second at most.
+    turn: tokio::sync::Mutex<()>,
 }
 
 impl Manager {
@@ -91,6 +96,17 @@ impl Manager {
             probe,
             live: Mutex::new(HashMap::new()),
             kept: Mutex::new(std::collections::HashSet::new()),
+            turn: tokio::sync::Mutex::new(()),
+        }
+    }
+
+    /// Forget what the page shows for a download that no longer runs.
+    fn forget(&self, id: i64) {
+        if let Ok(mut live) = self.live.lock() {
+            live.remove(&id);
+        }
+        if let Ok(mut kept) = self.kept.lock() {
+            kept.remove(&id);
         }
     }
 
@@ -149,6 +165,7 @@ impl Manager {
 
     /// One pass: progress for what runs, the plan applied, the finished filed.
     pub async fn tick(&self, now: &str) -> Result<Tick, ManagerError> {
+        let _turn = self.turn.lock().await;
         let repo = DownloadRepository::new(&self.db);
         let mut out = Tick::default();
 
@@ -287,6 +304,7 @@ impl Manager {
 
     /// Paused by the user: the queue will not start it again by itself.
     pub async fn pause(&self, id: i64) -> Result<(), ManagerError> {
+        let _turn = self.turn.lock().await;
         let repo = DownloadRepository::new(&self.db);
         if let Some(d) = repo.get(id).await? {
             if let (Some(b), Some(bid)) = (self.backend(&d.backend), d.backend_id.as_deref()) {
@@ -304,6 +322,7 @@ impl Manager {
     /// files kept) and queued: the next tick adds it again with the new limit, and the
     /// pieces it has are checked rather than fetched again.
     pub async fn set_limit(&self, id: i64, limit_kib: Option<i64>) -> Result<(), ManagerError> {
+        let _turn = self.turn.lock().await;
         let repo = DownloadRepository::new(&self.db);
         repo.set_limit(id, limit_kib).await?;
         if let Some(d) = repo.get(id).await? {
@@ -325,6 +344,7 @@ impl Manager {
     /// When it may start (`None`: as soon as there is room). A running download given a
     /// later start is paused in its backend, keeping its pieces, and waits in the queue.
     pub async fn schedule(&self, id: i64, not_before: Option<&str>) -> Result<(), ManagerError> {
+        let _turn = self.turn.lock().await;
         let repo = DownloadRepository::new(&self.db);
         repo.set_not_before(id, not_before).await?;
         if not_before.is_none() {
@@ -356,22 +376,52 @@ impl Manager {
 
     /// Back in the queue; the next tick starts it if there is room.
     pub async fn resume(&self, id: i64) -> Result<(), ManagerError> {
+        let _turn = self.turn.lock().await;
         DownloadRepository::new(&self.db)
             .set_state(id, DownloadState::Queued)
             .await?;
         Ok(())
     }
 
-    /// Stop it for good, and delete what was fetched unless told to keep it.
-    pub async fn cancel(&self, id: i64, delete_files: bool) -> Result<(), ManagerError> {
-        let repo = DownloadRepository::new(&self.db);
-        if let Some(d) = repo.get(id).await? {
+    /// Delete a finished download (Downloads, Kept on this PC): out of its backend first, then
+    /// its files, its library record and its row. A finished torrent stays in its backend to
+    /// seed or wait; left there with its files deleted, it counted every piece as had, and
+    /// playing the same torrent from Streams served files that were gone (the author,
+    /// 2026-11-21).
+    pub async fn clear(&self, id: i64) -> Result<(), ManagerError> {
+        let _turn = self.turn.lock().await;
+        if let Some(d) = DownloadRepository::new(&self.db).get(id).await? {
             if let (Some(b), Some(bid)) = (self.backend(&d.backend), d.backend_id.as_deref()) {
                 if b.holds(bid).await {
-                    b.remove(bid, delete_files).await?;
+                    b.remove(bid, false).await?;
                 }
             }
-            repo.set_state(id, DownloadState::Cancelled).await?;
+        }
+        self.forget(id);
+        crate::storage::clear(&self.db, id, &self.dir).await
+    }
+
+    /// Stop it for good, and delete what was fetched unless told to keep it. Marked cancelled
+    /// first, so nothing starts it again even if its backend refuses to let go; a backend
+    /// that cannot delete the files is asked once more to stop it, keeping them, and the
+    /// failure is reported.
+    pub async fn cancel(&self, id: i64, delete_files: bool) -> Result<(), ManagerError> {
+        let _turn = self.turn.lock().await;
+        let repo = DownloadRepository::new(&self.db);
+        let Some(d) = repo.get(id).await? else {
+            return Ok(());
+        };
+        repo.set_state(id, DownloadState::Cancelled).await?;
+        self.forget(id);
+        if let (Some(b), Some(bid)) = (self.backend(&d.backend), d.backend_id.as_deref()) {
+            if b.holds(bid).await {
+                if let Err(e) = b.remove(bid, delete_files).await {
+                    if delete_files && b.holds(bid).await {
+                        b.remove(bid, false).await?;
+                    }
+                    return Err(e.into());
+                }
+            }
         }
         Ok(())
     }

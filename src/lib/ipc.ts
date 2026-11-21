@@ -208,9 +208,30 @@ export const commands = {
 	playCandidate: (id: number, index: number) => typedError<string, string>(__TAURI_INVOKE("play_candidate", { id, index })),
 	/**  Remember where the viewer is, for resume. Called periodically and on leaving. */
 	savePosition: (id: number, position: number | null, duration: number | null) => typedError<null, string>(__TAURI_INVOKE("save_position", { id, position, duration })),
-	/**  The viewer's 1–5 rating, from the end card (Phase 11, ADR-0043). `None` clears it. */
-	rateTitle: (id: number, stars: number | null) => typedError<null, string>(__TAURI_INVOKE("rate_title", { id, stars })),
+	/**  Rate a film (or anything rated as a whole) in half stars, 1 to 10; `None` clears it. */
+	rateTitle: (id: number, halves: number | null) => typedError<null, string>(__TAURI_INVOKE("rate_title", { id, halves })),
+	/**  A title's own rating, in half stars. */
 	titleRating: (id: number) => typedError<number | null, string>(__TAURI_INVOKE("title_rating", { id })),
+	/**  Rate one season of a show in half stars, 1 to 10; `None` clears it. */
+	rateSeason: (series: number, season: number, halves: number | null) => typedError<null, string>(__TAURI_INVOKE("rate_season", { series, season, halves })),
+	/**  A show's rated seasons and their average. */
+	showRatings: (series: number) => typedError<ShowRatings, string>(__TAURI_INVOKE("show_ratings", { series })),
+	/**  How many titles this profile has rated: Home offers the rate-a-batch screen below ten. */
+	ratedCount: () => typedError<number, string>(__TAURI_INVOKE("rated_count")),
+	/**  The next films to rate one after another. */
+	toRate: (n: number) => typedError<HomeCard[], string>(__TAURI_INVOKE("to_rate", { n })),
+	/**  "Haven't seen it" on the rate-a-batch screen. */
+	skipRating: (id: number) => typedError<null, string>(__TAURI_INVOKE("skip_rating", { id })),
+	/**
+	 *  Remove a film or a show from Continue watching: hidden, its place kept, back once it is
+	 *  played again.
+	 */
+	removeFromContinue: (id: number) => typedError<null, string>(__TAURI_INVOKE("remove_from_continue", { id })),
+	/**
+	 *  Whether a film or a show is in this profile's Continue watching now (its page offers to
+	 *  remove it).
+	 */
+	inContinueWatching: (id: number) => typedError<boolean, string>(__TAURI_INVOKE("in_continue_watching", { id })),
 	subtitleSettings: () => typedError<SubtitleSettingsView, string>(__TAURI_INVOKE("subtitle_settings")),
 	setSubtitleSettings: (settings: SubtitleSettings) => typedError<null, string>(__TAURI_INVOKE("set_subtitle_settings", { settings })),
 	setOpensubtitlesKey: (key: string) => typedError<null, string>(__TAURI_INVOKE("set_opensubtitles_key", { key })),
@@ -382,7 +403,11 @@ export const commands = {
 	tasteProfile: () => typedError<TasteProfileView, string>(__TAURI_INVOKE("taste_profile")),
 	/**  Correct one mode of the profile's taste: "more", "less", "not_me", or `None` to undo. */
 	correctTaste: (anchor: number, correction: string | null) => typedError<null, string>(__TAURI_INVOKE("correct_taste", { anchor, correction })),
-	home: () => typedError<RailView[], string>(__TAURI_INVOKE("home")),
+	/**
+	 *  Home's rails. `hour` is the viewer's local hour (0 to 23): the part of the day the
+	 *  discovery engine learns and chooses in (Phase 18).
+	 */
+	home: (hour: number | null) => typedError<RailView[], string>(__TAURI_INVOKE("home", { hour })),
 	/**  The watchlist page (Appendix F, I39): what this profile saved, newest first. */
 	watchlist: () => typedError<HomeCard[], string>(__TAURI_INVOKE("watchlist")),
 	/**
@@ -437,6 +462,27 @@ export const commands = {
 	/**  Whether the first-run wizard has been finished or skipped. */
 	onboardingDone: () => typedError<boolean, string>(__TAURI_INVOKE("onboarding_done")),
 	finishOnboarding: () => typedError<null, string>(__TAURI_INVOKE("finish_onboarding")),
+	/**
+	 *  "Not for me", "not right now" or "already seen" on a recommended card, said at `hour`
+	 *  (local, 0 to 23). Home leaves the title out from now on (`sinephile_taste::discover`).
+	 */
+	dismiss: (id: number, kind: Dismissal, hour: number | null) => typedError<null, string>(__TAURI_INVOKE("dismiss", { id, kind, hour })),
+	/**  Take a dismissal back: the card's undo. */
+	undismiss: (id: number) => typedError<null, string>(__TAURI_INVOKE("undismiss", { id })),
+	/**  This profile's Comfort to Adventure setting, 0 to 1. */
+	discoveryBudget: () => typedError<number | null, string>(__TAURI_INVOKE("discovery_budget")),
+	setDiscoveryBudget: (value: number | null) => typedError<null, string>(__TAURI_INVOKE("set_discovery_budget", { value })),
+	/**
+	 *  Surprise me: one film this profile will probably like, from what Home recommends now.
+	 *  `None` when there is nothing to choose from.
+	 */
+	surpriseMe: (hour: number | null) => typedError<{
+	id: number,
+	/**  Why it was chosen, as its card on Home says it. */
+	note: string | null,
+	/**  In the library: it plays at once. */
+	on_this_pc: boolean,
+} | null, string>(__TAURI_INVOKE("surprise_me", { hour })),
 };
 
 /* Types */
@@ -651,6 +697,9 @@ export type CutoutRect = {
 	radius: number | null,
 };
 
+/**  What a viewer says of a recommended card (Phase 18). */
+export type Dismissal = "not_for_me" | "not_right_now" | "already_seen";
+
 /**  One download as the Downloads page lists it, with its live rate. */
 export type DownloadRow = {
 	download: DownloadView,
@@ -728,6 +777,8 @@ export type HomeCard = {
 	note: string | null,
 	/**  How far into it, 0 to 1: Continue watching's bar (Phase 16). */
 	progress: number | null,
+	/**  A show, rated season by season (ADR-0056); anything else is rated as a whole. */
+	is_show: boolean,
 };
 
 export type ImportView = {
@@ -991,6 +1042,13 @@ export type SearchResponse = {
 	ready: boolean,
 };
 
+/**  One rated season. */
+export type SeasonRating = {
+	season: number,
+	/**  1 to 10: half stars. */
+	halves: number,
+};
+
 export type SeasonView = {
 	/**  `None`: episodes without a season number. */
 	number: number | null,
@@ -1045,6 +1103,13 @@ export type ShowPlace = {
 	episode: number | null,
 	/**  The episode's own name, when the catalogue has one (not "Episode #1.2"). */
 	episode_title: string | null,
+};
+
+/**  A show's ratings: each rated season, and their average ("your average"). */
+export type ShowRatings = {
+	seasons: SeasonRating[],
+	/**  In half stars, 1 to 10; `None` until a season is rated. */
+	average: number | null,
 };
 
 /**  One row of the Sources list. */
@@ -1144,6 +1209,15 @@ export type SubtitleSettingsView = {
 	budget: number,
 	/**  What OpenSubtitles last said is left today, if it said. */
 	server_remaining: number | null,
+};
+
+/**  Surprise me's film (Phase 18, ADR-0043). */
+export type SurpriseView = {
+	id: number,
+	/**  Why it was chosen, as its card on Home says it. */
+	note: string | null,
+	/**  In the library: it plays at once. */
+	on_this_pc: boolean,
 };
 
 export type TasteInputView = {

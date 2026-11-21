@@ -56,6 +56,18 @@ pub async fn signals(
     for id in profiles.watchlist(profile).await? {
         out.push((id, Signal::Watchlisted, 0.0));
     }
+    // Phase 18's dismissals: "not for me" against the title, "already seen" as met. "Not
+    // right now" says nothing of taste.
+    for (id, kind, at) in sinephile_persistence::repositories::DiscoveryRepository::new(db)
+        .dismissed(profile)
+        .await?
+    {
+        match kind.as_str() {
+            "not_for_me" => out.push((id, Signal::NotForMe, age(&at))),
+            "already_seen" => out.push((id, Signal::AlreadySeen, age(&at))),
+            _ => {}
+        }
+    }
     Ok(out)
 }
 
@@ -89,6 +101,11 @@ type Cached = (String, Vec<Mode>, HashSet<i64>);
 #[derive(Default)]
 pub struct ModelCache {
     inner: std::sync::Mutex<std::collections::HashMap<i64, Cached>>,
+    /// Each mood shelf's sentence, embedded once per run of the app (Phase 18).
+    pub moods: crate::mood::MoodVectors,
+    /// Home's rails as last built for each profile: what Surprise me picks from while they
+    /// are current (`home::recent`).
+    pub(crate) homes: std::sync::Mutex<std::collections::HashMap<i64, crate::home::Built>>,
 }
 
 impl ModelCache {

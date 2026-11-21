@@ -7,6 +7,7 @@
 pub mod backfill;
 pub mod catalogue;
 pub mod credentials;
+pub mod discovery;
 pub mod downloads;
 pub mod episodes;
 pub mod library;
@@ -14,6 +15,7 @@ pub mod meaning;
 pub mod media;
 pub mod neighbours;
 pub mod profiles;
+pub mod regions;
 pub mod search;
 pub mod sources;
 pub mod subtitles;
@@ -24,6 +26,7 @@ pub use catalogue::{
     MIN_SYNOPSIS,
 };
 pub use credentials::{CredentialRepository, TmdbAccess};
+pub use discovery::{DiscoveryRepository, Happened};
 pub use downloads::{Download, DownloadRepository, DownloadState, NewDownload};
 pub use episodes::{EpisodeRepository, EpisodeRow};
 pub use library::{
@@ -34,6 +37,7 @@ pub use meaning::{Awaiting, MeaningCounts, MeaningRepository, Retry};
 pub use media::{Appearance, Credit, Facts, MediaRepository, RISING_KEY};
 pub use neighbours::{NeighbourRepository, NeighbourSource};
 pub use profiles::{NewProfile, Profile, ProfileRepository, Viewing, WatchScope};
+pub use regions::{RegionCounts, RegionRepository, Regions};
 pub use search::{Hit, HitDetail, MatchReason, SearchRepository};
 pub use sources::{
     AddonRow, BackendRow, DirectLinkRepository, DirectLinkRow, Sample, SourceRepository,

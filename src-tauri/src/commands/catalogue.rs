@@ -223,6 +223,7 @@ pub async fn keep_current(app: AppHandle) {
         start(app.clone(), false);
         showing_now(&app).await;
         live_neighbours(&app).await;
+        regions(&app).await;
         if last_airing.is_none_or(|t| t.elapsed() >= AIRING_EVERY) {
             last_airing = Some(std::time::Instant::now());
             airing(&app).await;
@@ -280,6 +281,24 @@ async fn live_neighbours(app: &AppHandle) {
             }
         }
         Err(error) => tracing::warn!(%error, "live neighbours stopped; the next check resumes"),
+    }
+}
+
+/// Countries and movements from Wikidata (Phase 18, ADR-0055, `sinephile_catalogue::regions`):
+/// what profiles met, then the most voted, 6,000 titles an hour until every one is asked.
+async fn regions(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let Some(db) = state.db() else { return };
+    match sinephile_catalogue::regions::at_launch(&db, state.http.clone()).await {
+        Ok(report) => {
+            tracing::info!(?report, "countries and movements");
+            if report.countries + report.movements > 0 {
+                let _ = app.emit("catalogue-refreshed", ());
+            }
+        }
+        Err(error) => {
+            tracing::warn!(%error, "countries and movements stopped; the next check resumes")
+        }
     }
 }
 

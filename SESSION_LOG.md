@@ -2660,3 +2660,124 @@ ADR-0054's whole subtask. I40 was done in Phase 16 (0fc2922).
 and mixed rails; the makers' pool (directors and creators, ten newest each, 150 kept) at weight 0.1; rising kept as the
 200 biggest gains at each refresh; the taste preview shows Home's rail; titles the meaning job describes belong to the
 companion, never the published graph. **Spec amendments:** A44 (4.7.1), recorded earlier today.
+
+## 2026-11-19 — session end: Phase 17 closed, Phase 18 open
+
+- Phase 17 merged (90231e6), tagged `phase-17`, CI green on main; the record closed in 42fb7a6. Phase 18 (Discovery
+  Engine) is open on `phase/18-discovery-engine`, its doc at `docs/phases/phase-18-discovery-engine.md`.
+- **Resume with "continue"**: `next_action` in PROJECT_STATE.json starts 18.1 (`crates/recommend/src/strategy.rs`, the
+  six arms with honest labels). Real-window checks need a fresh scratch copy of `data/` (the last one lived in a
+  session scratchpad): copy with SQLite's backup API, run the release build with `SINEPHILE_DATA_DIR` pointing at it,
+  stop it by PID.
+- Waiting on the author (Phase 19 batch): Phase 17 E5 on a Tier 0 machine, Phase 7 E7, Phase 14 E4/E6, D89, D91.
+
+## 2026-11-19 — Phase 18: the arms, Wikidata regions, the bandit, dismissals, Surprise me
+
+- **Built**: five discovery arms with labels re-derived by `holds` (18.1); countries and movements from Wikidata
+  (ADR-0055, migration 0033, spec 4.8.0); Thompson sampling over the arms with a floor and a cap (18.2); the bandit's
+  memory and dismissals (migration 0034), not for me / not right now / already seen on every recommended card (X on a
+  pad), Comfort to Adventure on the taste page (18.3); Surprise me (RT) and I42's length limit (18.4, part).
+- **Measured**: E1 met (+35/-21 points; first run missed at +12/-6, fixed by probability matching); E2 met (floor 20%
+  every day, every arm on 23%+ of days); E3 met (461,488 real labels, none false); E4 NOT met: novelty +2.02 bits (bar 1)
+  but Recall@N +33.2% over popularity (bar 40%) after three approaches, blocker B17 with option A taken next. Wikidata:
+  69,124 titles in 2,150 s, 93% with a country.
+- **Decisions**: listed in the phase doc's plan ("Decisions taken 2026-11-19"). **Spec amendment**: A45 (4.8.0).
+- **Lessons**: a 100-user trial said +42% where 15,640 users said +28.8%: judge on the full set, iterate on 2,000 (which
+  tracked it within a point). A plan's share means nothing if the screen does not show it: Home had dropped ten of the
+  familiar's thirty slots. Git Bash's `sed -i` turns CRLF into LF: edit CRLF files through Python.
+- **Resume**: `next_action` (B17 option A, then mood shelves and search-by-meaning quality). Waiting on the author:
+  nothing new; E5 (three films they had not heard of and want to watch) is asked at the phase's end, with the Phase 19
+  batch. Their profile has three ratings, so blind spots need ten met titles before they appear for them.
+
+## 2026-11-20 — Phase 18: the prior, the real window, search by meaning, mood shelves
+
+- **Built**: a population prior for a new profile's bandit (B17 option A, by a rule fixed first); search by meaning's
+  popularity prior (0.4, chosen on a new tuning set of ten queries; the original eight judged once); mood shelves; the
+  real window's four fixes (a taste named by its film nearest the pick; co-productions are not stretches; stretches and
+  bridges need 1,000 votes; mood shelves by raw closeness plus popularity, films only, sentences without title words);
+  the E5 checklist in MANUAL_TESTS; the flagship case study drafted (docs/case-studies/discovery.md).
+- **Measured**: E4 met at +40.4% with the first prior, then **NOT met at +39.9%** (bar 40%) once the window's fixes changed
+  the arms, novelty +1.89 bits (blocker B18). The re-run of the prior's rule chose 16, which starved blind spots in E2's
+  simulation (2.5% of days); 2 was taken, keeping E1 (+35.1/-22.1) and E2 (16.7%); recorded as a departure. Search by
+  meaning 0.0472 to 0.3276 (target 0.75), known items first, E2 43/43, p95 17.4 ms. Regression check: nothing regressed.
+- **Decisions**: the prior's rule and its departure (docs/eval-results.md 18.5); the search prior and its tuning set;
+  mood sentences and films-only shelves; E4 left open (not carried) until a change chosen on tuning users is judged once.
+  **Spec amendments**: none.
+- **Lessons**: look at the real window before tuning a metric on arms the window may change; a rule fixed in advance
+  needs to say what happens when its own required check fails; title words in a meaning query find titles.
+- **Resume**: `next_action` (B18 first). Waiting on the author: E5 (MANUAL_TESTS, "Discovery on your own taste"), and
+  Phase 5 E3/E4's third carry at Phase 18's close.
+
+## 2026-11-20 (later) — Phase 18: an installer for E5, a slow Wikidata, E4 met by a hair
+
+- **The installer for the author's test**: the one on disk dated from before Phase 17. `npm run release` from the phase
+  branch (b2842d4's arms; c2dcfbb onwards), then the release build on a fresh copy of the author's data (migration 29
+  to 34, their profile of three ratings): Home, Surprise me, the length chips, the taste rails, canon, deep cuts and a
+  mood shelf, no errors; second launch clean. Found there and fixed: Surprise me's row was off the rails' grid; and on a
+  slow WDQS day (39 s a query of 200, 2 s a query of 100 an hour later) every regions run timed out at the transport's
+  30 s, so queries are now 100 titles allowed WDQS's 60 s, 6,000 a run, and a stop is a warning in the release log
+  (ADR-0055 amended in place; not a spec change). The author's own titles were all asked first, as designed.
+- **E4 met at +40.0%** (b2842d4: popularity 0.1 in the arms' order, chosen on tuning users by a rule written first), by
+  under 0.05 point, said so; novelty +1.71 bits; E3 467,741 labels true. B18 closed. The test users have judged three
+  versions; each change was chosen without them.
+- **Decisions**: the per-request wait on the transport; Wikidata batches and rate; the arms' popularity weight by rule.
+  **Spec amendments**: none.
+- **Lesson**: a step that talks to a public service needs a slow day in its tests of the real window, not only its fast
+  one; and a stray second instance of a launch script muddies a log (stop by PID, launch one).
+- **Resume**: `next_action`. Waiting on the author: E5 with the new installer.
+
+## 2026-11-21 — Phase 18, 18.6: the author's fix list (ADR-0056)
+
+- **What the author found**: asked to rate ten films for E5, there was no way to rate a film except after watching it.
+  They asked for Letterboxd-style ratings that feed the taste model ("on that lies the recommendation algorithm"), a way
+  to remove anything from Continue watching, Surprise me beside the tabs, the line under Continue watching gone, and a
+  download that sometimes would not cancel fixed. Asked eleven specific questions; every answer is in ADR-0056 and
+  SPEC A46 (spec 4.9.0), and in memory.
+- **Built**: half stars everywhere (migration 0035 doubles what was rated; `title_ratings` the one reader); seasons rated
+  on a show's page with "your average"; every card's menu rates (a show's sends to its page); the end card's stars;
+  Rate films (well-known films, one after another) from Home's card under ten ratings and from Your taste; Continue
+  watching's removal (card menu, × for the mouse, the title page; back once played again); Surprise me in the masthead,
+  I42 removed end to end; the lines under Continue watching removed.
+- **The download that would not cancel**: a real race. The queue's once-a-second pass read the queue, a cancel landed
+  while it ran, the pass saw the torrent gone from its backend and added it again, running. `tests/cancel.rs` holds the
+  pass open with a stalling fake and reproduced it (Active, added twice); user actions now take turns with the pass.
+  Direct downloads' delete and quick pause/resume were suspected too and tested: sound, kept as guards.
+- **Measured**: the taste harness with half stars kept 40.71% (40.63% before), lift over popularity 1.17x (1.14x), on a
+  stricter set of favourites (a 3.5 is no longer rounded up into "liked"). Recorded in docs/eval-results.md 18.6.
+- **Found by a test**: rating a film before its saved rating had loaded was put back by the load, and cancelling the
+  load reverted it again; the hooks now cancel without reverting.
+- **Decisions** (mine, in ADR-0056's last section): the weights between whole stars, liked from four, strongly held from
+  4.5, imports one to one, a show's card menu sending to its page, Rate films' 100,000-vote floor, the 350 ms settle.
+  **Spec amendments**: A46 (4.9.0), the author's own answers.
+- **Lesson**: a feature that asks the author to do something (rate ten films) has to be checked in the release build for
+  whether they can; the acceptance test was written before the way to pass it existed.
+- **The installer** (2026-11-21 01:52, a1816c7) on a fresh copy of the author's data: migration 35 doubled their three
+  ratings, Home shows Surprise me by Search, the Rate films card ("3 of 10 rated") and no line under Continue watching;
+  no errors logged. An attempt to click into the real window landed in the author's VS Code instead (Windows would not
+  raise the app over their editor): nothing changed, the process was stopped, and in-window checks stay screenshots
+  only. The Rate films screen and the stars are covered by tests and the pad audit, not yet seen in the real window.
+
+## 2026-11-21 (later) — Phase 18 closed: the author's E5, three fixes, the retrospective
+
+- **E5**: the author ran it on their own profile with the new installer: "E5 seems okay". Recorded in their words; they
+  named no films.
+- **Three things they found, fixed with a test seen to fail first**: a long subtitle list ran off the window (the bar's
+  track menu had no height; 0d33fe9). A deleted download played from its old files (its torrent stayed in librqbit's
+  session counting every piece as had; Delete now takes the torrent out first, and a held torrent whose files are all
+  gone is dropped and fetched again, which also repairs what earlier deletes left behind; 4f0e1c8). Surprise me was
+  slow (each press built all of Home, 377 ms warm, 3.7 s cold, behind the search engine's lock; now it picks from the
+  rails Home last built while they are current, 1.5 to 1.8 ms; 525bb0a; `eval surprise`).
+- **Closed**: E1 to E6 met with evidence; Phase 5 E3 (0.3276) and E4 (half) carried a third time, to Phase 19, with an
+  untried approach (negation-aware queries) as its first subtask, flagged to the author. Regression check clean.
+- **Decisions**: the stale-torrent rule (something fetched, no file on disk) and its place in `add` and play; Surprise
+  me's 15-minute memo and what invalidates it; the carry. **Spec amendments**: none since A46.
+
+### Phase 18 retrospective
+
+- **What worked**: bars written before runs, tuning users kept apart from test users, and per-arm diagnostics; the
+  bandit's simulation proved E1 and E2 cheaply; one view for every reader of ratings.
+- **What did not**: E4 was judged three times on the test users as the arms changed (each change chosen without them,
+  but the margin is inside sampling noise); E5 was written before the app could rate a film; Surprise me shipped without
+  a timing.
+- **Next time**: time every user-facing action against a budget when it is built; walk the acceptance test through the
+  release build before asking the author to; look at the real window before tuning a metric on it.

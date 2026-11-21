@@ -1,0 +1,48 @@
+# Phase 18 (18.4): a TUNING set for search by meaning, written and committed before any run.
+#
+# semantic-queries.tsv judges E3 and has eight meaning queries: too few to choose a setting on
+# and then be judged by. Any setting search by meaning gains (a popularity prior first) is chosen
+# on THESE queries; E3 is then measured once on the original set.
+#
+# Same format: kind <TAB> query <TAB> imdb_id <TAB> grade <TAB> why
+#   grade 2 = an obvious answer, the one a person would name; 1 = a good answer.
+# Well-known films only, each id checked against the catalogue's title before commit.
+kind	query	imdb_id	grade	why
+meaning	samurai films about honour and duty	tt0047478	2	Seven Samurai
+meaning	samurai films about honour and duty	tt0056058	2	Harakiri
+meaning	samurai films about honour and duty	tt0055630	1	Yojimbo
+meaning	samurai films about honour and duty	tt0056443	1	Sanjuro
+meaning	astronauts stranded in space trying to survive	tt1454468	2	Gravity
+meaning	astronauts stranded in space trying to survive	tt3659388	2	The Martian
+meaning	astronauts stranded in space trying to survive	tt0112384	2	Apollo 13
+meaning	courtroom dramas about a murder trial	tt0050083	2	12 Angry Men
+meaning	courtroom dramas about a murder trial	tt0052561	2	Anatomy of a Murder
+meaning	courtroom dramas about a murder trial	tt0051201	1	Witness for the Prosecution
+meaning	courtroom dramas about a murder trial	tt0104257	1	A Few Good Men
+meaning	a mafia family saga across generations	tt0068646	2	The Godfather
+meaning	a mafia family saga across generations	tt0071562	2	The Godfather Part II
+meaning	a mafia family saga across generations	tt0087843	1	Once Upon a Time in America
+meaning	a mafia family saga across generations	tt0099685	1	Goodfellas
+meaning	dinosaurs brought back to life in a theme park	tt0107290	2	Jurassic Park
+meaning	dinosaurs brought back to life in a theme park	tt0119567	1	The Lost World: Jurassic Park
+meaning	dinosaurs brought back to life in a theme park	tt0369610	1	Jurassic World
+meaning	a hacker learns that reality is a simulation	tt0133093	2	The Matrix
+meaning	a hacker learns that reality is a simulation	tt0139809	1	The Thirteenth Floor
+meaning	a hacker learns that reality is a simulation	tt0118929	1	Dark City
+meaning	silent comedies with daredevil physical stunts	tt0017925	2	The General
+meaning	silent comedies with daredevil physical stunts	tt0015324	2	Sherlock Jr.
+meaning	silent comedies with daredevil physical stunts	tt0014429	2	Safety Last!
+meaning	silent comedies with daredevil physical stunts	tt0015864	1	The Gold Rush
+meaning	Japanese animated fantasy with a young girl as the heroine	tt0245429	2	Spirited Away
+meaning	Japanese animated fantasy with a young girl as the heroine	tt0097814	2	Kiki's Delivery Service
+meaning	Japanese animated fantasy with a young girl as the heroine	tt0096283	1	My Neighbor Totoro
+meaning	Japanese animated fantasy with a young girl as the heroine	tt0119698	1	Princess Mononoke
+meaning	a zombie outbreak horror	tt0063350	2	Night of the Living Dead
+meaning	a zombie outbreak horror	tt0077402	2	Dawn of the Dead
+meaning	a zombie outbreak horror	tt0289043	2	28 Days Later
+meaning	a zombie outbreak horror	tt5700672	1	Train to Busan
+meaning	a boxer fighting for a comeback	tt0075148	2	Rocky
+meaning	a boxer fighting for a comeback	tt0352248	2	Cinderella Man
+meaning	a boxer fighting for a comeback	tt0964517	1	The Fighter
+meaning	a boxer fighting for a comeback	tt0405159	1	Million Dollar Baby
+meaning	a boxer fighting for a comeback	tt0081398	1	Raging Bull

@@ -72,7 +72,9 @@ pub async fn target(
         } => {
             let id = info_hash.to_ascii_lowercase();
             let index = file_index.map(|i| i as usize);
-            if engine.has(&id) {
+            // A held torrent plays from what it has, unless its files were deleted: then it
+            // is fetched again rather than served from files that are not there.
+            if engine.has(&id) && !engine.drop_if_files_gone(&id).await? {
                 let file = match index {
                     Some(i) => engine.files(&id)?.into_iter().find(|f| f.index == i),
                     None => Some(engine.main_file(&id, wanted)?),

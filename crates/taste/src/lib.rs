@@ -10,13 +10,17 @@
 pub mod axes;
 pub mod continuing;
 pub mod describe;
+pub mod discover;
 pub mod home;
 pub mod hybrid;
 pub mod model;
 pub mod modes;
+pub mod mood;
+pub mod rate;
 pub mod rounds;
 pub mod shelf;
 pub mod signals;
+pub mod surprise;
 
 use std::collections::HashSet;
 

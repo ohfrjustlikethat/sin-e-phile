@@ -64,7 +64,7 @@ describe("First run (Phase 14)", () => {
     expect(screen.getByRole("button", { name: "Download 314 MB" })).toBeInTheDocument();
     expect(commands.downloadOptionalAssets).not.toHaveBeenCalled();
     fireEvent.click(await screen.findByRole("button", { name: /Film 3/ }));
-    await waitFor(() => expect(commands.rateTitle).toHaveBeenCalledWith(3, 4));
+    await waitFor(() => expect(commands.rateTitle).toHaveBeenCalledWith(3, 8));
     // A second round asks for films not yet shown.
     fireEvent.click(screen.getByRole("button", { name: "More like these, and others" }));
     await waitFor(() => expect(commands.tasteRound).toHaveBeenLastCalledWith(Array.from({ length: 12 }, (_, i) => i + 1), 12));

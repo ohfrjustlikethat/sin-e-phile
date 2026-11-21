@@ -155,6 +155,11 @@ const FAKE = `(() => {
     finish_onboarding: () => { window.__onboarded = true; return null; },
     update_profile: () => null,
     rate_title: () => null,
+    // ADR-0056: ratings for any title; this profile has rated enough that Home does not ask.
+    title_rating: () => null,
+    rated_count: () => 12,
+    show_ratings: () => ({ seasons: [], average: null }),
+    in_continue_watching: () => false,
     taste_round: () => Array.from({ length: 12 }, (_, i) => ({ id: 100 + i, title: "Film " + (i + 1),
       year: 1930 + i * 8, made_by: "A Director" })),
     taste_input: () => ({ statements: { pace: null, ambiguity: null, era: null, subtitles: null, runtime: null, form: null }, love: null }),
@@ -170,6 +175,8 @@ const FAKE = `(() => {
       axes: ["You tend to walk out of war."],
     }),
     correct_taste: (a) => { window.__corrections[a.anchor] = a.correction; return null; },
+    // Phase 18: Surprise me chooses Sunrise.
+    surprise_me: () => ({ id: 7, note: "Like Stalker, but from the 1920s", on_this_pc: false }),
     home: () => [{ key: "loved", title: "Widely loved", items: [{ id: 7, title: "Sunrise", year: 1927,
       made_by: "F. W. Murnau", runtime_minutes: 94 }] },
       // Phase 16 E3: a rail long enough to run off the screen, for the right stick.
@@ -614,7 +621,7 @@ try {
   await waitFor(() => evalJs(`document.body.textContent.includes("Film 1")`), "the title cards", 25);
   await steerToButton("Film 1A Director · 1930");
   await press(B.A);
-  check((await calls("rate_title")).some((a) => a.id === 100 && a.stars === 4), "A on a title card picks it (liked, four stars)");
+  check((await calls("rate_title")).some((a) => a.id === 100 && a.halves === 8), "A on a title card picks it (liked, four stars: eight halves)");
   await shoot("00b-title-cards");
   await steerToButton("Continue");
   await press(B.A);
@@ -757,6 +764,47 @@ try {
   const seen = await layoutProblems();
   await evalJs(`document.getElementById("too-wide").remove()`);
   check(seen.length > 0, `the layout check sees a 3000 px paragraph (${seen.join("; ")})`);
+  // Phase 18 and ADR-0056: a recommended card's menu, by pad alone. X opens it on its stars; Right
+  // twice rates it one star; Down reaches "not for me", A says it, A on Undo takes it back, and focus
+  // is on the card again.
+  await evalJs(`(() => { const t = document.querySelector('section[aria-label="For you"] [data-focus-tile]');
+    t.scrollIntoView({ block: "nearest", inline: "nearest" }); t.focus(); })()`);
+  await press(B.X);
+  const menu = await waitFor(
+    () => evalJs(`!!document.querySelector('[role="dialog"][aria-label$=": options"]')`),
+    "the card's menu", 15).catch(() => false);
+  check(menu && (await evalJs(`document.activeElement?.getAttribute("aria-label") === "Your rating"`)),
+    "X on a recommended card opens its menu, with focus on its stars");
+  await press(B.RIGHT);
+  await press(B.RIGHT);
+  // Whichever "For you" card has focus by now (300 to 323; earlier steps moved along the rail).
+  const rated = await waitFor(async () => (await calls("rate_title")).some((a) => a.id >= 300 && a.id < 324 && a.halves === 2),
+    "the card's rating", 15).catch(() => false);
+  check(rated && (await evalJs(`document.activeElement?.getAttribute("aria-valuetext") === "1 star"`)),
+    `Right twice on the stars rates it one star, saved once they settle (${JSON.stringify(await calls("rate_title"))})`);
+  await press(B.DOWN);
+  check(await evalJs(`document.activeElement?.textContent === "Not for me"`), "Down from the stars reaches Not for me");
+  await press(B.A);
+  const undone = await waitFor(() => evalJs(`document.activeElement?.textContent === "Undo"`), "the card's undo", 15)
+    .catch(() => false);
+  const said = await calls("dismiss");
+  check(undone && said.length === 1 && said[0].kind === "not_for_me",
+    `A on Not for me is said, and the card stands as an Undo (${JSON.stringify(said)})`);
+  await press(B.A);
+  const back = await waitFor(() => evalJs(`!!document.activeElement?.closest('section[aria-label="For you"]')
+      && document.activeElement?.hasAttribute("data-focus-tile")`), "the card back", 15).catch(() => false);
+  check(back && (await calls("undismiss")).length === 1, "A on Undo takes it back, focus on the card again");
+  // Phase 18 (ADR-0043): RT is Surprise me, which opens its film's page; B comes back to Home.
+  await press(B.RT);
+  const surprised = await waitFor(
+    () => evalJs(`(document.querySelector('main article h1')?.textContent ?? "").includes("Sunrise")`),
+    "Surprise me's film", 20).catch(() => false);
+  check(surprised && (await calls("surprise_me")).length === 1, "RT (Surprise me) opens a film's page");
+  await press(B.B);
+  await waitFor(() => evalJs(`!!document.querySelector('section[aria-label="For you"]')`), "Home again", 20)
+    .catch(() => false);
+  // The page Surprise me opened asked for its sources; the search flow below counts its own from none.
+  await evalJs(`__calls = __calls.filter((c) => c[0] !== "prepare_play")`);
 
   await press(B.Y);
   const kb = await waitFor(() => evalJs(`!!document.querySelector('[aria-label="On-screen keyboard"]')`), "the keyboard", 20);

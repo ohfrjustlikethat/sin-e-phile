@@ -94,7 +94,31 @@ pub fn to_delete(file: &Path, dir: &Path) -> PathBuf {
     }
 }
 
-/// Clear a finished download: its files from disk, its file from the library, its row.
+/// Delete a file or a folder, gone already being fine. A backend that has just let go of a
+/// file may not have closed it yet (Windows will not delete an open file), so a few tries
+/// over a second.
+async fn delete(target: &Path) -> Result<(), ManagerError> {
+    let mut tries = 0;
+    loop {
+        let gone = if target.is_dir() {
+            std::fs::remove_dir_all(target)
+        } else {
+            std::fs::remove_file(target)
+        };
+        match gone {
+            Ok(()) => return Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(e) if tries >= 10 => return Err(ManagerError::Io(e.to_string())),
+            Err(_) => {
+                tries += 1;
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+        }
+    }
+}
+
+/// Clear a finished download: its files from disk, its files from the library, its row.
+/// [`crate::Manager::clear`] takes it out of its backend first; this is the rest.
 pub async fn clear(db: &Db, id: i64, dir: &Path) -> Result<(), ManagerError> {
     let repo = DownloadRepository::new(db);
     let Some(d) = repo.get(id).await? else {
@@ -102,17 +126,16 @@ pub async fn clear(db: &Db, id: i64, dir: &Path) -> Result<(), ManagerError> {
     };
     if let Some(path) = d.file_path.as_deref() {
         let target = to_delete(Path::new(path), dir);
-        let gone = if target.is_dir() {
-            std::fs::remove_dir_all(&target)
-        } else {
-            std::fs::remove_file(&target)
-        };
-        if let Err(e) = gone {
-            if e.kind() != std::io::ErrorKind::NotFound {
-                return Err(ManagerError::Io(e.to_string()));
+        delete(&target).await?;
+        // Every file the library holds from what was deleted, not only the one the download
+        // made: the downloads folder is a library folder, and a scan records what it finds.
+        let library = LibraryRepository::new(db);
+        let folder = library.add_folder(&dir.to_string_lossy()).await?;
+        for f in library.files_in_folder(folder).await? {
+            if Path::new(&f.path).starts_with(&target) {
+                library.delete_file(f.id).await?;
             }
         }
-        let library = LibraryRepository::new(db);
         if let Some(f) = library.file_by_path(path).await? {
             library.delete_file(f.id).await?;
         }
