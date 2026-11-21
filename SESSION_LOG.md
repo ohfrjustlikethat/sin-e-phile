@@ -2805,3 +2805,15 @@ companion, never the published graph. **Spec amendments:** A44 (4.7.1), recorded
 - **Decisions**: the stream opened last counts as playing (there is no stop signal); orphans deleted only at start; the
   person lookup only for queries of four words or fewer, from 50 titles. **Spec amendments**: A47 (4.10.0).
 
+
+## 2026-11-22 — Session end: state saved for a cold "continue"
+
+- **Reported** to the author: the disk figures (524 GB of streams, `target/` 295 to 18 GB, C: about 157 to 1,028 GB
+  free), the 20 GB stream cache and where to change it, streaming only the watched file, person search, and the
+  installer to reinstall (`target/release/bundle/nsis/sin-e-phile_0.1.0_x64-setup.exe`, 2026-11-21 22:41).
+- **No code since b3b3cc1**; the full pre-push list run again before this commit.
+- **Open**: the one unidentified front-end test that failed once under load (watched in CI); the author's reinstall
+  and whatever it shows.
+- **Next session**: read `PROJECT_STATE.json` and `docs/phases/phase-19-browsing-surfaces.md`; fix anything the author
+  reports from the installer; then 19.1 (negation-aware search by meaning), as `next_action` says.
+- **Decisions**: none new. **Spec amendments**: none since A47 (4.10.0).

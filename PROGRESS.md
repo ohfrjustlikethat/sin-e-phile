@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 4.10.0** · 21 session(s) completed · last updated 2026-11-19
+**Spec version 4.10.0** · 22 session(s) completed · last updated 2026-11-22
 
 ---
 
@@ -49,7 +49,7 @@
 
 ## What's next
 
-Phase 19, 19.1: make search by meaning understand negation for Phase 5 E3/E4. In crates/search-engine/src/lib.rs, split a query's negated clause ('that aren't', 'but not', 'without', 'not too': a small pure function with tests), embed it apart, and subtract a weight times each candidate's cosine to it before the popularity prior; choose the weight on fixtures/search/meaning-tuning.tsv with `eval search --tune-meaning` (rule written into docs/eval-results.md first), then judge once with `eval search --report` (bar nDCG@10 > 0.75) and capture the grief query's results.
+First, if the author reports anything from the 2026-11-21 22:41 installer (target/release/bundle/nsis; stream cache, person search), fix that before new work. Then Phase 19, 19.1: make search by meaning understand negation for Phase 5 E3/E4. In crates/search-engine/src/lib.rs, split a query's negated clause ('that aren't', 'but not', 'without', 'not too': a small pure function with tests), embed it apart, and subtract a weight times each candidate's cosine to it before the popularity prior; choose the weight on fixtures/search/meaning-tuning.tsv with `eval search --tune-meaning` (rule written into docs/eval-results.md first), then judge once with `eval search --report` (bar nDCG@10 > 0.75) and capture the grief query's results.
 
 ---
 
