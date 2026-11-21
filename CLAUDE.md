@@ -4,7 +4,7 @@
 standing rules. `SPEC.md` is the constitution, but you do *not* re-read it end to
 end — see the session start ritual below.**
 
-*Synced against `SPEC.md` spec_version **4.9.0**. When `SPEC.md` is amended, resync
+*Synced against `SPEC.md` spec_version **4.10.0**. When `SPEC.md` is amended, resync
 this file in the same commit; a stale line here is worse than a stale line anywhere
 else, because this one loads into every session.*
 
@@ -321,6 +321,11 @@ movement until every title the profile met was asked (`strategy::Profile::unknow
 no reviews; a show shows the average of its rated seasons; stars and watching both count in the taste model; rate from
 the title page, any card's menu, the end card and a rate-a-batch screen. Continue watching removal hides a title and
 keeps its place. Surprise me is a text button left of Search; I42's length choice was removed by the author.
+
+**Disk is the author's** (ADR-0057): streaming fetches only the watched file; streamed torrents are a cache of at most
+20 GB (a setting), least recently watched out first, never a download. Build output stays small (Cargo profiles; doctor
+warns past 60 GB). Scratch copies of data are deleted when the work is done. A search that is a person's name shows
+their films, best known first.
 
 **TMDB is optional, and no key ever ships** (ADR-0013, ADR-0027). The app is fully
 functional on the offline IMDb + MovieLens catalogue with no key. Each user supplies

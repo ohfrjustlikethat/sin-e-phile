@@ -226,6 +226,44 @@ def check_libmpv() -> Result:
                   "python tools/mpv/fetch.py")
 
 
+# target/ reached 295 GB before anyone looked (the author, 2026-11-21). The build profiles
+# in Cargo.toml keep it far smaller now; this says so if it grows again anyway.
+TARGET_WARN_BYTES = 60 * 1024**3
+
+
+def target_bytes(root: Path, stop_at: int) -> int:
+    """Bytes under `root`, counting no further than `stop_at`."""
+    total = 0
+    stack = [root]
+    while stack:
+        try:
+            entries = list(os.scandir(stack.pop()))
+        except OSError:
+            continue
+        for e in entries:
+            try:
+                if e.is_dir(follow_symlinks=False):
+                    stack.append(Path(e.path))
+                else:
+                    total += e.stat(follow_symlinks=False).st_size
+            except OSError:
+                continue
+            if total > stop_at:
+                return total
+    return total
+
+
+def check_target_size() -> Result:
+    """Build output on disk: a warning, never a blocker."""
+    size = target_bytes(REPO_ROOT / "target", TARGET_WARN_BYTES)
+    gib = size / 1024**3
+    if size > TARGET_WARN_BYTES:
+        return Result("Build output (target/)", False, f"over {TARGET_WARN_BYTES // 1024**3} GB",
+                      "cargo clean (the next build takes longer; nothing else is lost)",
+                      required=False)
+    return Result("Build output (target/)", True, f"{gib:.1f} GB", required=False)
+
+
 def check_hooks(fix_it: bool) -> Result:
     """Verify — and optionally perform — the core.hooksPath bootstrap."""
     code, out = run("git", "-C", str(REPO_ROOT), "config", "--get", "core.hooksPath")
@@ -325,6 +363,7 @@ def main() -> int:
                       "pre-commit hook uses tools/guard/secretscan.py (ADR-0012).",
                       required=False),
         *check_env_vars(),
+        check_target_size(),
     ]
 
     print(f"{BOLD}Required{RESET}")

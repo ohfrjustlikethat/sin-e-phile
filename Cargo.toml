@@ -34,3 +34,19 @@ opt-level = 3
 
 [profile.dev.package.rustfft]
 opt-level = 3
+
+# Disk (the author, 2026-11-21: target/ had grown to 295 GB). Most of it was full debug
+# information for every dependency, copied into each of 129 test binaries (146 GB), and
+# the incremental caches of those test builds (137 GB). Dependencies now carry none, the
+# workspace's own code keeps line tables (a backtrace still names the line), and test
+# builds keep no incremental cache; the app's own dev build keeps its, for quick rebuilds.
+# tools/doctor warns once target/ passes 60 GB.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.test]
+incremental = false
+
