@@ -103,6 +103,9 @@ pub struct ModelCache {
     inner: std::sync::Mutex<std::collections::HashMap<i64, Cached>>,
     /// Each mood shelf's sentence, embedded once per run of the app (Phase 18).
     pub moods: crate::mood::MoodVectors,
+    /// Home's rails as last built for each profile: what Surprise me picks from while they
+    /// are current (`home::recent`).
+    pub(crate) homes: std::sync::Mutex<std::collections::HashMap<i64, crate::home::Built>>,
 }
 
 impl ModelCache {

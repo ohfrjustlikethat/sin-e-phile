@@ -463,3 +463,60 @@ async fn surprise_me_picks_a_film_within_the_length_asked() {
     );
     assert_eq!(seen.len(), 3, "films only, never the series: {seen:?}");
 }
+
+#[tokio::test]
+async fn surprise_me_picks_from_homes_rails_while_they_are_current() {
+    // The author, 2026-11-21: Surprise me was slow, building all of Home for one film. It
+    // reuses the rails Home built last, and only while nothing they stand on has moved.
+    use sinephile_taste::home::{rails_at, recent, Ask};
+    use sinephile_taste::surprise::from_recent;
+    let db = Db::in_memory().await.unwrap();
+    let a = film(&db, "Alpha", 1990, 900_000, &["Drama"]).await;
+    let _b = film(&db, "Beta", 1991, 800_000, &["Drama"]).await;
+    let me = ProfileRepository::new(&db).ensure_default().await.unwrap();
+    let models = sinephile_taste::model::ModelCache::default();
+    let evening = Ask { hour: Some(20) };
+    assert!(
+        from_recent(&db, me, false, None, &models, evening, 1)
+            .await
+            .unwrap()
+            .is_none(),
+        "no Home built yet: Home must be built"
+    );
+    let built = rails_at(&db, None, me, false, None, &models, evening)
+        .await
+        .unwrap();
+    let again = recent(&db, me, false, None, &models, evening)
+        .await
+        .unwrap()
+        .expect("current");
+    assert_eq!(again, built);
+    assert!(from_recent(&db, me, false, None, &models, evening, 1)
+        .await
+        .unwrap()
+        .expect("from the rails")
+        .is_some());
+    // Another part of the day, another love, or a profile that has changed since: built again.
+    let morning = Ask { hour: Some(9) };
+    assert!(recent(&db, me, false, None, &models, morning)
+        .await
+        .unwrap()
+        .is_none());
+    assert!(
+        recent(&db, me, false, Some("slow cinema"), &models, evening)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    ProfileRepository::new(&db)
+        .rate(me, a, Some(10))
+        .await
+        .unwrap();
+    assert!(
+        recent(&db, me, false, None, &models, evening)
+            .await
+            .unwrap()
+            .is_none(),
+        "a rating moves what Home would show"
+    );
+}

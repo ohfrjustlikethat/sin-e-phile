@@ -115,6 +115,53 @@ pub async fn taste_rail(
         .unwrap_or_default())
 }
 
+/// Home's rails as built, and what they were built from: [`recent`] gives them back while
+/// that is still so.
+pub(crate) struct Built {
+    fingerprint: String,
+    context: Context,
+    kids: bool,
+    love: Option<String>,
+    at: std::time::Instant,
+    rails: Vec<Rail>,
+}
+
+/// How long rails stay current without a change to the profile.
+pub const RECENT: std::time::Duration = std::time::Duration::from_secs(15 * 60);
+
+/// The rails Home last built for this profile, if they are still what it would build now:
+/// nothing the taste model reads has changed (the signal fingerprint), the same part of the
+/// day, the same "what you love", and built within [`RECENT`]. Surprise me picks from these
+/// rather than building Home again (the author, 2026-11-21: "very slow"; 377 ms a press warm,
+/// 3.7 s cold, waiting on the search engine besides).
+pub async fn recent(
+    db: &Db,
+    profile: i64,
+    kids: bool,
+    love: Option<&str>,
+    cache: &crate::model::ModelCache,
+    ask: Ask,
+) -> Result<Option<Vec<Rail>>, DbError> {
+    let context = ask.hour.map_or(Context::Evening, Context::of_hour);
+    let fingerprint = ProfileRepository::new(db)
+        .signal_fingerprint(profile)
+        .await?;
+    let homes = cache
+        .homes
+        .lock()
+        .map_err(|_| DbError::Invalid("poisoned".into()))?;
+    Ok(homes
+        .get(&profile)
+        .filter(|b| {
+            b.fingerprint == fingerprint
+                && b.context == context
+                && b.kids == kids
+                && b.love.as_deref() == love
+                && b.at.elapsed() < RECENT
+        })
+        .map(|b| b.rails.clone()))
+}
+
 /// What a Home is asked for beyond the profile (Phase 18).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Ask {
@@ -149,6 +196,8 @@ pub async fn rails_at(
     // A kids profile leaves out much of what is chosen, so more is chosen.
     let more = if kids { 6 } else { 1 };
     let profiles = ProfileRepository::new(db);
+    // What these rails are built from, for `recent`.
+    let fingerprint = profiles.signal_fingerprint(profile).await?;
     let media = MediaRepository::new(db);
     let suits = |ids: Vec<i64>| async move {
         if !kids {
@@ -573,5 +622,18 @@ pub async fn rails_at(
     DiscoveryRepository::new(db)
         .record_shown(profile, &recorded, context.key())
         .await?;
+    if let Ok(mut homes) = cache.homes.lock() {
+        homes.insert(
+            profile,
+            Built {
+                fingerprint,
+                context,
+                kids,
+                love: love.map(str::to_string),
+                at: std::time::Instant::now(),
+                rails: out.clone(),
+            },
+        );
+    }
     Ok(out)
 }

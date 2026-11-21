@@ -3746,3 +3746,21 @@ three stars' 0.2 and four's 1.0), so the held-out set is stricter and popularity
 the model finds slightly more than before and its margin over popularity widens (+5.98 points against +4.99). Whole-star
 ratings weigh exactly what they did (`modes::rating_weight`, tested), so nothing already rated moved.
 
+### 18.7: Surprise me's speed (the author, 2026-11-21: "very slow")
+
+`SINEPHILE_DATA_DIR=<a copy of the author's data> cargo run --release -p eval -- surprise`: their own profile, the
+catalogue's vector half, the evening. Budget: a press under 300 ms.
+
+| | Before (a1816c7) | After (Home's rails reused while current) |
+|---|---|---|
+| Home's rails, first build of the run | 3,677 ms | 325 ms (the files already in the OS cache) |
+| Home's rails, warm | 402 ms | 315 ms |
+| **Surprise me, a press** | **373 to 377 ms: over budget** | **1.5 to 1.8 ms** |
+| a press before Home was ever built | (as a press) | 342 ms (builds Home) |
+
+Before, each press built all of Home (taste model, discovery pools, mood shelves) to choose one film, holding the search
+engine's lock, so in the app it also waited behind any search or the launch's background work. Now Home keeps the rails
+it last built for each profile, and a press picks from them while nothing they stand on has moved (the taste fingerprint,
+the part of the day, "what you love", 15 minutes), without the engine. The first run, over budget, is the check seen to
+fail.
+

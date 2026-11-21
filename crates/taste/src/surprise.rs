@@ -15,7 +15,7 @@ use sinephile_recommend::bandit::Rng;
 use sinephile_recommend::strategy::Arm;
 use sinephile_search_engine::Semantic;
 
-use crate::home::{rails_at, Ask};
+use crate::home::{rails_at, recent, Ask, Rail};
 
 /// How many of the best qualifying films the pick is drawn from.
 pub const FROM: usize = 5;
@@ -42,7 +42,35 @@ pub async fn surprise(
     ask: Ask,
     seed: u64,
 ) -> Result<Option<Surprise>, DbError> {
-    let rails = rails_at(db, semantic, profile, kids, love, cache, ask).await?;
+    let rails = match recent(db, profile, kids, love, cache, ask).await? {
+        Some(rails) => rails,
+        None => rails_at(db, semantic, profile, kids, love, cache, ask).await?,
+    };
+    pick(db, &rails, seed).await
+}
+
+/// Surprise me from the rails Home built last, if they are current ([`recent`]): `None` when
+/// they are not, and Home must be built (with the search engine) first. Needs no engine, so
+/// a press does not wait behind a search or the launch's background work.
+#[allow(clippy::too_many_arguments)]
+pub async fn from_recent(
+    db: &Db,
+    profile: i64,
+    kids: bool,
+    love: Option<&str>,
+    cache: &crate::model::ModelCache,
+    ask: Ask,
+    seed: u64,
+) -> Result<Option<Option<Surprise>>, DbError> {
+    match recent(db, profile, kids, love, cache, ask).await? {
+        Some(rails) => Ok(Some(pick(db, &rails, seed).await?)),
+        None => Ok(None),
+    }
+}
+
+/// One film from these rails: the taste and discovery rails first, else new and loved; films
+/// only; what is on this PC first; one of the best [`FROM`] at random.
+async fn pick(db: &Db, rails: &[Rail], seed: u64) -> Result<Option<Surprise>, DbError> {
     let recommended =
         |key: &str| key == "taste" || Arm::from_key(key).is_some_and(|a| a != Arm::Familiar);
     let mut order: Vec<(i64, Option<String>)> = Vec::new();

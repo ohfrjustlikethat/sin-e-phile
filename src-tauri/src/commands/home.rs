@@ -119,6 +119,20 @@ pub async fn surprise_me(
     let seed = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_nanos() as u64);
+    let view = |s: sinephile_taste::surprise::Surprise| SurpriseView {
+        id: s.id as i32,
+        note: s.note,
+        on_this_pc: s.on_this_pc,
+    };
+    // From the rails Home built last, while they are current: no rebuild, and no wait for
+    // the search engine (the author, 2026-11-21: "very slow").
+    if let Some(chosen) =
+        sinephile_taste::surprise::from_recent(&db, me, kids, love.as_deref(), &MODELS, ask, seed)
+            .await
+            .map_err(|e| e.to_string())?
+    {
+        return Ok(chosen.map(view));
+    }
     let chosen = match state.engine() {
         Some(engine) => {
             let mut engine = engine.lock().await;
@@ -149,11 +163,7 @@ pub async fn surprise_me(
         }
     }
     .map_err(|e| e.to_string())?;
-    Ok(chosen.map(|s| SurpriseView {
-        id: s.id as i32,
-        note: s.note,
-        on_this_pc: s.on_this_pc,
-    }))
+    Ok(chosen.map(view))
 }
 
 /// What a viewer says of a recommended card (Phase 18).
