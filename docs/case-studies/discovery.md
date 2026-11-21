@@ -78,6 +78,25 @@ Every bar was written into `docs/eval-results.md` before the run it judges, so a
   narrowest margin:** discovery is 1.71 bits more novel than the taste rail (about 3.3 times less widely liked), and Home
   is **40.0%** above popularity (0.3630 against 0.2593; above 40% unrounded, by under 0.05 point, which is inside the
   noise between two samples of users), with the taste rail itself unchanged at Phase 17's 0.2639.
+- **E5, the author on their own taste: met, in their words.** On their own profile in the installed release, after
+  rating films with the stars built for it (below), the author's verdict was "E5 seems okay". They named no films, so
+  the three titles the criterion asks for are their judgment rather than a list in this document.
+
+## What the author's test found
+
+Asked to rate ten films for E5, the author found there was no way to: a film could be rated only on the card after
+watching it. The acceptance test had been written before the means of passing it existed. Ratings were rebuilt to the
+author's answers (ADR-0056): half stars like Letterboxd, a show rated season by season and counted as their average,
+from the title page, every card's menu, the end card and a screen of well-known films to rate one after another; stars
+and watching both count. One view in the database, `title_ratings`, is what every reader of a rating reads, so the
+taste model, liked titles and the bandit's outcomes cannot disagree about what was rated. On the taste harness (three
+MovieLens users' own half stars, imported as Letterboxd exports) the model found 40.71% of held-out favourites with half
+stars kept against 40.63% with 3.5 rounded up, and its lift over popularity rose from 1.14x to 1.17x on the stricter set.
+
+The same test found three more things: a long subtitle list that ran off the window, a deleted download whose torrent
+stayed in the engine and was played from files that were gone, and **Surprise me taking 377 ms a press** (3.7 s cold)
+because it built all of Home to choose one film. It now picks from the rails Home last built while they are current:
+1.5 to 1.8 ms.
 
 ## What went wrong, and what it taught
 
@@ -148,6 +167,8 @@ for tuning before any run, took the original eight from **0.0472 to 0.3276**, pu
   any number, and two of them (the co-production, the mis-named taste) were true labels that read as false.
 - **Judge a metric's arms in the window before tuning the metric.** The prior was tuned, judged and met, and then the
   window changed the arms it was tuned on.
+- **Check that the acceptance test can be done in the release build.** E5 asked the author to rate ten films in an app
+  that could not rate a film until after watching it.
 - **Offline relevance punishes discovery by construction.** A held-out favourite is a film the person found anyway;
   the deep cut they would have loved and never heard of cannot be in it. E5 (the author on their own taste) is the
   test that can see that, which is why the spec calls it the real one.
