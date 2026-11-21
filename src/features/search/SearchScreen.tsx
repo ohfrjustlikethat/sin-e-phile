@@ -57,6 +57,18 @@ const WHY_NOTE: Partial<Record<Why, string>> = {
 };
 
 /**
+ * A person's work, when the query was their name (ADR-0057: "zendaya" found none of her films): what they did in
+ * it, by name.
+ */
+export function personNote(why: Why, person: string | null): string | undefined {
+  if (!person) return undefined;
+  if (why === "starring") return `With ${person}`;
+  if (why === "directed") return `Directed by ${person}`;
+  if (why === "written") return `Written by ${person}`;
+  return undefined;
+}
+
+/**
  * The order kinds appear in: films first because that is what most searches are for, then shows, then episodes.
  * An anime film is a film and an anime series a show: split, "anime about loneliness" put every live-action film
  * the engine ranked lower ahead of the anime films it ranked higher (seen in the release build).
@@ -73,7 +85,18 @@ const KIND_MARK: Record<string, string> = {
 };
 
 /** How well a result matched, best first: its exact title, its words, a near spelling, its meaning. */
-const TIER: Record<Why, number> = { exact_title: 0, both: 1, keyword: 1, filter: 1, fuzzy: 2, semantic: 3 };
+const TIER: Record<Why, number> = {
+  exact_title: 0,
+  // A person's work, ahead of words that merely matched: the engine put it there.
+  starring: 1,
+  directed: 1,
+  written: 1,
+  both: 2,
+  keyword: 2,
+  filter: 2,
+  fuzzy: 3,
+  semantic: 4,
+};
 
 /**
  * Films first among results that matched equally well; the engine's rank decides everything else (see above).
@@ -315,7 +338,7 @@ export function SearchScreen() {
                     year: hit.year ?? 0,
                     director: hit.made_by ?? "",
                     tag: KIND_MARK[hit.kind],
-                    note: WHY_NOTE[hit.why],
+                    note: personNote(hit.why, response?.person ?? null) ?? WHY_NOTE[hit.why],
                   }}
                   onOpen={() => open(hit.id)}
                 />

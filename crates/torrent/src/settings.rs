@@ -20,6 +20,8 @@ pub struct TorrentSettings {
     pub keep_seeding: bool,
     /// An adapter's friendly name. `None` uses whatever route the system picks.
     pub bind_interface: Option<String>,
+    /// The most streamed films may keep on disk, GB (ADR-0057: 20 unless chosen).
+    pub stream_cache_gib: u32,
 }
 
 impl Default for TorrentSettings {
@@ -30,6 +32,7 @@ impl Default for TorrentSettings {
             peer_limit: 128,
             keep_seeding: false,
             bind_interface: None,
+            stream_cache_gib: 20,
         }
     }
 }
@@ -62,6 +65,9 @@ impl TorrentSettings {
                 ));
             }
         }
+        if !(1..=2000).contains(&self.stream_cache_gib) {
+            return Err("the stream cache must be between 1 and 2000 GB".into());
+        }
         if let Some(name) = &self.bind_interface {
             if name.trim().is_empty() || name.len() > 256 {
                 return Err("that adapter name is not valid".into());
@@ -80,6 +86,7 @@ impl TorrentSettings {
             SeedingPolicy::StopAtCompletion
         };
         config.bind_interface = self.bind_interface.clone();
+        config.stream_cache_bytes = u64::from(self.stream_cache_gib) * 1024 * 1024 * 1024;
         config
     }
 }

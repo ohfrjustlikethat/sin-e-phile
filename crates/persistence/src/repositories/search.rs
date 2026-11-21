@@ -62,7 +62,24 @@ pub enum MatchReason {
     /// captioned every one of eleven correct results "matched words", which is not what
     /// happened and not why they are there.
     Filter,
+    /// The query named a person (ADR-0057), and this is their work: acted in it...
+    Starring,
+    /// ...directed or created it...
+    Directed,
+    /// ...or wrote it.
+    Written,
 }
+
+/// A credited person a query names ([`SearchRepository::person_named`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NamedPerson {
+    pub id: i64,
+    pub name: String,
+}
+
+/// A person whose work has fewer votes than this in all is not who a search for the name
+/// means: an obscure namesake must not take "drive" from the film.
+pub const PERSON_MIN_VOTES: i64 = 10_000;
 
 /// Column weights for `bm25()`.
 ///
@@ -159,6 +176,103 @@ impl<'a> SearchRepository<'a> {
     /// Uses `titles.normalised` from migration 0009, which already holds the folded
     /// form for every title variant — so this finds *Sen to Chihiro no Kamikakushi*
     /// when the user types it, not only the display title.
+    /// The credited person `text` names exactly, case and accents aside ("zendaya",
+    /// "timothee chalamet"), or `None` (ADR-0057: a search for Zendaya found none of her
+    /// films, because titles *named* "Zendaya" outranked films she is merely in). Found
+    /// through the index's people column, then the credits of what it matched; of several
+    /// people with the name, the one whose work is most voted, if it has
+    /// [`PERSON_MIN_VOTES`].
+    pub async fn person_named(&self, text: &str) -> Result<Option<NamedPerson>, DbError> {
+        let wanted = normalise_query(text);
+        let words: Vec<&str> = wanted.split(' ').filter(|w| !w.is_empty()).collect();
+        // A name is a few words; a sentence searched by meaning is not one, and this costs
+        // on every query (eval search: p95 17 to 38 ms when it read 400 titles' credits).
+        if words.is_empty() || words.len() > 4 {
+            return Ok(None);
+        }
+        // Words are letters and digits only after `normalise_query`: safe inside quotes.
+        let phrase = format!("people : \"{}\"", words.join(" "));
+        let ids: Vec<i64> = sqlx::query_scalar(
+            "SELECT rowid FROM search_index WHERE search_index MATCH ?1 LIMIT 50",
+        )
+        .bind(&phrase)
+        .fetch_all(self.db.pool())
+        .await?;
+        if ids.is_empty() {
+            return Ok(None);
+        }
+        let list = ids.iter().map(i64::to_string).collect::<Vec<_>>().join(",");
+        let credited: Vec<(i64, String)> = sqlx::query_as(&format!(
+            "SELECT DISTINCT p.id, p.name FROM credits c JOIN people p ON p.id = c.person_id
+              WHERE c.media_item_id IN ({list})
+                AND c.role IN ('actor', 'actress', 'director', 'creator', 'writer')"
+        ))
+        .fetch_all(self.db.pool())
+        .await?;
+        let named: Vec<(i64, String)> = credited
+            .into_iter()
+            .filter(|(_, name)| normalise_query(name) == wanted)
+            .collect();
+        if named.is_empty() {
+            return Ok(None);
+        }
+        let people = named
+            .iter()
+            .map(|(id, _)| id.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        let best: Option<(i64, i64)> = sqlx::query_as(&format!(
+            "SELECT c.person_id, SUM(COALESCE(m.rating_votes, 0)) AS votes
+               FROM credits c JOIN media_items m ON m.id = c.media_item_id
+              WHERE c.person_id IN ({people})
+              GROUP BY c.person_id ORDER BY votes DESC, c.person_id LIMIT 1"
+        ))
+        .fetch_optional(self.db.pool())
+        .await?;
+        Ok(best
+            .filter(|(_, votes)| *votes >= PERSON_MIN_VOTES)
+            .and_then(|(id, _)| named.into_iter().find(|(p, _)| *p == id))
+            .map(|(id, name)| NamedPerson { id, name }))
+    }
+
+    /// A person's films and shows, best known first: what they directed or created, wrote,
+    /// or acted in (not what they only produced or scored, never a single episode), each
+    /// saying which, the first of directed, written, acted.
+    pub async fn works_of(&self, person_id: i64, limit: i64) -> Result<Vec<Hit>, DbError> {
+        let rows: Vec<(i64, String, Option<i64>, String, i64)> = sqlx::query_as(
+            "SELECT m.id, m.primary_title, m.release_year, m.kind,
+                    MIN(CASE WHEN c.role IN ('director', 'creator') THEN 0
+                             WHEN c.role = 'writer' THEN 1 ELSE 2 END) AS how
+               FROM credits c JOIN media_items m ON m.id = c.media_item_id
+              WHERE c.person_id = ?1
+                AND c.role IN ('actor', 'actress', 'director', 'creator', 'writer')
+                AND m.kind IN ('film', 'anime_film', 'series', 'anime_series')
+                AND m.is_adult = 0
+              GROUP BY m.id
+              ORDER BY COALESCE(m.rating_votes, 0) DESC, m.id
+              LIMIT ?2",
+        )
+        .bind(person_id)
+        .bind(limit)
+        .fetch_all(self.db.pool())
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|(media_item_id, title, year, kind, how)| Hit {
+                media_item_id,
+                title,
+                year,
+                kind,
+                score: None,
+                why: match how {
+                    0 => MatchReason::Directed,
+                    1 => MatchReason::Written,
+                    _ => MatchReason::Starring,
+                },
+            })
+            .collect())
+    }
+
     pub async fn exact_title(&self, query: &str, limit: i64) -> Result<Vec<Hit>, DbError> {
         let normalised = normalise_query(query);
         if normalised.is_empty() {

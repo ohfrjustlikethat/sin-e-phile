@@ -3280,3 +3280,96 @@ async fn discovery_repository_surface() {
     assert!(!repo.undismiss(me, f[4]).await.unwrap());
     assert!(repo.dismissed(me).await.unwrap().is_empty());
 }
+
+/// `SearchRepository::person_named` and `works_of` (ADR-0057), on a database of their own:
+/// the shared one above counts its searchable titles.
+#[tokio::test]
+async fn search_person_surface() {
+    let db = Db::in_memory().await.expect("open");
+    let media = MediaRepository::new(&db);
+    let search = SearchRepository::new(&db);
+    let probe = media
+        .insert(&NewMediaItem::film("Probe Title", 1970))
+        .await
+        .unwrap();
+    // person_named / works_of (ADR-0057: a search for Zendaya found none of her films) —
+    // a person named exactly, case and accents aside, and their work best known first
+    let mut known = NewMediaItem::film("Known Film", 2021);
+    known.rating_votes = Some(900_000);
+    let known = media.insert(&known).await.unwrap();
+    let mut show = NewMediaItem::film("Known Show", 2019);
+    show.kind = Some(MediaKind::Series);
+    show.rating_votes = Some(300_000);
+    let show = media.insert(&show).await.unwrap();
+    let mut chat = NewMediaItem::film("A Talk Show", 2015);
+    chat.kind = Some(MediaKind::Series);
+    chat.rating_votes = Some(5_000_000);
+    let chat = media.insert(&chat).await.unwrap();
+    for (id, name) in [(9001, "Timothée Chalamet"), (9002, "Timothée Chalamet")] {
+        sqlx::query("INSERT INTO people (id, name) VALUES (?, ?)")
+            .bind(id)
+            .bind(name)
+            .execute(db.pool())
+            .await
+            .unwrap();
+    }
+    for (item, person, role) in [
+        (known, 9001, "actor"),
+        (show, 9001, "director"),
+        (chat, 9001, "producer"),
+        (probe, 9002, "actor"),
+    ] {
+        sqlx::query(
+            "INSERT INTO credits (media_item_id, person_id, role, billing) VALUES (?, ?, ?, 1)",
+        )
+        .bind(item)
+        .bind(person)
+        .bind(role)
+        .execute(db.pool())
+        .await
+        .unwrap();
+    }
+    for (item, title) in [
+        (known, "Known Film"),
+        (show, "Known Show"),
+        (chat, "A Talk Show"),
+    ] {
+        search
+            .index_item(item, title, "", "Timothée Chalamet", "drama")
+            .await
+            .unwrap();
+    }
+    search
+        .index_item(
+            probe,
+            "Probe Title",
+            "Alt Probe",
+            "A Person Timothée Chalamet",
+            "drama",
+        )
+        .await
+        .unwrap();
+    let person = search
+        .person_named("timothee chalamet")
+        .await
+        .expect("person_named")
+        .expect("named, without the accent");
+    assert_eq!(person.id, 9001, "of two with the name, the better known");
+    assert!(
+        search.person_named("timothee").await.unwrap().is_none(),
+        "a whole name only"
+    );
+    assert!(search.person_named("probe title").await.unwrap().is_none());
+    let works = search.works_of(person.id, 10).await.expect("works_of");
+    assert_eq!(
+        works
+            .iter()
+            .map(|h| (h.media_item_id, h.why))
+            .collect::<Vec<_>>(),
+        vec![
+            (known, MatchReason::Starring),
+            (show, MatchReason::Directed)
+        ],
+        "best known first; directing, writing and acting only, never producing"
+    );
+}

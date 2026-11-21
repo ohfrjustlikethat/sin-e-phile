@@ -13,6 +13,12 @@
     "note": "Builds on Phase 18's discovery engine and ratings (ADR-0056). Receives Phase 5 E3 and E4 (search by meaning, carried a third time at Phase 18's close; 19.1). Ends a tier: the understanding gate fires at its close, and the author signs off the screenshot set; the author checks batched for this sign-off since Phase 17 (Phase 7 E7, Phase 14 E4 and E6) are asked with it.",
     "subtasks": [
       {
+        "id": "19.0",
+        "text": "The author's request before the phase (ADR-0057, spec 4.10.0): 524 GB of streams deleted and the session cleared of them; streaming fetches only the watched file; a 20 GB stream cache, least recently watched out first (Downloads page setting); target/ cleaned (325 GiB) and kept small by Cargo profiles with a doctor warning; scratch copies deleted (C: 1,028 GB free); a search that is a person's name shows their films (zendaya, timothee chalamet, christopher nolan).",
+        "status": "in_progress",
+        "commit": null
+      },
+      {
         "id": "19.1",
         "text": "Phase 5 E3 and E4, carried a third time: search by meaning that understands what a query is NOT ('films about grief that aren't depressing'). Split a negated clause ('that aren't', 'but not', 'without', 'not too'), embed it apart, and push down results close to it, chosen on fixtures/search/meaning-tuning.tsv first and judged once on the eight (crates/search-engine/src/lib.rs); the grief and Wong Kar-wai screenshots for docs/case-study/search.md.",
         "status": "not_started",
@@ -2280,6 +2286,12 @@
         }
       ],
       "subtasks": [
+        {
+          "id": "19.0",
+          "text": "The author's request before the phase (ADR-0057, spec 4.10.0): 524 GB of streams deleted and the session cleared of them; streaming fetches only the watched file; a 20 GB stream cache, least recently watched out first (Downloads page setting); target/ cleaned (325 GiB) and kept small by Cargo profiles with a doctor warning; scratch copies deleted (C: 1,028 GB free); a search that is a person's name shows their films (zendaya, timothee chalamet, christopher nolan).",
+          "status": "in_progress",
+          "commit": null
+        },
         {
           "id": "19.1",
           "text": "Phase 5 E3 and E4, carried a third time: search by meaning that understands what a query is NOT ('films about grief that aren't depressing'). Split a negated clause ('that aren't', 'but not', 'without', 'not too'), embed it apart, and push down results close to it, chosen on fixtures/search/meaning-tuning.tsv first and judged once on the eight (crates/search-engine/src/lib.rs); the grief and Wong Kar-wai screenshots for docs/case-study/search.md.",

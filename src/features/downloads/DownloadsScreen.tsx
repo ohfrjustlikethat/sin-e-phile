@@ -333,7 +333,45 @@ export function Settings() {
     <section aria-label="Download settings" className="mt-16 max-w-xl">
       <h2 className="label mb-5 border-t border-line-strong pt-3">Settings</h2>
       {view.data ? <SettingsForm initial={view.data} /> : <p className="text-sm text-ink-muted">Reading settings…</p>}
+      <StreamCache />
     </section>
+  );
+}
+
+const CACHE = ["stream-cache"];
+const CACHE_SIZES = [5, 10, 20, 50, 100];
+
+/**
+ * The stream cache (ADR-0057, the author's answers after 524 GB of streams were found kept): what streaming may
+ * keep on disk, the least recently watched deleted first past it. Saved at once; downloads are never part of it.
+ */
+export function StreamCache() {
+  const client = useQueryClient();
+  const view = useQuery({ queryKey: CACHE, queryFn: () => ok(commands.streamCache()) });
+  const set = useMutation({
+    mutationFn: (gib: number) => ok(commands.setStreamCache(gib)),
+    onSettled: () => void client.invalidateQueries({ queryKey: CACHE }),
+  });
+  if (!view.data) return null;
+  const gib = view.data.gib;
+  const choices = CACHE_SIZES.includes(gib) ? CACHE_SIZES : [...CACHE_SIZES, gib].sort((a, b) => a - b);
+  return (
+    <div className="mt-8 flex flex-col gap-2">
+      <div className="max-w-[260px]">
+        <Select
+          label="Streamed films kept, at most"
+          options={choices.map((n) => ({ value: String(n), label: `${n} GB` }))}
+          value={String(gib)}
+          onChange={(e) => set.mutate(Number(e.target.value))}
+        />
+      </div>
+      <p className="text-[11px] leading-relaxed text-ink-faint">
+        What you stream stays for a while, so resuming is instant; past this, the least recently watched is deleted.
+        Downloads are never deleted this way.
+        {view.data.used_bytes !== null && ` Streams hold ${size(view.data.used_bytes)} now.`}
+      </p>
+      {set.isError && <p className="text-xs text-danger">{set.error.message}</p>}
+    </div>
   );
 }
 

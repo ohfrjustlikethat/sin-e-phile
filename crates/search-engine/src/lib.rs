@@ -96,6 +96,8 @@ pub struct Semantic {
 pub struct Engine {
     semantic: Option<Semantic>,
     popularity: f64,
+    /// The person the last search named, when it did (ADR-0057).
+    person: Option<String>,
 }
 
 impl Engine {
@@ -104,13 +106,20 @@ impl Engine {
         Self {
             semantic: None,
             popularity: POPULARITY_PRIOR,
+            person: None,
         }
+    }
+
+    /// The person the last search named, by their credited name: "With Zendaya".
+    pub fn person(&self) -> Option<&str> {
+        self.person.as_deref()
     }
 
     pub fn hybrid(semantic: Semantic) -> Self {
         Self {
             semantic: Some(semantic),
             popularity: POPULARITY_PRIOR,
+            person: None,
         }
     }
 
@@ -215,6 +224,40 @@ impl Engine {
                 }
             }
             return Ok(results);
+        }
+
+        // A PERSON'S NAME (ADR-0057). Their films and shows, best known first, before the
+        // text tiers: in those, titles *named* after a person outrank what they are in, and
+        // a search for Zendaya found none of her films. Exact titles stay above.
+        self.person = None;
+        if let Some(person) = search.person_named(text).await? {
+            let mut works = search.works_of(person.id, limit).await?;
+            if parsed.has_filters() {
+                let candidates: Vec<i64> = works.iter().map(|h| h.media_item_id).collect();
+                let admitted = search
+                    .admitted(
+                        &candidates,
+                        parsed.years,
+                        under,
+                        over,
+                        parsed.director.as_deref(),
+                    )
+                    .await?;
+                works.retain(|h| admitted.contains(&h.media_item_id));
+            }
+            if !works.is_empty() {
+                self.person = Some(person.name);
+            }
+            for hit in works {
+                if seen.contains(&hit.media_item_id) {
+                    continue;
+                }
+                seen.push(hit.media_item_id);
+                results.push(hit);
+                if results.len() as i64 >= limit {
+                    return Ok(results);
+                }
+            }
         }
 
         // TIER 2. Both halves, as deep as CANDIDATES, then fused by position.

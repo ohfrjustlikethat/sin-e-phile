@@ -9,7 +9,7 @@ import { useUi } from "@/lib/store";
 const ok = <T,>(data: T) => Promise.resolve({ status: "ok" as const, data });
 
 const EMPTY: SearchResponse = {
-  hits: [], searchable_titles: 900_000, catalogue_partial: false, semantic: true, ready: true,
+  hits: [], searchable_titles: 900_000, catalogue_partial: false, semantic: true, ready: true, person: null,
 };
 const FOUND: SearchResponse = {
   ...EMPTY,
@@ -29,7 +29,7 @@ const commands = {
   recordSignal: vi.fn(() => ok(null)),
 };
 vi.mock("@/lib/ipc", () => ({ commands }));
-const { SearchScreen, filmsFirst } = await import("./SearchScreen");
+const { SearchScreen, filmsFirst, personNote } = await import("./SearchScreen");
 
 function render(ui: React.ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -171,3 +171,39 @@ describe("SearchScreen backfill", () => {
     }
   });
 });
+
+/** ADR-0057, the author: "i searched zendaya and it did not display a single movie of hers". */
+describe("a person's name", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("shows their work, each card saying what they did in it", async () => {
+    commands.search.mockReturnValue(
+      ok({
+        ...EMPTY,
+        person: "Zendaya",
+        hits: [hit(1, "Dune: Part Two", "film", "starring"), hit(2, "Euphoria", "series", "starring")],
+      }),
+    );
+    useUi.setState({ searchQuery: "zendaya" });
+    render(<SearchScreen />);
+    expect(await screen.findByText("Dune: Part Two")).toBeInTheDocument();
+    expect(screen.getAllByText("With Zendaya")).toHaveLength(2);
+  });
+
+  it("says directed and written too, and nothing without a person", () => {
+    expect(personNote("directed", "Christopher Nolan")).toBe("Directed by Christopher Nolan");
+    expect(personNote("written", "Charlie Kaufman")).toBe("Written by Charlie Kaufman");
+    expect(personNote("keyword", "Zendaya")).toBeUndefined();
+    expect(personNote("starring", null)).toBeUndefined();
+  });
+
+  it("puts a person's work after an exact title and before words that merely matched", () => {
+    const order = filmsFirst([
+      hit(1, "Zendaya Talks", "film", "keyword"),
+      hit(2, "Challengers", "film", "starring"),
+      hit(3, "Zendaya", "series", "exact_title"),
+    ]).map((h) => h.id);
+    expect(order).toEqual([3, 2, 1]);
+  });
+});
+

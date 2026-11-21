@@ -25,6 +25,59 @@ pub struct TorrentSettingsView {
     pub engine_running: bool,
 }
 
+/// The stream cache (ADR-0057): the most streamed films keep on disk, and what they hold.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct StreamCacheView {
+    pub gib: u32,
+    /// What streams hold now; `None` while the torrent engine has not started.
+    pub used_bytes: Option<f64>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn stream_cache(state: State<'_, AppState>) -> Result<StreamCacheView, String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let stored = ProfileRepository::new(&db)
+        .setting(SETTINGS_KEY)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(StreamCacheView {
+        gib: TorrentSettings::parse(stored.as_deref()).stream_cache_gib,
+        used_bytes: state
+            .torrent_if_started()
+            .map(|rt| rt.engine.stream_bytes() as f64),
+    })
+}
+
+/// Change the cap: kept with the other torrent settings, applied at once, and the cache
+/// brought within it (never the stream playing).
+#[tauri::command]
+#[specta::specta]
+pub async fn set_stream_cache(state: State<'_, AppState>, gib: u32) -> Result<(), String> {
+    let db = state.db().ok_or("the library is still opening")?;
+    let profiles = ProfileRepository::new(&db);
+    let stored = profiles
+        .setting(SETTINGS_KEY)
+        .await
+        .map_err(|e| e.to_string())?;
+    let mut s = TorrentSettings::parse(stored.as_deref());
+    s.stream_cache_gib = gib;
+    s.validate()?;
+    profiles
+        .set_setting(SETTINGS_KEY, &s.to_json())
+        .await
+        .map_err(|e| e.to_string())?;
+    if let Some(rt) = state.torrent_if_started() {
+        rt.engine
+            .set_stream_cap(u64::from(gib) * 1024 * 1024 * 1024);
+        rt.engine
+            .trim_streams(&[], false)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct AdapterView {
     pub name: String,
@@ -68,12 +121,18 @@ pub async fn set_torrent_settings(
     bind_interface: Option<String>,
 ) -> Result<(), String> {
     let db = state.db().ok_or("the library is still opening")?;
+    let stored = ProfileRepository::new(&db)
+        .setting(SETTINGS_KEY)
+        .await
+        .map_err(|e| e.to_string())?;
     let s = TorrentSettings {
         download_limit_kib,
         upload_limit_kib,
         peer_limit,
         keep_seeding,
         bind_interface: bind_interface.filter(|n| !n.trim().is_empty()),
+        // Set on the Downloads page, not here: kept as it is.
+        stream_cache_gib: TorrentSettings::parse(stored.as_deref()).stream_cache_gib,
     };
     s.validate()?;
     ProfileRepository::new(&db)

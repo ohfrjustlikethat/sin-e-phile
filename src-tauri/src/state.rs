@@ -185,16 +185,32 @@ impl AppState {
                 let settings =
                     sinephile_torrent::settings::TorrentSettings::parse(stored.as_deref());
                 let config = settings.apply(sinephile_torrent::EngineConfig::new(dir));
-                let engine = sinephile_torrent::Engine::start(config)
-                    .await
-                    .map_err(|e| e.to_string())?;
+                let engine = Arc::new(
+                    sinephile_torrent::Engine::start(config)
+                        .await
+                        .map_err(|e| e.to_string())?,
+                );
+                // The stream cache to its cap, and what nothing streams from cleared, before
+                // any stream opens (ADR-0057).
+                let trimming = engine.clone();
+                tauri::async_runtime::spawn(async move {
+                    match trimming.trim_streams(&[], true).await {
+                        Ok(gone) if !gone.is_empty() => {
+                            tracing::info!(
+                                removed = gone.len(),
+                                "the stream cache trimmed at start"
+                            )
+                        }
+                        Ok(_) => {}
+                        Err(error) => {
+                            tracing::warn!(%error, "the stream cache could not be trimmed")
+                        }
+                    }
+                });
                 let server = sinephile_torrent::StreamServer::start()
                     .await
                     .map_err(|e| e.to_string())?;
-                Ok(Arc::new(TorrentRuntime {
-                    engine: Arc::new(engine),
-                    server,
-                }))
+                Ok(Arc::new(TorrentRuntime { engine, server }))
             })
             .await
             .cloned()

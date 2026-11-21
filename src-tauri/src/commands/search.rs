@@ -59,6 +59,12 @@ pub enum Why {
     Both,
     /// Retrieved because it satisfies a filter the query asked for.
     Filter,
+    /// The query named a person, who acts in it (ADR-0057).
+    Starring,
+    /// The query named a person, who directed or created it.
+    Directed,
+    /// The query named a person, who wrote it.
+    Written,
 }
 
 impl From<MatchReason> for Why {
@@ -70,6 +76,9 @@ impl From<MatchReason> for Why {
             MatchReason::Semantic => Why::Semantic,
             MatchReason::Both => Why::Both,
             MatchReason::Filter => Why::Filter,
+            MatchReason::Starring => Why::Starring,
+            MatchReason::Directed => Why::Directed,
+            MatchReason::Written => Why::Written,
         }
     }
 }
@@ -96,6 +105,9 @@ pub struct SearchResponse {
     /// Not ready yet — the database or the model is still loading. Distinct from
     /// "found nothing", and the two must never render the same.
     pub ready: bool,
+    /// The person the query named, by their credited name, when it named one (ADR-0057):
+    /// their work is first, each card saying "With …" or "Directed by …".
+    pub person: Option<String>,
 }
 
 impl SearchResponse {
@@ -106,6 +118,7 @@ impl SearchResponse {
             catalogue_partial: true,
             semantic: false,
             ready: false,
+            person: None,
         }
     }
 }
@@ -175,5 +188,6 @@ pub async fn search(
         catalogue_partial: readiness.is_partial(),
         semantic: engine.is_hybrid(),
         ready: true,
+        person: engine.person().map(str::to_string),
     })
 }

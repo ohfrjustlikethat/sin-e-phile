@@ -2781,3 +2781,27 @@ companion, never the published graph. **Spec amendments:** A44 (4.7.1), recorded
   a timing.
 - **Next time**: time every user-facing action against a budget when it is built; walk the acceptance test through the
   release build before asking the author to; look at the real window before tuning a metric on it.
+
+## 2026-11-21 (evening) — Before Phase 19: disk use and person search (ADR-0057)
+
+- **The author**: the app took "a disgusting amount of space"; and "i searched zendaya and it did not display a single
+  movie of hers". Measured first, asked four questions (all answers in ADR-0057, SPEC A47, memory).
+- **Found**: the installed app's `data/torrents` held 524 GB of streams (43 torrents; one episode streamed fetched the
+  whole pack, and nothing removed a stream); the repo's `target/` 295 GB (dependency debug info in 129 test binaries,
+  and incremental caches); 40 GB of scratch copies in Temp.
+- **Done**: the streams deleted and removed from the torrent session (else librqbit fetches them again at the next
+  start); `cargo clean` (325 GiB), stale build folders, old model files, scratch copies; the newer dev database (with
+  regions) kept as the project's. C: went from about 157 GB free to 1,028 GB. The author's Downloads untouched.
+- **Built**: streaming narrows a torrent to the watched file; a stream cache of 20 GB (a setting on the Downloads page),
+  least recently watched out first, never the stream opened last; Cargo profiles that keep `target/` small and a doctor
+  warning past 60 GB; person search (zendaya, timothee chalamet without the accent, christopher nolan), after exact
+  titles, p95 20.8 ms (the first version cost 21 ms a query and was cut down).
+- **Seen to fail first**: the doctor at 295 GB; the stream fetching the sample too (14.7 MB for a 12.6 MB film); person
+  matching without the fold.
+- **Open**: one front-end test failed once while the Rust suite was running in parallel and passed nine runs since; not
+  identified. Recorded, watched in CI.
+- **Mistakes caught**: an unmeasured "free before" figure (corrected to what was measured); wrong file:line references
+  in the learning note (corrected); a fake 40-hex id in a test (the guard refused it).
+- **Decisions**: the stream opened last counts as playing (there is no stop signal); orphans deleted only at start; the
+  person lookup only for queries of four words or fewer, from 50 titles. **Spec amendments**: A47 (4.10.0).
+

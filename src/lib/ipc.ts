@@ -232,6 +232,12 @@ export const commands = {
 	 *  remove it).
 	 */
 	inContinueWatching: (id: number) => typedError<boolean, string>(__TAURI_INVOKE("in_continue_watching", { id })),
+	streamCache: () => typedError<StreamCacheView, string>(__TAURI_INVOKE("stream_cache")),
+	/**
+	 *  Change the cap: kept with the other torrent settings, applied at once, and the cache
+	 *  brought within it (never the stream playing).
+	 */
+	setStreamCache: (gib: number) => typedError<null, string>(__TAURI_INVOKE("set_stream_cache", { gib })),
 	subtitleSettings: () => typedError<SubtitleSettingsView, string>(__TAURI_INVOKE("subtitle_settings")),
 	setSubtitleSettings: (settings: SubtitleSettings) => typedError<null, string>(__TAURI_INVOKE("set_subtitle_settings", { settings })),
 	setOpensubtitlesKey: (key: string) => typedError<null, string>(__TAURI_INVOKE("set_opensubtitles_key", { key })),
@@ -1040,6 +1046,11 @@ export type SearchResponse = {
 	 *  "found nothing", and the two must never render the same.
 	 */
 	ready: boolean,
+	/**
+	 *  The person the query named, by their credited name, when it named one (ADR-0057):
+	 *  their work is first, each card saying "With …" or "Directed by …".
+	 */
+	person: string | null,
 };
 
 /**  One rated season. */
@@ -1174,6 +1185,13 @@ export type StoredView = {
 	bytes: number | null,
 	age_days: number | null,
 	watched: boolean,
+};
+
+/**  The stream cache (ADR-0057): the most streamed films keep on disk, and what they hold. */
+export type StreamCacheView = {
+	gib: number,
+	/**  What streams hold now; `None` while the torrent engine has not started. */
+	used_bytes: number | null,
 };
 
 export type SubtitleOfferView = {
@@ -1368,7 +1386,13 @@ export type Why =
 /**  Both halves found it — the strongest signal the engine has. */
 "both" | 
 /**  Retrieved because it satisfies a filter the query asked for. */
-"filter";
+"filter" | 
+/**  The query named a person, who acts in it (ADR-0057). */
+"starring" | 
+/**  The query named a person, who directed or created it. */
+"directed" | 
+/**  The query named a person, who wrote it. */
+"written";
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

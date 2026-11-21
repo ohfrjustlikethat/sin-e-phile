@@ -4,7 +4,7 @@
 > `python tools/state/validate_state.py --progress` (`SPEC.md` §10.1, so the two
 > can never disagree). Edit the state file, then regenerate.
 
-**Spec version 4.9.0** · 21 session(s) completed · last updated 2026-11-19
+**Spec version 4.10.0** · 21 session(s) completed · last updated 2026-11-19
 
 ---
 
@@ -16,8 +16,9 @@
 
 > Builds on Phase 18's discovery engine and ratings (ADR-0056). Receives Phase 5 E3 and E4 (search by meaning, carried a third time at Phase 18's close; 19.1). Ends a tier: the understanding gate fires at its close, and the author signs off the screenshot set; the author checks batched for this sign-off since Phase 17 (Phase 7 E7, Phase 14 E4 and E6) are asked with it.
 
-### Subtasks — 0/9 complete
+### Subtasks — 0/10 complete
 
+- [~] **19.0** The author's request before the phase (ADR-0057, spec 4.10.0): 524 GB of streams deleted and the session cleared of them; streaming fetches only the watched file; a 20 GB stream cache, least recently watched out first (Downloads page setting); target/ cleaned (325 GiB) and kept small by Cargo profiles with a doctor warning; scratch copies deleted (C: 1,028 GB free); a search that is a person's name shows their films (zendaya, timothee chalamet, christopher nolan).
 - [ ] **19.1** Phase 5 E3 and E4, carried a third time: search by meaning that understands what a query is NOT ('films about grief that aren't depressing'). Split a negated clause ('that aren't', 'but not', 'without', 'not too'), embed it apart, and push down results close to it, chosen on fixtures/search/meaning-tuning.tsv first and judged once on the eight (crates/search-engine/src/lib.rs); the grief and Wong Kar-wai screenshots for docs/case-study/search.md.
 - [ ] **19.2** Mockups before code (ADR-0023): static HTML with real catalogue data in docs/design/mockups/, two interpretations of the masthead, Home, Films and a detail page, each with no artwork first and with artwork second; the author chooses, and the taste calls (I76 tinted cards, I77 true black, I78 hidden tabs) are settled there.
 - [ ] **19.3** Home: Continue watching first (its removal built in Phase 18), then the discovery engine's rails ordered by predicted engagement, an optional hero, and the TV billboard (the focused film's backdrop with a TMDB key, the designed tint without, cross-fading under 300 ms at 60 fps); Home in under 800 ms on Tier 0 with 20 rails (E1, E9).

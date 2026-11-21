@@ -93,6 +93,8 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::ratings::skip_rating,
             commands::ratings::remove_from_continue,
             commands::ratings::in_continue_watching,
+            commands::torrent::stream_cache,
+            commands::torrent::set_stream_cache,
             commands::subtitles::subtitle_settings,
             commands::subtitles::set_subtitle_settings,
             commands::subtitles::set_opensubtitles_key,

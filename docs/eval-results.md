@@ -3777,3 +3777,44 @@ What 18.6 and 18.7 touched that earlier harnesses measure, run again on the scra
 | Search (Phase 5 E1, E2, E3) | as recorded in 18.4 | no search code changed since |
 
 Nothing regressed. The full workspace suite: 960 passed; the front end: 294.
+
+## Between Phases 18 and 19 — disk use and searching a person (ADR-0057, 2026-11-21)
+
+### Disk, measured before and after (`du -sh`)
+
+| Where | Before | After |
+|---|---|---|
+| The installed app's `data/torrents` (streamed, not downloaded: 43 torrents) | 524 GB | 0 (and their 43 session entries removed) |
+| The repository's `target/` (`cargo clean`: 343,106 files) | 295 GB (325 GiB) | rebuilt lean on demand |
+| `src-tauri/target` (stale), the spikes' build output | 6.5 GB, 4.4 GB | 0 |
+| Stale data (the previous model's files, a backup of the meaning file) | 0.7 GB | 0 |
+| Scratch copies of data in Temp | 40 GB | 2 MB |
+| **Free on C:** | about 157 GB (not measured: 681 GB measured once the streams were gone, less their 524) | **1,028 GB** |
+
+The author's Downloads (11 GB) were not touched. `tools/doctor` now warns when `target/` passes 60 GB: seen to fail at
+295 GB before the clean, 0.0 GB after.
+
+### Streaming fetches only the watched file (`cargo test -p sinephile-torrent --test swarm`)
+
+`streaming_fetches_only_the_file_watched`: a three-file torrent (a 12 MB film, a 2 MB sample, a readme) streamed by its
+film fetched **at most the film plus 1 MB**; without the fix it fetched 14,693,309 bytes for the 12,595,257-byte film
+(seen to fail). `the_stream_cache_keeps_to_its_cap_and_clears_what_nothing_owns`: over a 1 MB cap the stream playing is
+kept and a stray folder removed; not playing, it is removed with its file. The cache's order (`cache::evictions`, unit
+tests): least recently watched first, never what plays, a stream never recorded first.
+
+### Person search (`eval search --query`, the full catalogue)
+
+| Query | Top results now |
+|---|---|
+| zendaya | Zendaya (a series of that exact name), then Dune: Part One, Spider-Man: No Way Home, Spider-Man: Homecoming, Dune: Part Two, Spider-Man: Far from Home (Starring) |
+| timothee chalamet (no accent) | Interstellar, Dune: Part One, Dune: Part Two, Don't Look Up, Lady Bird, Call Me by Your Name |
+| christopher nolan | The Dark Knight, Inception, Interstellar, The Dark Knight Rises, Batman Begins, The Prestige (Directed) |
+| tom hanks | Forrest Gump, Saving Private Ryan, The Green Mile |
+| drive / heat (titles) | Drive (2011) / Heat (1995) first, unchanged |
+
+Before: "zendaya" returned none of her films (titles and episodes *named* Zendaya outranked them in the text tier).
+
+**The Phase 5 harness, regression** (`eval search --report`): E2 exact titles **43/43**; E3 filter 1.0000, known-item MRR
+1.0000, meaning queries unchanged; **E1 p95 20.8 ms** (17.2 ms without the person lookup; the first version read 400
+titles' credits per query and took p95 to 38.8 ms, so it now reads 50 and only for queries of four words or fewer).
+

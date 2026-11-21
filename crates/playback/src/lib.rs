@@ -159,7 +159,21 @@ pub async fn resolved(
         (PlayableStream::Torrent { .. }, None) => {
             return Err("a torrent, but the torrent engine is not running".into())
         }
-        (_, Some((engine, server))) => target(engine, server, &stream, Wanted::default()).await,
+        (_, Some((engine, server))) => {
+            let opened = target(engine, server, &stream, Wanted::default()).await;
+            // A stream just opened: the cache keeps to its cap, never removing this one
+            // (ADR-0057).
+            if let (Ok(_), PlayableStream::Torrent { info_hash, .. }) = (&opened, &stream) {
+                let engine = engine.clone();
+                let playing = vec![info_hash.to_ascii_lowercase()];
+                tokio::spawn(async move {
+                    if let Err(error) = engine.trim_streams(&playing, false).await {
+                        tracing::warn!(%error, "the stream cache could not be trimmed");
+                    }
+                });
+            }
+            opened
+        }
         (PlayableStream::Http { url, .. }, None) => Ok(Target::Url(url.clone())),
         (PlayableStream::File { path }, None) => Ok(Target::File(path.into())),
     };

@@ -72,6 +72,8 @@ pub struct EngineConfig {
     /// How long to wait for a magnet's metadata, or a stream's first peer, before
     /// saying the swarm is dead.
     pub dead_swarm_after: Duration,
+    /// The most streamed torrents may hold on disk (ADR-0057; `cache`).
+    pub stream_cache_bytes: u64,
 }
 
 impl EngineConfig {
@@ -89,6 +91,7 @@ impl EngineConfig {
             seeding: SeedingPolicy::StopAtCompletion,
             bind_interface: None,
             dead_swarm_after: Duration::from_secs(30),
+            stream_cache_bytes: crate::cache::DEFAULT_CAP_BYTES,
         }
     }
 
@@ -183,6 +186,20 @@ pub struct Engine {
     session: Arc<Session>,
     config: EngineConfig,
     watcher: tokio::task::JoinHandle<()>,
+    /// The stream cache's cap, changeable while running (Settings).
+    stream_cap: std::sync::atomic::AtomicU64,
+    /// One writer of `stream-cache.json` at a time.
+    cache_file: std::sync::Mutex<()>,
+    /// The stream opened last: taken to be the one playing, so the cache never removes it.
+    last_opened: std::sync::Mutex<Option<String>>,
+}
+
+/// What [`Engine::add_new`] did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Added {
+    pub id: String,
+    /// The engine held it already (a download, or a stream started earlier).
+    pub already: bool,
 }
 
 impl Engine {
@@ -239,9 +256,150 @@ impl Engine {
         let watcher = tokio::spawn(watch_completion(session.clone(), config.seeding));
         Ok(Self {
             session,
+            stream_cap: std::sync::atomic::AtomicU64::new(config.stream_cache_bytes),
             config,
             watcher,
+            cache_file: std::sync::Mutex::new(()),
+            last_opened: std::sync::Mutex::new(None),
         })
+    }
+
+    /// What the streamed torrents hold on disk now.
+    pub fn stream_bytes(&self) -> u64 {
+        let folder = self.config.downloads_dir();
+        self.session.with_torrents(|it| {
+            it.filter(|(_, h)| h.output_folder().starts_with(&folder))
+                .map(|(_, h)| h.stats().progress_bytes)
+                .sum()
+        })
+    }
+
+    /// Change the stream cache's cap while running (Settings).
+    pub fn set_stream_cap(&self, bytes: u64) {
+        self.stream_cap
+            .store(bytes, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub fn stream_cap(&self) -> u64 {
+        self.stream_cap.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Whether a torrent is a stream's: in the engine's own folder. A download is moved to
+    /// the downloads folder when it is asked for (`sinephile_downloads::Rqbit::add`), so
+    /// nothing here is ever a download.
+    pub fn is_stream(&self, id: &str) -> bool {
+        self.handle(id)
+            .map(|h| h.output_folder().starts_with(self.config.downloads_dir()))
+            .unwrap_or(false)
+    }
+
+    /// Fetch only these files of a torrent (ADR-0057: streaming one episode added the whole
+    /// torrent, and a 95 GB collection was fetched in the background for one film).
+    pub async fn select_files(&self, id: &str, files: &[usize]) -> Result<(), TorrentError> {
+        let h = self.handle(id)?;
+        let set: std::collections::HashSet<usize> = files.iter().copied().collect();
+        self.session
+            .update_only_files(&h, &set)
+            .await
+            .map_err(engine_err)
+    }
+
+    /// Record that a stream was opened now, for the cache's "least recently watched".
+    pub fn touch_stream(&self, id: &str) {
+        if let Ok(mut last) = self.last_opened.lock() {
+            *last = Some(id.to_ascii_lowercase());
+        }
+        let _one = self.cache_file.lock();
+        let dir = self.config.session_dir();
+        let mut seen = crate::cache::LastUsed::load(&dir);
+        seen.0.insert(id.to_ascii_lowercase(), crate::cache::now());
+        if let Err(error) = seen.save(&dir) {
+            tracing::warn!(%error, "the stream cache's record could not be written");
+        }
+    }
+
+    /// Bring the streamed torrents within the cap: the least recently watched are deleted,
+    /// files and all, never one in `playing`. With `orphans`, also deletes whatever is in
+    /// the engine's folder that no held torrent owns (streams kept before the cache existed,
+    /// or left by a removal that could not finish); only at start, before any stream opens.
+    /// Returns the ids removed.
+    pub async fn trim_streams(
+        &self,
+        playing: &[String],
+        orphans: bool,
+    ) -> Result<Vec<String>, TorrentError> {
+        let folder = self.config.downloads_dir();
+        let streams: Vec<(String, u64, Vec<PathBuf>)> = self.session.with_torrents(|it| {
+            it.filter(|(_, h)| h.output_folder().starts_with(&folder))
+                .map(|(_, h)| {
+                    let owned = h
+                        .with_metadata(|m| {
+                            m.file_infos
+                                .iter()
+                                .map(|f| h.output_folder().join(&f.relative_filename))
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+                    (
+                        h.info_hash().as_string(),
+                        h.stats().progress_bytes,
+                        std::iter::once(h.output_folder().to_path_buf())
+                            .chain(owned)
+                            .collect(),
+                    )
+                })
+                .collect()
+        });
+        let seen = {
+            let _one = self.cache_file.lock();
+            crate::cache::LastUsed::load(&self.config.session_dir())
+        };
+        let entries: Vec<crate::cache::Entry> = streams
+            .iter()
+            .map(|(id, bytes, _)| crate::cache::Entry {
+                id: id.clone(),
+                bytes: *bytes,
+                last_used: seen.0.get(id).copied().unwrap_or(0),
+            })
+            .collect();
+        let mut keep: Vec<String> = playing.to_vec();
+        if let Some(last) = self.last_opened.lock().ok().and_then(|l| l.clone()) {
+            keep.push(last);
+        }
+        let gone = crate::cache::evictions(&entries, self.stream_cap(), &keep);
+        for id in &gone {
+            tracing::info!(id, "the stream cache is over its cap; removed");
+            self.remove(id, true).await?;
+        }
+        {
+            let _one = self.cache_file.lock();
+            let mut seen = crate::cache::LastUsed::load(&self.config.session_dir());
+            seen.0
+                .retain(|id, _| streams.iter().any(|(s, ..)| s == id) && !gone.contains(id));
+            let _ = seen.save(&self.config.session_dir());
+        }
+        if orphans {
+            let kept: Vec<&PathBuf> = streams
+                .iter()
+                .filter(|(id, ..)| !gone.contains(id))
+                .flat_map(|(_, _, paths)| paths.iter())
+                .collect();
+            if let Ok(entries) = std::fs::read_dir(&folder) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    let owned = kept.iter().any(|k| k.starts_with(&path) && **k != folder);
+                    if !owned {
+                        tracing::info!(path = %path.display(), "nothing streams from this; removed");
+                        let _ = if path.is_dir() {
+                            std::fs::remove_dir_all(&path)
+                        } else {
+                            std::fs::remove_file(&path)
+                        };
+                    }
+                }
+            }
+        }
+        Ok(gone)
     }
 
     pub fn config(&self) -> &EngineConfig {
@@ -262,14 +420,20 @@ impl Engine {
     /// Add a torrent and wait until it is live. A magnet whose metadata does not arrive
     /// within `dead_swarm_after` is a dead swarm, said plainly.
     pub async fn add(&self, source: Source, opts: AddOptions) -> Result<String, TorrentError> {
+        Ok(self.add_new(source, opts).await?.id)
+    }
+
+    /// [`Engine::add`], saying whether the engine held it already.
+    pub async fn add_new(&self, source: Source, opts: AddOptions) -> Result<Added, TorrentError> {
         let (id, already) = self.add_once(source.clone(), opts.clone()).await?;
         // Held already, but its files deleted behind its back (a download cleared before
         // 2026-11-21 left its torrent in the session): it would count every piece as had and
         // serve files that are gone. Dropped, and added again from nothing.
         if already && self.drop_if_files_gone(&id).await? {
-            return Ok(self.add_once(source, opts).await?.0);
+            let (id, _) = self.add_once(source, opts).await?;
+            return Ok(Added { id, already: false });
         }
-        Ok(id)
+        Ok(Added { id, already })
     }
 
     /// Whether a torrent the engine holds has lost its files: something of it was fetched,

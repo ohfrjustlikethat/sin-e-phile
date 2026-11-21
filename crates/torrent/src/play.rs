@@ -30,7 +30,8 @@ pub async fn prepare(
     wanted: Wanted,
     opts: AddOptions,
 ) -> Result<Prepared, TorrentError> {
-    let id = engine.add(source, opts).await?;
+    let added = engine.add_new(source, opts).await?;
+    let id = added.id;
     let file = match file_index {
         Some(i) => engine
             .files(&id)?
@@ -39,6 +40,12 @@ pub async fn prepare(
             .ok_or_else(|| TorrentError::BadInput(format!("the torrent has no file {i}")))?,
         None => engine.main_file(&id, wanted)?,
     };
+    // A stream fetches what is watched and nothing else (ADR-0057); a download the engine
+    // already held keeps the files it was asked for.
+    if !added.already || engine.is_stream(&id) {
+        engine.select_files(&id, &[file.index]).await?;
+        engine.touch_stream(&id);
+    }
     let route = format!("{}-{}", &id[..16], file.index);
     let url = server.publish(&route, engine.stream_source(&id, &file)?);
     Ok(Prepared { id, url, file })
@@ -80,6 +87,10 @@ pub async fn target(
                     None => Some(engine.main_file(&id, wanted)?),
                 }
                 .ok_or(TorrentError::NoVideo)?;
+                if engine.is_stream(&id) {
+                    engine.select_files(&id, &[file.index]).await?;
+                    engine.touch_stream(&id);
+                }
                 let route = format!("{}-{}", &id[..16], file.index);
                 return Ok(Target::Url(
                     server.publish(&route, engine.stream_source(&id, &file)?),

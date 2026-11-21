@@ -19,6 +19,8 @@ const ROWS = [
 ];
 
 const commands = {
+  streamCache: vi.fn(() => ok({ gib: 20, used_bytes: 3 * 1024 * MB })),
+  setStreamCache: vi.fn((_gib: number) => ok(null)),
   downloadShow: vi.fn((_id: number) => ok(null)),
   downloads: vi.fn(() => ok(ROWS)),
   downloadsStorage: vi.fn(() =>
@@ -144,3 +146,17 @@ describe("Downloads (SPEC.md Phase 13)", () => {
     expect(screen.queryByRole("button", { name: "Play Faust" })).toBeNull();
   });
 });
+
+/** ADR-0057, the author's answers after 524 GB of streams were found kept. */
+describe("the stream cache", () => {
+  it("shows the cap and what streams hold, and a new cap is saved at once", async () => {
+    renderIt();
+    const cap = await screen.findByLabelText("Streamed films kept, at most");
+    expect(cap).toHaveValue("20");
+    expect(screen.getByText(/Streams hold 3\.0 GB now\./)).toBeInTheDocument();
+    expect(screen.getByText(/Downloads are never deleted this way/)).toBeInTheDocument();
+    fireEvent.change(cap, { target: { value: "50" } });
+    await waitFor(() => expect(commands.setStreamCache).toHaveBeenCalledWith(50));
+  });
+});
+

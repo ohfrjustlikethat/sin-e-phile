@@ -84,6 +84,109 @@ async fn a_held_torrent_whose_files_were_deleted_is_fetched_again() {
     assert!(on_disk == s.bytes("Test.Film.1922.mkv"), "and whole");
 }
 
+/// ADR-0057 (the author found 524 GB of streams kept): streaming one file of a torrent
+/// fetched every file in it. Only the file watched is fetched now.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn streaming_fetches_only_the_file_watched() {
+    use sinephile_torrent::play::prepare;
+    use sinephile_torrent::{AddOptions, Engine, Source};
+    let s = swarm(LAYOUT, None).await;
+    let dir = temp();
+    let engine = Arc::new(Engine::start(offline_config(dir.path())).await.unwrap());
+    let server = StreamServer::start().await.unwrap();
+    let p = prepare(
+        &engine,
+        &server,
+        Source::File(s.torrent.clone()),
+        None,
+        Wanted::default(),
+        AddOptions {
+            initial_peers: vec![s.peer],
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(p.file.path, "Test.Film.1922.mkv");
+    assert!(engine.is_stream(&p.id));
+    wait_finished(&engine, &p.id, Duration::from_secs(60)).await;
+    let main = (12 * MIB + 12_345) as u64;
+    let had = engine.status(&p.id).unwrap().progress_bytes;
+    assert!(
+        had <= main + MIB as u64,
+        "fetched {had} bytes for a {main}-byte file: the sample came too"
+    );
+    let on_disk = std::fs::read(engine.file_path(&p.id, &p.file).unwrap()).unwrap();
+    assert!(
+        on_disk == s.bytes("Test.Film.1922.mkv"),
+        "the film is whole"
+    );
+    let record =
+        std::fs::read_to_string(engine.config().session_dir().join("stream-cache.json")).unwrap();
+    assert!(
+        record.contains(&p.id),
+        "when it was watched is kept: {record}"
+    );
+}
+
+/// ADR-0057: past the cap the streams least recently watched are deleted, never one playing;
+/// at start, what nothing streams from is deleted too.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn the_stream_cache_keeps_to_its_cap_and_clears_what_nothing_owns() {
+    use sinephile_torrent::play::prepare;
+    use sinephile_torrent::{AddOptions, Engine, Source};
+    let s = swarm(LAYOUT, None).await;
+    let dir = temp();
+    let mut config = offline_config(dir.path());
+    config.stream_cache_bytes = MIB as u64;
+    let engine = Arc::new(Engine::start(config).await.unwrap());
+    let server = StreamServer::start().await.unwrap();
+    let p = prepare(
+        &engine,
+        &server,
+        Source::File(s.torrent.clone()),
+        None,
+        Wanted::default(),
+        AddOptions {
+            initial_peers: vec![s.peer],
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    wait_finished(&engine, &p.id, Duration::from_secs(60)).await;
+    let film = engine.file_path(&p.id, &p.file).unwrap();
+    let stray = engine.config().downloads_dir().join("Left from before");
+    std::fs::create_dir_all(&stray).unwrap();
+    std::fs::write(stray.join("old.mkv"), b"not anything's").unwrap();
+
+    // Playing (named, and the stream opened last): kept, however far over the cap; the
+    // stray goes.
+    let gone = engine
+        .trim_streams(std::slice::from_ref(&p.id), true)
+        .await
+        .unwrap();
+    assert!(gone.is_empty(), "{gone:?}");
+    assert!(engine.has(&p.id) && film.exists());
+    assert!(!stray.exists(), "nothing owned it");
+    let gone = engine.trim_streams(&[], false).await.unwrap();
+    assert!(
+        gone.is_empty(),
+        "the stream opened last is taken to be playing: {gone:?}"
+    );
+
+    // Another stream opened since, and this one over the cap: removed, files and all.
+    engine.touch_stream("another-stream");
+    let gone = engine.trim_streams(&[], false).await.unwrap();
+    assert_eq!(gone, vec![p.id.clone()]);
+    assert!(!engine.has(&p.id));
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while film.exists() && Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert!(!film.exists(), "its file is deleted");
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn seeding_stops_at_completion_by_default() {
     let s = swarm(LAYOUT, None).await;
