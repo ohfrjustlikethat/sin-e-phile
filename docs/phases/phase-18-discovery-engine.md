@@ -1,6 +1,6 @@
 # Phase 18 — Discovery Engine
 
-**Status:** in_progress · **Depends on:** 17 · **Sessions:** 2
+**Status:** complete · **Depends on:** 17 · **Sessions:** 2
 
 > The single file a session reads to know what it is doing. Generated from
 > `SPEC.md` §15 by `tools/phasedoc/generate.py`. Working file, not a document.
@@ -109,3 +109,41 @@ E1 bar.
 - **18.6** The author's fix list of 2026-11-20 (ADR-0056, spec 4.9.0): half-star ratings for any title (sho · `a1816c7`
 - **18.5** The flagship case study (E6), the author's acceptance test on their own taste (E5, asked in the  · `b1d59eb`
 - **18.7** The author's E5 findings of 2026-11-21: a long subtitle list that ran off the window (0d33fe9);  · `525bb0a`
+
+<!-- closed: written at phase end -->
+
+---
+
+## Outcome
+
+**Complete.** Merged as `677caa4`.
+
+### Evidence per criterion
+
+**E1** — The bandit demonstrably shifts its strategy distribution in simulation when reward patterns change.
+
+> eval discovery --simulate on fcc4110 (1,000 simulated viewers, 120 days, favourite arm changes day 61): new favourite's share of discovery 12.8% -> 47.8% (+35.0 points, bar +15), old 49.0% -> 28.0% (-21.0, bar -15), rose for 98.9% of viewers (bar 80%). Seen to fail with --frozen (+0.1 points, NOT met). First run on 7bc4ef3 missed the bar (+12.0/-6.0) and is recorded in docs/eval-results.md 18.2.
+
+**E2** — The exploration floor holds: even a maximally-conservative simulated user still receives genuine discovery.
+
+> eval discovery --simulate on fcc4110: 1,000 maximally conservative viewers (Comfort, every discovery card 'not for me') for 120 days: discovery's least share on any day 20.0% (bar 20%), 0 of 120,000 days without a discovery rail, every discovery arm shown on at least 23.3% of each viewer's days (bar 10%). Seen to fail with --no-floor (0.0% on every day, NOT met). docs/eval-results.md 18.2.
+
+**E3** — Rail labels accurately describe why each item is there.
+
+> strategy::tests::every_label_of_every_arm_holds_on_generated_profiles (300 generated profiles, every pick's Label re-derived by strategy::holds; seen to fail with arms taking titles 0.1 short of close and with the blind spot ignoring met regions, 6784097); sinephile-taste tests/discover.rs every_label_holds_and_an_episode_counts_as_its_series; strategy::tests::a_blind_spot_rail_holds_one_region (a rail named for a region holds only it); and on real users: `eval discovery` on a1dd9a9 over 15,640 MovieLens test users checked 461,488 discovery labels (467,741 on 0e06e59) with strategy::holds, none false (docs/eval-results.md, 18.2).
+
+**E4** — Novelty metric (mean inverse popularity of recommendations) meets its target while relevance is maintained.
+
+> `eval discovery` on b2842d4 (the arms after the real window's fixes, popularity in the arms' order at 0.1 and the bandit's prior at 2, both chosen on tuning users by rules fixed before they ran), all 15,640 MovieLens test users: discovery 1.71 bits more novel than the taste rail (bar 1); Recall@N of everything shown 0.3630 against popularity's top N 0.2593, +40.0% (bar more than 40%): met by under 0.05 point (the unrounded ratio above 1.40, at most 1.4004), inside sampling noise and said so. The test users have judged three versions (+40.4%, +39.9%, +40.0%). Seen to fail: the same harness gave +28.8% before the prior. docs/eval-results.md 18.2 to 18.5.
+
+**E5** — The author tests it on their own taste and finds at least three films they hadn't heard of and want to watch. This is the real acceptance test.
+
+> manual: the author ran it on their own profile in the installed release (installer of 2026-11-21 from a1816c7, after rating films with the half stars built for it, ADR-0056) and said "E5 seems okay" (2026-11-21). They named no films; the three the criterion asks for are their judgment, not a list recorded here. docs/case-studies/discovery.md, E5.
+
+**E6** — Case study written — this is the flagship one.
+
+> docs/case-studies/discovery.md (the flagship case study: the problem, the five arms and the bandit, how each criterion was judged with bars fixed first, what the author's test found, what went wrong, the side effect on search, what would be done differently); every number in docs/eval-results.md, Phase 18.
+
+### Next phase starts by
+
+Phase 19, 19.1: make search by meaning understand negation for Phase 5 E3/E4. In crates/search-engine/src/lib.rs, split a query's negated clause ('that aren't', 'but not', 'without', 'not too': a small pure function with tests), embed it apart, and subtract a weight times each candidate's cosine to it before the popularity prior; choose the weight on fixtures/search/meaning-tuning.tsv with `eval search --tune-meaning` (rule written into docs/eval-results.md first), then judge once with `eval search --report` (bar nDCG@10 > 0.75) and capture the grief query's results.
