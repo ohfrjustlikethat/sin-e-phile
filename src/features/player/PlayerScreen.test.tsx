@@ -355,6 +355,22 @@ describe("PlayerScreen (SPEC.md Phase 8)", () => {
     }
   }
 
+  it("a long subtitle list keeps within the window and scrolls (the author, 2026-11-21)", async () => {
+    const tracks = Array.from({ length: 40 }, (_, i) => ({
+      id: i + 1, kind: "sub", lang: "en", title: `Subtitles ${i + 1}`, selected: false,
+    }));
+    await inTauri(async () => {
+      render(<PlayerScreen />);
+      await waitFor(() => expect(events.on["player-state"]).toBeDefined());
+      act(() => events.on["player-state"]?.({ payload: { ...STATE, tracks } }));
+      fireEvent.click(await screen.findByRole("button", { name: "Subtitles" }));
+      const menu = screen.getByRole("menu", { name: "Subtitles" });
+      expect(menu.querySelectorAll('[role="menuitem"]')).toHaveLength(41);
+      expect(menu.className).toMatch(/max-h-\[60vh\]/);
+      expect(menu.className).toMatch(/overflow-y-auto/);
+    });
+  });
+
   it("in a film the bumpers move by chapter, and say where they went (Phase 16)", async () => {
     commands.playerChapters.mockImplementation(() =>
       ok([{ time: 0, title: "Opening" }, { time: 600, title: "The city" }, { time: 1500, title: null }]),
